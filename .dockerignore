@@ -10,6 +10,25 @@ venv/
 .pytest_cache/
 scratch/
 *.log
+
+# Development artifacts
 experiments/runs/
+notebooks/
+docs/
+*.docx
+*.md
+BUILD_PROMPTS.md
+WORKING_CONTEXT.md
+
+# Data (fetched at runtime via Binance API)
 data/raw/
 data/processed/
+
+# Web frontend (served by Netlify, not needed in backend container)
+web/
+web_dist/
+.netlify/
+
+# Test files (not needed in production)
+tests/
+pytest.ini

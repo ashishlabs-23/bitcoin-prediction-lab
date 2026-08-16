@@ -1,0 +1,41 @@
+# fly.toml — Fly.io deployment config for BTCognitive FastAPI backend
+
+app = "btcognitive-engine"
+primary_region = "sin"        # Singapore — closest to India for low latency
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT            = "8000"
+  PYTHONUNBUFFERED = "1"
+  # Secrets (SMTP_PASSWORD, WEBHOOK_URL, etc.) are set via:
+  #   fly secrets set SMTP_PASSWORD="..." WEBHOOK_URL="..."
+  # NEVER put real secrets in this file.
+
+[http_service]
+  internal_port = 8000
+  force_https   = true
+  auto_stop_machines  = false    # Keep always-on (no cold starts)
+  auto_start_machines = true
+  min_machines_running = 1       # At least 1 machine always running
+
+  [http_service.concurrency]
+    type       = "requests"
+    hard_limit = 50
+    soft_limit = 25
+
+[[vm]]
+  memory = "512mb"               # Sufficient for FastAPI + sklearn/XGBoost
+  cpu_kind = "shared"
+  cpus     = 1
+
+[checks]
+  [checks.health]
+    grace_period = "15s"
+    interval     = "30s"
+    method       = "GET"
+    path         = "/health"
+    port         = 8000
+    timeout      = "5s"
+    type         = "http"

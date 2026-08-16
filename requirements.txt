@@ -18,5 +18,7 @@ pytest
 
 # api & server
 fastapi
-uvicorn
+uvicorn[standard]
 websockets
+python-multipart
+httpx
