@@ -1,0 +1,22 @@
+# core
+pandas
+numpy
+pyarrow
+
+# data
+ccxt
+
+# models
+scikit-learn
+xgboost
+
+# explainability / calibration
+shap
+
+# testing
+pytest
+
+# api & server
+fastapi
+uvicorn
+websockets

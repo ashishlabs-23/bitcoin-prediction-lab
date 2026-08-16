@@ -1,0 +1,79 @@
+# Data & Datasets
+data/raw/
+data/processed/
+*.csv
+*.parquet
+*.h5
+*.feather
+
+# Python & Virtual Environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.venv/
+venv/
+ENV/
+env/
+
+# Environment Variables & Secrets (CRITICAL: Do NOT commit secrets)
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Netlify & Deploy States
+.netlify/
+web_dist/
+
+# Testing & Caches
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Temporary & Scratch Files
+scratch/
+*.log
+*.tmp
+*.temp
+scratch_docx_text.txt
+
+# Database files
+*.sqlite
+*.sqlite3
+*.db
+
+# ML Model checkpoints & serialized artifacts
+experiments/runs/
+*.pkl
+*.pt
+*.ckpt
+*.onnx
+*.joblib
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# OS Specific
+.DS_Store
+Thumbs.db
+desktop.ini
