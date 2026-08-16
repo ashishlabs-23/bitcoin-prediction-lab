@@ -99,8 +99,9 @@ def generate_counterfactual_matrix(
                 sl_price = round(latest_price + sl_mult * atr_14, 2)
             else:
                 dec = "SKIP"
-                tp_price = None
-                sl_price = None
+                # Show reference levels (what TP/SL would be if triggered)
+                tp_price = round(latest_price + tp_mult * atr_14, 2)
+                sl_price = round(latest_price - sl_mult * atr_14, 2)
 
             counterfactuals.append({
                 "genome_id": g_id,
@@ -133,8 +134,16 @@ def generate_counterfactual_matrix(
             else:
                 pos = position_size(np.array([ensemble_prob]), method=psm_m)[0]
             dec = "LONG" if pos > 0.1 else ("SHORT" if pos < -0.1 else "SKIP")
-            tp_p = round(latest_price + tp_m * atr_14, 2) if dec == "LONG" else (round(latest_price - tp_m * atr_14, 2) if dec == "SHORT" else None)
-            sl_p = round(latest_price - sl_m * atr_14, 2) if dec == "LONG" else (round(latest_price + sl_m * atr_14, 2) if dec == "SHORT" else None)
+            # Always compute reference TP/SL levels; for SKIP these are informational
+            if dec == "LONG":
+                tp_p = round(latest_price + tp_m * atr_14, 2)
+                sl_p = round(latest_price - sl_m * atr_14, 2)
+            elif dec == "SHORT":
+                tp_p = round(latest_price - tp_m * atr_14, 2)
+                sl_p = round(latest_price + sl_m * atr_14, 2)
+            else:
+                tp_p = round(latest_price + tp_m * atr_14, 2)
+                sl_p = round(latest_price - sl_m * atr_14, 2)
 
             counterfactuals.append({
                 "genome_id": name,

@@ -2377,8 +2377,24 @@ function CounterfactualPanel({ counterfactualData }) {
             h("td", { style: { padding: "10px" } },
               h("span", { style: { color: c.decision === "LONG" ? "#00E5A8" : (c.decision === "SHORT" ? "#FF5C7C" : "#94A3B8"), fontWeight: "700" } }, c.decision)
             ),
-            h("td", { style: { padding: "10px", fontFamily: "var(--font-mono)", color: "#00E5A8" } }, c.tp_price ? `$${Math.round(c.tp_price).toLocaleString()}` : "—"),
-            h("td", { style: { padding: "10px", fontFamily: "var(--font-mono)", color: "#FF5C7C" } }, c.sl_price ? `$${Math.round(c.sl_price).toLocaleString()}` : "—"),
+            h("td", { style: { padding: "10px" } },
+              c.tp_price
+                ? h("span", null,
+                    h("span", { style: { fontFamily: "var(--font-mono)", color: c.decision === "SKIP" ? "#94A3B8" : "#00E5A8", fontWeight: "700" } },
+                      `$${Math.round(c.tp_price).toLocaleString()}`),
+                    c.decision === "SKIP" && h("span", { style: { fontSize: "0.65rem", color: "#64748B", marginLeft: "4px", fontStyle: "italic" } }, "ref")
+                  )
+                : h("span", { style: { color: "#64748B" } }, "—")
+            ),
+            h("td", { style: { padding: "10px" } },
+              c.sl_price
+                ? h("span", null,
+                    h("span", { style: { fontFamily: "var(--font-mono)", color: c.decision === "SKIP" ? "#94A3B8" : "#FF5C7C", fontWeight: "700" } },
+                      `$${Math.round(c.sl_price).toLocaleString()}`),
+                    c.decision === "SKIP" && h("span", { style: { fontSize: "0.65rem", color: "#64748B", marginLeft: "4px", fontStyle: "italic" } }, "ref")
+                  )
+                : h("span", { style: { color: "#64748B" } }, "—")
+            ),
             h("td", { style: { padding: "10px", fontFamily: "var(--font-mono)", color: "#00F0FF" } }, c.deflated_sharpe ? c.deflated_sharpe.toFixed(2) : "—")
           ))
         )
