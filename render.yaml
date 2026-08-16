@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: btcognitive-engine
+    env: python
+    region: singapore
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api.server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: WEBHOOK_ENABLED
+        value: "false"
