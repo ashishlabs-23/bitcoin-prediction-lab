@@ -56,6 +56,9 @@ scratch/
 *.tmp
 *.temp
 scratch_docx_text.txt
+*.docx
+BUILD_PROMPTS.md
+WORKING_CONTEXT.md
 
 # Database files
 *.sqlite
