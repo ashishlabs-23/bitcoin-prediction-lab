@@ -18,6 +18,7 @@ from config import RESULTS_DIR
 from xgboost import XGBClassifier
 from models.train_baselines import make_dataset
 from validation.purged_split import PurgedWalkForwardSplit
+from models.risk_metrics import sharpe_ratio, maximum_drawdown
 
 
 
@@ -163,18 +164,14 @@ def run_backtest(
         }
 
     total_return = float(equity_curve.iloc[-1] - 1.0)
-    ret_mean = float(strategy_ret.mean())
-    ret_std = float(strategy_ret.std())
+    ret_list = strategy_ret.tolist()
+    sharpe_val = sharpe_ratio(ret_list, periods_per_year=8760)
+    sharpe = float(sharpe_val) if sharpe_val is not None else 0.0
 
-    if ret_std == 0.0 or np.isnan(ret_std):
-        sharpe = 0.0
-    else:
-        # Annualized Sharpe ratio for hourly bars: 24 * 365 = 8760 bars/year
-        sharpe = float((ret_mean / ret_std) * np.sqrt(8760.0))
+    eq_list = equity_curve.tolist()
+    mdd_val = maximum_drawdown(eq_list)
+    max_drawdown = -float(mdd_val) if mdd_val > 0 else 0.0
 
-    running_max = equity_curve.cummax()
-    drawdown = (equity_curve - running_max) / running_max
-    max_drawdown = float(drawdown.min())
     turnover = float(pos_diff.mean())
     n_trades = int((pos_diff > 1e-5).sum())
 

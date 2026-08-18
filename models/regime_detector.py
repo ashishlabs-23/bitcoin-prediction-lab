@@ -13,6 +13,7 @@ Evaluates baseline model performance per market regime and saves results to expe
 
 import os
 import sys
+from typing import Dict, Any, Optional
 import pandas as pd
 import numpy as np
 from sklearn.metrics import roc_auc_score, accuracy_score, brier_score_loss
@@ -28,9 +29,14 @@ from validation.purged_split import PurgedWalkForwardSplit
 from backtest.simulate import position_size, run_backtest
 
 
-def predict_regime_probabilities(df: pd.DataFrame) -> pd.DataFrame:
+def predict_regime_probabilities(
+    df: pd.DataFrame,
+    onchain_valuation: Optional[Dict[str, Any]] = None,
+    macro_prior_scale: float = 0.60
+) -> pd.DataFrame:
     """
     Computes soft, continuous regime membership probabilities for each row in df.
+    Optionally applies macro on-chain cycle bias (MVRV / NUPL) scaled by macro_prior_scale.
     Returns a DataFrame with columns:
     ['HIGH_VOLATILITY', 'BREAKOUT', 'TRENDING_BULL', 'TRENDING_BEAR', 'RANGING']
     where each row sums to 1.0.
@@ -55,6 +61,26 @@ def predict_regime_probabilities(df: pd.DataFrame) -> pd.DataFrame:
         logits[i, 3] = max(0.0, -t_val * 4.0)
         logits[i, 4] = max(0.0, 1.5 - abs(t_val) * 3.0)
 
+    # Apply macro on-chain valuation bias scaled by source reliability/weight
+    cycle_phase = None
+    influence_weight = 1.0
+    if onchain_valuation and isinstance(onchain_valuation, dict):
+        cycle_phase = onchain_valuation.get('cycle_phase')
+        influence_weight = float(onchain_valuation.get('influence_weight', 1.0))
+    elif 'cycle_phase' in df.columns:
+        cycle_phase = df['cycle_phase'].iloc[-1]
+
+    if influence_weight > 0.0 and cycle_phase is not None:
+        effective_scale = macro_prior_scale * influence_weight
+        if cycle_phase == 'CAPITULATION':
+            # Macro value zone: soft positive prior on accumulation, soft penalty on late shorting
+            logits[:, 2] += effective_scale
+            logits[:, 3] = np.maximum(0.0, logits[:, 3] - (effective_scale * 0.67))
+        elif cycle_phase == 'EUPHORIA':
+            # Macro overextended zone: soft positive prior on high volatility, soft penalty on top chasing
+            logits[:, 0] += effective_scale
+            logits[:, 2] = np.maximum(0.0, logits[:, 2] - (effective_scale * 0.67))
+
     # Softmax over logits to convert into smooth probabilities
     exp_logits = np.exp(logits - np.max(logits, axis=1, keepdims=True))
     probs = exp_logits / np.sum(exp_logits, axis=1, keepdims=True)
@@ -63,14 +89,25 @@ def predict_regime_probabilities(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(probs, index=df.index, columns=cols)
 
 
-def classify_regimes(df: pd.DataFrame) -> pd.Series:
-    """Classifies each row of df into discrete market regimes."""
+def classify_regimes(
+    df: pd.DataFrame,
+    onchain_valuation: Optional[Dict[str, Any]] = None
+) -> pd.Series:
+    """Classifies each row of df into discrete market regimes with macro on-chain confluence."""
     states_df = compute_market_states(df)
 
     trend = states_df.get('trend_score', pd.Series(0.0, index=df.index))
     vol_state = states_df.get('volatility_state', pd.Series('MEDIUM', index=df.index))
     mom_state = states_df.get('momentum_state', pd.Series('NEUTRAL', index=df.index))
     lev_state = states_df.get('leverage_state', pd.Series('NORMAL', index=df.index))
+
+    cycle_phase = None
+    influence_weight = 1.0
+    if onchain_valuation and isinstance(onchain_valuation, dict):
+        cycle_phase = onchain_valuation.get('cycle_phase')
+        influence_weight = float(onchain_valuation.get('influence_weight', 1.0))
+    elif 'cycle_phase' in df.columns:
+        cycle_phase = df['cycle_phase'].iloc[-1]
 
     regimes = []
     for idx in range(len(df)):
@@ -86,7 +123,11 @@ def classify_regimes(df: pd.DataFrame) -> pd.Series:
         elif t_val > 0.15 and m_val != 'NEGATIVE':
             regimes.append('TRENDING_BULL')
         elif t_val < -0.15 and m_val != 'POSITIVE':
-            regimes.append('TRENDING_BEAR')
+            # If in verified macro capitulation value zone, block aggressive bear chasing unless panic breakdown
+            if influence_weight > 0.0 and cycle_phase == 'CAPITULATION' and t_val > -0.35:
+                regimes.append('RANGING')
+            else:
+                regimes.append('TRENDING_BEAR')
         else:
             regimes.append('RANGING')
 

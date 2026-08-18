@@ -28,35 +28,37 @@ TRADING_DAYS_PER_YEAR = 365
 # Core Risk Metrics
 # ---------------------------------------------------------------------------
 
-def sharpe_ratio(returns: List[float], risk_free_rate: float = 0.0) -> Optional[float]:
+def sharpe_ratio(returns: List[float], risk_free_rate: float = 0.0, periods_per_year: int = TRADING_DAYS_PER_YEAR) -> Optional[float]:
     """
     Computes the annualized Sharpe Ratio.
 
     Args:
-        returns:        List of per-period returns (e.g., daily).
-        risk_free_rate: Annualized risk-free rate (default: 0.0).
+        returns:          List of per-period returns (e.g., daily or hourly).
+        risk_free_rate:   Annualized risk-free rate (default: 0.0).
+        periods_per_year: Number of periods per year (365 for daily crypto, 8760 for hourly).
 
     Returns:
         Annualized Sharpe Ratio, or None if insufficient data.
     """
     if len(returns) < 2:
         return None
-    excess = [r - risk_free_rate / TRADING_DAYS_PER_YEAR for r in returns]
+    excess = [r - risk_free_rate / periods_per_year for r in returns]
     mean_e = statistics.mean(excess)
     std_e  = statistics.stdev(excess)
     if std_e == 0:
         return None
-    return round(mean_e / std_e * math.sqrt(TRADING_DAYS_PER_YEAR), 4)
+    return round(mean_e / std_e * math.sqrt(periods_per_year), 4)
 
 
-def sortino_ratio(returns: List[float], risk_free_rate: float = 0.0, target_return: float = 0.0) -> Optional[float]:
+def sortino_ratio(returns: List[float], risk_free_rate: float = 0.0, target_return: float = 0.0, periods_per_year: int = TRADING_DAYS_PER_YEAR) -> Optional[float]:
     """
     Computes the annualized Sortino Ratio (downside deviation only).
 
     Args:
-        returns:       List of per-period returns.
-        risk_free_rate: Annualized risk-free rate.
-        target_return:  Minimum acceptable return per period.
+        returns:          List of per-period returns.
+        risk_free_rate:   Annualized risk-free rate.
+        target_return:    Minimum acceptable return per period.
+        periods_per_year: Number of periods per year (365 for daily crypto, 8760 for hourly).
 
     Returns:
         Annualized Sortino Ratio, or None if insufficient data.
@@ -64,12 +66,12 @@ def sortino_ratio(returns: List[float], risk_free_rate: float = 0.0, target_retu
     if len(returns) < 2:
         return None
     mean_r    = statistics.mean(returns)
-    excess    = mean_r - risk_free_rate / TRADING_DAYS_PER_YEAR
+    excess    = mean_r - risk_free_rate / periods_per_year
     downside  = [min(0.0, r - target_return) ** 2 for r in returns]
     down_std  = math.sqrt(sum(downside) / len(downside))
     if down_std == 0:
         return None
-    return round(excess / down_std * math.sqrt(TRADING_DAYS_PER_YEAR), 4)
+    return round(excess / down_std * math.sqrt(periods_per_year), 4)
 
 
 def maximum_drawdown(equity_curve: List[float]) -> float:

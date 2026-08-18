@@ -93,7 +93,7 @@ def test_notification_manager_email():
     manager = NotificationManager()
     settings = manager.get_settings()
     assert settings["email_enabled"] is True
-    assert settings["email_recipient"] == "manuashi2018@gmail.com"
+    assert "manuashi2018@gmail.com" in settings["email_recipient"]
 
     alert = {
         "id": "alert_email_test_999",

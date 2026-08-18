@@ -8,7 +8,7 @@ Deflated Sharpe Ratio (DSR) to correct for multi-trial backtest overfitting.
 import os
 import sys
 import time
-from typing import Dict, List
+from typing import Dict, List, Any
 import pandas as pd
 import numpy as np
 from scipy.stats import norm
@@ -132,6 +132,52 @@ def deflated_sharpe_ratio(
 
     deflated_sharpe = sr - expected_max_sr
     return float(deflated_sharpe)
+
+
+def check_promotion_gate(
+    candidate_metrics: Dict[str, float],
+    production_metrics: Dict[str, float],
+    dsr_pvalue_threshold: float = 0.95,
+    paired_pvalue_threshold: float = 0.05,
+    max_dd_slack_pct: float = 0.5
+) -> Dict[str, Any]:
+    """
+    NON-NEGOTIABLE PROMOTION GATE STANDARD CHECKLIST:
+    A candidate model/system can only replace current production if ALL 4 criteria pass:
+    
+    1. Deflated Sharpe Ratio (DSR):
+       Candidate DSR >= 0.95 (proving true positive Sharpe under multiple testing).
+    2. Paired Out-of-Sample Significance Test:
+       Paired t-test or Wilcoxon p-value < 0.05 vs production on identical test folds.
+    3. Maximum Drawdown & Tail Risk:
+       Candidate Max DD <= Production Max DD + 0.5% (no tail-risk blowout).
+    4. Out-of-Sample Calibration Integrity:
+       Candidate Brier Score <= Production Brier Score across ALL predictions (including SKIPs).
+    """
+    c_dsr = candidate_metrics.get('dsr', 0.0)
+    c_paired_p = candidate_metrics.get('paired_p_value', 1.0)
+    c_max_dd = candidate_metrics.get('max_drawdown_pct', 100.0)
+    p_max_dd = production_metrics.get('max_drawdown_pct', 100.0)
+    c_brier = candidate_metrics.get('brier_score', 1.0)
+    p_brier = production_metrics.get('brier_score', 1.0)
+
+    pass_dsr = c_dsr >= dsr_pvalue_threshold
+    pass_paired = c_paired_p < paired_pvalue_threshold
+    pass_dd = c_max_dd <= (p_max_dd + max_dd_slack_pct)
+    pass_brier = c_brier <= p_brier
+
+    all_passed = pass_dsr and pass_paired and pass_dd and pass_brier
+
+    return {
+        'promoted': all_passed,
+        'criteria': {
+            '1_dsr_gate': {'passed': pass_dsr, 'candidate_dsr': c_dsr, 'required': dsr_pvalue_threshold},
+            '2_paired_significance_gate': {'passed': pass_paired, 'p_value': c_paired_p, 'required': f'<{paired_pvalue_threshold}'},
+            '3_drawdown_gate': {'passed': pass_dd, 'candidate_dd': c_max_dd, 'prod_dd': p_max_dd},
+            '4_brier_calibration_gate': {'passed': pass_brier, 'candidate_brier': c_brier, 'prod_brier': p_brier}
+        },
+        'human_signoff_required': True
+    }
 
 
 if __name__ == "__main__":

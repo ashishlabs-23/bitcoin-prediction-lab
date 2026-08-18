@@ -13,14 +13,20 @@ Exposes compute_decomposed_uncertainty() and format_uncertainty_narrative().
 import math
 import numpy as np
 import pandas as pd
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Any
 
 
-def compute_data_reliability(df_row: pd.Series) -> float:
+def compute_data_reliability(
+    df_row: pd.Series,
+    is_degraded: bool = False,
+    feed_latency_ms: Optional[float] = None
+) -> float:
     """
     Computes Data Reliability score in [0.0, 1.0].
-    1.0 = all expected features present and non-null.
-    Reduces proportionally for missing features or NaN values.
+    Evaluates:
+      1. Completeness: Non-null finite values across canonical features.
+      2. Source Health: Penalty if running on degraded/fallback data (e.g. offline on-chain proxy).
+      3. Latency: Soft penalty if exchange/feed latency exceeds 1000ms.
     """
     expected_cols = [
         'close', 'rsi_14', 'macd', 'sma_ratio_50',
@@ -28,47 +34,68 @@ def compute_data_reliability(df_row: pd.Series) -> float:
     ]
     present_cols = [c for c in expected_cols if c in df_row.index]
     if not present_cols:
-        return 0.5
+        return 0.40
 
     non_null_count = sum(1 for c in present_cols if pd.notna(df_row[c]) and math.isfinite(float(df_row[c])))
-    return float(non_null_count / len(expected_cols))
+    completeness = float(non_null_count / len(expected_cols))
+
+    # Apply penalties for degradation and high latency
+    degradation_factor = 0.70 if is_degraded else 1.0
+    latency_factor = 1.0
+    if feed_latency_ms is not None and feed_latency_ms > 1000.0:
+        latency_factor = max(0.50, 1.0 - (feed_latency_ms - 1000.0) / 4000.0)
+
+    return float(np.clip(completeness * degradation_factor * latency_factor, 0.0, 1.0))
 
 
 def compute_regime_certainty(regime_probs: Dict[str, float]) -> float:
     """
-    Computes Regime Certainty score in [0.0, 1.0] using 1 - Normalized Shannon Entropy.
-    1.0 = 100% single regime certainty.
-    0.0 = max entropy (flat 20% across all 5 regimes).
+    Computes Regime Certainty score in [0.0, 1.0].
+    Calculated as 1 - Normalized Shannon Entropy over continuous regime probabilities.
+    1.0 = single dominant regime with 100% certainty.
+    0.0 = completely uniform maximum entropy (maximum ambiguity).
     """
-    probs = np.array(list(regime_probs.values()), dtype=float)
-    probs = np.clip(probs, 1e-9, 1.0)
-    probs = probs / np.sum(probs)  # normalize
-
-    n_regimes = len(probs)
-    if n_regimes <= 1:
+    p_vals = np.array([float(p) for p in regime_probs.values() if float(p) > 0.0])
+    if len(p_vals) <= 1:
         return 1.0
 
-    entropy = -np.sum(probs * np.log2(probs))
-    max_entropy = np.log2(n_regimes)
+    total = p_vals.sum()
+    if total <= 0:
+        return 0.5
+    p_norm = p_vals / total
+
+    entropy = -np.sum(p_norm * np.log(p_norm))
+    max_entropy = np.log(len(regime_probs))
+
+    if max_entropy <= 0:
+        return 1.0
 
     normalized_entropy = float(entropy / max_entropy)
     return float(np.clip(1.0 - normalized_entropy, 0.0, 1.0))
 
 
-def compute_model_agreement(model_probs: Dict[str, float]) -> float:
+def compute_model_agreement(model_probs: Dict[str, float], regime_certainty: float = 1.0) -> float:
     """
     Computes Model Agreement score in [0.0, 1.0].
-    1.0 = zero variance among model predictions (full consensus).
-    0.0 = extreme disagreement (e.g. 0.90 vs 0.10).
+    Measures consensus variance across models, scaled by regime certainty to prevent
+    artificial 100% consensus when all models are simply clamped to 0.50 during SKIP regimes.
     """
     p_vals = list(model_probs.values())
     if len(p_vals) <= 1:
         return 1.0
 
+    # If models are all idling at 0.50 (SKIP), their raw feature agreement is uninformative
+    mean_p = float(np.mean(p_vals))
     std_dev = float(np.std(p_vals))
-    # Max possible std_dev for probabilities in [0, 1] is 0.5 (e.g., [0.0, 1.0])
-    agreement = 1.0 - (2.0 * std_dev)
-    return float(np.clip(agreement, 0.0, 1.0))
+    raw_agreement = 1.0 - (2.0 * std_dev)
+
+    # When all models return 0.50, scale agreement towards regime certainty
+    if abs(mean_p - 0.50) < 0.01:
+        effective_agreement = 0.50 + 0.50 * regime_certainty
+    else:
+        effective_agreement = raw_agreement
+
+    return float(np.clip(effective_agreement, 0.0, 1.0))
 
 
 def compute_volatility_stress(realized_vol_24h: float, historical_vol_series: Optional[pd.Series] = None) -> float:
@@ -95,7 +122,9 @@ def compute_decomposed_uncertainty(
     regime_probs: Dict[str, float],
     model_probs: Dict[str, float],
     historical_vol_series: Optional[pd.Series] = None,
-) -> Dict[str, float]:
+    is_degraded: bool = False,
+    feed_latency_ms: Optional[float] = None
+) -> Dict[str, Any]:
     """
     Computes all 4 uncertainty scores and their harmonic mean quality score.
 
@@ -105,10 +134,11 @@ def compute_decomposed_uncertainty(
       - model_agreement
       - volatility_stress
       - composite_quality_score (harmonic mean)
+      - composite_scoring_method ("Harmonic Mean (Weakest-Link Principle)")
     """
-    u_data   = compute_data_reliability(df_row)
+    u_data   = compute_data_reliability(df_row, is_degraded=is_degraded, feed_latency_ms=feed_latency_ms)
     u_regime = compute_regime_certainty(regime_probs)
-    u_model  = compute_model_agreement(model_probs)
+    u_model  = compute_model_agreement(model_probs, regime_certainty=u_regime)
 
     rvol = float(df_row.get('realized_vol_24h', 0.01))
     u_vol    = compute_volatility_stress(rvol, historical_vol_series)
@@ -116,7 +146,7 @@ def compute_decomposed_uncertainty(
     scores = [u_data, u_regime, u_model, u_vol]
     scores_clamped = [max(1e-4, s) for s in scores]
 
-    # Harmonic mean emphasizes the lowest score (weakest link principle)
+    # Harmonic mean emphasizes the lowest score (weakest link principle: 4 / sum(1/s_i))
     harmonic_mean = float(len(scores_clamped) / sum(1.0 / s for s in scores_clamped))
 
     return {
@@ -125,6 +155,7 @@ def compute_decomposed_uncertainty(
         'model_agreement':       round(u_model, 4),
         'volatility_stress':     round(u_vol, 4),
         'composite_quality_score': round(harmonic_mean, 4),
+        'composite_scoring_method': 'Harmonic Mean (Weakest-Link Principle)'
     }
 
 
