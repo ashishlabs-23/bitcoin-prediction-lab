@@ -99,6 +99,10 @@ class ArenaRunner:
                         FOREIGN KEY (experiment_id) REFERENCES experiments(id)
                     );
                 """)
+                try:
+                    conn.execute("ALTER TABLE trades ADD COLUMN exit_reason TEXT DEFAULT 'MARKET';")
+                except Exception:
+                    pass
 
                 # 3. Active Open Positions Table
                 conn.execute("""
@@ -120,11 +124,42 @@ class ArenaRunner:
                         macd REAL,
                         ema20 REAL,
                         ema50 REAL,
-                        volume REAL
+                        volume REAL,
+                        v3_metadata TEXT
+                    );
+                """)
+                try:
+                    conn.execute("ALTER TABLE open_positions ADD COLUMN v3_metadata TEXT;")
+                except Exception:
+                    pass
+
+                # 4. V3 Paper Trades Telemetry Table
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS v3_paper_trades (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        experiment_id INTEGER NOT NULL,
+                        timestamp TEXT NOT NULL,
+                        action TEXT NOT NULL,
+                        entry_price REAL NOT NULL,
+                        exit_price REAL NOT NULL,
+                        quantity REAL NOT NULL,
+                        pnl REAL NOT NULL,
+                        pnl_pct REAL NOT NULL,
+                        fees REAL NOT NULL,
+                        holding_time_minutes INTEGER NOT NULL,
+                        balance_after REAL NOT NULL,
+                        decision TEXT NOT NULL,
+                        regime TEXT NOT NULL,
+                        experts_json TEXT NOT NULL,
+                        prediction_json TEXT NOT NULL,
+                        attention_json TEXT NOT NULL,
+                        tensor_json TEXT NOT NULL,
+                        exit_reason TEXT DEFAULT 'TP_SL',
+                        FOREIGN KEY (experiment_id) REFERENCES experiments(id)
                     );
                 """)
 
-                # 4. Equity History Table
+                # 5. Equity History Table
                 conn.execute("""
                     CREATE TABLE IF NOT EXISTS equity_history (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -137,7 +172,7 @@ class ArenaRunner:
                     );
                 """)
 
-                # 5. Model Registry Table
+                # 6. Model Registry Table
                 conn.execute("""
                     CREATE TABLE IF NOT EXISTS model_registry (
                         id TEXT PRIMARY KEY,
@@ -456,6 +491,318 @@ class ArenaRunner:
                         "risk_usd": risk_usd
                     }
 
+        finally:
+            conn.close()
+
+    def process_v3_candle(
+        self,
+        candle: Dict[str, Any],
+        tensor: Optional[np.ndarray] = None,
+        broadcast_websocket: bool = True
+    ) -> Dict[str, Any]:
+        """
+        BTCognitive V3 Autonomous Paper Trading Engine:
+        Executes on every completed 1-minute candle:
+          1. Receives tensor (120, 32)
+          2. Runs Temporal Fusion Transformer (TFT)
+          3. Detects Market Regime
+          4. Selects Top-2 Experts via Sparse MoE Router
+          5. Runs Meta Labeler (Sharpe-optimized trade filter)
+          6. Sizes position: $10 initial balance, 2% risk * Meta Labeler multiplier
+          7. Paper executes against real candle High/Low/Close with 5 bps fee + 2 bps slippage
+          8. Saves trade and telemetry (tensor, prediction, attention, experts, pnl, holding time, fees, balance)
+          9. Dispatches WebSocket event
+        """
+        from models.tft_model import predict as predict_tft
+        from models.regime_detector import detect_regime
+        from models.router import predict_moe
+        from models.meta_labeler import evaluate_trade_filter
+        from engine.explainability import explain_prediction
+        from engine.feature_pipeline import feature_pipeline
+
+        high_p = float(candle.get("high", candle.get("close", 0.0)))
+        low_p = float(candle.get("low", candle.get("close", 0.0)))
+        close_p = float(candle.get("close", 0.0))
+        now_str = candle.get("timestamp", datetime.now(timezone.utc).isoformat())
+
+        if close_p <= 0:
+            return {"status": "error", "message": "Invalid candle close price"}
+
+        # 1. Acquire Tensor (120, 32)
+        if tensor is None:
+            tensor = feature_pipeline.latest_tensor()
+        tensor_arr = np.asarray(tensor, dtype=np.float32)
+
+        # 2. Run TFT Model
+        tft_res = predict_tft(tensor_arr)
+
+        # 3. Detect Market Regime
+        regime_res = detect_regime(tensor_arr)
+
+        # 4. Sparse MoE Router Selection
+        moe_res = predict_moe(tensor_arr, regime_data=regime_res)
+
+        # 5. Run Meta Labeler
+        features_dict = feature_pipeline.latest_features()
+        meta_res = evaluate_trade_filter(
+            tft_probs=moe_res["probabilities"],
+            expert_outputs=moe_res.get("selected_experts"),
+            market_metrics=features_dict
+        )
+
+        # 6. Generate Explainability & Attention Breakdown
+        xai_res = explain_prediction(
+            tensor=tensor_arr,
+            regime_info=regime_res,
+            moe_result=moe_res,
+            tft_result=tft_res
+        )
+
+        conn = self._get_connection()
+        try:
+            exp = self.get_active_experiment()
+            exp_id = exp["id"]
+            cur_pos = conn.execute("SELECT * FROM open_positions WHERE experiment_id = ? ORDER BY id DESC LIMIT 1;", (exp_id,))
+            open_pos_row = cur_pos.fetchone()
+            open_pos = dict(open_pos_row) if open_pos_row else None
+
+            event_type = "NO_ACTION"
+            trade_record = None
+
+            # -----------------------------------------------------------------
+            # Phase 1: Evaluate Active Open Position
+            # -----------------------------------------------------------------
+            if open_pos:
+                direction = "LONG" if open_pos["action"] == "BUY" else "SHORT"
+                entry_p = float(open_pos["entry_price"])
+                tp = float(open_pos["tp_price"])
+                sl = float(open_pos["sl_price"])
+                qty = float(open_pos["quantity"])
+                size_usd = float(open_pos["position_size_usd"])
+                bars_held = int(open_pos.get("bars_held", 0)) + 1
+
+                closure = check_position_closure_high_low(
+                    direction=direction,
+                    tp=tp,
+                    sl=sl,
+                    candle_high=high_p,
+                    candle_low=low_p
+                )
+
+                if not closure["closed"] and bars_held >= 30:
+                    closure = {"closed": True, "reason": "TIME_EXPIRED", "close_price": close_p}
+
+                if closure["closed"]:
+                    exit_p = closure["close_price"]
+                    exit_reason = closure["reason"]
+
+                    # Slippage on exit (2 bps)
+                    if direction == "LONG":
+                        exit_p_adj = exit_p * (1.0 - 0.0002) if exit_reason != "TP" else exit_p
+                        price_diff = exit_p_adj - entry_p
+                    else:
+                        exit_p_adj = exit_p * (1.0 + 0.0002) if exit_reason != "TP" else exit_p
+                        price_diff = entry_p - exit_p_adj
+
+                    gross_pnl = qty * price_diff
+                    # 10 bps total fee drag (5 bps entry + 5 bps exit taker fee)
+                    fees_usd = size_usd * 0.0010
+                    net_pnl = round(gross_pnl - fees_usd, 4)
+                    pnl_pct = round((net_pnl / size_usd) * 100.0, 3) if size_usd > 0 else 0.0
+
+                    new_balance = round(max(0.10, exp["current_balance"] + net_pnl), 4)
+
+                    # Extract stored V3 metadata
+                    v3_meta = json.loads(open_pos.get("v3_metadata") or "{}")
+
+                    with conn:
+                        # Record in v3_paper_trades table
+                        cur_t = conn.execute("""
+                            INSERT INTO v3_paper_trades (
+                                experiment_id, timestamp, action, entry_price, exit_price, quantity,
+                                pnl, pnl_pct, fees, holding_time_minutes, balance_after, decision,
+                                regime, experts_json, prediction_json, attention_json, tensor_json, exit_reason
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                        """, (
+                            exp_id, now_str, open_pos["action"], entry_p, exit_p, qty,
+                            net_pnl, pnl_pct, fees_usd, bars_held, new_balance,
+                            v3_meta.get("decision", "Execute"),
+                            v3_meta.get("regime", regime_res["regime"]),
+                            json.dumps(v3_meta.get("selected_experts", moe_res.get("selected_experts", []))),
+                            json.dumps(v3_meta.get("prediction", tft_res)),
+                            json.dumps(v3_meta.get("attention_heatmap", xai_res.get("attention_heatmap", []))),
+                            json.dumps(tensor_arr.tolist() if tensor_arr.size < 4000 else []),
+                            exit_reason
+                        ))
+                        v3_trade_id = cur_t.lastrowid
+
+                        # Record in legacy trades table for UI dashboard compatibility
+                        conn.execute("""
+                            INSERT INTO trades (
+                                experiment_id, timestamp, action, entry_price, exit_price, quantity,
+                                confidence, rsi, macd, ema20, ema50, volume, reasoning, pnl,
+                                balance_after, model_version, exit_reason
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                        """, (
+                            exp_id, now_str, open_pos["action"], entry_p, exit_p, qty,
+                            open_pos["confidence"], features_dict.get("rsi_14", 50.0),
+                            features_dict.get("macd", 0.0), features_dict.get("ema_20_ratio", entry_p),
+                            features_dict.get("ema_50_ratio", entry_p), features_dict.get("norm_volume", 100.0),
+                            xai_res.get("formatted_explanation", ""), net_pnl,
+                            new_balance, "BTCognitive V3 MoE", exit_reason
+                        ))
+
+                        # Update equity history
+                        conn.execute("""
+                            INSERT INTO equity_history (experiment_id, timestamp, balance, trade_id, drawdown)
+                            VALUES (?, ?, ?, ?, 0.0);
+                        """, (exp_id, now_str, new_balance, v3_trade_id))
+
+                        # Delete open position
+                        conn.execute("DELETE FROM open_positions WHERE id = ?;", (open_pos["id"],))
+
+                        # Update experiment balance & total trades
+                        conn.execute("UPDATE experiments SET current_balance = ?, total_trades = total_trades + 1 WHERE id = ?;", (new_balance, exp_id))
+
+                    event_type = "TRADE_CLOSED"
+                    trade_record = {
+                        "trade_id": v3_trade_id,
+                        "action": open_pos["action"],
+                        "entry_price": entry_p,
+                        "exit_price": exit_p,
+                        "exit_reason": exit_reason,
+                        "pnl": net_pnl,
+                        "pnl_pct": pnl_pct,
+                        "fees": fees_usd,
+                        "holding_time_minutes": bars_held,
+                        "balance_after": new_balance
+                    }
+                else:
+                    with conn:
+                        conn.execute("UPDATE open_positions SET bars_held = ? WHERE id = ?;", (bars_held, open_pos["id"]))
+                    event_type = "POSITION_HELD"
+
+            # -----------------------------------------------------------------
+            # Phase 2: Open New Position with Meta Labeler & 2% Risk Sizing
+            # -----------------------------------------------------------------
+            elif not open_pos:
+                decision = meta_res["decision"] # "Execute", "Reject", "Reduce Size"
+                sizing_mult = meta_res["sizing_multiplier"] # 1.0, 0.5, 0.0
+                raw_dir = moe_res.get("direction", "HOLD")
+
+                if decision != "Reject" and sizing_mult > 0.0 and raw_dir in ["BUY", "SELL"]:
+                    action = raw_dir
+                    balance = float(exp["current_balance"])
+
+                    # Rule: $10 initial balance, 2% risk scaled by meta multiplier
+                    base_risk_usd = min(0.02 * balance, 0.20)
+                    risk_usd = round(base_risk_usd * sizing_mult, 4)
+
+                    # Dynamic ATR stop distance
+                    atr_val = features_dict.get("atr_14_ratio", 0.015)
+                    stop_dist_pct = max(0.008, min(0.035, float(atr_val) * 1.5))
+
+                    position_size_usd = round(risk_usd / stop_dist_pct, 4)
+                    # Cap position size at 2.5x bankroll
+                    position_size_usd = min(position_size_usd, balance * 2.5)
+
+                    # 2 bps slippage on entry
+                    entry_p = close_p * (1.0002 if action == "BUY" else 0.9998)
+                    qty = round(position_size_usd / entry_p, 6)
+
+                    # 2:1 Reward-to-Risk Target
+                    tp_dist_pct = stop_dist_pct * 2.0
+                    if action == "BUY":
+                        tp = round(entry_p * (1.0 + tp_dist_pct), 2)
+                        sl = round(entry_p * (1.0 - stop_dist_pct), 2)
+                    else:
+                        tp = round(entry_p * (1.0 - tp_dist_pct), 2)
+                        sl = round(entry_p * (1.0 + stop_dist_pct), 2)
+
+                    v3_metadata_payload = {
+                        "decision": decision,
+                        "sizing_multiplier": sizing_mult,
+                        "regime": regime_res["regime"],
+                        "selected_experts": moe_res.get("selected_experts", []),
+                        "prediction": moe_res,
+                        "attention_heatmap": xai_res.get("attention_heatmap", [])
+                    }
+
+                    with conn:
+                        conn.execute("""
+                            INSERT INTO open_positions (
+                                experiment_id, opened_at, action, entry_price, tp_price, sl_price,
+                                quantity, confidence, position_size_usd, model_version, reasoning,
+                                bars_held, rsi, macd, ema20, ema50, volume, v3_metadata
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?);
+                        """, (
+                            exp_id, now_str, action, entry_p, tp, sl, qty,
+                            moe_res.get("confidence", 0.85), position_size_usd,
+                            "BTCognitive V3 MoE", xai_res.get("formatted_explanation", ""),
+                            features_dict.get("rsi_14", 50.0), features_dict.get("macd", 0.0),
+                            features_dict.get("ema_20_ratio", entry_p), features_dict.get("ema_50_ratio", entry_p),
+                            features_dict.get("norm_volume", 100.0), json.dumps(v3_metadata_payload)
+                        ))
+
+                    event_type = "POSITION_OPENED"
+                    trade_record = {
+                        "action": action,
+                        "decision": decision,
+                        "entry_price": entry_p,
+                        "tp": tp,
+                        "sl": sl,
+                        "size_usd": position_size_usd,
+                        "risk_usd": risk_usd,
+                        "sizing_multiplier": sizing_mult
+                    }
+
+            # -----------------------------------------------------------------
+            # Assemble Broadcast Payload
+            # -----------------------------------------------------------------
+            result_payload = {
+                "event": event_type,
+                "timestamp": now_str,
+                "candle": {"close": close_p, "high": high_p, "low": low_p},
+                "balance": float(exp["current_balance"]),
+                "initial_balance": float(exp.get("initial_balance", 10.00)),
+                "prediction": {
+                    "direction": moe_res.get("direction", "HOLD"),
+                    "confidence": moe_res.get("confidence", 0.50),
+                    "probabilities": moe_res.get("probabilities", {})
+                },
+                "market_regime": regime_res,
+                "selected_experts": moe_res.get("selected_experts", []),
+                "meta_labeler": meta_res,
+                "attention_heatmap_length": len(xai_res.get("attention_heatmap", [])),
+                "trade_record": trade_record
+            }
+
+            return result_payload
+
+        finally:
+            conn.close()
+
+    def get_v3_paper_trades(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Retrieves rich V3 paper trade records from SQLite."""
+        conn = self._get_connection()
+        try:
+            cur = conn.execute("""
+                SELECT id, experiment_id, timestamp, action, entry_price, exit_price, quantity,
+                       pnl, pnl_pct, fees, holding_time_minutes, balance_after, decision, regime,
+                       experts_json, prediction_json, attention_json, exit_reason
+                FROM v3_paper_trades
+                ORDER BY id DESC
+                LIMIT ?;
+            """, (limit,))
+            rows = [dict(r) for r in cur.fetchall()]
+            for r in rows:
+                try:
+                    r["experts"] = json.loads(r.get("experts_json") or "[]")
+                    r["prediction"] = json.loads(r.get("prediction_json") or "{}")
+                    r["attention"] = json.loads(r.get("attention_json") or "[]")
+                except Exception:
+                    pass
+            return rows
         finally:
             conn.close()
 

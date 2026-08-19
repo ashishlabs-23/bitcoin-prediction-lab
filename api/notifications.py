@@ -1,13 +1,14 @@
 import os
 import json
 import time
-import urllib.request
 import asyncio
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timezone
+
+from api.http_client import get_shared_client
 
 
 class NotificationManager:
@@ -303,9 +304,11 @@ class NotificationManager:
             print(f"[EMAIL QUEUED] Email formatted and ready for {recipient_str}. (To send live, set SMTP_PASSWORD in .env or Settings modal).")
 
     async def _send_external_webhook(self, alert: Dict[str, Any]):
-        """Asynchronously sends Discord or generic HTTP webhook."""
+        """Asynchronously sends Discord or generic HTTP webhook using shared httpx client."""
         url = self.settings.get("webhook_url")
         w_type = self.settings.get("webhook_type", "discord")
+        if not url:
+            return
 
         try:
             if w_type == "discord" and "discord.com" in url:
@@ -326,22 +329,22 @@ class NotificationManager:
                     "footer": {"text": "BTCognitive High-Profit Radar"},
                     "timestamp": alert.get("timestamp")
                 }
-                payload = {"content": f"🚨 **HIGH PROFIT ALERT DETECTED!** 🚨", "embeds": [embed]}
+                payload = {"content": "🚨 **HIGH PROFIT ALERT DETECTED!** 🚨", "embeds": [embed]}
             else:
                 # Generic webhook payload
                 payload = alert
 
-            data = json.dumps(payload).encode("utf-8")
-            req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json", "User-Agent": "BTCognitive/2.0"})
-            
-            loop = asyncio.get_running_loop()
-            await loop.run_in_executor(None, lambda: urllib.request.urlopen(req, timeout=5))
-            print(f"Webhook notification delivered to {url}")
+            client = get_shared_client()
+            res = await client.post(url, json=payload, headers={"Content-Type": "application/json", "User-Agent": "BTCognitive/2.0"}, timeout=5.0)
+            if res.status_code < 300:
+                print(f"Webhook notification delivered to {url}")
+            else:
+                print(f"Webhook returned status {res.status_code}")
         except Exception as e:
             print(f"Error sending webhook notification: {e}")
 
     async def _send_telegram_alert(self, alert: Dict[str, Any]):
-        """Asynchronously sends Telegram Bot message."""
+        """Asynchronously sends Telegram Bot message using shared httpx client."""
         bot_token = self.settings.get("telegram_bot_token")
         chat_id = self.settings.get("telegram_chat_id")
 
@@ -362,12 +365,12 @@ class NotificationManager:
         try:
             url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
             payload = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
-            data = json.dumps(payload).encode("utf-8")
-            req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
-
-            loop = asyncio.get_running_loop()
-            await loop.run_in_executor(None, lambda: urllib.request.urlopen(req, timeout=5))
-            print("Telegram notification delivered successfully.")
+            client = get_shared_client()
+            res = await client.post(url, json=payload, timeout=5.0)
+            if res.status_code == 200:
+                print("Telegram notification delivered successfully.")
+            else:
+                print(f"Telegram API responded with {res.status_code}: {res.text}")
         except Exception as e:
             print(f"Error sending Telegram notification: {e}")
 

@@ -1,39 +1,32 @@
 """
-Market Memory Engine for bitcoin-prediction-lab.
-
-Maintains a permanent, persistent database of model predictions, market regimes, decisions, and actual outcomes:
-- prediction_id (e.g. pred_20260813_1400)
-- timestamp
-- candle_time
-- price
-- regime
-- raw_prob
-- calibrated_prob
-- decision (TAKE_LONG / TAKE_SHORT / SKIP)
-- actual_return
-- was_correct
-- pnl
-- direction
-- tp
-- sl
-- model_version (e.g. xgb_v2.1)
-- feature_version (e.g. features_v3)
-- regime_version (e.g. regime_v1)
+backtest/market_memory.py — Dual-Layer Market Memory Engine
+===========================================================
+High-performance dual-layer memory persistence:
+1. Operational Layer: SQLite with WAL mode (fast atomic concurrent reads/writes)
+2. Export & File Layer: Synchronized CSV & Parquet for testing, ML datasets and reproducibility.
 """
 
 import os
 import sys
 import uuid
 import time
-import pandas as pd
-import numpy as np
+import sqlite3
+import logging
 from datetime import datetime, timezone
-from contextlib import contextmanager
+from typing import Dict, List, Optional, Any
+import numpy as np
+import pandas as pd
 
 # Ensure project root is in sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from config import RESULTS_DIR
+
+logger = logging.getLogger("btcognitive.market_memory")
+
+DB_PATH = os.path.join(RESULTS_DIR, "market_memory.db")
+CSV_PATH = os.path.join(RESULTS_DIR, "market_memory.csv")
+EXPORTS_DIR = os.path.join(RESULTS_DIR, "exports")
 
 DEFAULT_COLUMNS = [
     'prediction_id', 'timestamp', 'candle_time', 'price', 'regime', 'raw_prob',
@@ -45,17 +38,6 @@ DEFAULT_COLUMNS = [
     'outcome_resolved', 'outcome_resolved_at', 'data_source'
 ]
 
-
-def get_memory_file() -> str:
-    os.makedirs(RESULTS_DIR, exist_ok=True)
-    return os.path.join(RESULTS_DIR, "market_memory.csv")
-
-
-def get_stress_trials_file() -> str:
-    os.makedirs(RESULTS_DIR, exist_ok=True)
-    return os.path.join(RESULTS_DIR, "stress_trials.csv")
-
-
 STRESS_TRIAL_COLUMNS = [
     'trial_id', 'timestamp', 'price', 'direction', 'decision', 'probability',
     'tp', 'sl', 'macro_shock', 'volatility_mult', 'liquidity_shock_pct',
@@ -63,29 +45,102 @@ STRESS_TRIAL_COLUMNS = [
 ]
 
 
-@contextmanager
-def file_lock(lock_filepath: str, timeout: float = 5.0):
-    """Simple cross-platform spinlock context manager for atomic file access."""
-    start_time = time.time()
-    while True:
-        try:
-            # Create exclusive lock file
-            fd = os.open(lock_filepath, os.O_CREAT | os.O_EXCL | os.O_RDWR)
-            os.close(fd)
-            break
-        except OSError:
-            if time.time() - start_time > timeout:
-                break
-            time.sleep(0.05)
-    try:
-        yield
-    finally:
-        if os.path.exists(lock_filepath):
-            try:
-                os.remove(lock_filepath)
-            except OSError:
-                pass
+def get_memory_file() -> str:
+    """Returns CSV filepath for backwards compatibility and test isolation."""
+    os.makedirs(RESULTS_DIR, exist_ok=True)
+    return CSV_PATH
 
+
+def get_stress_trials_file() -> str:
+    os.makedirs(RESULTS_DIR, exist_ok=True)
+    return os.path.join(RESULTS_DIR, "stress_trials.csv")
+
+
+def _get_db(db_file: Optional[str] = None) -> sqlite3.Connection:
+    """Returns thread-safe SQLite connection with WAL mode enabled."""
+    target_db = db_file or DB_PATH
+    os.makedirs(os.path.dirname(os.path.abspath(target_db)), exist_ok=True)
+    conn = sqlite3.connect(target_db, timeout=10.0)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA synchronous=NORMAL;")
+    return conn
+
+
+def _init_tables(conn: sqlite3.Connection):
+    """Initializes operational tables in SQLite."""
+    with conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS predictions (
+                prediction_id TEXT PRIMARY KEY,
+                timestamp TEXT NOT NULL,
+                candle_time TEXT,
+                price REAL NOT NULL,
+                regime TEXT NOT NULL,
+                raw_prob REAL NOT NULL,
+                calibrated_prob REAL NOT NULL,
+                decision TEXT NOT NULL,
+                actual_return REAL DEFAULT 0.0,
+                was_correct INTEGER DEFAULT 1,
+                pnl REAL DEFAULT 0.0,
+                direction TEXT NOT NULL,
+                tp REAL,
+                sl REAL,
+                model_version TEXT,
+                feature_version TEXT,
+                regime_version TEXT,
+                context_vector_json TEXT,
+                macro_cycle TEXT,
+                mvrv_val REAL,
+                nupl_val REAL,
+                data_reliability REAL,
+                regime_certainty REAL,
+                model_agreement REAL,
+                volatility_stress REAL,
+                composite_quality_score REAL,
+                expected_return_gross_pct REAL,
+                expected_return_net_pct REAL,
+                outcome_resolved INTEGER DEFAULT 0,
+                outcome_resolved_at TEXT,
+                data_source TEXT DEFAULT 'live_terminal'
+            );
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_pred_ts ON predictions(timestamp);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_pred_resolved ON predictions(outcome_resolved);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_pred_regime ON predictions(regime);")
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS stress_trials (
+                trial_id TEXT PRIMARY KEY,
+                timestamp TEXT NOT NULL,
+                price REAL NOT NULL,
+                direction TEXT NOT NULL,
+                decision TEXT NOT NULL,
+                probability REAL NOT NULL,
+                tp REAL,
+                sl REAL,
+                macro_shock TEXT,
+                volatility_mult REAL,
+                liquidity_shock_pct REAL,
+                hypothetical_return REAL,
+                was_correct INTEGER,
+                pnl_bps REAL,
+                data_source TEXT DEFAULT 'synthetic_arena'
+            );
+        """)
+
+
+try:
+    _conn = _get_db()
+    _init_tables(_conn)
+    _conn.close()
+except Exception:
+    pass
+
+
+# ---------------------------------------------------------------------------
+# Core Operational Operations
+# ---------------------------------------------------------------------------
 
 def record_prediction(
     timestamp: str,
@@ -119,10 +174,7 @@ def record_prediction(
     outcome_resolved: bool = False,
     outcome_resolved_at: str = None
 ) -> pd.DataFrame:
-    """Appends a new versioned prediction record to Market Memory CSV atomically."""
-    memory_csv = get_memory_file()
-    lock_file = memory_csv + ".lock"
-
+    """Appends a new versioned prediction record into SQLite WAL and syncs CSV."""
     if not prediction_id:
         dt_str = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M")
         prediction_id = f"pred_{dt_str}_{str(uuid.uuid4())[:4]}"
@@ -137,7 +189,7 @@ def record_prediction(
             "macro_cycle": macro_cycle
         })
 
-    new_record = {
+    record_dict = {
         'prediction_id': str(prediction_id),
         'timestamp': str(timestamp),
         'candle_time': str(candle_time if candle_time else timestamp),
@@ -147,7 +199,7 @@ def record_prediction(
         'calibrated_prob': float(calibrated_prob),
         'decision': str(decision),
         'actual_return': float(actual_return),
-        'was_correct': bool(was_correct),
+        'was_correct': 1 if was_correct else 0,
         'pnl': float(pnl),
         'direction': str(direction),
         'tp': float(tp),
@@ -166,172 +218,186 @@ def record_prediction(
         'composite_quality_score': float(composite_quality_score),
         'expected_return_gross_pct': float(expected_return_gross_pct),
         'expected_return_net_pct': float(expected_return_net_pct),
-        'outcome_resolved': bool(outcome_resolved),
+        'outcome_resolved': 1 if outcome_resolved else 0,
         'outcome_resolved_at': str(outcome_resolved_at) if outcome_resolved_at else None,
         'data_source': 'live_terminal'
     }
 
-    with file_lock(lock_file):
-        if os.path.exists(memory_csv):
-            try:
-                df = pd.read_csv(memory_csv)
-            except Exception:
-                df = pd.DataFrame()
-            # Ensure schema compatibility with missing columns
-            for col in DEFAULT_COLUMNS:
-                if not df.empty and col not in df.columns:
-                    df[col] = np.nan
-            df = pd.concat([df, pd.DataFrame([new_record])], ignore_index=True)
+    # 1. Insert into SQLite
+    conn = _get_db()
+    _init_tables(conn)
+    try:
+        with conn:
+            cols = list(record_dict.keys())
+            placeholders = ", ".join(["?" for _ in cols])
+            query = f"INSERT OR REPLACE INTO predictions ({', '.join(cols)}) VALUES ({placeholders})"
+            conn.execute(query, list(record_dict.values()))
+    except Exception as e:
+        logger.error(f"Error inserting prediction into SQLite: {e}")
+    finally:
+        conn.close()
+
+    # 2. Sync to CSV for testing & external exports
+    csv_file = get_memory_file()
+    try:
+        rec_for_df = record_dict.copy()
+        rec_for_df['was_correct'] = bool(was_correct)
+        rec_for_df['outcome_resolved'] = bool(outcome_resolved)
+        new_row_df = pd.DataFrame([rec_for_df])
+        if os.path.exists(csv_file) and os.path.getsize(csv_file) > 0:
+            existing = pd.read_csv(csv_file)
+            combined = pd.concat([existing, new_row_df], ignore_index=True)
         else:
-            df = pd.DataFrame([new_record])
+            combined = new_row_df
+        combined.to_csv(csv_file, index=False)
+    except Exception as e:
+        logger.warning(f"Error syncing prediction to CSV: {e}")
 
-        # Write to temporary file first then sync and rename for atomic write
-        tmp_csv = memory_csv + ".tmp"
-        with open(tmp_csv, "w", newline="", encoding="utf-8") as f:
-            df.to_csv(f, index=False)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp_csv, memory_csv)
-
-    return df
+    return load_market_memory()
 
 
 def load_market_memory() -> pd.DataFrame:
-    """Loads historical Market Memory predictions atomically."""
-    memory_csv = get_memory_file()
-    lock_file = memory_csv + ".lock"
+    """Loads historical Market Memory predictions."""
+    csv_file = get_memory_file()
+    # If a specific/custom CSV exists (e.g. during pytest monkeypatch), load directly from it
+    if os.path.exists(csv_file) and os.path.getsize(csv_file) > 0:
+        try:
+            df = pd.read_csv(csv_file)
+            for col in DEFAULT_COLUMNS:
+                if col not in df.columns:
+                    df[col] = np.nan
+            if 'was_correct' in df.columns:
+                df['was_correct'] = df['was_correct'].astype(bool)
+            if 'outcome_resolved' in df.columns:
+                df['outcome_resolved'] = df['outcome_resolved'].astype(bool)
+            return df
+        except Exception:
+            pass
 
-    if os.path.exists(memory_csv):
-        with file_lock(lock_file):
-            try:
-                df = pd.read_csv(memory_csv)
-                for col in DEFAULT_COLUMNS:
-                    if col not in df.columns:
-                        df[col] = np.nan
-                return df
-            except Exception:
-                pass
-    return pd.DataFrame(columns=DEFAULT_COLUMNS)
+    conn = _get_db()
+    _init_tables(conn)
+    try:
+        df = pd.read_sql_query("SELECT * FROM predictions ORDER BY timestamp ASC", conn)
+        df['was_correct'] = df['was_correct'].astype(bool)
+        df['outcome_resolved'] = df['outcome_resolved'].astype(bool)
+        return df
+    except Exception as e:
+        logger.error(f"Error loading market memory from SQLite: {e}")
+        return pd.DataFrame(columns=DEFAULT_COLUMNS)
+    finally:
+        conn.close()
 
 
 def query_similar_context(current_context: dict, top_k: int = 20) -> pd.DataFrame:
-    """
-    Retrieves historical Market Memory outcomes under similar market contexts
-    using regime and state similarity.
-
-    Returns DataFrame of matching historical records.
-    """
-    mem_df = load_market_memory()
-    if mem_df.empty:
-        return mem_df
-
+    """Retrieves historical Market Memory outcomes under similar market contexts."""
+    conn = _get_db()
     target_regime = current_context.get('regime', '')
-    if target_regime:
-        matching = mem_df[mem_df['regime'] == target_regime]
-        if not matching.empty:
-            return matching.tail(top_k)
-
-    return mem_df.tail(top_k)
+    try:
+        if target_regime:
+            df = pd.read_sql_query(
+                "SELECT * FROM predictions WHERE regime = ? ORDER BY timestamp DESC LIMIT ?",
+                conn,
+                params=(target_regime, top_k)
+            )
+            if not df.empty:
+                return df.iloc[::-1].reset_index(drop=True)
+        df = pd.read_sql_query("SELECT * FROM predictions ORDER BY timestamp DESC LIMIT ?", conn, params=(top_k,))
+        return df.iloc[::-1].reset_index(drop=True)
+    except Exception as e:
+        logger.error(f"Error querying similar context: {e}")
+        return pd.DataFrame(columns=DEFAULT_COLUMNS)
+    finally:
+        conn.close()
 
 
 def update_prediction_outcome(prediction_id: str, actual_return: float, was_correct: bool, pnl: float) -> bool:
-    """Updates an existing prediction record's actual return, correctness, and PnL atomically."""
-    memory_csv = get_memory_file()
-    lock_file = memory_csv + ".lock"
+    """Updates an existing prediction record atomically in SQLite & CSV."""
+    conn = _get_db()
+    try:
+        with conn:
+            cur = conn.execute("""
+                UPDATE predictions
+                SET actual_return = ?, was_correct = ?, pnl = ?, outcome_resolved = 1, outcome_resolved_at = ?
+                WHERE prediction_id = ?
+            """, (float(actual_return), 1 if was_correct else 0, float(pnl), datetime.now(timezone.utc).isoformat(), str(prediction_id)))
+            updated = cur.rowcount > 0
+    except Exception as e:
+        logger.error(f"Error updating prediction outcome: {e}")
+        updated = False
+    finally:
+        conn.close()
 
-    if os.path.exists(memory_csv):
-        with file_lock(lock_file):
-            try:
-                df = pd.read_csv(memory_csv)
-                mask = df['prediction_id'] == str(prediction_id)
-                if mask.any():
-                    df.loc[mask, 'actual_return'] = float(actual_return)
-                    df.loc[mask, 'was_correct'] = bool(was_correct)
-                    df.loc[mask, 'pnl'] = float(pnl)
-                    df.loc[mask, 'outcome_resolved'] = True
-                    df.loc[mask, 'outcome_resolved_at'] = datetime.now(timezone.utc).isoformat()
-                    tmp_csv = memory_csv + ".tmp"
-                    with open(tmp_csv, "w", newline="", encoding="utf-8") as f:
-                        df.to_csv(f, index=False)
-                        f.flush()
-                        os.fsync(f.fileno())
-                    os.replace(tmp_csv, memory_csv)
-                    return True
-            except Exception as e:
-                print(f"Error updating prediction outcome: {e}")
-    return False
+    csv_file = get_memory_file()
+    if os.path.exists(csv_file):
+        try:
+            df = pd.read_csv(csv_file)
+            mask = df['prediction_id'] == str(prediction_id)
+            if mask.any():
+                df.loc[mask, 'actual_return'] = float(actual_return)
+                df.loc[mask, 'was_correct'] = bool(was_correct)
+                df.loc[mask, 'pnl'] = float(pnl)
+                df.loc[mask, 'outcome_resolved'] = True
+                df.loc[mask, 'outcome_resolved_at'] = datetime.now(timezone.utc).isoformat()
+                df.to_csv(csv_file, index=False)
+        except Exception:
+            pass
+
+    return updated
 
 
 def resolve_pending_outcomes(current_price: float, current_time_str: str, horizon_hours: int = 4) -> int:
     """
-    Two-phase outcome resolver: Scans unresolved prediction records.
-    If current_time - prediction_time >= horizon_hours (e.g. 4h or 24h),
-    computes actual return, checks correctness, and marks outcome_resolved = True.
-    Returns the number of records resolved.
+    Two-phase outcome resolver: Queries unresolved records,
+    computes return, and marks outcome_resolved = 1.
     """
-    memory_csv = get_memory_file()
-    lock_file = memory_csv + ".lock"
-
-    if not os.path.exists(memory_csv):
-        return 0
-
+    conn = _get_db()
     resolved_count = 0
+
     try:
         now_ts = pd.Timestamp(current_time_str).tz_localize(None) if pd.Timestamp(current_time_str).tz is None else pd.Timestamp(current_time_str).tz_convert(None)
     except Exception:
         now_ts = pd.Timestamp.now()
 
-    with file_lock(lock_file):
-        try:
-            df = pd.read_csv(memory_csv)
-            for col in DEFAULT_COLUMNS:
-                if col not in df.columns:
-                    df[col] = np.nan
+    try:
+        cursor = conn.cursor()
+        rows = cursor.execute("SELECT prediction_id, timestamp, price, direction FROM predictions WHERE outcome_resolved = 0").fetchall()
+        
+        updates = []
+        for r in rows:
+            p_id, ts_str, entry_p, direction = r[0], r[1], float(r[2]), str(r[3]).upper()
+            try:
+                row_ts = pd.Timestamp(ts_str).tz_localize(None) if pd.Timestamp(ts_str).tz is None else pd.Timestamp(ts_str).tz_convert(None)
+            except Exception:
+                continue
 
-            unresolved_mask = (df['outcome_resolved'] == False) | (df['outcome_resolved'].isna())
-            if not unresolved_mask.any():
-                return 0
+            diff_hours = (now_ts - row_ts).total_seconds() / 3600.0
+            if diff_hours >= horizon_hours and entry_p > 0:
+                raw_ret = (float(current_price) - entry_p) / entry_p
+                if direction == "LONG":
+                    strat_ret = raw_ret - 0.0010
+                    was_corr = 1 if raw_ret > 0 else 0
+                elif direction == "SHORT":
+                    strat_ret = -raw_ret - 0.0010
+                    was_corr = 1 if raw_ret < 0 else 0
+                else:
+                    strat_ret = 0.0
+                    was_corr = 1 if abs(raw_ret) < 0.005 else 0
 
-            for idx in df[unresolved_mask].index:
-                row_ts_str = str(df.loc[idx, 'timestamp'])
-                try:
-                    row_ts = pd.Timestamp(row_ts_str).tz_localize(None) if pd.Timestamp(row_ts_str).tz is None else pd.Timestamp(row_ts_str).tz_convert(None)
-                except Exception:
-                    continue
+                pnl = round(strat_ret * 10000.0, 2)
+                updates.append((round(raw_ret, 6), was_corr, pnl, current_time_str, p_id))
 
-                diff_hours = (now_ts - row_ts).total_seconds() / 3600.0
-                if diff_hours >= horizon_hours:
-                    entry_p = float(df.loc[idx, 'price'])
-                    if entry_p > 0:
-                        raw_ret = (float(current_price) - entry_p) / entry_p
-                        direction = str(df.loc[idx, 'direction']).upper()
-                        if direction == "LONG":
-                            strat_ret = raw_ret - 0.0010  # 10 bps fee
-                            was_corr = raw_ret > 0
-                        elif direction == "SHORT":
-                            strat_ret = -raw_ret - 0.0010
-                            was_corr = raw_ret < 0
-                        else:  # SKIP
-                            strat_ret = 0.0
-                            # For SKIP, was_corr = True if avoiding the trade saved money or flat
-                            was_corr = abs(raw_ret) < 0.005
-
-                        df.loc[idx, 'actual_return'] = round(raw_ret, 6)
-                        df.loc[idx, 'pnl'] = round(strat_ret * 10000.0, 2)  # bps pnl
-                        df.loc[idx, 'was_correct'] = was_corr
-                        df.loc[idx, 'outcome_resolved'] = True
-                        df.loc[idx, 'outcome_resolved_at'] = current_time_str
-                        resolved_count += 1
-
-            if resolved_count > 0:
-                tmp_csv = memory_csv + ".tmp"
-                with open(tmp_csv, "w", newline="", encoding="utf-8") as f:
-                    df.to_csv(f, index=False)
-                    f.flush()
-                    os.fsync(f.fileno())
-                os.replace(tmp_csv, memory_csv)
-        except Exception as e:
-            print(f"Error resolving pending outcomes: {e}")
+        if updates:
+            with conn:
+                conn.executemany("""
+                    UPDATE predictions
+                    SET actual_return = ?, was_correct = ?, pnl = ?, outcome_resolved = 1, outcome_resolved_at = ?
+                    WHERE prediction_id = ?
+                """, updates)
+            resolved_count = len(updates)
+    except Exception as e:
+        logger.error(f"Error resolving pending outcomes in SQLite: {e}")
+    finally:
+        conn.close()
 
     return resolved_count
 
@@ -353,10 +419,8 @@ def record_stress_trial(
     pnl_bps: float,
     data_source: str = "synthetic_arena"
 ) -> None:
-    """Appends a synthetic Monte Carlo stress experiment trial to separate results/stress_trials.csv."""
-    stress_csv = get_stress_trials_file()
-    lock_file = stress_csv + ".lock"
-
+    """Inserts a synthetic Monte Carlo stress experiment trial into SQLite & stress_trials.csv."""
+    stress_file = get_stress_trials_file()
     new_row = {
         'trial_id': str(trial_id),
         'timestamp': str(timestamp),
@@ -375,48 +439,73 @@ def record_stress_trial(
         'data_source': str(data_source)
     }
 
-    with file_lock(lock_file):
-        if os.path.exists(stress_csv) and os.path.getsize(stress_csv) > 0:
-            try:
-                df = pd.read_csv(stress_csv)
-                df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-            except Exception:
-                df = pd.DataFrame([new_row], columns=STRESS_TRIAL_COLUMNS)
+    # 1. Sync to stress_trials.csv
+    try:
+        new_df = pd.DataFrame([new_row])
+        if os.path.exists(stress_file) and os.path.getsize(stress_file) > 0:
+            existing = pd.read_csv(stress_file)
+            combined = pd.concat([existing, new_df], ignore_index=True)
         else:
-            df = pd.DataFrame([new_row], columns=STRESS_TRIAL_COLUMNS)
+            combined = new_df
+        combined.to_csv(stress_file, index=False)
+    except Exception as e:
+        logger.warning(f"Error writing to stress_trials.csv: {e}")
 
-        tmp_csv = stress_csv + ".tmp"
-        with open(tmp_csv, "w", newline="", encoding="utf-8") as f:
-            df.to_csv(f, index=False)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp_csv, stress_csv)
+    # 2. Insert into SQLite
+    conn = _get_db()
+    _init_tables(conn)
+    try:
+        with conn:
+            conn.execute("""
+                INSERT OR REPLACE INTO stress_trials (
+                    trial_id, timestamp, price, direction, decision, probability,
+                    tp, sl, macro_shock, volatility_mult, liquidity_shock_pct,
+                    hypothetical_return, was_correct, pnl_bps, data_source
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                str(trial_id), str(timestamp), float(price), str(direction), str(decision), float(probability),
+                float(tp), float(sl), str(macro_shock), float(volatility_mult), float(liquidity_shock_pct),
+                float(hypothetical_return), 1 if was_correct else 0, float(pnl_bps), str(data_source)
+            ))
+    except Exception as e:
+        logger.error(f"Error recording stress trial in SQLite: {e}")
+    finally:
+        conn.close()
 
 
 def load_stress_trials(limit: int = 100) -> pd.DataFrame:
-    """Loads recorded synthetic stress trials from results/stress_trials.csv."""
+    """Loads recorded synthetic stress trials from stress_trials.csv or SQLite."""
     stress_csv = get_stress_trials_file()
-    if not os.path.exists(stress_csv) or os.path.getsize(stress_csv) == 0:
-        return pd.DataFrame(columns=STRESS_TRIAL_COLUMNS)
+    if os.path.exists(stress_csv) and os.path.getsize(stress_csv) > 0:
+        try:
+            df = pd.read_csv(stress_csv)
+            if 'was_correct' in df.columns:
+                df['was_correct'] = df['was_correct'].astype(bool)
+            return df.tail(limit)
+        except Exception:
+            pass
+
+    conn = _get_db()
+    _init_tables(conn)
     try:
-        df = pd.read_csv(stress_csv)
-        return df.tail(limit)
-    except Exception:
+        df = pd.read_sql_query("SELECT * FROM stress_trials ORDER BY timestamp DESC LIMIT ?", conn, params=(limit,))
+        df['was_correct'] = df['was_correct'].astype(bool)
+        return df.iloc[::-1].reset_index(drop=True)
+    except Exception as e:
+        logger.error(f"Error loading stress trials: {e}")
         return pd.DataFrame(columns=STRESS_TRIAL_COLUMNS)
+    finally:
+        conn.close()
 
 
 def sanitize_market_memory() -> int:
-    """Purges any synthetic arena rows or simulated artifacts from market_memory.csv to guarantee zero contamination."""
-    memory_csv = get_memory_file()
-    if not os.path.exists(memory_csv) or os.path.getsize(memory_csv) == 0:
-        return 0
-    lock_file = memory_csv + ".lock"
+    """Purges any synthetic arena rows or simulated artifacts from predictions."""
+    csv_file = get_memory_file()
     purged_count = 0
-    with file_lock(lock_file):
+    if os.path.exists(csv_file) and os.path.getsize(csv_file) > 0:
         try:
-            df = pd.read_csv(memory_csv)
+            df = pd.read_csv(csv_file)
             initial_len = len(df)
-            # Purge any row starting with SIM_ARENA_ or tagged synthetic_arena
             clean_df = df[~df['regime'].astype(str).str.startswith("SIM_ARENA_")].copy()
             if 'data_source' in clean_df.columns:
                 clean_df = clean_df[clean_df['data_source'] != 'synthetic_arena'].copy()
@@ -424,42 +513,39 @@ def sanitize_market_memory() -> int:
                 clean_df['data_source'] = 'live_terminal'
             purged_count = initial_len - len(clean_df)
             if purged_count > 0 or 'data_source' not in df.columns:
-                tmp_csv = memory_csv + ".tmp"
-                with open(tmp_csv, "w", newline="", encoding="utf-8") as f:
-                    clean_df.to_csv(f, index=False)
-                    f.flush()
-                    os.fsync(f.fileno())
-                os.replace(tmp_csv, memory_csv)
+                clean_df.to_csv(csv_file, index=False)
         except Exception as e:
-            print(f"Error sanitizing market memory: {e}")
+            logger.error(f"Error sanitizing CSV market memory: {e}")
+
+    conn = _get_db()
+    try:
+        with conn:
+            cur = conn.execute("DELETE FROM predictions WHERE regime LIKE 'SIM_ARENA_%' OR data_source = 'synthetic_arena'")
+            if cur.rowcount > purged_count:
+                purged_count = cur.rowcount
+    except Exception as e:
+        logger.error(f"Error sanitizing SQLite market memory: {e}")
+    finally:
+        conn.close()
+
     return purged_count
 
 
-if __name__ == "__main__":
-    import tempfile
-    with tempfile.TemporaryDirectory() as tmpdir:
-        test_file = os.path.join(tmpdir, "test_memory.csv")
-        original_get_memory_file = get_memory_file
-        get_memory_file = lambda: test_file
-        try:
-            record_prediction(
-                timestamp="2026-08-14 12:00:00+00:00",
-                price=64000.0,
-                regime="TRENDING_BULL",
-                raw_prob=0.68,
-                calibrated_prob=0.72,
-                decision="TAKE_LONG",
-                actual_return=0.0084,
-                was_correct=True,
-                pnl=84.0,
-                direction="LONG",
-                tp=64960.0,
-                sl=63360.0
-            )
-            mem_df = load_market_memory()
-            print("Market Memory Records:")
-            print(mem_df.tail(3))
-            print("PASS: Market Memory Engine test completed cleanly.")
-        finally:
-            get_memory_file = original_get_memory_file
+def export_market_memory_datasets(target_csv: Optional[str] = None, target_parquet: Optional[str] = None):
+    """Exports SQLite operational memory to Parquet & CSV for external ML tools."""
+    df = load_market_memory()
+    if df.empty:
+        return
 
+    csv_dest = target_csv or CSV_PATH
+    try:
+        df.to_csv(csv_dest, index=False)
+    except Exception as e:
+        logger.warning(f"Failed exporting to CSV: {e}")
+
+    try:
+        os.makedirs(EXPORTS_DIR, exist_ok=True)
+        pq_dest = target_parquet or os.path.join(EXPORTS_DIR, "market_memory.parquet")
+        df.to_parquet(pq_dest, index=False, engine="pyarrow")
+    except Exception as e:
+        logger.warning(f"Failed exporting to Parquet: {e}")
