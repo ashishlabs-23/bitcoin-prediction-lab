@@ -52,9 +52,11 @@ htmlcov/
 
 # Temporary & Scratch Files
 scratch/
+archive/
 *.log
 *.tmp
 *.temp
+*.zip
 scratch_docx_text.txt
 *.docx
 BUILD_PROMPTS.md
