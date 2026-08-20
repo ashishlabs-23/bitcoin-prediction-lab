@@ -106,6 +106,31 @@ async def get_prediction_latest(live: bool = False):
     }
 
 
+@router.get("/prediction/range")
+@router.get("/api/prediction/range")
+async def get_prediction_range():
+    """Returns the latest calibrated probabilistic BTCUSD 24h range forecast, excursions, and risk envelope."""
+    async with live_engine._lock:
+        if live_engine.latest_range_forecast is not None:
+            resp = live_engine.latest_range_forecast.copy()
+            resp["status"] = "online"
+            return resp
+
+    # Fallback on-demand generation if engine is warming up
+    row = feature_cache.get_latest_row()
+    entry_p = float(row.get("close", 65000.0)) if row is not None else 65000.0
+    vol = float(row.get("realized_vol_24h", 0.015)) if row is not None else 0.015
+    fc = live_engine.range_service.generate_forecast(
+        current_price=entry_p,
+        vol_24h=vol,
+        features=row if row is not None else {'vol_24h': vol, 'rsi_14': 50.0},
+        market_regime="Sideways"
+    )
+    resp = fc.to_dict()
+    resp["status"] = "online"
+    return resp
+
+
 @router.get("/prediction/history")
 def get_prediction_history(limit: int = Query(20, le=500)):
     """Returns historical prediction records with JSON-safe fields for chart markers."""

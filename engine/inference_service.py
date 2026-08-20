@@ -32,6 +32,7 @@ from models.opportunity_detector import opportunity_detector
 from backtest.market_memory import record_prediction, resolve_pending_outcomes
 from data.ingest_onchain import get_latest_onchain_valuation
 from engine.feature_cache import feature_cache
+from engine.range_forecast_service import RangeForecastService, BTCUSDRangeForecast
 from api.http_client import (
     fetch_binance_klines_async,
     fetch_live_binance_funding_rate_async,
@@ -51,7 +52,9 @@ class LiveInferenceEngine:
     def __init__(self):
         self.model: Optional[AdaptiveRegimeEnsemble] = None
         self.train_df: Optional[pd.DataFrame] = None
+        self.range_service = RangeForecastService()
         self.latest_prediction: Optional[Dict[str, Any]] = None
+        self.latest_range_forecast: Optional[Dict[str, Any]] = None
         self.latest_regime: Optional[Dict[str, Any]] = None
         self.latest_explanation: Optional[Dict[str, Any]] = None
         self.latest_quality: Optional[Dict[str, Any]] = None
@@ -337,6 +340,29 @@ class LiveInferenceEngine:
                 "drift_score": dr_score,
                 "model_agreement": ag_score
             }
+
+            # Generate production 24h range forecast & risk envelope
+            try:
+                fc = self.range_service.generate_forecast(
+                    current_price=entry_price,
+                    vol_24h=float(df.iloc[-1].get('realized_vol_24h', 0.015)),
+                    features=df.iloc[-1].to_dict(),
+                    market_regime=current_regime,
+                    directional_prob=prob,
+                    timestamp=self.latest_prediction["timestamp"]
+                )
+                self.latest_range_forecast = fc.to_dict()
+
+                # Broadcast over WebSocket if manager provided
+                if ws_manager is not None:
+                    import json
+                    ws_msg = {
+                        "type": "range_forecast_update",
+                        "data": self.latest_range_forecast
+                    }
+                    asyncio.create_task(ws_manager.broadcast(json.dumps(ws_msg)))
+            except Exception as fc_err:
+                logger.error(f"Range forecast generation error: {fc_err}")
 
             # Record prediction & resolve pending outcomes in SQLite WAL
             try:
