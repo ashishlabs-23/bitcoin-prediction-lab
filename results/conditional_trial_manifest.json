@@ -1,0 +1,47 @@
+{
+  "trial_summary": {
+    "n_total_features_tested": 73,
+    "n_configurations_tested": 41,
+    "n_horizons_tested": 5,
+    "n_models_tested": 21,
+    "total_effective_k": 146
+  },
+  "experiments_log": [
+    {
+      "name": "Conditional Subspaces",
+      "n_models": 1,
+      "n_horizons": 1,
+      "n_configs": 6
+    },
+    {
+      "name": "Event Shocks",
+      "n_models": 1,
+      "n_horizons": 1,
+      "n_configs": 7
+    },
+    {
+      "name": "Momentum vs Reversion",
+      "n_models": 3,
+      "n_horizons": 1,
+      "n_configs": 3
+    },
+    {
+      "name": "Selective Prediction",
+      "n_models": 1,
+      "n_horizons": 1,
+      "n_configs": 5
+    },
+    {
+      "name": "Conformal Uncertainty",
+      "n_models": 1,
+      "n_horizons": 1,
+      "n_configs": 1
+    },
+    {
+      "name": "Economic Multi-Task Targets",
+      "n_models": 4,
+      "n_horizons": 1,
+      "n_configs": 4
+    }
+  ]
+}

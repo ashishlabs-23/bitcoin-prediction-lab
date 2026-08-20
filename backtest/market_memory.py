@@ -129,6 +129,95 @@ def _init_tables(conn: sqlite3.Connection):
             );
         """)
 
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS range_forecasts (
+                forecast_id TEXT PRIMARY KEY,
+                timestamp TEXT NOT NULL,
+                symbol TEXT NOT NULL DEFAULT 'BTCUSD',
+                horizon TEXT NOT NULL DEFAULT '24h',
+                current_price REAL NOT NULL,
+                upper_p10 REAL,
+                upper_p25 REAL,
+                upper_p50 REAL,
+                upper_p75 REAL,
+                upper_p90 REAL,
+                lower_p10 REAL,
+                lower_p25 REAL,
+                lower_p50 REAL,
+                lower_p75 REAL,
+                lower_p90 REAL,
+                uncertainty REAL,
+                coverage_confidence REAL,
+                market_regime TEXT,
+                data_quality TEXT,
+                degraded INTEGER DEFAULT 0,
+                model_version TEXT,
+                created_at TEXT NOT NULL
+            );
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_rf_ts ON range_forecasts(timestamp);")
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS excursion_forecasts (
+                forecast_id TEXT PRIMARY KEY,
+                timestamp TEXT NOT NULL,
+                symbol TEXT NOT NULL DEFAULT 'BTCUSD',
+                horizon TEXT NOT NULL DEFAULT '24h',
+                mfe_p10 REAL,
+                mfe_p25 REAL,
+                mfe_p50 REAL,
+                mfe_p75 REAL,
+                mfe_p90 REAL,
+                mae_p10 REAL,
+                mae_p25 REAL,
+                mae_p50 REAL,
+                mae_p75 REAL,
+                mae_p90 REAL,
+                exp_mfe REAL,
+                exp_mae REAL,
+                model_version TEXT,
+                created_at TEXT NOT NULL
+            );
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_ef_ts ON excursion_forecasts(timestamp);")
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS uncertainty_forecasts (
+                forecast_id TEXT PRIMARY KEY,
+                timestamp TEXT NOT NULL,
+                symbol TEXT NOT NULL DEFAULT 'BTCUSD',
+                interval_width REAL,
+                relative_uncertainty REAL,
+                data_quality_score REAL,
+                forecast_state TEXT,
+                created_at TEXT NOT NULL
+            );
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS forecast_outcomes (
+                outcome_id TEXT PRIMARY KEY,
+                forecast_id TEXT NOT NULL,
+                prediction_timestamp TEXT NOT NULL,
+                resolution_timestamp TEXT NOT NULL,
+                actual_high REAL NOT NULL,
+                actual_low REAL NOT NULL,
+                actual_close REAL NOT NULL,
+                actual_mfe REAL NOT NULL,
+                actual_mae REAL NOT NULL,
+                mfe_error REAL,
+                mae_error REAL,
+                upper_covered INTEGER NOT NULL,
+                lower_covered INTEGER NOT NULL,
+                path_contained INTEGER NOT NULL,
+                regime TEXT,
+                data_quality TEXT,
+                created_at TEXT NOT NULL
+            );
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_fo_fc_id ON forecast_outcomes(forecast_id);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_fo_ts ON forecast_outcomes(prediction_timestamp);")
+
 
 try:
     _conn = _get_db()

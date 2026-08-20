@@ -7,7 +7,7 @@ and sample_uniqueness calculation to weight samples in overlapping clusters.
 
 import os
 import sys
-from typing import Iterator, Tuple
+from typing import Iterator, Tuple, Optional, Union, Dict, Any
 import pandas as pd
 import numpy as np
 
@@ -42,13 +42,15 @@ class PurgedWalkForwardSplit:
         chunk_size = n // (self.n_splits + 1)
         embargoed_indices = set()
 
+        # Standardize timestamps and t1 to UTC pandas Series
+        ts_clean = pd.Series(pd.to_datetime(timestamps.values, utc=True))
+        t1_clean = pd.Series(pd.to_datetime(t1.values, utc=True))
+
         # Dynamically scale embargo_bars if label horizon span in t1 exceeds configured default embargo
         effective_embargo = self.embargo_bars
-        if not t1.empty and len(t1) > 0:
+        if not t1_clean.empty and len(t1_clean) > 0:
             try:
-                ts_vals = pd.to_datetime(timestamps.values, utc=True)
-                t1_vals = pd.to_datetime(t1.values, utc=True)
-                diff_hours = (t1_vals - ts_vals).to_series().dt.total_seconds() / 3600.0
+                diff_hours = (t1_clean - ts_clean).dt.total_seconds() / 3600.0
                 max_horizon_bars = int(np.ceil(diff_hours.quantile(0.95)))
                 effective_embargo = max(self.embargo_bars, max_horizon_bars)
             except Exception:
@@ -59,13 +61,13 @@ class PurgedWalkForwardSplit:
             test_end_idx = (i + 2) * chunk_size if i < self.n_splits - 1 else n
 
             test_idx = np.arange(test_start_idx, test_end_idx)
-            test_start_time = timestamps.iloc[test_start_idx]
+            test_start_time = ts_clean.iloc[test_start_idx]
 
             # Expanding window candidate train: indices 0 to test_start_idx - 1
             cand_train = np.arange(0, test_start_idx)
 
             # PURGE: remove training samples whose t1 >= test_start_time
-            t1_cand = t1.iloc[cand_train]
+            t1_cand = t1_clean.iloc[cand_train]
             purge_mask = (t1_cand < test_start_time).values
 
             # EMBARGO: remove any sample index in embargoed_indices from previous folds
@@ -177,22 +179,32 @@ def deflated_sharpe_ratio(returns: pd.Series, n_trials: int = 10, benchmark_shar
     return float(dsr)
 
 
-def sample_uniqueness(t1: pd.Series) -> pd.Series:
+def sample_uniqueness(t1: pd.Series, timestamps: Optional[pd.Series] = None) -> pd.Series:
     """
     For each sample i with label window [timestamp_i, t1_i], count how many
     other samples' windows overlap it, return 1 / (overlap_count) as a weight
-    — samples in a very overlapping cluster get downweighted. Vectorize this
-    reasonably; a plain double loop is acceptable at this project's data size
-    but must complete in well under a minute on ~1 year of hourly data.
+    — samples in a very overlapping cluster get downweighted.
     """
-    if isinstance(t1.index, pd.DatetimeIndex):
-        t0_vals = t1.index.values
+    if timestamps is not None:
+        t0_series = timestamps
+    elif isinstance(t1.index, pd.DatetimeIndex):
+        t0_series = pd.Series(t1.index.values, index=t1.index)
     else:
-        t0_vals = pd.to_datetime(t1.index, utc=True).values
+        try:
+            t0_series = pd.to_datetime(pd.Series(t1.index), utc=True)
+            t0_series.index = t1.index
+        except Exception:
+            t0_series = pd.Series(np.arange(len(t1)), index=t1.index)
 
-    t1_vals = pd.to_datetime(t1.values, utc=True).values
+    # Format t0 and t1 values
+    try:
+        t0_vals = pd.to_datetime(t0_series.values, utc=True).values
+        t1_vals = pd.to_datetime(t1.values, utc=True).values
+    except Exception:
+        t0_vals = np.asarray(t0_series.values)
+        t1_vals = np.asarray(t1.values)
+
     n = len(t1)
-
     overlap_counts = np.zeros(n, dtype=float)
 
     # Local window search: sample i can only overlap with j in a nearby neighborhood

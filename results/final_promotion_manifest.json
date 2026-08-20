@@ -1,0 +1,47 @@
+{
+  "trial_summary": {
+    "n_total_features_tested": 73,
+    "n_configurations_tested": 491,
+    "n_horizons_tested": 8,
+    "n_models_tested": 76,
+    "total_effective_k": 1099
+  },
+  "experiments_log": [
+    {
+      "name": "Position Sizing Dataflow Audit",
+      "n_models": 1,
+      "n_horizons": 1,
+      "n_configs": 8
+    },
+    {
+      "name": "Reference Sizing Implementation",
+      "n_models": 2,
+      "n_horizons": 1,
+      "n_configs": 2
+    },
+    {
+      "name": "Range & Price Path Coverage Audit",
+      "n_models": 1,
+      "n_horizons": 1,
+      "n_configs": 6
+    },
+    {
+      "name": "Sharpe Annualization Forensics",
+      "n_models": 1,
+      "n_horizons": 1,
+      "n_configs": 4
+    },
+    {
+      "name": "Exposure & Leverage Forensics",
+      "n_models": 1,
+      "n_horizons": 1,
+      "n_configs": 6
+    },
+    {
+      "name": "Economic Block Bootstrap (10,000)",
+      "n_models": 1,
+      "n_horizons": 1,
+      "n_configs": 5
+    }
+  ]
+}

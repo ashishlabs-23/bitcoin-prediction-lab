@@ -1,0 +1,52 @@
+{
+  "version": "v1",
+  "trained_at": "2026-08-20T15:28:45.023311+00:00",
+  "train_samples": 20,
+  "test_samples": 10,
+  "metrics": {
+    "sharpe_ratio": 9.3009,
+    "sortino_ratio": 31.1526,
+    "calmar_ratio": 234.0558,
+    "deflated_sharpe": 0.9063,
+    "win_rate": 0.5,
+    "max_drawdown": 0.0086
+  },
+  "comparison_table": {
+    "tft_accuracy": {
+      "old": 0.8,
+      "new": 0.4
+    },
+    "tft_auc": {
+      "old": 1.0,
+      "new": 0.25
+    },
+    "regime_accuracy": {
+      "old": 1.0,
+      "new": 1.0
+    },
+    "meta_win_rate": {
+      "old": 0.5,
+      "new": 0.5
+    },
+    "meta_auc": {
+      "old": 0.28,
+      "new": 0.6
+    },
+    "dsr": {
+      "old": 0.9184,
+      "new": 0.9179
+    },
+    "cost_adjusted_sharpe": {
+      "old": 39.9046,
+      "new": 34.1346
+    }
+  },
+  "incumbent_dsr": 0.965,
+  "promoted": false,
+  "model_paths": {
+    "tft": "models\\registry\\v1\\tft.pt",
+    "regime": "models\\registry\\v1\\regime.pt",
+    "router": "models\\registry\\v1\\router.pt",
+    "meta": "models\\registry\\v1\\meta.pt"
+  }
+}

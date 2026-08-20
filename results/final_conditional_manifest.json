@@ -1,0 +1,65 @@
+{
+  "trial_summary": {
+    "n_total_features_tested": 73,
+    "n_configurations_tested": 65,
+    "n_horizons_tested": 8,
+    "n_models_tested": 31,
+    "total_effective_k": 313
+  },
+  "experiments_log": [
+    {
+      "name": "Funding Point-in-Time Audit",
+      "n_models": 1,
+      "n_horizons": 1,
+      "n_configs": 1
+    },
+    {
+      "name": "Event Independence & Cooldowns",
+      "n_models": 1,
+      "n_horizons": 3,
+      "n_configs": 3
+    },
+    {
+      "name": "Funding Direction Asymmetry",
+      "n_models": 2,
+      "n_horizons": 1,
+      "n_configs": 2
+    },
+    {
+      "name": "Funding Threshold Ladder",
+      "n_models": 1,
+      "n_horizons": 1,
+      "n_configs": 5
+    },
+    {
+      "name": "Funding Holding Horizons",
+      "n_models": 1,
+      "n_horizons": 6,
+      "n_configs": 6
+    },
+    {
+      "name": "Volatility Proxy Controls",
+      "n_models": 1,
+      "n_horizons": 1,
+      "n_configs": 6
+    },
+    {
+      "name": "Magnitude Forecasting Models",
+      "n_models": 5,
+      "n_horizons": 1,
+      "n_configs": 5
+    },
+    {
+      "name": "Excursion Models",
+      "n_models": 2,
+      "n_horizons": 1,
+      "n_configs": 2
+    },
+    {
+      "name": "Conditional Hurdle Rules",
+      "n_models": 2,
+      "n_horizons": 1,
+      "n_configs": 10
+    }
+  ]
+}

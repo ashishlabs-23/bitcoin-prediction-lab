@@ -1,0 +1,68 @@
+{
+  "version": "v2",
+  "trained_at": "2026-08-20T15:41:16.721380+00:00",
+  "train_samples": 1174,
+  "test_samples": 250,
+  "metrics": {
+    "sharpe_ratio": 5.779,
+    "sortino_ratio": 9.9973,
+    "calmar_ratio": 7.7844,
+    "deflated_sharpe": 0.8939,
+    "win_rate": 0.612,
+    "max_drawdown": 0.0695
+  },
+  "comparison_table": {
+    "n_samples": 250,
+    "tft_accuracy": {
+      "old": 0.684,
+      "new": 0.572,
+      "n": 250
+    },
+    "tft_auc": {
+      "old": 0.5971,
+      "new": 0.5041,
+      "n": 250
+    },
+    "regime_accuracy": {
+      "old": 1.0,
+      "new": 1.0,
+      "n": 250
+    },
+    "meta_win_rate": {
+      "old": 0.0,
+      "new": 0.0,
+      "n": 250
+    },
+    "meta_auc": {
+      "old": 0.3906,
+      "new": 0.4461,
+      "n": 250
+    },
+    "dsr": {
+      "old": 0.2975,
+      "new": 0.2975,
+      "n": 250
+    },
+    "cost_adjusted_sharpe": {
+      "old": 0.0,
+      "new": 0.0,
+      "n": 250
+    },
+    "sharpe_diagnostics": {
+      "n_trades": 250,
+      "new_mean_return": 0.0,
+      "new_std_return": 0.0,
+      "old_mean_return": 0.0,
+      "old_std_return": 0.0,
+      "annualization_factor": "sqrt(252) = 15.8745"
+    }
+  },
+  "incumbent_dsr": 0.965,
+  "promoted": false,
+  "model_paths": {
+    "tft": "models\\registry\\v2\\tft.pt",
+    "regime": "models\\registry\\v2\\regime.pt",
+    "router": "models\\registry\\v2\\router.pt",
+    "meta": "models\\registry\\v2\\meta.pt"
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "trial_summary": {
+    "n_total_features_tested": 73,
+    "n_configurations_tested": 197,
+    "n_horizons_tested": 8,
+    "n_models_tested": 75,
+    "total_effective_k": 797
+  },
+  "experiments_log": [
+    {
+      "name": "MFE Target & Leakage Audit",
+      "n_models": 1,
+      "n_horizons": 6,
+      "n_configs": 6
+    },
+    {
+      "name": "MFE Baselines & Volatility Control",
+      "n_models": 7,
+      "n_horizons": 1,
+      "n_configs": 7
+    },
+    {
+      "name": "Quantile MFE & Conformal Intervals",
+      "n_models": 5,
+      "n_horizons": 1,
+      "n_configs": 5
+    },
+    {
+      "name": "Quantile MAE & Excursion Envelope",
+      "n_models": 5,
+      "n_horizons": 1,
+      "n_configs": 5
+    },
+    {
+      "name": "Hurdle Probability Targets",
+      "n_models": 6,
+      "n_horizons": 1,
+      "n_configs": 6
+    },
+    {
+      "name": "Conditional Direction & Asymmetry",
+      "n_models": 3,
+      "n_horizons": 1,
+      "n_configs": 5
+    },
+    {
+      "name": "Tradeability & Selectivity",
+      "n_models": 2,
+      "n_horizons": 1,
+      "n_configs": 8
+    },
+    {
+      "name": "3-System Economic Benchmark",
+      "n_models": 3,
+      "n_horizons": 1,
+      "n_configs": 3
+    }
+  ]
+}

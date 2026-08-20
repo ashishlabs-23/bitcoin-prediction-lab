@@ -25,61 +25,57 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from models.tft_model import TemporalFusionTransformer, CHECKPOINT_PATH
 from engine.feature_pipeline import FeaturePipeline, NUM_FEATURES, SEQUENCE_LENGTH
+from validation.purged_split import PurgedWalkForwardSplit, sample_uniqueness
 
 logger = logging.getLogger("btcognitive.train_tft")
 
 
 class QuantileLoss(nn.Module):
-    """Pinball loss over multiple quantiles [p10, p50, p90]."""
+    """Pinball loss over multiple quantiles [p10, p50, p90] with optional sample weights."""
     def __init__(self, quantiles: List[float] = [0.1, 0.5, 0.9]):
         super().__init__()
         self.quantiles = quantiles
 
-    def forward(self, preds: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+    def forward(self, preds: torch.Tensor, targets: torch.Tensor, weights: Optional[torch.Tensor] = None) -> torch.Tensor:
         # preds: (batch, len(quantiles)), targets: (batch, 1) or (batch,)
         if targets.ndim == 1:
             targets = targets.unsqueeze(1)
         losses = []
         for i, q in enumerate(self.quantiles):
             errors = targets - preds[:, i:i+1]
-            loss = torch.max((q - 1) * errors, q * errors)
-            losses.append(loss.mean())
+            loss_i = torch.max((q - 1) * errors, q * errors)
+            if weights is not None:
+                w = weights.view(-1, 1)
+                losses.append((loss_i * w).sum() / torch.clamp(w.sum(), min=1e-6))
+            else:
+                losses.append(loss_i.mean())
         return torch.stack(losses).mean()
 
 
 class MarketSequenceDataset(Dataset):
-    """Time-series dataset returning (120, 32) tensors with future labels."""
-    def __init__(self, tensors: np.ndarray, returns: np.ndarray, directions: np.ndarray, volatilities: np.ndarray):
+    """Time-series dataset returning (120, 32) tensors with future labels and uniqueness weights."""
+    def __init__(
+        self,
+        tensors: np.ndarray,
+        returns: np.ndarray,
+        directions: np.ndarray,
+        volatilities: np.ndarray,
+        weights: Optional[np.ndarray] = None
+    ):
         self.tensors = torch.from_numpy(tensors).float()
         self.returns = torch.from_numpy(returns).float()
         self.directions = torch.from_numpy(directions).long()
         self.volatilities = torch.from_numpy(volatilities).float()
+        if weights is not None:
+            self.weights = torch.from_numpy(weights).float()
+        else:
+            self.weights = torch.ones(len(tensors), dtype=torch.float32)
 
     def __len__(self) -> int:
         return len(self.tensors)
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        return self.tensors[idx], self.returns[idx], self.directions[idx], self.volatilities[idx]
-
-
-def generate_walk_forward_splits(
-    total_bars: int,
-    train_bars: int = 500,
-    val_bars: int = 100,
-    step_bars: int = 100
-) -> List[Tuple[Tuple[int, int], Tuple[int, int]]]:
-    """
-    Generates strict forward-rolling temporal splits with no lookahead leakage.
-    Returns list of ((train_start, train_end), (val_start, val_end)).
-    """
-    splits = []
-    start = 0
-    while start + train_bars + val_bars <= total_bars:
-        train_range = (start, start + train_bars)
-        val_range = (start + train_bars, start + train_bars + val_bars)
-        splits.append((train_range, val_range))
-        start += step_bars
-    return splits
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        return self.tensors[idx], self.returns[idx], self.directions[idx], self.volatilities[idx], self.weights[idx]
 
 
 def train_walk_forward(
@@ -87,13 +83,18 @@ def train_walk_forward(
     returns: np.ndarray,
     directions: np.ndarray,
     volatilities: np.ndarray,
+    timestamps: Optional[pd.Series] = None,
+    t1: Optional[pd.Series] = None,
+    n_splits: int = 5,
+    embargo_bars: int = 24,
     epochs: int = 5,
     batch_size: int = 32,
     lr: float = 1e-3,
     checkpoint_out: str = CHECKPOINT_PATH
 ) -> Dict[str, Any]:
     """
-    Executes walk-forward training across sequential rolling time horizons.
+    Executes walk-forward training using PurgedWalkForwardSplit across sequential rolling time horizons,
+    applying sample-uniqueness weighting to account for label overlap.
     Saves best performing checkpoint to disk.
     """
     os.makedirs(os.path.dirname(checkpoint_out), exist_ok=True)
@@ -102,35 +103,53 @@ def train_walk_forward(
     model = TemporalFusionTransformer(num_features=NUM_FEATURES, seq_len=SEQUENCE_LENGTH, d_model=64).to(device)
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
 
-    ce_loss_fn = nn.CrossEntropyLoss()
+    ce_loss_fn = nn.CrossEntropyLoss(reduction='none')
     quantile_loss_fn = QuantileLoss(quantiles=[0.1, 0.5, 0.9])
-    mse_loss_fn = nn.MSELoss()
+    mse_loss_fn = nn.MSELoss(reduction='none')
 
     total_samples = len(sequences)
-    train_window = max(300, int(total_samples * 0.6))
-    val_window = max(60, int(total_samples * 0.2))
-    splits = generate_walk_forward_splits(total_samples, train_bars=train_window, val_bars=val_window, step_bars=val_window)
+    if timestamps is None:
+        ts_idx = pd.date_range("2024-01-01", periods=total_samples, freq="1h", tz="UTC")
+        timestamps = pd.Series(ts_idx)
+    else:
+        timestamps = pd.Series(pd.to_datetime(timestamps.values, utc=True))
+
+    if t1 is None:
+        t1 = pd.Series(timestamps + pd.Timedelta(hours=4), index=timestamps.index)
+    else:
+        t1 = pd.Series(pd.to_datetime(t1.values, utc=True), index=timestamps.index)
+
+    # Compute sample uniqueness weights accounting for label overlap
+    weights_series = sample_uniqueness(t1, timestamps=timestamps)
+    sample_weights = weights_series.values
+
+    splitter = PurgedWalkForwardSplit(n_splits=n_splits, embargo_bars=embargo_bars)
+    splits = list(splitter.split(timestamps, t1))
 
     if not splits:
-        # Fallback single chronological split
         split_pt = int(total_samples * 0.75)
-        splits = [((0, split_pt), (split_pt, total_samples))]
+        splits = [(np.arange(0, split_pt), np.arange(split_pt, total_samples))]
 
     best_val_loss = float("inf")
     history = []
 
-    for fold_idx, (train_r, val_r) in enumerate(splits):
+    for fold_idx, (train_idx, val_idx) in enumerate(splits):
+        if len(train_idx) == 0 or len(val_idx) == 0:
+            continue
+
         train_ds = MarketSequenceDataset(
-            sequences[train_r[0]:train_r[1]],
-            returns[train_r[0]:train_r[1]],
-            directions[train_r[0]:train_r[1]],
-            volatilities[train_r[0]:train_r[1]]
+            sequences[train_idx],
+            returns[train_idx],
+            directions[train_idx],
+            volatilities[train_idx],
+            weights=sample_weights[train_idx]
         )
         val_ds = MarketSequenceDataset(
-            sequences[val_r[0]:val_r[1]],
-            returns[val_r[0]:val_r[1]],
-            directions[val_r[0]:val_r[1]],
-            volatilities[val_r[0]:val_r[1]]
+            sequences[val_idx],
+            returns[val_idx],
+            directions[val_idx],
+            volatilities[val_idx],
+            weights=sample_weights[val_idx]
         )
 
         train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
@@ -139,18 +158,25 @@ def train_walk_forward(
         for epoch in range(epochs):
             model.train()
             train_loss = 0.0
-            for batch_x, batch_ret, batch_dir, batch_vol in train_loader:
+            for batch_x, batch_ret, batch_dir, batch_vol, batch_w in train_loader:
                 batch_x = batch_x.to(device)
                 batch_ret = batch_ret.to(device)
                 batch_dir = batch_dir.to(device)
                 batch_vol = batch_vol.to(device)
+                batch_w = batch_w.to(device)
 
                 optimizer.zero_grad()
                 out = model(batch_x)
 
-                loss_ce = ce_loss_fn(out["logits"], batch_dir)
-                loss_q = quantile_loss_fn(out["quantiles"], batch_ret)
-                loss_vol = mse_loss_fn(out["expected_volatility"], batch_vol)
+                w_sum = torch.clamp(batch_w.sum(), min=1e-6)
+                loss_ce_unreduced = ce_loss_fn(out["logits"], batch_dir)
+                loss_ce = (loss_ce_unreduced * batch_w).sum() / w_sum
+
+                loss_q = quantile_loss_fn(out["quantiles"], batch_ret, weights=batch_w)
+
+                loss_vol_unreduced = mse_loss_fn(out["expected_volatility"], batch_vol)
+                loss_vol = (loss_vol_unreduced * batch_w).sum() / w_sum
+
                 total_loss = loss_ce + (0.5 * loss_q) + (0.1 * loss_vol)
 
                 total_loss.backward()
@@ -166,16 +192,20 @@ def train_walk_forward(
             val_loss = 0.0
             correct = 0
             with torch.no_grad():
-                for batch_x, batch_ret, batch_dir, batch_vol in val_loader:
+                for batch_x, batch_ret, batch_dir, batch_vol, batch_w in val_loader:
                     batch_x = batch_x.to(device)
                     batch_ret = batch_ret.to(device)
                     batch_dir = batch_dir.to(device)
                     batch_vol = batch_vol.to(device)
+                    batch_w = batch_w.to(device)
 
                     out = model(batch_x)
-                    loss_ce = ce_loss_fn(out["logits"], batch_dir)
-                    loss_q = quantile_loss_fn(out["quantiles"], batch_ret)
-                    loss_vol = mse_loss_fn(out["expected_volatility"], batch_vol)
+                    w_sum = torch.clamp(batch_w.sum(), min=1e-6)
+                    loss_ce_unreduced = ce_loss_fn(out["logits"], batch_dir)
+                    loss_ce = (loss_ce_unreduced * batch_w).sum() / w_sum
+                    loss_q = quantile_loss_fn(out["quantiles"], batch_ret, weights=batch_w)
+                    loss_vol_unreduced = mse_loss_fn(out["expected_volatility"], batch_vol)
+                    loss_vol = (loss_vol_unreduced * batch_w).sum() / w_sum
                     v_loss = loss_ce + (0.5 * loss_q) + (0.1 * loss_vol)
                     val_loss += v_loss.item() * len(batch_x)
 

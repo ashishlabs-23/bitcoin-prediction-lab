@@ -1,0 +1,25 @@
+{
+  "candidate_target_definition": "24h Volatility-Adaptive Triple Barrier (Intrabar High/Low)",
+  "horizon_bars": 24,
+  "pt_multiplier": 2.0,
+  "sl_multiplier": 2.0,
+  "point_in_time_volatility_window": 24,
+  "intrabar_ambiguity_policy": "mark_ambiguous_and_exclude_training",
+  "training_span": "2026-04-10 to 2026-07-01 (1958 bars)",
+  "validation_span": "2026-07-02 to 2026-08-02 (744 bars)",
+  "final_holdout_span": "2026-08-03 to 2026-08-13 (250 bars)",
+  "purge_bars": 24,
+  "embargo_bars": 24,
+  "sample_count_total": 3000,
+  "validation_stats": {
+    "cross_fold_auc_mean": 0.5002,
+    "cross_fold_auc_std": 0.0635,
+    "bootstrap_ci_95": [
+      0.469,
+      0.5715
+    ],
+    "permutation_p_value": 0.418,
+    "economic_win_rate_pct": 52.46,
+    "cost_adjusted_sharpe": -12.2724
+  }
+}

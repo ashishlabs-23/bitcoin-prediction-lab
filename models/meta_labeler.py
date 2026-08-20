@@ -31,12 +31,15 @@ import logging
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any, Union, Tuple
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 # Ensure project root is in sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from validation.purged_split import sample_uniqueness
 
 logger = logging.getLogger("btcognitive.meta_labeler")
 
@@ -95,7 +98,7 @@ def compute_expert_agreement(expert_outputs: Optional[List[Dict[str, Any]]] = No
 
 class SharpeSurrogateLoss(nn.Module):
     """
-    Differentiable negative Sharpe Ratio loss function.
+    Differentiable negative Sharpe Ratio loss function with optional sample-uniqueness weights.
     Optimizes sizing decisions directly for Sharpe Ratio maximization.
     """
     def __init__(self, fee_drag_bps: float = 8.0, risk_free_rate: float = 0.0):
@@ -103,7 +106,12 @@ class SharpeSurrogateLoss(nn.Module):
         self.fee_drag = fee_drag_bps / 10000.0
         self.rf = risk_free_rate
 
-    def forward(self, sizing_probs: torch.Tensor, hypothetical_returns: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self,
+        sizing_probs: torch.Tensor,
+        hypothetical_returns: torch.Tensor,
+        weights: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
         # sizing_probs: (batch, 3) -> [P(Execute=1.0), P(Reject=0.0), P(Reduce=0.5)]
         # hypothetical_returns: (batch,)
         sizes = torch.tensor([1.0, 0.0, 0.5], device=sizing_probs.device, dtype=sizing_probs.dtype)
@@ -112,8 +120,15 @@ class SharpeSurrogateLoss(nn.Module):
         # Net strategy return after size-weighted fee drag
         net_returns = (expected_sizes * hypothetical_returns) - (expected_sizes * self.fee_drag)
 
-        mean_ret = torch.mean(net_returns)
-        std_ret = torch.std(net_returns) + 1e-6
+        if weights is not None:
+            w_norm = weights / torch.clamp(torch.sum(weights), min=1e-6)
+            mean_ret = torch.sum(w_norm * net_returns)
+            var_ret = torch.sum(w_norm * (net_returns - mean_ret) ** 2) + 1e-6
+            std_ret = torch.sqrt(var_ret)
+        else:
+            mean_ret = torch.mean(net_returns)
+            std_ret = torch.std(net_returns) + 1e-6
+
         sharpe = (mean_ret - self.rf) / std_ret
 
         # Minimize negative Sharpe ratio (with L2 regularization on sizing stability)
@@ -232,13 +247,23 @@ class MetaLabeler:
         meta_features: np.ndarray,
         hypothetical_returns: np.ndarray,
         epochs: int = 20,
-        lr: float = 0.003
+        lr: float = 0.003,
+        sample_weights: Optional[Union[np.ndarray, torch.Tensor]] = None,
+        t1: Optional[pd.Series] = None,
+        timestamps: Optional[pd.Series] = None
     ) -> Dict[str, Any]:
         """
-        Trains the Meta Labeler using direct Sharpe Ratio maximization.
+        Trains the Meta Labeler using direct Sharpe Ratio maximization with optional sample-uniqueness weighting.
         """
         tensor_x = torch.from_numpy(meta_features).float()
         tensor_rets = torch.from_numpy(hypothetical_returns).float()
+
+        if sample_weights is None and t1 is not None:
+            sample_weights = sample_uniqueness(t1, timestamps=timestamps).values
+
+        weights_t = None
+        if sample_weights is not None:
+            weights_t = torch.as_tensor(sample_weights, dtype=torch.float32)
 
         self.model.train()
         optimizer = torch.optim.AdamW(self.model.parameters(), lr=lr, weight_decay=1e-4)
@@ -249,7 +274,7 @@ class MetaLabeler:
             optimizer.zero_grad()
             logits = self.model(tensor_x)
             probs = F.softmax(logits, dim=-1)
-            loss = sharpe_loss_fn(probs, tensor_rets)
+            loss = sharpe_loss_fn(probs, tensor_rets, weights=weights_t)
             loss.backward()
             optimizer.step()
 

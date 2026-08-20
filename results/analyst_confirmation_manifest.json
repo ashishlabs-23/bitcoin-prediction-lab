@@ -1,0 +1,35 @@
+{
+  "trial_summary": {
+    "n_total_features_tested": 73,
+    "n_configurations_tested": 15,
+    "n_horizons_tested": 5,
+    "n_models_tested": 11,
+    "total_effective_k": 70
+  },
+  "experiments_log": [
+    {
+      "name": "MODEL A (Raw Technical Features)",
+      "n_models": 1,
+      "n_horizons": 1,
+      "n_configs": 2
+    },
+    {
+      "name": "MODEL B (Analyst Factors Only)",
+      "n_models": 1,
+      "n_horizons": 1,
+      "n_configs": 2
+    },
+    {
+      "name": "MODEL C (Raw Technical + Analyst Factors)",
+      "n_models": 1,
+      "n_horizons": 1,
+      "n_configs": 2
+    },
+    {
+      "name": "MODEL D (Minimal Signal Set - 6 Factors)",
+      "n_models": 1,
+      "n_horizons": 1,
+      "n_configs": 2
+    }
+  ]
+}

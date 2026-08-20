@@ -42,6 +42,7 @@ from sklearn.cluster import KMeans
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from config import RESULTS_DIR
+from validation.purged_split import sample_uniqueness
 
 logger = logging.getLogger("btcognitive.regime_detector")
 
@@ -179,15 +180,26 @@ class MarketRegimeDetector:
         # Fallback zeros
         return np.zeros((1, 7), dtype=np.float32)
 
-    def fit(self, X_data: Union[np.ndarray, pd.DataFrame], epochs: int = 15, lr: float = 0.005) -> Dict[str, Any]:
+    def fit(
+        self,
+        X_data: Union[np.ndarray, pd.DataFrame],
+        epochs: int = 15,
+        lr: float = 0.005,
+        sample_weights: Optional[Union[np.ndarray, torch.Tensor]] = None,
+        t1: Optional[pd.Series] = None,
+        timestamps: Optional[pd.Series] = None
+    ) -> Dict[str, Any]:
         """
         Two-stage training:
           1. Unsupervised K-Means clustering (7 clusters)
-          2. Supervised Neural Refinement Network training
+          2. Supervised Neural Refinement Network training with sample-uniqueness weighting
         """
         feats = self.extract_features(X_data)
         if len(feats) < 14:
             raise ValueError(f"Need at least 14 samples to train regime detector, got {len(feats)}")
+
+        if sample_weights is None and t1 is not None:
+            sample_weights = sample_uniqueness(t1, timestamps=timestamps).values
 
         # 1. Unsupervised Clustering Stage
         self.kmeans = KMeans(n_clusters=NUM_REGIMES, random_state=42, n_init=10)
@@ -203,14 +215,23 @@ class MarketRegimeDetector:
         tensor_x = torch.from_numpy(feats).float()
         tensor_y = torch.from_numpy(supervised_targets).long()
 
+        weights_t = None
+        if sample_weights is not None:
+            weights_t = torch.as_tensor(sample_weights, dtype=torch.float32)
+
         self.model.train()
         optimizer = torch.optim.AdamW(self.model.parameters(), lr=lr, weight_decay=1e-4)
-        criterion = nn.CrossEntropyLoss()
+        criterion = nn.CrossEntropyLoss(reduction='none')
 
         for epoch in range(epochs):
             optimizer.zero_grad()
             logits = self.model(tensor_x)
-            loss = criterion(logits, tensor_y)
+            loss_unreduced = criterion(logits, tensor_y)
+            if weights_t is not None:
+                w_sum = torch.clamp(weights_t.sum(), min=1e-6)
+                loss = (loss_unreduced * weights_t).sum() / w_sum
+            else:
+                loss = loss_unreduced.mean()
             loss.backward()
             optimizer.step()
 
@@ -330,5 +351,18 @@ def predict_regime_probabilities(df: pd.DataFrame, onchain_valuation: Optional[D
     records = []
     for idx, row in df.iterrows():
         res = regime_detector.predict(row)
-        records.append(res.get("probabilities", {r: 1.0/NUM_REGIMES for r in REGIMES}))
+        raw_probs = dict(res.get("probabilities", {r: 1.0/NUM_REGIMES for r in REGIMES}))
+        
+        # Map 7 V3 regimes to 5 V2 canonical regimes and normalize
+        v2_probs = {
+            'TRENDING_BULL': float(raw_probs.get('Strong Uptrend', 0.0) + raw_probs.get('Weak Uptrend', 0.0)),
+            'TRENDING_BEAR': float(raw_probs.get('Capitulation', 0.0)),
+            'RANGING': float(raw_probs.get('Sideways', 0.0) + raw_probs.get('Distribution', 0.0)),
+            'HIGH_VOLATILITY': float(raw_probs.get('High Volatility', 0.0)),
+            'ACCUMULATION': float(raw_probs.get('Accumulation', 0.0))
+        }
+        total_p = sum(v2_probs.values())
+        if total_p > 0:
+            v2_probs = {k: v / total_p for k, v in v2_probs.items()}
+        records.append(v2_probs)
     return pd.DataFrame(records, index=df.index)

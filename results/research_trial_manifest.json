@@ -1,0 +1,53 @@
+{
+  "trial_summary": {
+    "n_total_features_tested": 62,
+    "n_configurations_tested": 7,
+    "n_horizons_tested": 1,
+    "n_models_tested": 7,
+    "total_effective_k": 14
+  },
+  "experiments_log": [
+    {
+      "name": "MODEL 0 (Baseline 32 Features)",
+      "n_models": 1,
+      "n_horizons": 1,
+      "n_configs": 1
+    },
+    {
+      "name": "MODEL 1 (Baseline + 12 Analyst Factors)",
+      "n_models": 1,
+      "n_horizons": 1,
+      "n_configs": 1
+    },
+    {
+      "name": "MODEL 2 (Baseline + Rich Order Flow)",
+      "n_models": 1,
+      "n_horizons": 1,
+      "n_configs": 1
+    },
+    {
+      "name": "MODEL 3 (Baseline + Derivatives)",
+      "n_models": 1,
+      "n_horizons": 1,
+      "n_configs": 1
+    },
+    {
+      "name": "MODEL 4 (Baseline + Cross-Asset Macro)",
+      "n_models": 1,
+      "n_horizons": 1,
+      "n_configs": 1
+    },
+    {
+      "name": "MODEL 5 (Baseline + Sentiment/Events)",
+      "n_models": 1,
+      "n_horizons": 1,
+      "n_configs": 1
+    },
+    {
+      "name": "MODEL 6 (Full Multimodal Stack 1-6)",
+      "n_models": 1,
+      "n_horizons": 1,
+      "n_configs": 1
+    }
+  ]
+}

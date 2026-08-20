@@ -1,0 +1,53 @@
+{
+  "trial_summary": {
+    "n_total_features_tested": 73,
+    "n_configurations_tested": 320,
+    "n_horizons_tested": 8,
+    "n_models_tested": 86,
+    "total_effective_k": 1008
+  },
+  "experiments_log": [
+    {
+      "name": "Hurdle Label Audit & Diagnostics",
+      "n_models": 2,
+      "n_horizons": 1,
+      "n_configs": 5
+    },
+    {
+      "name": "Probabilistic MFE Distribution",
+      "n_models": 5,
+      "n_horizons": 1,
+      "n_configs": 5
+    },
+    {
+      "name": "MFE Calibration & Regime Coverage",
+      "n_models": 5,
+      "n_horizons": 1,
+      "n_configs": 7
+    },
+    {
+      "name": "Range Forecast & Price Containment",
+      "n_models": 3,
+      "n_horizons": 1,
+      "n_configs": 3
+    },
+    {
+      "name": "Risk Envelope & Decision Table",
+      "n_models": 1,
+      "n_horizons": 1,
+      "n_configs": 4
+    },
+    {
+      "name": "Tradeability Formulations & Sizing",
+      "n_models": 4,
+      "n_horizons": 1,
+      "n_configs": 7
+    },
+    {
+      "name": "Secondary Conditional Direction",
+      "n_models": 2,
+      "n_horizons": 1,
+      "n_configs": 4
+    }
+  ]
+}

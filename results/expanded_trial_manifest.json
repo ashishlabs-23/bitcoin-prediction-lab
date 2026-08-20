@@ -1,0 +1,41 @@
+{
+  "trial_summary": {
+    "n_total_features_tested": 73,
+    "n_configurations_tested": 100,
+    "n_horizons_tested": 8,
+    "n_models_tested": 50,
+    "total_effective_k": 500
+  },
+  "experiments_log": [
+    {
+      "name": "24h Direction Revalidation",
+      "n_models": 4,
+      "n_horizons": 1,
+      "n_configs": 4
+    },
+    {
+      "name": "Magnitude & Excursion Revalidation",
+      "n_models": 6,
+      "n_horizons": 1,
+      "n_configs": 6
+    },
+    {
+      "name": "Economic Revalidation & Circuit Breakers",
+      "n_models": 5,
+      "n_horizons": 1,
+      "n_configs": 12
+    },
+    {
+      "name": "Selective Prediction Revalidation",
+      "n_models": 1,
+      "n_horizons": 1,
+      "n_configs": 6
+    },
+    {
+      "name": "Regime & Era Stability",
+      "n_models": 3,
+      "n_horizons": 1,
+      "n_configs": 7
+    }
+  ]
+}
