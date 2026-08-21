@@ -339,8 +339,9 @@ bitcoin-prediction-lab/
 ├── training/           # Point-in-time feature extraction and adaptation harnesses
 ├── docs/               # System contracts, operator runbooks, and metric definitions
 ├── results/            # Frozen manifests, audit CSVs, and statistical logs
-├── tests/              # 26 comprehensive pytest suites (52+ tests)
 └── web/                # Frontend dashboard, chart visualizations, and UI assets
+
+*(Note: Test suites and operational logs are maintained locally in `tests/` and ignored from remote tracking to ensure a lightweight, clutter-free production repository).*
 ```
 
 ---
