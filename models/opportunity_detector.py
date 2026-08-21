@@ -76,10 +76,12 @@ class OpportunityDetector:
         if quality_data:
             quality_score = int(quality_data.get("score", 75))
 
-        current_regime = "NORMAL"
+        from models.regime_contract import CanonicalRegime, normalize_regime
+        current_regime = CanonicalRegime.RANGING.value
         event_flags = []
         if regime_data:
-            current_regime = regime_data.get("current_regime", "NORMAL")
+            raw_reg = regime_data.get("current_regime", CanonicalRegime.RANGING.value)
+            current_regime = normalize_regime(raw_reg).value
             event_flags = regime_data.get("event_flags", [])
 
         # Avoid counter-trend traps during liquidation cascades

@@ -1,0 +1,11 @@
+{
+  "trial_id": "TRIAL-LONGITUDINAL-60-90",
+  "timestamp": "2026-08-21T00:00:00Z",
+  "observed_blocks": 31,
+  "target_blocks": 90,
+  "next_milestone_block": 35,
+  "governance_mode": "LONGITUDINAL_MONITORING_MODE",
+  "research_stop_rule_active": true,
+  "stop_rule_status": "NO_NEW_RESEARCH_REQUIRED",
+  "data_status": "OBSERVED_SEPARATED_FROM_TARGETS"
+}

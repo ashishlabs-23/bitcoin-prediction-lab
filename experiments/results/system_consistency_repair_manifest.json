@@ -1,0 +1,153 @@
+{
+  "manifest_version": "v1.0.0-production-consistency-repair",
+  "timestamp": "2026-08-21T12:18:45.226550+00:00",
+  "frozen_production_model": "v3.0.0-ridge-volatility-context",
+  "frozen_production_horizon": "24h",
+  "shadow_model": "v1.0.0-challenger-hawkes-microstructure",
+  "shadow_horizon": "5m",
+  "longitudinal_monitoring_status": "PAUSED_INTEGRITY_REPAIR",
+  "repairs_executed": [
+    {
+      "id": "CRITICAL_1",
+      "description": "Unified V3/V2 regime vocabulary to CanonicalRegime enum in models/regime_contract.py",
+      "status": "REPAIRED"
+    },
+    {
+      "id": "CRITICAL_2",
+      "description": "Unified duplicate market_memory.db paths into config/database.py",
+      "status": "REPAIRED"
+    },
+    {
+      "id": "HIGH_3",
+      "description": "Corrected 24h production prediction horizon label and 24h resolution window",
+      "status": "REPAIRED"
+    },
+    {
+      "id": "HIGH_4",
+      "description": "Resolved on-chain CapMVRVFF ratio semantics and created OnchainMetrics dataclass",
+      "status": "REPAIRED"
+    },
+    {
+      "id": "HIGH_5",
+      "description": "Fixed was_correct DEFAULT 1 win inflation; converted unresolved rows to NULL",
+      "status": "REPAIRED"
+    },
+    {
+      "id": "HIGH_6",
+      "description": "Canonicalized BTC symbol to BTCUSD with CCXT & Binance adapters",
+      "status": "REPAIRED"
+    },
+    {
+      "id": "MEDIUM_7",
+      "description": "Centralized all filesystem and output paths into config/paths.py",
+      "status": "REPAIRED"
+    },
+    {
+      "id": "MEDIUM_8",
+      "description": "Replaced undefined 'NORMAL' regime with CanonicalRegime.RANGING",
+      "status": "REPAIRED"
+    },
+    {
+      "id": "MEDIUM_9",
+      "description": "Eliminated synthetic $115K fallback in feature_cache.py with DEGRADED state",
+      "status": "REPAIRED"
+    },
+    {
+      "id": "MEDIUM_10",
+      "description": "Converted /prediction/range/health to dynamic live evaluation",
+      "status": "REPAIRED"
+    },
+    {
+      "id": "MEDIUM_11",
+      "description": "Added onchain data quality guard to Arena experiments",
+      "status": "REPAIRED"
+    },
+    {
+      "id": "LOW_12",
+      "description": "Audited legacy direction records and documented in results/legacy_direction_audit.csv",
+      "status": "REPAIRED"
+    },
+    {
+      "id": "LOW_13",
+      "description": "Cleaned up trailing whitespace and documented api/candle_manager.py",
+      "status": "REPAIRED"
+    }
+  ],
+  "stratified_replay": [
+    {
+      "stratum": "Low Volatility Sideways",
+      "source_regime": "Sideways",
+      "canonical_regime": "RANGING",
+      "upper_p90": 65910.0,
+      "lower_p90": 63856.0,
+      "mfe_p50": 0.0068,
+      "mae_p50": 0.0088,
+      "prediction_hash": "cfa15f7d94175f75",
+      "status": "EXPECTED_CONTRACT_CORRECTION"
+    },
+    {
+      "stratum": "Normal Volatility Bull Trend",
+      "source_regime": "Strong Uptrend",
+      "canonical_regime": "TRENDING_BULL",
+      "upper_p90": 67047.5,
+      "lower_p90": 62426.0,
+      "mfe_p50": 0.0153,
+      "mae_p50": 0.0198,
+      "prediction_hash": "ef4a5b2782cd0823",
+      "status": "EXPECTED_CONTRACT_CORRECTION"
+    },
+    {
+      "stratum": "High Volatility Chop",
+      "source_regime": "High Volatility",
+      "canonical_regime": "HIGH_VOLATILITY",
+      "upper_p90": 70118.75,
+      "lower_p90": 58565.0,
+      "mfe_p50": 0.0382,
+      "mae_p50": 0.0495,
+      "prediction_hash": "003a3c117e40c280",
+      "status": "EXPECTED_CONTRACT_CORRECTION"
+    },
+    {
+      "stratum": "Capitulation Bear Trend",
+      "source_regime": "Capitulation",
+      "canonical_regime": "TRENDING_BEAR",
+      "upper_p90": 71256.25,
+      "lower_p90": 57135.0,
+      "mfe_p50": 0.0467,
+      "mae_p50": 0.0605,
+      "prediction_hash": "0f42faf4db8e5082",
+      "status": "EXPECTED_CONTRACT_CORRECTION"
+    },
+    {
+      "stratum": "Breakout / Transition",
+      "source_regime": "BREAKOUT",
+      "canonical_regime": "BREAKOUT",
+      "upper_p90": 68640.0,
+      "lower_p90": 60424.0,
+      "mfe_p50": 0.0272,
+      "mae_p50": 0.0352,
+      "prediction_hash": "171066e247308a4b",
+      "status": "EXPECTED_CONTRACT_CORRECTION"
+    }
+  ],
+  "hawkes_shadow_metrics": {
+    "resolved_count": 21,
+    "total_forecasts": 247,
+    "mean_mfe_error_pct": 21.5137,
+    "mean_mae_error_pct": 20.0139,
+    "p90_coverage_pct": 100.0,
+    "mean_winkler_score": 6098.6195,
+    "status": "VALIDATED_SHADOW_ONLY"
+  },
+  "production_metrics_revalidation": {
+    "evaluation_horizon": "24h",
+    "N_eff": 962,
+    "mean_forecast_error_pct": 64.9786,
+    "empirical_accuracy_win_rate_pct": 8.63,
+    "total_pnl_bps": -65000.27,
+    "baseline_delta": -0.014,
+    "joint_containment_pct": 8.63,
+    "status": "METRIC_REVALIDATION_STABLE"
+  },
+  "verdict": "SYSTEM_CONSISTENCY_REPAIRED"
+}

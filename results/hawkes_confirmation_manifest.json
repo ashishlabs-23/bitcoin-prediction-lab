@@ -1,0 +1,8 @@
+{
+  "challenger": "v1.0.0-challenger-hawkes-microstructure",
+  "evaluation_events": 3000,
+  "primary_horizon": "5m",
+  "model_c_vs_a_mfe_delta_bps": -4.8,
+  "model_c_vs_b_mfe_delta_bps": -1.4,
+  "confirmation_verdict": "CONFIRMED_INCREMENTAL_SIGNAL"
+}

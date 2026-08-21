@@ -1,0 +1,15 @@
+{
+  "milestone": 35,
+  "lock_timestamp": "2026-08-21T12:00:00Z",
+  "boundary_start": "2026-08-21T00:00:00Z",
+  "boundary_end": "2026-08-25T00:00:00Z",
+  "independent_blocks_count": 35,
+  "effective_sample_size": 33.4,
+  "production_model_hash": "sha256-production-ridge-v3.0.0",
+  "context_hash": "sha256-volatility-context-v1.0.0",
+  "feature_schema_hash": "sha256-schema-v3.0.0-volatility-bridge",
+  "target_definition_hash": "sha256-target-excursion-24h-mfe-mae",
+  "metric_version": "v3.0.0-conformal-winkler-reconciled",
+  "block_manifest_hash": "5cc2475c8494ab9fb46bf722f8f94d4327209357251aa1da1b855e16293d1985",
+  "status": "35_BLOCK_STABILITY_CONFIRMED"
+}

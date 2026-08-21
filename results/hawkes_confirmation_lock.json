@@ -1,0 +1,40 @@
+{
+  "challenger_version": "v1.0.0-challenger-hawkes-microstructure",
+  "lock_timestamp": "2026-08-21T14:32:00Z",
+  "feature_schema": [
+    "mid_price", "spread", "relative_spread", "microprice",
+    "top_imbalance", "depth_imbalance", "multi_level_imbalance",
+    "signed_volume", "buy_sell_ratio", "order_flow_imbalance",
+    "order_arrival_rate", "cancellation_rate",
+    "imbalance_velocity", "spread_velocity", "microprice_velocity",
+    "realized_vol_50",
+    "lambda_buy", "lambda_sell", "lambda_liquidity", "lambda_volatility",
+    "buy_sell_intensity_ratio", "event_pressure", "event_cluster_score"
+  ],
+  "event_types": [
+    "trade", "bid_update", "ask_update", "depth_update", "spread_change", "imbalance_change"
+  ],
+  "primary_horizon": "5m",
+  "secondary_horizons": ["1m", "15m", "30m"],
+  "target_definitions": {
+    "mfe_5m": "max(price[t:t+5m] - price[t]) / price[t]",
+    "mae_5m": "max(price[t] - min(price[t:t+5m])) / price[t]",
+    "dir_5m": "sign(price[t+5m] - price[t])"
+  },
+  "hawkes_parameters": {
+    "dimensions": 4,
+    "decay_beta": [1.5, 1.5, 1.0, 2.0],
+    "baseline_mu": [0.50, 0.50, 0.30, 0.10]
+  },
+  "discovery_window": {
+    "start": "2026-07-01T00:00:00Z",
+    "end": "2026-08-10T00:00:00Z",
+    "purpose": "Feature extraction and parameter tuning"
+  },
+  "frozen_confirmation_window": {
+    "start": "2026-08-10T00:00:01Z",
+    "end": "2026-08-21T00:00:00Z",
+    "purpose": "Untouched independent statistical audit"
+  },
+  "governance_status": "LOCKED_FOR_CONFIRMATION"
+}

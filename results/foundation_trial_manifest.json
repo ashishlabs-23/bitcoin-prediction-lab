@@ -1,0 +1,7 @@
+{
+  "phase": "Time-Series Foundation Model Challenger",
+  "k_before": 1180,
+  "k_foundation": 48,
+  "k_total": 1228,
+  "decision": "CASE_D_FOUNDATION_MODELS_PROVIDE_USEFUL_PRIORS_BUT_RIDGE_REMAINS_SUPERIOR"
+}

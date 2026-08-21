@@ -1,0 +1,13 @@
+{
+  "validation_phase": "LONG_HORIZON_LIVE_RANGE_VALIDATION",
+  "timestamp": "2026-08-21T00:18:00Z",
+  "frozen_model_version": "v3.0.0-excursion-ridge-conformal",
+  "independent_blocks_count": 31,
+  "cumulative_hours_evaluated": 744,
+  "joint_path_containment_pct": 90.32258064516128,
+  "mean_range_width_pct": 5.924838709677418,
+  "baseline_challenge_p_val": 0.0172,
+  "paired_mae_delta_pct": -0.0830830353954245,
+  "drift_status": "ALERT",
+  "promotion_gate_status": "MAINTAIN_PRODUCTION_RIDGE_RANGE_ENGINE"
+}

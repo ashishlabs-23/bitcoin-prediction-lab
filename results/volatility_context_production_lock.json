@@ -1,0 +1,23 @@
+{
+  "production_lock_timestamp": "2026-08-21T15:46:00Z",
+  "production_model_version": "v3.0.0-excursion-ridge-conformal",
+  "production_context_version": "v1.0.0-volatility-bridge-context",
+  "combined_system_id": "v3.0.0-ridge-volatility-context",
+  "horizon": "24h",
+  "feature_schema_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "context_schema_hash": "4a7d1ed414474e4033ac29ccb8653d9b0ef76451e06d9a13b632fa5a72df9e5c",
+  "active_ratios": [
+    "r_5m = (vol_5m * sqrt(288)) / vol_24h",
+    "r_1h = (vol_1h * sqrt(24)) / vol_24h",
+    "r_4h = (vol_4h * sqrt(6)) / vol_24h"
+  ],
+  "regime_thresholds": {
+    "VOL_EXPANDING": "r_1h > 1.30 or r_5m > 1.40",
+    "VOL_COMPRESSION": "r_1h < 0.75",
+    "PEAK_VOLATILITY": "r_4h > 1.50",
+    "NORMAL": "otherwise"
+  },
+  "fallback_policy": "FALLBACK_TO_BASELINE_RIDGE_ON_MISSING_HORIZONS",
+  "shadow_coupling": "NONE (ZERO_HAWKES_DEPENDENCY)",
+  "governance_status": "LOCKED_IN_PRODUCTION"
+}

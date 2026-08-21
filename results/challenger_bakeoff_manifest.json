@@ -1,0 +1,11 @@
+{
+  "bakeoff_id": "bakeoff_ridge_vs_ewma_20260821",
+  "production_model": "v3.0.0-excursion-ridge-conformal",
+  "challenger_model": "v3.1.0-excursion-ewma-baseline",
+  "total_evaluation_blocks": 33,
+  "ridge_mfe_mae": 0.7019350282479422,
+  "ewma_mfe_mae": 0.7850180636433668,
+  "ridge_path_containment": 75.75757575757575,
+  "ewma_path_containment": 66.66666666666666,
+  "bakeoff_verdict": "RETAIN_PRODUCTION_RIDGE"
+}

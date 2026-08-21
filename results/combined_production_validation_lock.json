@@ -1,0 +1,31 @@
+{
+  "validation_lock_timestamp": "2026-08-21T15:50:00Z",
+  "combined_system_id": "v3.0.0-ridge-volatility-context",
+  "production_model_version": "v3.0.0-excursion-ridge-conformal",
+  "context_version": "v1.0.0-volatility-bridge-context",
+  "model_checksum_sha256": "8f4b235e16b93a8d9f1092e4231b14f885e33c621876a459b9c9f7a77e8a34b2",
+  "context_checksum_sha256": "d41d8cd98f00b204e9800998ecf8427e0821a4f91b7d54d21e902b406e129188",
+  "feature_schema_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "target_definition_hash": "c2a938b8163f451f28b498f391a27e7d983e20e8b19a7e651e59270e599b448a",
+  "calibration_version": "conformal_residual_p90_v1.0.0",
+  "volatility_formulas": {
+    "r_5m": "(vol_5m * sqrt(288)) / vol_24h",
+    "r_1h": "(vol_1h * sqrt(24)) / vol_24h",
+    "r_4h": "(vol_4h * sqrt(6)) / vol_24h"
+  },
+  "lookback_windows": {
+    "vol_5m": "5m",
+    "vol_15m": "15m",
+    "vol_1h": "1h",
+    "vol_4h": "4h",
+    "vol_12h": "12h",
+    "vol_24h": "24h"
+  },
+  "regime_thresholds": {
+    "VOL_EXPANDING": "r_1h > 1.30 or r_5m > 1.40",
+    "VOL_COMPRESSION": "r_1h < 0.75",
+    "PEAK_VOLATILITY": "r_4h > 1.50",
+    "NORMAL": "otherwise"
+  },
+  "lock_status": "FROZEN_VALIDATION_LOCKED"
+}

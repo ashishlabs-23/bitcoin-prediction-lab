@@ -1,0 +1,13 @@
+{
+  "evaluated_horizons": [
+    "5m",
+    "15m",
+    "1h",
+    "4h",
+    "12h",
+    "24h",
+    "48h"
+  ],
+  "cumulative_research_trials_K": 1139,
+  "verdict": "CASE_A_DIFFERENT_HORIZONS_HAVE_DIFFERENT_OPTIMAL_MODELS"
+}

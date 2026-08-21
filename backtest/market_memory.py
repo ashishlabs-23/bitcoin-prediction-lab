@@ -21,10 +21,11 @@ import pandas as pd
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from config import RESULTS_DIR
+from config.database import MARKET_MEMORY_DB_PATH
 
 logger = logging.getLogger("btcognitive.market_memory")
 
-DB_PATH = os.path.join(RESULTS_DIR, "market_memory.db")
+DB_PATH = MARKET_MEMORY_DB_PATH
 CSV_PATH = os.path.join(RESULTS_DIR, "market_memory.csv")
 EXPORTS_DIR = os.path.join(RESULTS_DIR, "exports")
 
@@ -81,7 +82,7 @@ def _init_tables(conn: sqlite3.Connection):
                 calibrated_prob REAL NOT NULL,
                 decision TEXT NOT NULL,
                 actual_return REAL DEFAULT 0.0,
-                was_correct INTEGER DEFAULT 1,
+                was_correct INTEGER DEFAULT NULL,
                 pnl REAL DEFAULT 0.0,
                 direction TEXT NOT NULL,
                 tp REAL,
@@ -239,7 +240,7 @@ def record_prediction(
     calibrated_prob: float,
     decision: str,
     actual_return: float = 0.0,
-    was_correct: bool = True,
+    was_correct: Optional[bool] = None,
     pnl: float = 0.0,
     direction: str = "LONG",
     tp: float = 0.0,
@@ -288,7 +289,7 @@ def record_prediction(
         'calibrated_prob': float(calibrated_prob),
         'decision': str(decision),
         'actual_return': float(actual_return),
-        'was_correct': 1 if was_correct else 0,
+        'was_correct': (1 if was_correct else 0) if was_correct is not None else None,
         'pnl': float(pnl),
         'direction': str(direction),
         'tp': float(tp),
@@ -330,7 +331,7 @@ def record_prediction(
     csv_file = get_memory_file()
     try:
         rec_for_df = record_dict.copy()
-        rec_for_df['was_correct'] = bool(was_correct)
+        rec_for_df['was_correct'] = was_correct if was_correct is not None else np.nan
         rec_for_df['outcome_resolved'] = bool(outcome_resolved)
         new_row_df = pd.DataFrame([rec_for_df])
         if os.path.exists(csv_file) and os.path.getsize(csv_file) > 0:
@@ -356,7 +357,7 @@ def load_market_memory() -> pd.DataFrame:
                 if col not in df.columns:
                     df[col] = np.nan
             if 'was_correct' in df.columns:
-                df['was_correct'] = df['was_correct'].astype(bool)
+                df['was_correct'] = df['was_correct'].astype('boolean')
             if 'outcome_resolved' in df.columns:
                 df['outcome_resolved'] = df['outcome_resolved'].astype(bool)
             return df
@@ -367,7 +368,7 @@ def load_market_memory() -> pd.DataFrame:
     _init_tables(conn)
     try:
         df = pd.read_sql_query("SELECT * FROM predictions ORDER BY timestamp ASC", conn)
-        df['was_correct'] = df['was_correct'].astype(bool)
+        df['was_correct'] = df['was_correct'].astype('boolean')
         df['outcome_resolved'] = df['outcome_resolved'].astype(bool)
         return df
     except Exception as e:
@@ -434,7 +435,7 @@ def update_prediction_outcome(prediction_id: str, actual_return: float, was_corr
     return updated
 
 
-def resolve_pending_outcomes(current_price: float, current_time_str: str, horizon_hours: int = 4) -> int:
+def resolve_pending_outcomes(current_price: float, current_time_str: str, horizon_hours: int = 24) -> int:
     """
     Two-phase outcome resolver: Queries unresolved records,
     computes return, and marks outcome_resolved = 1.

@@ -1,0 +1,30 @@
+{
+  "lock_timestamp": "2026-08-21T15:43:00Z",
+  "horizon": "24h",
+  "candidate_configurations": {
+    "A": "Ridge baseline (excursion_ridge_v3.0.0)",
+    "B": "Ridge + Volatility Term Structure (5m, 15m, 1h, 4h, 12h, 24h ratios)",
+    "C": "Ridge + Full Multiscale State (Hawkes + Derivatives + Vol Term Structure)"
+  },
+  "frozen_features": [
+    "vol_5m_24h_ratio",
+    "vol_1h_24h_ratio",
+    "vol_4h_24h_ratio",
+    "volatility_regime_encoded",
+    "realized_vol_24h"
+  ],
+  "volatility_ratios": {
+    "r_5m": "(vol_5m * sqrt(288)) / vol_24h",
+    "r_1h": "(vol_1h * sqrt(24)) / vol_24h",
+    "r_4h": "(vol_4h * sqrt(6)) / vol_24h"
+  },
+  "regime_thresholds": {
+    "VOL_EXPANDING": "r_1h > 1.30 or r_5m > 1.40",
+    "VOL_COMPRESSION": "r_1h < 0.75",
+    "PEAK_VOLATILITY": "r_4h > 1.50",
+    "NORMAL": "otherwise"
+  },
+  "purge_hours": 24,
+  "embargo_hours": 24,
+  "status": "FROZEN_LOCKED"
+}

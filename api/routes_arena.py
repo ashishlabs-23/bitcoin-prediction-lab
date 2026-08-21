@@ -113,6 +113,19 @@ async def run_arena_experiment(payload: Optional[Dict[str, Any]] = Body(default=
     base_atr = float(row.get("atr_14", live_p * 0.012)) if row is not None else live_p * 0.012
 
     onchain = get_latest_onchain_valuation(live_btc_price=live_p)
+    from models.onchain_contract import OnchainQuality, assess_onchain_quality, OnchainMetrics
+    onchain_q = assess_onchain_quality(onchain)
+    
+    if onchain_q == OnchainQuality.INVALID and macro_shock == "CURRENT":
+        raise HTTPException(status_code=400, detail="Cannot run Arena experiment: upstream onchain data is INVALID.")
+        
+    allow_degraded = bool(payload.get("allow_degraded", True))
+    experiment_mode = "VALID"
+    if onchain_q in [OnchainQuality.DEGRADED, OnchainQuality.STALE] and macro_shock == "CURRENT":
+        if not allow_degraded:
+            raise HTTPException(status_code=400, detail="Arena experiment blocked: onchain data is DEGRADED. Set allow_degraded=True to run research experiment.")
+        experiment_mode = "DEGRADED_RESEARCH"
+
     if macro_shock == "CAPITULATION":
         sim_cycle = "CAPITULATION"
         sim_mvrv, sim_nupl = 0.92, -0.05
@@ -123,9 +136,15 @@ async def run_arena_experiment(payload: Optional[Dict[str, Any]] = Body(default=
         sim_cycle = "NEUTRAL"
         sim_mvrv, sim_nupl = 1.85, 0.42
     else:
-        sim_cycle = onchain.get("cycle_phase", "NEUTRAL")
-        sim_mvrv = float(onchain.get("mvrv", onchain.get("mvrv_zscore", 1.85)))
-        sim_nupl = float(onchain.get("nupl", 0.42))
+        try:
+            m = OnchainMetrics.from_dict(onchain)
+            sim_cycle = m.cycle_phase
+            sim_mvrv = m.mvrv_ratio
+            sim_nupl = m.nupl
+        except Exception:
+            sim_cycle = onchain.get("cycle_phase", "NEUTRAL")
+            sim_mvrv = float(onchain.get("mvrv", 1.85))
+            sim_nupl = float(onchain.get("nupl", 0.42))
 
     trials_results = []
     directions_count = {"LONG": 0, "SHORT": 0, "SKIP": 0}
@@ -206,7 +225,8 @@ async def run_arena_experiment(payload: Optional[Dict[str, Any]] = Body(default=
             "macro_shock": sim_cycle,
             "mvrv": sim_mvrv,
             "liquidity_shock_pct": liq_shock_pct,
-            "committed_to_ledger": commit_to_ledger
+            "committed_to_ledger": commit_to_ledger,
+            "experiment_mode": experiment_mode
         },
         "distribution": {
             "long_pct": long_pct,

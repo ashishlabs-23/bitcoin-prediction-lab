@@ -1,0 +1,22 @@
+{
+  "migration_timestamp": "2026-08-21T12:04:55.020324+00:00",
+  "source_db_path": "C:\\Projects\\BTCognitive\\bitcoin-prediction-lab\\data\\market_memory.db",
+  "source_db_sha256": "8656a39e14cfd13d9a25aa056b30e2a1b95b607aa411e8a5885f7f8bee11569f",
+  "target_db_path": "C:\\Projects\\BTCognitive\\bitcoin-prediction-lab\\experiments\\results\\market_memory.db",
+  "backup_db_path": "C:\\Projects\\BTCognitive\\bitcoin-prediction-lab\\experiments\\results\\market_memory_pre_hawkes_backup_1787313894.db",
+  "target_db_sha256_before": "989f71eaf8e544ebdf8edf60c20b0c8911f5982a1ae911d18264fefe5da07064",
+  "target_db_sha256_after": "256d700753d789f477cb78f576ef3822e56c2286b2f818ab6bd346efc5e6598a",
+  "hawkes_forecasts": {
+    "source_rows": 247,
+    "target_before": 0,
+    "migrated": 247,
+    "target_after": 247
+  },
+  "hawkes_outcomes": {
+    "source_rows": 21,
+    "target_before": 0,
+    "migrated": 21,
+    "target_after": 21
+  },
+  "status": "MIGRATION_SUCCESS"
+}

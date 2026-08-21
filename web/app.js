@@ -201,6 +201,31 @@ const api = {
     if (!res.ok) throw new Error("prediction/counterfactual failed");
     return res.json();
   },
+  async fetchRangeLatest() {
+    const res = await fetch(`${getApiBaseUrl()}/prediction/range`);
+    if (!res.ok) throw new Error("prediction/range failed");
+    return res.json();
+  },
+  async fetchRangePath(horizon = 24) {
+    const res = await fetch(`${getApiBaseUrl()}/prediction/range/path?horizon=${horizon}`);
+    if (!res.ok) throw new Error("prediction/range/path failed");
+    return res.json();
+  },
+  async fetchRangeHealth() {
+    const res = await fetch(`${getApiBaseUrl()}/prediction/range/health`);
+    if (!res.ok) throw new Error("prediction/range/health failed");
+    return res.json();
+  },
+  async fetchLongitudinalStatus() {
+    const res = await fetch(`${getApiBaseUrl()}/prediction/longitudinal`);
+    if (!res.ok) throw new Error("prediction/longitudinal failed");
+    return res.json();
+  },
+  async fetchDirectionAccuracy() {
+    const res = await fetch(`${getApiBaseUrl()}/prediction/direction/accuracy`);
+    if (!res.ok) throw new Error("prediction/direction/accuracy failed");
+    return res.json();
+  },
   async fetchHealth() {
     const res = await fetch(`${getApiBaseUrl()}/health`);
     if (!res.ok) throw new Error("health failed");

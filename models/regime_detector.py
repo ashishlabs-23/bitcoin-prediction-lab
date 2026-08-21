@@ -338,11 +338,13 @@ def detect_regime(data: Union[Dict[str, Any], pd.DataFrame, pd.Series, np.ndarra
 # ---------------------------------------------------------------------------
 
 def classify_regimes(df: pd.DataFrame, onchain_valuation: Optional[Dict[str, Any]] = None) -> pd.Series:
-    """Backwards compatibility helper for existing backtest pipelines."""
+    """Canonical regime classification returning canonical regime series."""
+    from models.regime_contract import normalize_regime
     res_list = []
     for idx, row in df.iterrows():
         res = regime_detector.predict(row)
-        res_list.append(res["regime"])
+        canonical = normalize_regime(res["regime"]).value
+        res_list.append(canonical)
     return pd.Series(res_list, index=df.index, name="regime")
 
 

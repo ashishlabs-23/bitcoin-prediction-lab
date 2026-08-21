@@ -1,0 +1,113 @@
+{
+  "trials": [
+    {
+      "context_length": 120,
+      "seed": 42,
+      "parameters": 20620,
+      "best_val_loss": 1.47075,
+      "confirmation_pinball": 1.22472,
+      "confirmation_mfe_mae_pct": 180.0196,
+      "confirmation_mae_mae_pct": 204.2648,
+      "training_samples": 389,
+      "confirmation_samples": 156,
+      "status": "TRAINED"
+    },
+    {
+      "context_length": 120,
+      "seed": 123,
+      "parameters": 20620,
+      "best_val_loss": 1.21571,
+      "confirmation_pinball": 1.39586,
+      "confirmation_mfe_mae_pct": 192.1366,
+      "confirmation_mae_mae_pct": 224.8185,
+      "training_samples": 389,
+      "confirmation_samples": 156,
+      "status": "TRAINED"
+    },
+    {
+      "context_length": 120,
+      "seed": 2026,
+      "parameters": 20620,
+      "best_val_loss": 1.06405,
+      "confirmation_pinball": 0.97008,
+      "confirmation_mfe_mae_pct": 126.2814,
+      "confirmation_mae_mae_pct": 156.7527,
+      "training_samples": 389,
+      "confirmation_samples": 156,
+      "status": "TRAINED"
+    },
+    {
+      "context_length": 240,
+      "seed": 42,
+      "parameters": 20620,
+      "best_val_loss": 1.47159,
+      "confirmation_pinball": 1.2288,
+      "confirmation_mfe_mae_pct": 179.7402,
+      "confirmation_mae_mae_pct": 205.0365,
+      "training_samples": 359,
+      "confirmation_samples": 126,
+      "status": "TRAINED"
+    },
+    {
+      "context_length": 240,
+      "seed": 123,
+      "parameters": 20620,
+      "best_val_loss": 1.25425,
+      "confirmation_pinball": 1.44456,
+      "confirmation_mfe_mae_pct": 195.2106,
+      "confirmation_mae_mae_pct": 234.7884,
+      "training_samples": 359,
+      "confirmation_samples": 126,
+      "status": "TRAINED"
+    },
+    {
+      "context_length": 240,
+      "seed": 2026,
+      "parameters": 20620,
+      "best_val_loss": 1.05221,
+      "confirmation_pinball": 1.00481,
+      "confirmation_mfe_mae_pct": 128.6328,
+      "confirmation_mae_mae_pct": 164.8006,
+      "training_samples": 359,
+      "confirmation_samples": 126,
+      "status": "TRAINED"
+    },
+    {
+      "context_length": 480,
+      "seed": 42,
+      "parameters": 20620,
+      "best_val_loss": 1.29619,
+      "confirmation_pinball": 1.19005,
+      "confirmation_mfe_mae_pct": 177.2218,
+      "confirmation_mae_mae_pct": 199.1911,
+      "training_samples": 299,
+      "confirmation_samples": 66,
+      "status": "TRAINED"
+    },
+    {
+      "context_length": 480,
+      "seed": 123,
+      "parameters": 20620,
+      "best_val_loss": 1.38582,
+      "confirmation_pinball": 1.5601,
+      "confirmation_mfe_mae_pct": 209.8439,
+      "confirmation_mae_mae_pct": 259.6652,
+      "training_samples": 299,
+      "confirmation_samples": 66,
+      "status": "TRAINED"
+    },
+    {
+      "context_length": 480,
+      "seed": 2026,
+      "parameters": 20620,
+      "best_val_loss": 1.03436,
+      "confirmation_pinball": 1.0329,
+      "confirmation_mfe_mae_pct": 130.5539,
+      "confirmation_mae_mae_pct": 166.9113,
+      "training_samples": 299,
+      "confirmation_samples": 66,
+      "status": "TRAINED"
+    }
+  ],
+  "total_trials": 9
+}

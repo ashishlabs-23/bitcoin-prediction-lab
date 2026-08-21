@@ -1,0 +1,11 @@
+{
+  "phase": "1H-4H Intermediate Horizon Validation",
+  "historical_trials": 1139,
+  "1h_trials": 5,
+  "4h_trials": 5,
+  "decay_trials": 7,
+  "total_trials": 1156,
+  "final_decision": "CASE_B_5M_DECAYS_BUT_DERIVATIVES_VOLATILITY_BRIDGE_TO_4H",
+  "production_status": "RIDGE_24H_FROZEN_PRODUCTION",
+  "shadow_status": "HAWKES_5M_VALIDATED_SHADOW"
+}

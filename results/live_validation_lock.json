@@ -1,0 +1,17 @@
+{
+  "validation_lock_timestamp": "2026-08-21T00:17:00Z",
+  "frozen_model_version": "v3.0.0-excursion-ridge-conformal",
+  "target_definition": "24h_mfe_and_mae_price_envelope",
+  "target_horizon_hours": 24,
+  "nominal_quantile_coverage_target": 0.90,
+  "nominal_joint_path_containment_target": 0.7887,
+  "canonical_metric_contract_file": "research/live_metric_contract.md",
+  "primary_statistical_validation_unit": "24h_non_overlapping_independent_blocks",
+  "minimum_independent_blocks_required": 30,
+  "data_quality_rules": {
+    "missing_features_action": "DEGRADED_MODE_WIDEN_UNCERTAINTY",
+    "invalid_price_action": "REJECT_FORECAST",
+    "staleness_threshold_hours": 2
+  },
+  "lock_status": "FROZEN_FOR_LONG_HORIZON_VALIDATION"
+}

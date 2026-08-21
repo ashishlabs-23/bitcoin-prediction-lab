@@ -26,9 +26,10 @@ class FeatureCache:
         self._df: Optional[pd.DataFrame] = None
         self._last_update_ts: float = 0.0
         self._is_initialized: bool = False
+        self._is_degraded: bool = False
 
     def initialize(self):
-        """Initializes the in-memory dataframe from local parquet or default seed."""
+        """Initializes the in-memory dataframe from local parquet or enters DEGRADED state."""
         feat_path = os.path.join(DATA_PROCESSED_DIR, "features.parquet")
         if os.path.exists(feat_path):
             try:
@@ -36,40 +37,23 @@ class FeatureCache:
                 df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
                 self._df = df.sort_values("timestamp").reset_index(drop=True)
                 self._is_initialized = True
+                self._is_degraded = False
                 self._last_update_ts = time.time()
                 logger.info(f"FeatureCache initialized from parquet with {len(self._df)} rows.")
                 return
             except Exception as e:
                 logger.warning(f"FeatureCache failed to read parquet: {e}")
 
-        # Fallback synthetic historical initialization if parquet not present
-        ts = pd.date_range("2024-01-01", periods=100, freq="1h", tz="UTC")
-        prices = 115000.0 + np.cumsum(np.random.normal(10, 50, size=100))
-        self._df = pd.DataFrame({
-            "timestamp": ts,
-            "open": prices - 10,
-            "high": prices + 25,
-            "low": prices - 25,
-            "close": prices,
-            "volume": np.random.uniform(50, 200, 100),
-            "ret_1h": np.random.normal(0.001, 0.005, 100),
-            "ret_4h": np.random.normal(0.004, 0.010, 100),
-            "ret_24h": np.random.normal(0.01, 0.02, 100),
-            "realized_vol_24h": np.random.uniform(0.01, 0.03, 100),
-            "rsi_14": np.random.uniform(40, 70, 100),
-            "macd": np.random.normal(0, 50, 100),
-            "macd_signal": np.random.normal(0, 40, 100),
-            "sma_ratio_20": np.random.normal(0, 0.01, 100),
-            "sma_ratio_50": np.random.normal(0, 0.02, 100),
-            "atr_14": np.random.uniform(500, 1200, 100),
-            "funding_rate": np.random.normal(0.0001, 0.0001, 100),
-            "funding_rate_change_24h": np.random.normal(0, 0.00005, 100),
-            "open_interest": np.random.uniform(100000, 110000, 100),
-            "oi_pct_change_24h": np.random.normal(0.01, 0.03, 100)
-        })
+        # If no real data available, enter DEGRADED state without fabricating prices
+        self._df = pd.DataFrame()
         self._is_initialized = True
+        self._is_degraded = True
         self._last_update_ts = time.time()
-        logger.info("FeatureCache initialized with seed dataset.")
+        logger.warning("FeatureCache: No real historical data found. Entering DEGRADED state.")
+
+    def is_healthy(self) -> bool:
+        """Returns True if cache has valid real data and is not degraded."""
+        return self._is_initialized and not self._is_degraded and self._df is not None and not self._df.empty
 
     def update_from_candles(
         self,

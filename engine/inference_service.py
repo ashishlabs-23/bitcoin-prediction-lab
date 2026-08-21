@@ -21,7 +21,10 @@ import pandas as pd
 # Ensure project root is in sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from config import SYMBOL, DATA_PROCESSED_DIR
+from config import DATA_PROCESSED_DIR
+from models.symbol_contract import CANONICAL_SYMBOL
+from models.horizon_contract import PRODUCTION_RANGE_HORIZON_LABEL, OUTCOME_RESOLUTION_HORIZON_HOURS
+from models.onchain_contract import OnchainMetrics, assess_onchain_quality
 from models.train_baselines import make_dataset
 from models.ensemble import AdaptiveRegimeEnsemble
 from models.market_state import compute_market_states
@@ -154,6 +157,7 @@ class LiveInferenceEngine:
         latest_row = df[feature_cols].iloc[-1:]
         entry_price = float(df.iloc[-1]['close'])
         onchain_val = get_latest_onchain_valuation(live_btc_price=entry_price)
+        onchain_metrics = OnchainMetrics.from_dict(onchain_val)
         regimes_series = classify_regimes(df, onchain_valuation=onchain_val)
         current_regime = str(regimes_series.iloc[-1])
         states_df = compute_market_states(df)
@@ -295,6 +299,7 @@ class LiveInferenceEngine:
                 "model": "Adaptive Regime Ensemble (RF + XGBoost)",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "entry_time_ms": int(time.time() * 1000),
+                "symbol": CANONICAL_SYMBOL,
                 "btc_price": entry_price,
                 "entry_price": entry_price,
                 "tp": tp,
@@ -302,10 +307,12 @@ class LiveInferenceEngine:
                 "tp_atr_mult": 2.0,
                 "sl_atr_mult": 1.5,
                 "confidence": round(confidence, 3),
-                "horizon": "4h",
-                "macro_cycle": onchain_val.get('cycle_phase', 'NEUTRAL'),
-                "mvrv_zscore": onchain_val.get('mvrv', onchain_val.get('mvrv_zscore', 1.85)),
-                "nupl": onchain_val.get('nupl', 0.42),
+                "horizon": PRODUCTION_RANGE_HORIZON_LABEL,
+                "macro_cycle": onchain_metrics.cycle_phase,
+                "mvrv": onchain_metrics.mvrv_ratio,
+                "mvrv_ratio": onchain_metrics.mvrv_ratio,
+                "nupl": onchain_metrics.nupl,
+                "onchain_quality": onchain_metrics.quality.value,
                 "uncertainty_breakdown": unc_breakdown,
                 "uncertainty_narrative": unc_narrative
             }
@@ -319,9 +326,11 @@ class LiveInferenceEngine:
                 "funding_state": str(latest_state.get('funding_state', 'NEUTRAL')),
                 "leverage_state": str(latest_state.get('leverage_state', 'NORMAL')),
                 "current_regime": current_regime,
-                "macro_cycle": onchain_val.get('cycle_phase', 'NEUTRAL'),
-                "mvrv_zscore": onchain_val.get('mvrv_zscore', 1.85),
-                "nupl": onchain_val.get('nupl', 0.42),
+                "macro_cycle": onchain_metrics.cycle_phase,
+                "mvrv": onchain_metrics.mvrv_ratio,
+                "mvrv_ratio": onchain_metrics.mvrv_ratio,
+                "nupl": onchain_metrics.nupl,
+                "onchain_quality": onchain_metrics.quality.value,
                 "event_flags": active_event_flags,
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
@@ -376,9 +385,9 @@ class LiveInferenceEngine:
                     direction=direction,
                     tp=tp,
                     sl=sl,
-                    macro_cycle=onchain_val.get('cycle_phase', 'NEUTRAL'),
-                    mvrv_val=float(onchain_val.get('mvrv', onchain_val.get('mvrv_zscore', 1.85))),
-                    nupl_val=float(onchain_val.get('nupl', 0.42)),
+                    macro_cycle=onchain_metrics.cycle_phase,
+                    mvrv_val=onchain_metrics.mvrv_ratio,
+                    nupl_val=onchain_metrics.nupl,
                     data_reliability=unc_breakdown.get('data_reliability', 1.0),
                     regime_certainty=unc_breakdown.get('regime_certainty', 1.0),
                     model_agreement=unc_breakdown.get('model_agreement', 1.0),
@@ -387,7 +396,7 @@ class LiveInferenceEngine:
                     expected_return_gross_pct=round(abs(expected_ret) * 100, 2),
                     expected_return_net_pct=round(expected_ret_net * 100, 2)
                 )
-                resolve_pending_outcomes(current_price=entry_price, current_time_str=self.latest_prediction["timestamp"], horizon_hours=4)
+                resolve_pending_outcomes(current_price=entry_price, current_time_str=self.latest_prediction["timestamp"], horizon_hours=OUTCOME_RESOLUTION_HORIZON_HOURS)
             except Exception as mem_err:
                 logger.error(f"Market memory write error: {mem_err}")
 

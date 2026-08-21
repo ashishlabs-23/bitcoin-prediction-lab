@@ -1,0 +1,15 @@
+{
+  "feature_schema": [
+    "vol_24h",
+    "rsi_14",
+    "atr_14",
+    "funding_rate",
+    "mvrv_zscore"
+  ],
+  "target": "24h MFE / MAE quantiles",
+  "horizon": "24h",
+  "train_samples": 299,
+  "val_samples": 20,
+  "confirmation_samples": 66,
+  "no_leakage_verified": true
+}

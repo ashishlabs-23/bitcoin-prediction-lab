@@ -1,0 +1,11 @@
+{
+  "failure_id": "TRIGGER-20260821-112823",
+  "timestamp": "2026-08-21T11:28:23.075059+00:00",
+  "status": "RESEARCH_TRIGGERED",
+  "trigger_type": "PERSISTENT_CALIBRATION_DEGRADATION",
+  "evidence": "Persistent failure detected across 3 consecutive review windows.",
+  "affected_component": "v3.0.0-ridge-volatility-context",
+  "candidate_scope": "Offline research hypothesis proposal only",
+  "validation_plan": "10,000 block bootstrap OOS evaluation",
+  "manual_review_required": true
+}

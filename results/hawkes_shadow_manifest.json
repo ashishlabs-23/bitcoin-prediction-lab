@@ -1,0 +1,8 @@
+{
+  "challenger": "v1.0.0-challenger-hawkes-microstructure",
+  "production_baseline": "v3.0.0-excursion-ridge-conformal",
+  "offline_reference_mfe_bps": 9.4,
+  "offline_reference_p90_cov": 92.1,
+  "live_status": "SHADOW_HEALTHY",
+  "promotion_eligible_to_shadow_status": "VALIDATED_SHADOW_MODEL"
+}
