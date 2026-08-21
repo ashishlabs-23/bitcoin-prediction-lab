@@ -391,7 +391,7 @@ def get_memory_records(limit: int = Query(50, le=500)):
     df = load_market_memory()
     if df.empty:
         return []
-    tail_df = df.tail(limit).fillna("")
+    tail_df = df.tail(limit).astype(object).fillna("")
     records = _sanitize_records(tail_df.to_dict(orient="records"))
     return records
 
@@ -402,7 +402,7 @@ def get_api_memory_records(limit: int = Query(50, le=500)):
     df = load_market_memory()
     if df.empty:
         return {"memory": [], "count": 0}
-    tail_df = df.tail(limit).fillna("")
+    tail_df = df.tail(limit).astype(object).fillna("")
     records = _sanitize_records(tail_df.to_dict(orient="records"))
     return {"memory": records, "count": len(records)}
 

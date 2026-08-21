@@ -44,6 +44,7 @@ env/
 web_dist/
 
 # Testing & Caches
+tests/
 .pytest_cache/
 .coverage
 htmlcov/

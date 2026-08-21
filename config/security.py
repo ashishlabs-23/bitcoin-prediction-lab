@@ -84,10 +84,10 @@ SECURITY_HEADERS: Dict[str, str] = {
     "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
     "Content-Security-Policy": (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "font-src 'self' https://fonts.gstatic.com; "
-        "connect-src 'self' wss: https:; "
+        "connect-src 'self' ws: wss: https:; "
         "img-src 'self' data: https:; "
         "frame-ancestors 'none';"
     )

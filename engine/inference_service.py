@@ -284,7 +284,7 @@ class LiveInferenceEngine:
 
         async with self._lock:
             self.latest_prediction = {
-                "symbol": SYMBOL,
+                "symbol": CANONICAL_SYMBOL,
                 "direction": direction,
                 "probability": prob,
                 "probability_pct": round(prob * 100, 1),
