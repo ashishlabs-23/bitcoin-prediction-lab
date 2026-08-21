@@ -282,23 +282,70 @@ uvicorn api.server:app --host 127.0.0.1 --port 8000
 
 ---
 
-## 25. Repository Structure
+## 25. Core Architecture & Module Map
+
+The repository is structured into high-performance production services, immutable data contracts, and reproducible research harnesses:
+
+### 🌟 Core Production Files (Main Pipeline)
+* **`api/server.py`**: FastAPI application entry point, middleware, and CORS configuration.
+* **`api/routes_prediction.py`**: Primary prediction routes, longitudinal monitoring, and resolution-health endpoints.
+* **`engine/inference_service.py`**: Live production inference pipeline combining Ridge regression with volatility context.
+* **`engine/feature_cache.py`**: Thread-safe live feature caching with deterministic fallbacks.
+* **`engine/longitudinal_status.py`**: Real-time longitudinal status tracking and block progress reporting.
+* **`models/ridge_model.py`**: Production 24h range & excursion forecasting model (`v3.0.0-ridge-volatility-context`).
+* **`models/volatility_bridge.py`**: Multi-horizon volatility ratio calculator and regime feature extractor.
+* **`models/hawkes_process.py`**: 5-minute microstructure point-process engine (`v1.0.0-challenger-hawkes-microstructure`, shadow mode).
+* **`config/database.py` & `config/paths.py`**: Authoritative database path resolver (`experiments/results/market_memory.db`) and centralized directory configuration.
+
+---
+
+### 🛡️ Immutable System Contracts (`models/`)
+* **`models/regime_contract.py`**: Canonical 5-state market regime contract (`VOL_COMPRESSION`, `VOL_NORMAL`, `VOL_EXPANDING`, `PEAK_VOLATILITY`, `TRENDING`).
+* **`models/horizon_contract.py`**: Canonical 24h production range & 5m shadow horizons.
+* **`models/symbol_contract.py`**: Canonical `BTCUSD` symbol specification with multi-exchange normalization adapters.
+* **`models/forecast_quality_contract.py`**: Forecast quality stratification (`VALID`, `DEGRADED`, `INVALID`) and validation eligibility governance.
+
+---
+
+### 🔬 Post-Repair Longitudinal & Governance Modules (`research/`)
+* **`research/run_contract_suite.py`**: Master test runner executing 26 test suites (52/52 tests green).
+* **`research/post_repair_outcome_resolver.py`**: Point-in-time $(t, t+24\text{h}]$ automated 24h outcome resolution engine.
+* **`research/post_repair_block_builder.py`**: Non-overlapping independent 24h block builder and $N_{\text{eff}}$ sample accountant.
+* **`research/degraded_forecast_monitor.py`**: Degraded forecast rate monitor with operational alerting (`1.0%` threshold).
+* **`research/milestone_5_post_repair_gate.py`**: First post-repair milestone evaluator (requires 5 VALID blocks).
+* **`research/post_repair_dataset_audit.py`**: Clean dataset partitioner separating `POST_REPAIR` from `PRE_REPAIR_HISTORY`.
+* **`research/post_repair_longitudinal_monitor.py`**: Metric collector generating live longitudinal tracking tables.
+* **`research/research_stop_rule.py`**: Enforces strict algorithmic freeze (`NO_NEW_RESEARCH_REQUIRED`).
+
+---
+
+### 📊 Validation Reports & Audit Documentation (`docs/` & `research/reports/`)
+* **`docs/prediction_metrics.md`**: Formal mathematical definitions of MFE, MAE, Winkler Score, and Conformal Uncertainty.
+* **`docs/model_lifecycle.md`**: Model promotion, shadow bakeoff, and decommissioning lifecycle rules.
+* **`docs/production_operator_runbook.md`**: Operational runbook for production deployment, database recovery, and monitoring.
+* **`research/reports/`**: Point-in-time validation summaries, restart reviews, and pre/post-repair comparisons.
+
+---
+
+## 26. Repository Structure
 
 ```text
 bitcoin-prediction-lab/
 ├── api/                # FastAPI REST routes and server entry points
-├── engine/             # Core inference, accuracy observatory, and reliability services
-├── models/             # Production Ridge, Hawkes shadow, and Foundation adapters
-├── research/           # Validation harnesses, statistical gates, and failure analysis
+├── engine/             # Core inference, feature caching, and longitudinal services
+├── models/             # Production Ridge, Volatility Bridge, Hawkes shadow, and Contracts
+├── config/             # Centralized database paths and system configuration
+├── research/           # Outcome resolvers, block builders, monitors, and audit harnesses
 ├── training/           # Point-in-time feature extraction and adaptation harnesses
-├── docs/               # Architecture contracts and design documentation
+├── docs/               # System contracts, operator runbooks, and metric definitions
 ├── results/            # Frozen manifests, audit CSVs, and statistical logs
-├── tests/              # 68 comprehensive pytest suites (325+ tests)
+├── tests/              # 26 comprehensive pytest suites (52+ tests)
 └── web/                # Frontend dashboard, chart visualizations, and UI assets
 ```
 
 ---
 
-## 26. License
+## 27. License
 
 Licensed under the [Apache 2.0 License](LICENSE).
+
