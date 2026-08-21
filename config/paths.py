@@ -29,6 +29,7 @@ DATA_PROCESSED_DIR: str = os.path.join(PROJECT_ROOT, "data", "processed")
 # ---------------------------------------------------------------------------
 RESULTS_DIR: str = os.path.join(PROJECT_ROOT, "experiments", "results")
 RESEARCH_RESULTS_DIR: str = RESULTS_DIR   # alias — same directory
+LOGS_DIR: str = os.path.join(PROJECT_ROOT, "experiments", "logs")
 
 # ---------------------------------------------------------------------------
 # Model artefacts
@@ -39,7 +40,7 @@ GENOME_DIR: str = os.path.join(PROJECT_ROOT, "experiments", "genome")
 # ---------------------------------------------------------------------------
 # Ensure critical output directories exist at import time
 # ---------------------------------------------------------------------------
-for _d in (RESULTS_DIR, DATA_RAW_DIR, DATA_PROCESSED_DIR, MODEL_REGISTRY_DIR, GENOME_DIR):
+for _d in (RESULTS_DIR, LOGS_DIR, DATA_RAW_DIR, DATA_PROCESSED_DIR, MODEL_REGISTRY_DIR, GENOME_DIR):
     os.makedirs(_d, exist_ok=True)
 
 

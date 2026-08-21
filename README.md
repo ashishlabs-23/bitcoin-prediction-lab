@@ -295,7 +295,13 @@ The repository is structured into high-performance production services, immutabl
 * **`models/ridge_model.py`**: Production 24h range & excursion forecasting model (`v3.0.0-ridge-volatility-context`).
 * **`models/volatility_bridge.py`**: Multi-horizon volatility ratio calculator and regime feature extractor.
 * **`models/hawkes_process.py`**: 5-minute microstructure point-process engine (`v1.0.0-challenger-hawkes-microstructure`, shadow mode).
-* **`config/database.py` & `config/paths.py`**: Authoritative database path resolver (`experiments/results/market_memory.db`) and centralized directory configuration.
+### 🔒 Production Security Architecture (OWASP ASVS 5.0 Hardened)
+* **`config/security.py`**: Role-based access control (RBAC), rate limit thresholds, strict CORS, and master kill-switches.
+* **`api/security_auth.py`**: Constant-time token verification (`secrets.compare_digest`) and role dependencies (`PUBLIC`, `USER`, `RESEARCH`, `ADMIN`).
+* **`api/security_middleware.py`**: Injects OWASP ASVS headers (HSTS, CSP, X-Frame-Options), enforces body size caps (1MB), and sanitizes unhandled exceptions.
+* **`engine/security_validators.py`**: SSRF prevention (blocks private/loopback/cloud metadata IPs), path traversal jails, and SQL identifier whitelisting.
+* **`engine/security_audit.py`**: Structured JSON security audit logger with automated regex secret masking.
+* **`docs/security_architecture.md`**: Full OWASP ASVS 5.0 and OWASP API Top 10 compliance specification and threat model.
 
 ---
 
