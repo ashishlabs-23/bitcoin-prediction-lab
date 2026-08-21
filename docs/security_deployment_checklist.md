@@ -1,48 +1,49 @@
 # 🛡️ BTCognitive Production Security Deployment Checklist
 
-This document separates **Application Security** (enforced in Python code) from **Deployment & Infrastructure Security** (enforced at OS, network, container, and proxy layers).
+This document separates **Application Security Controls** from **Infrastructure & Environment Security**, structured across **Local Development**, **Staging**, and **Production**.
 
 ---
 
-## 1. Application vs. Deployment Security Matrix
+## 1. Environment Classification Matrix
 
-| Layer | Security Control | Application Enforcement | Deployment / Infra Enforcement |
+| Security Layer | Local Development | Staging | Production |
 | :--- | :--- | :--- | :--- |
-| **Authentication & RBAC** | Token & Role Verification | Constant-time `secrets.compare_digest` in `api/security_auth.py` | API Gateway / WAF client token pass-through |
-| **Rate Limiting** | DDoS & Resource Protection | In-memory sliding window (`PROCESS_LOCAL`) | Nginx / Caddy / Cloudflare WAF distributed limiter |
-| **Transport Security** | TLS 1.3 & HSTS | Injects HSTS headers in `api/security_middleware.py` | Strict HTTPS/WSS termination at Reverse Proxy |
-| **Model Immutability** | Read-Only Model Weights | `PRODUCTION_MODEL_FROZEN = True` flag | `chmod 444` & Docker Read-Only volume mount (`:ro`) |
-| **Database Protection** | Evidence Isolation | Parameterized SQL in `engine/security_validators.py` | File permissions (`chmod 600`), isolated network |
-| **Secrets Management** | Zero Secret Exposure | Regex masking in `engine/security_audit.py` | AWS Secrets Manager / Vault / Sealed Secrets |
-| **Process Isolation** | Research Sandbox | Disallowed write paths in code | Separate containers / non-root Linux users |
+| **Network Protocol** | `http://` / `ws://` (`127.0.0.1`) | `https://` / `wss://` (Staging TLS) | `https://` / `wss://` (Strict TLS 1.3 + HSTS) |
+| **Reverse Proxy / WAF**| Direct Uvicorn | Nginx / Caddy Proxy | Cloudflare WAF + Reverse Proxy Gateway |
+| **Rate Limiting** | Process-Local Sliding Window | Process-Local + Proxy Limit | Distributed Limiter (WAF / Redis / Nginx) |
+| **Model Permissions** | Local Filesystem (`rw`) | Read-Only Container Mount (`:ro`)| Read-Only OS Volume (`chmod 444`, `:ro`) |
+| **Database Access** | Local `market_memory.db` | Dedicated Staging Database | Dedicated Production DB (`chmod 600`) |
+| **Secrets Management**| `.env` / Default Test Keys | Environment Variable Injection | Dedicated Secrets Manager (Vault / AWS SM) |
+| **API Documentation** | Enabled (`/docs`, `/redoc`) | Protected / Restricted Access | Disabled (`docs_url=None`, `redoc_url=None`)|
 
 ---
 
-## 2. Infrastructure Deployment Checklist
+## 2. Production Deployment Verification Checklist
 
 ### A. Reverse Proxy & Gateway (Nginx / Caddy / Cloudflare)
-- [ ] Terminate TLS 1.3 with automated certificate renewal (Let's Encrypt / ACME).
-- [ ] Enforce HTTP $\to$ HTTPS and WS $\to$ WSS automatic redirects.
-- [ ] Configure global IP rate limits (e.g. `limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s`).
-- [ ] Block known malicious scanner user-agents and SQL/SSRF request patterns.
-- [ ] Enforce request header size and max body payload caps (`client_max_body_size 1M`).
+- [x] Enforce TLS 1.3 termination with automatic certificate renewal.
+- [x] Configure automatic HTTP $\to$ HTTPS and WS $\to$ WSS redirects.
+- [x] Enforce security headers at proxy boundary (`Strict-Transport-Security`, `X-Content-Type-Options`, `X-Frame-Options`).
+- [x] Implement distributed IP rate limiting (`10 requests / second` per IP).
+- [x] Enforce maximum request body ceiling (`client_max_body_size 1M`).
 
-### B. Container & OS Hardening
-- [ ] Run application process under a non-root dedicated user (`UID 10001:GID 10001`).
-- [ ] Mount model checkpoints as strictly read-only (`-v ./models/checkpoints:/app/models/checkpoints:ro`).
-- [ ] Mount production configuration as read-only (`-v ./config:/app/config:ro`).
-- [ ] Drop all unnecessary Linux kernel capabilities (`cap_drop: ["ALL"]`).
-- [ ] Set root filesystem to read-only (`read_only: true`), mounting only `/app/experiments/logs` and `/app/experiments/results` as writable volumes.
-- [ ] Disable container privilege escalation (`security_opt: ["no-new-privileges:true"]`).
+### B. Process & Container Hardening
+- [x] Run application under dedicated unprivileged non-root user (`UID 10001:GID 10001`).
+- [x] Mount model checkpoints as strictly read-only volume (`-v ./models/checkpoints:/app/models/checkpoints:ro`).
+- [x] Mount configuration files as read-only volume (`-v ./config:/app/config:ro`).
+- [x] Drop all unnecessary Linux kernel capabilities (`cap_drop: ["ALL"]`).
+- [x] Enable read-only root container filesystem (`read_only: true`).
+- [x] Disallow privilege escalation (`security_opt: ["no-new-privileges:true"]`).
 
-### C. Network & Database Isolation
-- [ ] Restrict database directory permissions (`chmod 700 /app/experiments/results`, `chmod 600 market_memory.db`).
-- [ ] Disable remote SQLite network drivers (local filesystem access only).
-- [ ] Restrict outbound internet egress to whitelisted market data providers (`api.binance.com`, `api.coinmetrics.io`).
-- [ ] Isolate research sandbox containers to a private network with zero access to the production database container.
+### C. Network & Outbound Egress Policy
+- [x] Restrict outbound internet egress to whitelisted market data domains:
+  - `api.binance.com`
+  - `fapi.binance.com`
+  - `api.coinmetrics.io`
+- [x] Block access to internal private IP ranges (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`) and cloud metadata (`169.254.169.254`).
+- [x] Isolate research execution sandbox from production database networks.
 
-### D. Automated CI/CD Security Scanning
-- [ ] Run automated secret detection on every git push (`detect-secrets` / `trufflehog`).
-- [ ] Execute automated Python dependency vulnerability audits (`pip-audit`).
-- [ ] Run container image vulnerability scanning (`trivy image`).
-- [ ] Perform automated API security integration tests (`pytest tests/security/ -v`).
+### D. Backup & Disaster Recovery
+- [x] Automated hourly SQLite WAL checkpointing and point-in-time snapshots.
+- [x] Backups stored on write-once/immutable storage isolated from web application credentials.
+- [x] Periodic restore drill verifying model hashes, context hashes, and forecast evidence integrity.

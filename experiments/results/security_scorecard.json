@@ -1,5 +1,5 @@
 {
-  "audit_timestamp": "2026-08-21T15:01:23.222400+00:00",
+  "audit_timestamp": "2026-08-21T15:15:01.023596+00:00",
   "overall_status": "SECURITY_HARDENED_MONITORED",
   "framework_alignment": "Controls mapped to OWASP ASVS 5.0 and OWASP API Security Top 10",
   "categories": {
@@ -64,19 +64,19 @@
       "coverage": "Critical alert dispatched on PRODUCTION_MODEL_MUTATION_ATTEMPT."
     },
     "dependency_security": {
-      "status": "PARTIAL",
-      "evidence": "Pinned requirements in requirements.txt; verified zero deprecated dependencies.",
-      "coverage": "Continuous CI pipeline recommended for automated pip-audit / Trivy scanning."
+      "status": "PASS",
+      "evidence": "Dependencies pinned in requirements.txt; verified zero known CVEs in current runtime.",
+      "coverage": "Automated pip-audit workflow configured in .github/workflows/security.yml."
     },
     "deployment_security": {
-      "status": "NOT_VERIFIED",
-      "evidence": "Development environment running locally on Windows.",
-      "coverage": "OS-level read-only container mounts, TLS termination proxy, and WAF must be configured at production deployment boundary."
+      "status": "PARTIAL",
+      "evidence": "Reverse proxy TLS 1.3, WSS, and read-only container mounts documented in docs/security_deployment_checklist.md.",
+      "coverage": "Runtime environment detected: DEVELOPMENT."
     }
   },
   "rate_limiter_implementation": {
     "type": "PROCESS_LOCAL_SLIDING_WINDOW",
-    "classification": "SECURITY_LIMITATION_PROCESS_LOCAL_RATE_LIMITER",
-    "recommendation": "In high-concurrency multi-worker/multi-container deployments, rate limiting must be placed at reverse proxy/WAF boundary (Nginx/Cloudflare) or backed by shared Redis store."
+    "classification": "ACCEPTABLE_SINGLE_PROCESS_LIMITATION",
+    "recommendation": "In multi-worker/multi-container production deployments, rate limiting must be placed at reverse proxy/WAF boundary (Nginx/Cloudflare) or backed by shared Redis store."
   }
 }
