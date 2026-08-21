@@ -18,6 +18,9 @@ from config.database import (
     LEGACY_HAWKES_DB_PATH,
 )
 
+SYMBOL: str = "BTCUSD"
+EXCHANGE: str = "binance"
+
 __all__ = [
     "PROJECT_ROOT",
     "DATA_DIR",
@@ -30,4 +33,6 @@ __all__ = [
     "MARKET_MEMORY_DB_PATH",
     "HAWKES_DB_PATH",
     "LEGACY_HAWKES_DB_PATH",
+    "SYMBOL",
+    "EXCHANGE",
 ]

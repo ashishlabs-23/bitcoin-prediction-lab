@@ -44,12 +44,12 @@ env/
 web_dist/
 
 # Testing & Caches
-tests/
 .pytest_cache/
 .coverage
 htmlcov/
 .tox/
 .nox/
+experiments/logs/
 
 # Temporary & Scratch Files
 scratch/

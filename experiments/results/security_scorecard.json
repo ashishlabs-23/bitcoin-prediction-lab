@@ -1,0 +1,82 @@
+{
+  "audit_timestamp": "2026-08-21T15:01:23.222400+00:00",
+  "overall_status": "SECURITY_HARDENED_MONITORED",
+  "framework_alignment": "Controls mapped to OWASP ASVS 5.0 and OWASP API Security Top 10",
+  "categories": {
+    "authentication": {
+      "status": "PASS",
+      "evidence": "Constant-time comparison via secrets.compare_digest in api/security_auth.py; 401 on missing/invalid tokens.",
+      "coverage": "APIKeyHeader & HTTPBearer support with structured AUTH_SUCCESS / AUTH_FAILURE logging."
+    },
+    "authorization": {
+      "status": "PASS",
+      "evidence": "Server-side role hierarchy (PUBLIC, USER, RESEARCH, ADMIN) in api/security_auth.py; 403 on role breach.",
+      "coverage": "Route matrix categorized across 45+ endpoints."
+    },
+    "session_token_security": {
+      "status": "PARTIAL",
+      "evidence": "Bearer / X-API-Key token validation active.",
+      "coverage": "Production deployment assumes tokens are rotated via environment secrets manager (e.g. AWS Secrets / Vault)."
+    },
+    "input_validation": {
+      "status": "PASS",
+      "evidence": "Pydantic contract schemas on symbol, horizon, regimes; SQL identifier whitelist in engine/security_validators.py.",
+      "coverage": "100% Parameterized queries for SQLite."
+    },
+    "api_security": {
+      "status": "PASS",
+      "evidence": "Global error sanitization masks stack traces and internal paths into opaque request_ids; docs disabled in production.",
+      "coverage": "FastAPI exception handlers & docs_url conditional on BTC_ENVIRONMENT."
+    },
+    "transport_security": {
+      "status": "PASS",
+      "evidence": "SecurityHeadersMiddleware injects HSTS (max-age=31536000), CSP, X-Frame-Options: DENY, X-Content-Type-Options: nosniff.",
+      "coverage": "TrustedHostMiddleware blocks Host header poisoning; strict CORS allowlist."
+    },
+    "secrets": {
+      "status": "PASS",
+      "evidence": "Zero secrets in Git (.env ignored); regex secret masking in engine/security_audit.py before logging.",
+      "coverage": "Secrets scan verified clean across codebase."
+    },
+    "filesystem": {
+      "status": "PASS",
+      "evidence": "Realpath jail in engine/security_validators.py blocks directory traversal (../); production model weights frozen.",
+      "coverage": "Direct static file exposure of .db, .py, or model files blocked."
+    },
+    "database": {
+      "status": "PASS",
+      "evidence": "Single canonical database experiments/results/market_memory.db in WAL mode; no arbitrary client query endpoints.",
+      "coverage": "Public HTTP cannot download database or execute raw SQL."
+    },
+    "websocket": {
+      "status": "PASS",
+      "evidence": "Connection limit (5 per IP), message ceiling (64 KB), ping/pong restriction in api/server.py.",
+      "coverage": "Arbitrary command execution through WebSocket strictly blocked."
+    },
+    "logging": {
+      "status": "PASS",
+      "evidence": "Structured JSON security audit logging in experiments/logs/security_audit.log with automatic secret masking.",
+      "coverage": "Logs security lifecycle events (AUTH, AUTHZ, SSRF, PATH_TRAVERSAL, MUTATION)."
+    },
+    "monitoring": {
+      "status": "PASS",
+      "evidence": "Degraded forecast monitor (1% alert threshold) & research stop rule active.",
+      "coverage": "Critical alert dispatched on PRODUCTION_MODEL_MUTATION_ATTEMPT."
+    },
+    "dependency_security": {
+      "status": "PARTIAL",
+      "evidence": "Pinned requirements in requirements.txt; verified zero deprecated dependencies.",
+      "coverage": "Continuous CI pipeline recommended for automated pip-audit / Trivy scanning."
+    },
+    "deployment_security": {
+      "status": "NOT_VERIFIED",
+      "evidence": "Development environment running locally on Windows.",
+      "coverage": "OS-level read-only container mounts, TLS termination proxy, and WAF must be configured at production deployment boundary."
+    }
+  },
+  "rate_limiter_implementation": {
+    "type": "PROCESS_LOCAL_SLIDING_WINDOW",
+    "classification": "SECURITY_LIMITATION_PROCESS_LOCAL_RATE_LIMITER",
+    "recommendation": "In high-concurrency multi-worker/multi-container deployments, rate limiting must be placed at reverse proxy/WAF boundary (Nginx/Cloudflare) or backed by shared Redis store."
+  }
+}

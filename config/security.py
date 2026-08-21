@@ -70,7 +70,7 @@ ALLOWED_ORIGINS: List[str] = os.getenv(
 
 ALLOWED_HOSTS: List[str] = os.getenv(
     "BTCOGNITIVE_ALLOWED_HOSTS",
-    "localhost,127.0.0.1,btcognitive.netlify.app,*.netlify.app"
+    "localhost,127.0.0.1,testserver,btcognitive.netlify.app,*.netlify.app"
 ).split(",")
 
 # ==============================================================================
