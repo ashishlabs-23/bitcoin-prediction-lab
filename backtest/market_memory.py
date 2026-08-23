@@ -108,6 +108,7 @@ def _init_tables(conn: sqlite3.Connection):
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_pred_ts ON predictions(timestamp);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_pred_resolved ON predictions(outcome_resolved);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_pred_resolved_ts ON predictions(outcome_resolved, timestamp);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_pred_regime ON predictions(regime);")
 
         conn.execute("""
@@ -157,6 +158,8 @@ def _init_tables(conn: sqlite3.Connection):
             );
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_rf_ts ON range_forecasts(timestamp);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_rf_ts_regime ON range_forecasts(market_regime, timestamp);")
+
 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS excursion_forecasts (

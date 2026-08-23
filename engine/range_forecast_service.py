@@ -142,19 +142,26 @@ class RangeForecastService:
         ts_str = timestamp or datetime.now(timezone.utc).isoformat()
         forecast_id = str(uuid.uuid4())
 
+        # Mondrian Volatility-Adaptive Conformal Scaling
+        # Dynamically scales residual quantiles based on term structure ratio (sigma_1h / sigma_24h)
+        vol_ratio = float(features.get('vol_ratio_1h_24h', 1.0)) if features else 1.0
+        mfe_scale = float(np.clip(1.0 + 0.35 * (vol_ratio - 1.0), 0.85, 1.45))
+        mae_scale = float(np.clip(1.0 + 0.50 * (vol_ratio - 1.0), 0.85, 1.60))
+
         # Calibrated Base Multipliers for 24h MFE / MAE Quantiles
         base_vol = max(0.005, vol_24h)
-        mfe_p10 = float(np.maximum(0.001, base_vol * 0.35))
-        mfe_p25 = float(np.maximum(0.002, base_vol * 0.55))
-        mfe_p50 = float(np.maximum(0.004, base_vol * 0.85))
-        mfe_p75 = float(np.maximum(0.007, base_vol * 1.25))
-        mfe_p90 = float(np.maximum(0.010, base_vol * 1.75))
+        mfe_p10 = float(np.maximum(0.001, base_vol * 0.35 * mfe_scale))
+        mfe_p25 = float(np.maximum(0.002, base_vol * 0.55 * mfe_scale))
+        mfe_p50 = float(np.maximum(0.004, base_vol * 0.85 * mfe_scale))
+        mfe_p75 = float(np.maximum(0.007, base_vol * 1.25 * mfe_scale))
+        mfe_p90 = float(np.maximum(0.010, base_vol * 1.75 * mfe_scale))
 
-        mae_p10 = float(np.maximum(0.001, base_vol * 0.40))
-        mae_p25 = float(np.maximum(0.002, base_vol * 0.65))
-        mae_p50 = float(np.maximum(0.004, base_vol * 1.10))
-        mae_p75 = float(np.maximum(0.007, base_vol * 1.55))
-        mae_p90 = float(np.maximum(0.010, base_vol * 2.20))
+        mae_p10 = float(np.maximum(0.001, base_vol * 0.40 * mae_scale))
+        mae_p25 = float(np.maximum(0.002, base_vol * 0.65 * mae_scale))
+        mae_p50 = float(np.maximum(0.004, base_vol * 1.10 * mae_scale))
+        mae_p75 = float(np.maximum(0.007, base_vol * 1.55 * mae_scale))
+        mae_p90 = float(np.maximum(0.010, base_vol * 2.20 * mae_scale))
+
 
         # Price Range Boundaries
         upper_p10 = round(current_price * (1.0 + mfe_p10), 2)

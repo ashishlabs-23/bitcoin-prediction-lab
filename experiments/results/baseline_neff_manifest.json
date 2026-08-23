@@ -1,0 +1,13 @@
+{
+  "timestamp": "2026-08-23T17:36:59.080637+00:00",
+  "baseline_model": "v3.0.0-ridge-volatility-context",
+  "raw_sample_size_N": 649,
+  "neff_point_estimate": 107.97,
+  "neff_block_bootstrap_20th_pct": 115.55,
+  "neff_conservative": 107.97,
+  "se_ic_conservative": 0.0976,
+  "mde_admission_threshold_delta_ic": 0.1952,
+  "rebaseline_reason": "Phase 5 retraction \u2014 baseline recomputed on authenticated real inputs with block-bootstrap serial preservation",
+  "rebaselining_policy": "FROZEN_UNTIL_QUARTERLY_CADENCE",
+  "provenance_hash": "08d64830b76f6d0fa1280b96783d53b67a54994d14b170b99022918a46bd5d79"
+}

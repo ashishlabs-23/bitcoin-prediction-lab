@@ -50,6 +50,8 @@ from api.routes_prediction import router as prediction_router
 from api.routes_arena import router as arena_router
 from api.routes_notifications import router as notifications_router
 from api.genome_routes import router as genome_router
+from api.routes_analogs import router as analogs_router
+
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("btcognitive.server")
@@ -183,6 +185,8 @@ app.include_router(prediction_router)
 app.include_router(arena_router)
 app.include_router(notifications_router)
 app.include_router(genome_router)
+app.include_router(analogs_router)
+
 
 
 # ---------------------------------------------------------------------------

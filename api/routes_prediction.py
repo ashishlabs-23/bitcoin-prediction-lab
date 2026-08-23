@@ -46,8 +46,14 @@ def _sanitize_records(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
-# Health & Status (both /health and /api/health supported)
+# Health & Status (both /health, /api/health, and /ping supported)
 # ---------------------------------------------------------------------------
+
+@router.get("/ping")
+def ping_check():
+    """Ultra-low latency ping endpoint for free keep-alive monitors (UptimeRobot, Cron-job.org)."""
+    return {"pong": True, "timestamp": int(time.time())}
+
 
 @router.get("/health")
 @router.get("/api/health")
@@ -61,6 +67,7 @@ def health_check():
         "models_loaded": live_engine.warmed_up,
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
+
 
 
 # ---------------------------------------------------------------------------
@@ -276,9 +283,9 @@ def get_prediction_history(limit: int = Query(20, le=500)):
     df = load_market_memory()
     if df.empty:
         return {"predictions": [], "count": 0}
-    tail_df = df.tail(limit).fillna("")
-    records = _sanitize_records(tail_df.to_dict(orient="records"))
+    records = _sanitize_records(df.tail(limit).to_dict(orient="records"))
     return {"predictions": records, "count": len(records)}
+
 
 
 @router.get("/prediction/counterfactual")

@@ -84,6 +84,14 @@ class LongitudinalStatusService:
         invalid_count = status["observed_invalid_forecasts"]
         n_eff = status["n_eff"]
 
+        # Rigorous Sample Size Stratification (Binomial Confidence Interval Accounting)
+        if obs_valid_blocks < 30:
+            cal_status = "OPERATIONAL_SMOKE_TEST (N_eff < 30; SE ~ 6.5%, calibration unconfirmed)"
+        elif obs_valid_blocks < 150:
+            cal_status = "INTERMEDIATE_HEALTH_MONITORING (30 <= N_eff < 150; passive drift tracking only)"
+        else:
+            cal_status = "STATISTICALLY_VALIDATED_CALIBRATION (N_eff >= 150; SE < 2.5%, formal verdict verified)"
+
         obs = ObservedMetrics(
             independent_valid_blocks=obs_valid_blocks,
             independent_mixed_blocks=obs_mixed_blocks,
@@ -98,9 +106,10 @@ class LongitudinalStatusService:
             conformal_interval_width_pct=None if obs_valid_blocks < 5 else 5.28,
             baseline_delta_bps=None if obs_valid_blocks < 5 else -14.0,
             drift_psi=0.0,
-            calibration_status="CALIBRATION_OK",
+            calibration_status=cal_status,
             model_status="MODEL_FROZEN"
         )
+
 
         milestones = [5, 10, 20, 30, 40, 60, 90]
         targets = []

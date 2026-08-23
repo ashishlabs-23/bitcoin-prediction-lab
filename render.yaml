@@ -2,11 +2,16 @@ services:
   - type: web
     name: btcognitive-engine
     env: python
+    plan: free
     region: singapore
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn api.server:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install --no-cache-dir -r requirements.txt
+    startCommand: uvicorn api.server:app --host 0.0.0.0 --port $PORT --workers 1
+    healthCheckPath: /ping
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
+      - key: BTC_ENVIRONMENT
+        value: production
       - key: WEBHOOK_ENABLED
         value: "false"
+

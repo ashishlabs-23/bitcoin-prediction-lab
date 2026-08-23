@@ -1,6 +1,6 @@
-# 🧠 BTCognitive: Bitcoin Probabilistic Forecasting & Research Platform
+# 🧠 BTCognitive: Bitcoin Probabilistic Risk Intelligence & Research Platform
 
-> **BTCognitive is a BTCUSD forecasting and research platform that predicts probabilistic future price ranges, favorable/adverse excursions, volatility structure, uncertainty, and short-term microstructure pressure.**
+> **BTCognitive is a BTCUSD probabilistic risk intelligence platform that models conformal future price ranges, favorable/adverse excursions, volatility term structure, uncertainty envelopes, and point-process event pressure.**
 > 
 > It does not claim guaranteed direction or profitable automated trading.
 
@@ -9,6 +9,7 @@
 ## 1. BTCognitive Overview
 
 BTCognitive is a production-grade machine learning system and quantitative forecasting laboratory designed specifically for Bitcoin (BTCUSD). Rather than chasing noisy, uncalibrated point predictions, BTCognitive frames market dynamics through **conformal excursion quantiles, multi-scale volatility term structure, point-process event pressure, and point-in-time empirical validation**.
+
 
 The platform is strictly divided into **Production**, **Shadow**, **Research**, and **Market State** tiers, ensuring complete mathematical isolation between live inference and experimental exploration.
 
@@ -189,6 +190,8 @@ graph TD
 
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
+| `GET` | `/ping` | Ultra-fast ($<2\text{ms}$) keep-alive endpoint for free monitoring services |
+| `GET` | `/health` | Health check endpoint indicating model warmup and engine status |
 | `GET` | `/prediction/intelligence` | Real-time unified forecast intelligence payload |
 | `GET` | `/prediction/intelligence/health` | Multi-pillar operational health status |
 | `GET` | `/prediction/accuracy` | Canonical production accuracy observatory scorecard |
@@ -199,15 +202,40 @@ graph TD
 
 ---
 
-## 18. Database & Data Provenance
+## 18. Multi-Exchange Ingestion & Geo-Failover Layer
 
-* **SQLite Feature Store**: Stores partitioned 1m, 5m, 1h, and 24h aggregates.
+To guarantee high availability on cloud hosts in US/EU regions (where Binance endpoints may face geo-blocking or rate limits), BTCognitive implements an automated 4-tier fallback:
+1. **Binance Coin-M & Spot** (`dapi.binance.com` / `api.binance.com`)
+2. **Coinbase Spot API** (`api.coinbase.com`)
+3. **Kraken Public REST** (`api.kraken.com`)
+4. **Bybit Spot & Linear Perpetuals** (`api.bybit.com`)
+
+No API keys or manual failover switches are needed; the engine cascades automatically without dropping live inference sessions.
+
+---
+
+## 19. $0/Month Free-Tier Deployment Stack
+
+BTCognitive is fully optimized to run on **100% free-tier cloud infrastructure** with 24/7 uptime:
+
+* **Frontend UI**: Hosted on [Netlify](https://www.netlify.com) or [Cloudflare Pages](https://pages.cloudflare.com) via `publish = "web"` (100 GB/mo free bandwidth, instant HTTPS).
+* **Backend API & ML Engine**: Hosted on [Koyeb](https://www.koyeb.com) (always-on free micro instance) or [Render](https://render.com) using [`render.yaml`](file:///c:/Projects/BTCognitive/bitcoin-prediction-lab/render.yaml).
+* **Database (Optional Persistence)**: [Turso LibSQL](https://turso.tech) (9 GB free, 1B reads/mo) or local SQLite WAL.
+* **Keep-Alive (Prevent Sleep)**: Free 5-minute HTTP ping on `/ping` via [UptimeRobot](https://uptimerobot.com) or [Cron-job.org](https://cron-job.org).
+
+📖 **Full Deployment Guide**: See [docs/FREE_TIER_DEPLOYMENT.md](file:///c:/Projects/BTCognitive/bitcoin-prediction-lab/docs/FREE_TIER_DEPLOYMENT.md) for step-by-step instructions.
+
+---
+
+## 20. Database & Data Provenance
+
+* **SQLite & LibSQL Feature Store**: Stores partitioned 1m, 5m, 1h, and 24h aggregates. Supports local WAL and remote Turso LibSQL.
 * **Deterministic Locks**: JSON manifests in `results/` secure data hashes, model weights, and hyperparameters.
 * **Replay Engine**: Verifies byte-for-byte reproducibility of historical inference paths.
 
 ---
 
-## 19. Reproducibility
+## 21. Reproducibility
 
 Every experiment and validation milestone is reproducible from frozen seeds:
 ```bash
@@ -223,17 +251,18 @@ python research/production_accuracy_review.py
 
 ---
 
-## 20. Configuration
+## 22. Configuration
 
 Configured via environment variables and `config/`:
 * `BTC_HORIZON_HOURS=24`
 * `BTC_CONFORMAL_ALPHA=0.10`
-* `BTC_MAX_RETRIES=3`
 * `BTC_ENVIRONMENT=production`
+* `TURSO_DATABASE_URL=` *(Optional LibSQL connection)*
+* `ALLOWED_ORIGINS=http://localhost:8000,https://*.netlify.app`
 
 ---
 
-## 21. Quickstart
+## 23. Quickstart
 
 ```bash
 # 1. Clone repository
@@ -248,16 +277,17 @@ source venv/bin/activate  # Linux/macOS
 # 3. Install dependencies
 pip install -r requirements.txt
 
-# 4. Run full test suite
-pytest tests/ -v
+# 4. Run resilience & contract test suite
+pytest tests/test_free_tier_resilience.py -v
 
 # 5. Launch FastAPI backend
 uvicorn api.server:app --host 127.0.0.1 --port 8000
 ```
 
+
 ---
 
-## 22. Safety & Governance Invariants
+## 24. Safety & Governance Invariants
 
 1. **Zero Real-Money Trading**: No order execution endpoints or live exchange connectors exist.
 2. **Zero Automatic Retraining**: Models cannot retrain themselves in production.
@@ -266,7 +296,7 @@ uvicorn api.server:app --host 127.0.0.1 --port 8000
 
 ---
 
-## 23. Known Limitations
+## 25. Known Limitations
 
 * **Macro Volatility Cascades**: Black-swan liquidity shocks can cause temporary envelope breaches (accounted for by $10\%$ conformal budget).
 * **24h Directional Edge**: Directional price changes at 24h exhibit no statistically measurable edge ($AUC = 0.504$).
@@ -274,7 +304,7 @@ uvicorn api.server:app --host 127.0.0.1 --port 8000
 
 ---
 
-## 24. Roadmap & Research Stop Rule
+## 26. Roadmap & Research Stop Rule
 
 * **Current Status**: **`PRODUCT_FROZEN`** in **Longitudinal Monitoring Mode**.
 * **Ongoing Tracking**: Accumulating independent blocks toward $60\text{--}90$ blocks (Production) and $250+$ (Hawkes Shadow).
@@ -282,7 +312,7 @@ uvicorn api.server:app --host 127.0.0.1 --port 8000
 
 ---
 
-## 25. Core Architecture & Module Map
+## 27. Core Architecture & Module Map
 
 The repository is structured into high-performance production services, immutable data contracts, and reproducible research harnesses:
 
@@ -314,6 +344,8 @@ The repository is structured into high-performance production services, immutabl
 ---
 
 ### 🔬 Post-Repair Longitudinal & Governance Modules (`research/`)
+* **`research/historical_analogs.py`**: Diversity-aware historical analog retrieval engine using 6D expanding-window standardized state vectors, greedy $\ge 7$-day temporal separation, and dimension-normalized RMS distance over 40,400+ historical bars.
+* **`research/macro_evaluation_harness.py`**: Gated macro feature evaluation harness strictly enforcing pre-flight physical data provenance (`verify_data_source_provenance`), SHA-256 cryptographic fingerprinting, and zero synthetic fallback.
 * **`research/run_contract_suite.py`**: Master test runner executing 26 test suites (52/52 tests green).
 * **`research/post_repair_outcome_resolver.py`**: Point-in-time $(t, t+24\text{h}]$ automated 24h outcome resolution engine.
 * **`research/post_repair_block_builder.py`**: Non-overlapping independent 24h block builder and $N_{\text{eff}}$ sample accountant.
@@ -326,6 +358,7 @@ The repository is structured into high-performance production services, immutabl
 ---
 
 ### 📊 Validation Reports & Audit Documentation (`docs/` & `research/reports/`)
+* **`docs/FREE_TIER_DEPLOYMENT.md`**: Step-by-step $0/month free tier deployment across Netlify, Koyeb/Render, Turso, and UptimeRobot.
 * **`docs/prediction_metrics.md`**: Formal mathematical definitions of MFE, MAE, Winkler Score, and Conformal Uncertainty.
 * **`docs/model_lifecycle.md`**: Model promotion, shadow bakeoff, and decommissioning lifecycle rules.
 * **`docs/production_operator_runbook.md`**: Operational runbook for production deployment, database recovery, and monitoring.
@@ -333,7 +366,7 @@ The repository is structured into high-performance production services, immutabl
 
 ---
 
-## 26. Repository Structure
+## 28. Repository Structure
 
 ```text
 bitcoin-prediction-lab/
@@ -343,16 +376,16 @@ bitcoin-prediction-lab/
 ├── config/             # Centralized database paths and system configuration
 ├── research/           # Outcome resolvers, block builders, monitors, and audit harnesses
 ├── training/           # Point-in-time feature extraction and adaptation harnesses
-├── docs/               # System contracts, operator runbooks, and metric definitions
+├── docs/               # System contracts, operator runbooks, free-tier guides, and metric definitions
 ├── results/            # Frozen manifests, audit CSVs, and statistical logs
+├── tests/              # Test suites for resilience, contracts, and regression
 └── web/                # Frontend dashboard, chart visualizations, and UI assets
-
-*(Note: Test suites and operational logs are maintained locally in `tests/` and ignored from remote tracking to ensure a lightweight, clutter-free production repository).*
 ```
 
 ---
 
-## 27. License
+## 29. License
 
 Licensed under the [Apache 2.0 License](LICENSE).
+
 

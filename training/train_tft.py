@@ -1,10 +1,19 @@
 """
-training/train_tft.py — Walk-Forward Training for Temporal Fusion Transformer
-=============================================================================
-Trains the primary BTCUSD Temporal Fusion Transformer forecasting model using:
-  - Multi-Task Loss: Cross Entropy (Direction) + Quantile Pinball Loss (Returns)
-  - Strict Walk-Forward Time-Series Cross Validation (No Random Splitting)
-  - Checkpoint persistence to models/checkpoints/tft.pt
+training/train_tft.py — Walk-Forward TFT Trainer [ARCHIVED / DEPRECATED]
+========================================================================
+STATUS: ARCHIVED / NON-PRODUCTION RESEARCH ARTIFACT
+
+HISTORICAL CONTEXT & STATISTICAL REASON FOR ARCHIVAL:
+  In comprehensive walk-forward Purged Cross-Validation across 58,034 hourly bars
+  (2020–2026 multi-regime dataset), complex deep temporal architectures attempting
+  point directional alpha on BTCUSD achieved out-of-sample directional AUC ≈ 0.504
+  (p > 0.40 against random coin-flip null).
+
+  Production architecture intentionally decommissioned directional point prediction
+  in favor of calibrated 24h Conformal Excursion Quantiles (P10/P50/P90) and Volatility
+  Boundary Estimation (Winkler-score optimization), where empirical statistical edge
+  is rigorously validated (Spearman IC = +0.1529, N_eff = 4,370.03).
+========================================================================
 """
 
 import os

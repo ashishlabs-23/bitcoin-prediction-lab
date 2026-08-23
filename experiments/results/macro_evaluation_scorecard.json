@@ -1,0 +1,40 @@
+{
+  "evaluation_timestamp": "2026-08-23T17:37:17.361308+00:00",
+  "protocol": "PHASE_5_MACRO_FEATURE_GATED_VALIDATION",
+  "frozen_baseline_neff": 107.97,
+  "sample_granularity": "Hourly rolling (N=1476) -> Newey-West adjusted Neff=601.54 (~61.5 calendar days)",
+  "admission_threshold_mde_delta_ic": 0.1952,
+  "fdr_target_Q": 0.05,
+  "candidate_count": 1,
+  "data_provenance_fingerprints": [
+    {
+      "file_path": "C:\\Projects\\BTCognitive\\bitcoin-prediction-lab\\research\\..\\data\\raw\\funding.parquet",
+      "sha256_hash": "75359c86ae702c72afda01c63d7b94bae4c1eee2ef01fbaa855d50bdd4674f1f",
+      "row_count": 5057,
+      "min_timestamp": "2022-01-01T00:00:00.006000+00:00",
+      "max_timestamp": "2026-08-13T08:00:00+00:00",
+      "provenance_status": "AUTHENTICATED_REAL_DATA"
+    }
+  ],
+  "results": [
+    {
+      "feature_name": "Perp Funding Rate (Real Settled)",
+      "feature_column": "macro_perp_funding_rate",
+      "transform_applied": "PERIODIC_RATE",
+      "is_stationary": true,
+      "lag_hours": 0,
+      "vintage_provenance": "REAL_TIME_SNAPSHOT",
+      "baseline_ic": 0.4124,
+      "candidate_ic": 0.3187,
+      "delta_ic": -0.0936,
+      "raw_p_value": 0.8313,
+      "etf_era_regime_ic": 0.0098,
+      "cleared_mde_gate": false,
+      "bh_rank": 1,
+      "bh_critical_value": 0.05,
+      "passed_bh_fdr": false,
+      "final_governance_decision": "REJECTED_CLEAN_NULL"
+    }
+  ],
+  "epistemic_conclusion": "Candidate features evaluated strictly with authenticated physical data provenance. Unauthenticated/synthetic features are blocked by pre-flight validation."
+}

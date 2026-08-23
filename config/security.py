@@ -99,6 +99,11 @@ SECURITY_HEADERS: Dict[str, str] = {
 ALLOWED_EXTERNAL_DOMAINS: Set[str] = {
     "api.binance.com",
     "fapi.binance.com",
+    "dapi.binance.com",
+    "api.coinbase.com",
+    "api.exchange.coinbase.com",
+    "api.kraken.com",
+    "api.bybit.com",
     "community-api.coinmetrics.io",
     "api.coinmetrics.io"
 }

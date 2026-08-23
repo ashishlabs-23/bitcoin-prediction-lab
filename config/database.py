@@ -14,6 +14,7 @@ Reconciliation findings (2026-08-21):
 """
 
 import os
+from typing import Optional
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.abspath(os.path.join(_HERE, ".."))
@@ -23,9 +24,16 @@ _PROJECT_ROOT = os.path.abspath(os.path.join(_HERE, ".."))
 # ---------------------------------------------------------------------------
 # ALL writers and readers (production + shadow) must point here.
 
-MARKET_MEMORY_DB_PATH: str = os.path.join(
+DEFAULT_SQLITE_PATH: str = os.path.join(
     _PROJECT_ROOT, "experiments", "results", "market_memory.db"
 )
+
+# Cloud Turso LibSQL / Custom Database URL (Optional for $0/mo free tier cloud persistence)
+TURSO_DATABASE_URL: Optional[str] = os.getenv("TURSO_DATABASE_URL") or os.getenv("DATABASE_URL")
+TURSO_AUTH_TOKEN: Optional[str] = os.getenv("TURSO_AUTH_TOKEN")
+DATABASE_IS_REMOTE: bool = bool(TURSO_DATABASE_URL and TURSO_DATABASE_URL.startswith(("libsql://", "https://", "wss://")))
+
+MARKET_MEMORY_DB_PATH: str = os.getenv("SQLITE_DB_PATH") or DEFAULT_SQLITE_PATH
 
 # Hawkes shadow writes to the SAME canonical DB (after migration verification).
 # The hawkes_forecasts and hawkes_outcomes tables are isolated by table name.
@@ -42,6 +50,7 @@ LEGACY_HAWKES_DB_PATH: str = os.path.join(
 # Ensure parent directory exists
 # ---------------------------------------------------------------------------
 os.makedirs(os.path.dirname(MARKET_MEMORY_DB_PATH), exist_ok=True)
+
 
 
 if __name__ == "__main__":

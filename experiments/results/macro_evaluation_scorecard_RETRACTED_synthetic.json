@@ -1,0 +1,9 @@
+{
+  "retraction_metadata": {
+    "status": "RETRACTED_DUE_TO_SYNTHETIC_DATA_INPUTS",
+    "retraction_date": "2026-08-23",
+    "retraction_notice": "PHASE 5 RESULTS RETRACTED — ALL 5 CANDIDATES WERE EVALUATED ON SYNTHETIC/PSEUDO-RANDOM DATA GENERATED IN-MEMORY, NOT ON REAL MARKET DATA. NO REAL MACRO HYPOTHESIS HAS BEEN TESTED. The original false-positive-catch narrative regarding DFII10 stationarity is also invalid as it operated on synthetic random walk artifacts.",
+    "original_evaluation_timestamp": "2026-08-23T14:53:08.201399+00:00"
+  },
+  "original_unretracted_scorecard_archive": "experiments/results/macro_evaluation_scorecard_RETRACTED_synthetic.json"
+}

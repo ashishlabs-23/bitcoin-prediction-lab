@@ -60,8 +60,12 @@ class PurgedWalkForwardSplit:
             test_start_idx = (i + 1) * chunk_size
             test_end_idx = (i + 2) * chunk_size if i < self.n_splits - 1 else n
 
+            if test_start_idx >= n or test_start_idx >= test_end_idx:
+                continue
+
             test_idx = np.arange(test_start_idx, test_end_idx)
             test_start_time = ts_clean.iloc[test_start_idx]
+
 
             # Expanding window candidate train: indices 0 to test_start_idx - 1
             cand_train = np.arange(0, test_start_idx)
