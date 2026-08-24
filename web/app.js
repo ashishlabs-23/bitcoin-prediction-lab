@@ -3382,10 +3382,10 @@ function CounterfactualPanel({ counterfactualData }) {
     h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" } },
       h("div", null,
         h("h3", { style: { fontSize: "1.2rem", fontWeight: "700" } }, "⚡ Replay & Counterfactual Engine"),
-        h("div", { style: { fontSize: "0.8rem", color: "#94A3B8", marginTop: "4px" } }, "Comparing competing strategy decisions on identical candle context")
+        h("div", { style: { fontSize: "0.8rem", color: "#94A3B8", marginTop: "4px" } }, "Comparing competing strategy decisions on identical candle context · Descriptive only")
       ),
       h("span", { style: { background: `${consensusColor}15`, border: `1px solid ${consensusColor}40`, color: consensusColor, padding: "6px 12px", borderRadius: "20px", fontSize: "0.8rem", fontWeight: "700" } },
-        `Consensus: ${consensus}`
+        `Strategy Agreement: ${consensus}`
       )
     ),
     h("div", { style: { fontSize: "0.85rem", color: "#CBD5E1", marginBottom: "16px", background: "rgba(0,0,0,0.2)", padding: "10px 14px", borderRadius: "8px" } },

@@ -1,9 +1,9 @@
 {
-  "evaluation_timestamp": "2026-08-23T17:37:17.361308+00:00",
+  "evaluation_timestamp": "2026-08-24T14:22:58.771646+00:00",
   "protocol": "PHASE_5_MACRO_FEATURE_GATED_VALIDATION",
-  "frozen_baseline_neff": 107.97,
-  "sample_granularity": "Hourly rolling (N=1476) -> Newey-West adjusted Neff=601.54 (~61.5 calendar days)",
-  "admission_threshold_mde_delta_ic": 0.1952,
+  "frozen_baseline_neff": 2036.56,
+  "sample_granularity": "Full Multi-Regime Hourly (N=20978) -> Newey-West adjusted Neff=2036.56",
+  "admission_threshold_mde_delta_ic": 0.0444,
   "fdr_target_Q": 0.05,
   "candidate_count": 1,
   "data_provenance_fingerprints": [
@@ -27,7 +27,7 @@
       "baseline_ic": 0.4124,
       "candidate_ic": 0.3187,
       "delta_ic": -0.0936,
-      "raw_p_value": 0.8313,
+      "raw_p_value": 1.0,
       "etf_era_regime_ic": 0.0098,
       "cleared_mde_gate": false,
       "bh_rank": 1,

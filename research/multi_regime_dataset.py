@@ -29,14 +29,19 @@ def assign_macro_regime(timestamp_series: pd.Series) -> pd.Series:
     Categorizes timestamps into 4 distinct historical macroeconomic regimes.
     """
     ts = pd.to_datetime(timestamp_series, utc=True)
-    regimes = pd.Series(index=ts, dtype="object")
-
-    regimes[ts < "2021-11-10"] = "REGIME_1_HALVING_BULL"
-    regimes[(ts >= "2021-11-10") & (ts < "2023-01-01")] = "REGIME_2_FED_HIKING_BEAR"
-    regimes[(ts >= "2023-01-01") & (ts < "2024-01-11")] = "REGIME_3_TRANSITION_COMPRESSION"
-    regimes[ts >= "2024-01-11"] = "REGIME_4_SPOT_ETF_INSTITUTIONAL"
-
-    return regimes.values
+    conditions = [
+        ts < "2021-11-10",
+        (ts >= "2021-11-10") & (ts < "2023-01-01"),
+        (ts >= "2023-01-01") & (ts < "2024-01-11"),
+        ts >= "2024-01-11"
+    ]
+    choices = [
+        "REGIME_1_HALVING_BULL",
+        "REGIME_2_FED_HIKING_BEAR",
+        "REGIME_3_TRANSITION_COMPRESSION",
+        "REGIME_4_SPOT_ETF_INSTITUTIONAL"
+    ]
+    return np.select(conditions, choices, default="REGIME_4_SPOT_ETF_INSTITUTIONAL")
 
 
 

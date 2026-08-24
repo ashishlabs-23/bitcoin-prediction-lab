@@ -1,0 +1,77 @@
+{
+  "timestamp": "2026-08-24T15:00:55.661940+00:00",
+  "experiment": "UNCERTAINTY-01",
+  "frozen_point_forecast": "HAR-RS-DOW",
+  "target_variable": "rv7d_var_ann",
+  "nominal_coverage": 0.9,
+  "sample_size": 32974,
+  "results": {
+    "U0": {
+      "overall_coverage_pct": 86.81,
+      "mean_width": 0.37929,
+      "winkler_score": 0.60614,
+      "upper_breach_pct": 8.99,
+      "lower_breach_pct": 4.21,
+      "regime_coverage": {
+        "REGIME_2_FED_HIKING_BEAR": 91.49,
+        "REGIME_3_TRANSITION_COMPRESSION": 84.9,
+        "REGIME_4_SPOT_ETF_INSTITUTIONAL": 87.27
+      }
+    },
+    "U1": {
+      "overall_coverage_pct": 83.88,
+      "mean_width": 0.37258,
+      "winkler_score": 0.5386,
+      "upper_breach_pct": 10.7,
+      "lower_breach_pct": 5.43,
+      "regime_coverage": {
+        "REGIME_2_FED_HIKING_BEAR": 84.72,
+        "REGIME_3_TRANSITION_COMPRESSION": 83.62,
+        "REGIME_4_SPOT_ETF_INSTITUTIONAL": 83.92
+      }
+    },
+    "U2": {
+      "overall_coverage_pct": 93.53,
+      "mean_width": 0.47367,
+      "winkler_score": 0.71173,
+      "upper_breach_pct": 5.94,
+      "lower_breach_pct": 0.54,
+      "regime_coverage": {
+        "REGIME_2_FED_HIKING_BEAR": 80.71,
+        "REGIME_3_TRANSITION_COMPRESSION": 94.98,
+        "REGIME_4_SPOT_ETF_INSTITUTIONAL": 93.77
+      }
+    },
+    "U3": {
+      "overall_coverage_pct": 87.77,
+      "mean_width": 0.44693,
+      "winkler_score": 0.57721,
+      "upper_breach_pct": 6.71,
+      "lower_breach_pct": 5.52,
+      "regime_coverage": {
+        "REGIME_2_FED_HIKING_BEAR": 96.75,
+        "REGIME_3_TRANSITION_COMPRESSION": 86.18,
+        "REGIME_4_SPOT_ETF_INSTITUTIONAL": 87.82
+      }
+    },
+    "U4": {
+      "overall_coverage_pct": 87.84,
+      "mean_width": 0.45387,
+      "winkler_score": 0.56691,
+      "upper_breach_pct": 6.15,
+      "lower_breach_pct": 6.01,
+      "regime_coverage": {
+        "REGIME_2_FED_HIKING_BEAR": 89.9,
+        "REGIME_3_TRANSITION_COMPRESSION": 87.57,
+        "REGIME_4_SPOT_ETF_INSTITUTIONAL": 87.81
+      }
+    }
+  },
+  "admission_gates": {
+    "coverage_valid": true,
+    "regime_robust": true,
+    "winkler_superior": false,
+    "breach_symmetric": true
+  },
+  "verdict": "GATE_FAILED_REEXAMINE"
+}

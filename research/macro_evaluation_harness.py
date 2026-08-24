@@ -75,16 +75,23 @@ def freeze_baseline_neff(n_bootstraps: int = 1000, force_recompute: bool = False
             manifest = json.load(f)
             return manifest
 
-    # Load baseline features and excursion targets
-    features_path = os.path.join(DATA_PROCESSED_DIR, "features.parquet")
+    # Load baseline features and excursion targets (Full Multi-Regime)
+    features_path = os.path.join(DATA_PROCESSED_DIR, "multi_regime_features.parquet")
     if os.path.exists(features_path):
         df = pd.read_parquet(features_path, engine="pyarrow")
-        df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
     else:
-        raise DataProvenanceError(f"Cannot freeze baseline: missing {features_path}")
+        features_fallback = os.path.join(DATA_PROCESSED_DIR, "features.parquet")
+        if os.path.exists(features_fallback):
+            df = pd.read_parquet(features_fallback, engine="pyarrow")
+        else:
+            raise DataProvenanceError(f"Cannot freeze baseline: missing {features_path}")
 
-    df.sort_values('timestamp', inplace=True)
-    df.set_index('timestamp', inplace=True)
+    if 'timestamp' in df.columns:
+        df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
+        df.sort_values('timestamp', inplace=True)
+        df.set_index('timestamp', inplace=True)
+    else:
+        df = df.sort_index()
 
     exc = compute_excursion_targets(df, horizon_bars=24)
     valid_idx = ~exc['mfe'].isna()
@@ -380,7 +387,7 @@ def evaluate_macro_feature_candidates() -> Dict[str, Any]:
         "evaluation_timestamp": datetime.now(timezone.utc).isoformat(),
         "protocol": "PHASE_5_MACRO_FEATURE_GATED_VALIDATION",
         "frozen_baseline_neff": neff_conserv,
-        "sample_granularity": "Hourly rolling (N=1476) -> Newey-West adjusted Neff=601.54 (~61.5 calendar days)",
+        "sample_granularity": f"Full Multi-Regime Hourly (N={manifest.get('raw_sample_size_N', 20978)}) -> Newey-West adjusted Neff={neff_conserv:.2f}",
         "admission_threshold_mde_delta_ic": round(admission_gate_delta_ic, 4),
         "fdr_target_Q": Q,
         "candidate_count": K,

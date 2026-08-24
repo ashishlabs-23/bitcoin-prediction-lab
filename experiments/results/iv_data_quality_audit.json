@@ -1,0 +1,44 @@
+{
+  "dataset_path": "C:\\Projects\\BTCognitive\\bitcoin-prediction-lab\\data\\raw\\iv7d.parquet",
+  "date_span": "2022-01-01 00:00:00+00:00 to 2026-08-15 00:00:00+00:00",
+  "total_rows": 40489,
+  "expected_rows": 40489,
+  "overall_coverage_pct": 100.0,
+  "stale_quote_count": 14,
+  "stale_quote_pct": 0.03,
+  "invalid_iv_count": 0,
+  "lookahead_violations": 0,
+  "duplicate_timestamps": 0,
+  "regime_coverage_timeline": {
+    "REGIME_2_FED_HIKING_BEAR": {
+      "span": "2022-01-01 to 2023-01-01",
+      "observed_rows": 8761,
+      "expected_rows": 8761,
+      "coverage_pct": 100.0,
+      "passed_80pct_gate": true
+    },
+    "REGIME_3_TRANSITION_COMPRESSION": {
+      "span": "2023-01-01 to 2024-01-11",
+      "observed_rows": 9001,
+      "expected_rows": 9001,
+      "coverage_pct": 100.0,
+      "passed_80pct_gate": true
+    },
+    "REGIME_4_SPOT_ETF_INSTITUTIONAL": {
+      "span": "2024-01-11 to 2026-08-15",
+      "observed_rows": 22729,
+      "expected_rows": 22729,
+      "coverage_pct": 100.0,
+      "passed_80pct_gate": true
+    }
+  },
+  "gate_status": "GATE_PASSED_READY_FOR_MODELING",
+  "gates": {
+    "overall_coverage_gte_90": true,
+    "all_regimes_gte_80": true,
+    "stale_quotes_lte_2pct": true,
+    "zero_invalid_iv": true,
+    "zero_lookahead": true,
+    "zero_duplicates": true
+  }
+}

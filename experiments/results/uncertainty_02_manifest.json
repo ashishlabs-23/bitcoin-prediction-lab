@@ -1,0 +1,178 @@
+{
+  "timestamp": "2026-08-24T15:03:44.673208+00:00",
+  "experiment": "UNCERTAINTY-02",
+  "frozen_point_forecast": "HAR-RS-DOW",
+  "best_calibrated_candidate": "C3",
+  "results": {
+    "C0": {
+      "overall_coverage_pct": 87.47,
+      "mean_width": 0.44122,
+      "winkler_score": 0.55514,
+      "upper_breach_pct": 6.3,
+      "lower_breach_pct": 6.23,
+      "regime_coverage": {
+        "REGIME_2_FED_HIKING_BEAR": 91.84,
+        "REGIME_3_TRANSITION_COMPRESSION": 87.31,
+        "REGIME_4_SPOT_ETF_INSTITUTIONAL": 87.26
+      },
+      "quintile_stress_test": {
+        "Q1 (Bottom 20% Calm)": {
+          "coverage_pct": 88.26,
+          "upper_breach_pct": 0.0
+        },
+        "Q2 (20-40%)": {
+          "coverage_pct": 89.64,
+          "upper_breach_pct": 1.05
+        },
+        "Q3 (40-60%)": {
+          "coverage_pct": 88.69,
+          "upper_breach_pct": 5.19
+        },
+        "Q4 (60-80%)": {
+          "coverage_pct": 89.55,
+          "upper_breach_pct": 7.08
+        },
+        "Q5 (Top 20% Extreme)": {
+          "coverage_pct": 81.21,
+          "upper_breach_pct": 18.17
+        }
+      }
+    },
+    "C1": {
+      "overall_coverage_pct": 88.27,
+      "mean_width": 0.46276,
+      "winkler_score": 0.58128,
+      "upper_breach_pct": 5.01,
+      "lower_breach_pct": 6.72,
+      "regime_coverage": {
+        "REGIME_2_FED_HIKING_BEAR": 91.84,
+        "REGIME_3_TRANSITION_COMPRESSION": 86.68,
+        "REGIME_4_SPOT_ETF_INSTITUTIONAL": 88.67
+      },
+      "quintile_stress_test": {
+        "Q1 (Bottom 20% Calm)": {
+          "coverage_pct": 84.69,
+          "upper_breach_pct": 0.0
+        },
+        "Q2 (20-40%)": {
+          "coverage_pct": 89.57,
+          "upper_breach_pct": 0.11
+        },
+        "Q3 (40-60%)": {
+          "coverage_pct": 94.78,
+          "upper_breach_pct": 0.76
+        },
+        "Q4 (60-80%)": {
+          "coverage_pct": 91.21,
+          "upper_breach_pct": 5.99
+        },
+        "Q5 (Top 20% Extreme)": {
+          "coverage_pct": 81.09,
+          "upper_breach_pct": 18.2
+        }
+      }
+    },
+    "C2": {
+      "overall_coverage_pct": 94.03,
+      "mean_width": 0.52151,
+      "winkler_score": 0.56274,
+      "upper_breach_pct": 3.07,
+      "lower_breach_pct": 2.91,
+      "regime_coverage": {
+        "REGIME_2_FED_HIKING_BEAR": 93.5,
+        "REGIME_3_TRANSITION_COMPRESSION": 94.27,
+        "REGIME_4_SPOT_ETF_INSTITUTIONAL": 93.96
+      },
+      "quintile_stress_test": {
+        "Q1 (Bottom 20% Calm)": {
+          "coverage_pct": 93.66,
+          "upper_breach_pct": 0.0
+        },
+        "Q2 (20-40%)": {
+          "coverage_pct": 95.36,
+          "upper_breach_pct": 0.52
+        },
+        "Q3 (40-60%)": {
+          "coverage_pct": 95.1,
+          "upper_breach_pct": 2.47
+        },
+        "Q4 (60-80%)": {
+          "coverage_pct": 95.6,
+          "upper_breach_pct": 3.06
+        },
+        "Q5 (Top 20% Extreme)": {
+          "coverage_pct": 90.4,
+          "upper_breach_pct": 9.28
+        }
+      }
+    },
+    "C3": {
+      "overall_coverage_pct": 87.05,
+      "mean_width": 0.44139,
+      "winkler_score": 0.56148,
+      "upper_breach_pct": 6.61,
+      "lower_breach_pct": 6.34,
+      "regime_coverage": {
+        "REGIME_2_FED_HIKING_BEAR": 90.18,
+        "REGIME_3_TRANSITION_COMPRESSION": 86.87,
+        "REGIME_4_SPOT_ETF_INSTITUTIONAL": 86.92
+      },
+      "quintile_stress_test": {
+        "Q1 (Bottom 20% Calm)": {
+          "coverage_pct": 88.08,
+          "upper_breach_pct": 0.0
+        },
+        "Q2 (20-40%)": {
+          "coverage_pct": 88.31,
+          "upper_breach_pct": 1.03
+        },
+        "Q3 (40-60%)": {
+          "coverage_pct": 89.67,
+          "upper_breach_pct": 4.96
+        },
+        "Q4 (60-80%)": {
+          "coverage_pct": 88.67,
+          "upper_breach_pct": 8.13
+        },
+        "Q5 (Top 20% Extreme)": {
+          "coverage_pct": 80.5,
+          "upper_breach_pct": 18.95
+        }
+      }
+    },
+    "C4": {
+      "overall_coverage_pct": 87.36,
+      "mean_width": 0.43715,
+      "winkler_score": 0.55044,
+      "upper_breach_pct": 6.47,
+      "lower_breach_pct": 6.17,
+      "regime_coverage": {
+        "REGIME_2_FED_HIKING_BEAR": 91.84,
+        "REGIME_3_TRANSITION_COMPRESSION": 87.9,
+        "REGIME_4_SPOT_ETF_INSTITUTIONAL": 86.86
+      },
+      "quintile_stress_test": {
+        "Q1 (Bottom 20% Calm)": {
+          "coverage_pct": 88.26,
+          "upper_breach_pct": 0.0
+        },
+        "Q2 (20-40%)": {
+          "coverage_pct": 89.76,
+          "upper_breach_pct": 1.05
+        },
+        "Q3 (40-60%)": {
+          "coverage_pct": 88.44,
+          "upper_breach_pct": 5.52
+        },
+        "Q4 (60-80%)": {
+          "coverage_pct": 88.57,
+          "upper_breach_pct": 8.16
+        },
+        "Q5 (Top 20% Extreme)": {
+          "coverage_pct": 81.76,
+          "upper_breach_pct": 17.62
+        }
+      }
+    }
+  }
+}

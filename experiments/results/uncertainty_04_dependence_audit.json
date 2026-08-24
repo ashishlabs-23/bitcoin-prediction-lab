@@ -1,0 +1,25 @@
+{
+  "timestamp": "2026-08-24T15:09:57.349826+00:00",
+  "experiment": "UNCERTAINTY-04",
+  "engine": "C2_DEPENDENCE_AWARE_CONFORMAL_RISK_ENVELOPE",
+  "holdout_bars": 5224,
+  "causality_audit": {
+    "zero_leakage": true,
+    "boundary_causal": true
+  },
+  "coverage_confidence_intervals": {
+    "overall_coverage": {
+      "point_estimate_pct": 92.84,
+      "ci_95_lower_pct": 88.25,
+      "ci_95_upper_pct": 96.46,
+      "bootstrap_std_pct": 2.09
+    },
+    "q5_extreme_volatility_coverage": {
+      "point_estimate_pct": 89.47,
+      "ci_95_lower_pct": 82.39,
+      "ci_95_upper_pct": 96.65,
+      "bootstrap_std_pct": 3.69
+    }
+  },
+  "governance_status": "PROVISIONALLY_VALIDATED_FOR_RISK_CONTAINMENT"
+}

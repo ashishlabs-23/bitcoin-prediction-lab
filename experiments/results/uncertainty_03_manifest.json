@@ -1,0 +1,76 @@
+{
+  "timestamp": "2026-08-24T15:06:29.745032+00:00",
+  "experiment": "UNCERTAINTY-03",
+  "protocol": "UNTOUCHED_2026_HOLDOUT_VALIDATION",
+  "holdout_span": "2026-01-01 00:00:00+00:00 to 2026-08-06 16:00:00+00:00",
+  "holdout_observations": 5225,
+  "results_c2": {
+    "coverage_pct": 92.9,
+    "coverage_gap_G": 2.9,
+    "mean_width": 0.45815,
+    "winkler_score": 0.49004,
+    "upper_breach_pct": 3.67,
+    "lower_breach_pct": 3.43,
+    "tail_symmetry_delta": 0.25,
+    "quintiles": {
+      "Q1 (Bottom 20% Calm)": {
+        "coverage_pct": 90.72,
+        "upper_breach_pct": 0.0
+      },
+      "Q2 (20-40%)": {
+        "coverage_pct": 95.22,
+        "upper_breach_pct": 1.15
+      },
+      "Q3 (40-60%)": {
+        "coverage_pct": 93.97,
+        "upper_breach_pct": 2.01
+      },
+      "Q4 (60-80%)": {
+        "coverage_pct": 94.64,
+        "upper_breach_pct": 5.17
+      },
+      "Q5 (Top 20% Extreme)": {
+        "coverage_pct": 89.95,
+        "upper_breach_pct": 10.05
+      }
+    }
+  },
+  "results_c0": {
+    "coverage_pct": 86.14,
+    "coverage_gap_G": -3.86,
+    "mean_width": 0.3889,
+    "winkler_score": 0.48854,
+    "upper_breach_pct": 6.14,
+    "lower_breach_pct": 7.71,
+    "tail_symmetry_delta": 1.57,
+    "quintiles": {
+      "Q1 (Bottom 20% Calm)": {
+        "coverage_pct": 80.38,
+        "upper_breach_pct": 0.0
+      },
+      "Q2 (20-40%)": {
+        "coverage_pct": 89.95,
+        "upper_breach_pct": 2.39
+      },
+      "Q3 (40-60%)": {
+        "coverage_pct": 88.13,
+        "upper_breach_pct": 3.16
+      },
+      "Q4 (60-80%)": {
+        "coverage_pct": 89.19,
+        "upper_breach_pct": 8.52
+      },
+      "Q5 (Top 20% Extreme)": {
+        "coverage_pct": 83.06,
+        "upper_breach_pct": 16.65
+      }
+    }
+  },
+  "gates": {
+    "coverage_gte_90": true,
+    "q5_containment": false,
+    "all_quintiles_gte_85": true,
+    "tail_symmetry": true
+  },
+  "verdict": "GATE_FAILED"
+}

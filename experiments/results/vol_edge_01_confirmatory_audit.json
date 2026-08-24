@@ -1,0 +1,22 @@
+{
+  "actual_delta_qlike": 0.000234,
+  "standard_diebold_mariano": {
+    "stat": 0.316,
+    "p_value": 0.37581,
+    "bandwidth": 168
+  },
+  "clark_west_nested_test": {
+    "stat": 1.804,
+    "p_value": 0.03561,
+    "bandwidth": 168,
+    "n_eff": 3835.31
+  },
+  "placebo_block_permutation_b1000": {
+    "b_iterations": 1000,
+    "null_mean": -0.000248,
+    "null_std": 0.000628,
+    "null_p95": 0.000713,
+    "empirical_p_value": 0.178
+  },
+  "confirmatory_verdict": "REEXAMINE"
+}

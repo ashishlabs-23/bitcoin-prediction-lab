@@ -1,0 +1,12 @@
+{
+  "actual_delta_qlike": 0.000234,
+  "block_length": 168,
+  "bootstrap_iterations": 1000,
+  "bootstrap_null_std": 0.000707,
+  "bootstrap_p95": 0.000875,
+  "bootstrap_p_value": 0.231,
+  "standard_dm_p_value": 0.37581,
+  "clark_west_p_value": 0.03561,
+  "block_placebo_p_value": 0.178,
+  "final_classification": "ARCHIVED_NO_MATERIAL_INCREMENTAL_FORECASTING_VALUE"
+}

@@ -1,0 +1,87 @@
+{
+  "timestamp": "2026-08-24T14:48:28.568236+00:00",
+  "protocol": "VOL-EDGE-01_PURGED_CROSS_VALIDATION",
+  "target_variable": "rv7d_var_ann",
+  "primary_horizon": "7 days (168 hours)",
+  "total_test_observations": 32974,
+  "n_eff_target": 238.2,
+  "n_eff_dm": 3827.82,
+  "decisive_test": {
+    "delta_qlike": 0.000234,
+    "dm_statistic": 0.316,
+    "dm_p_value": 0.37581,
+    "delta_r2": 0.0012,
+    "delta_ic": 0.0007,
+    "placebo_p_value": 0.14
+  },
+  "model_performance": {
+    "M0": {
+      "mean_qlike": 0.25673,
+      "r2_oos": -0.1112,
+      "spearman_ic": -0.0758,
+      "mae_variance": 0.13187,
+      "calibration_slope": 0.02
+    },
+    "M1": {
+      "mean_qlike": 0.20184,
+      "r2_oos": 0.0944,
+      "spearman_ic": 0.4897,
+      "mae_variance": 0.10628,
+      "calibration_slope": 0.686
+    },
+    "M2": {
+      "mean_qlike": 0.19623,
+      "r2_oos": 0.1382,
+      "spearman_ic": 0.5173,
+      "mae_variance": 0.10312,
+      "calibration_slope": 0.764
+    },
+    "M2-R": {
+      "mean_qlike": 0.193,
+      "r2_oos": 0.1515,
+      "spearman_ic": 0.5272,
+      "mae_variance": 0.10192,
+      "calibration_slope": 0.785
+    },
+    "M3": {
+      "mean_qlike": 0.19597,
+      "r2_oos": 0.1383,
+      "spearman_ic": 0.5196,
+      "mae_variance": 0.10297,
+      "calibration_slope": 0.757
+    },
+    "M4": {
+      "mean_qlike": 0.23359,
+      "r2_oos": 0.0368,
+      "spearman_ic": 0.503,
+      "mae_variance": 0.09708,
+      "calibration_slope": 0.892
+    },
+    "M5": {
+      "mean_qlike": 0.19969,
+      "r2_oos": 0.1386,
+      "spearman_ic": 0.5487,
+      "mae_variance": 0.09544,
+      "calibration_slope": 0.856
+    },
+    "M6": {
+      "mean_qlike": 0.19946,
+      "r2_oos": 0.1398,
+      "spearman_ic": 0.5494,
+      "mae_variance": 0.09547,
+      "calibration_slope": 0.847
+    }
+  },
+  "fold_compression_gammas": [
+    0.0689,
+    0.0727,
+    0.046,
+    0.0453,
+    0.0389
+  ],
+  "compression_iv_correlation": {
+    "pearson": 0.0112,
+    "spearman": 0.0083
+  },
+  "verdict": "EMPIRICAL_NULL_REJECTED"
+}

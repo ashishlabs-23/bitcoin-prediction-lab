@@ -12,5 +12,7 @@
   "status": "CANONICAL_ACTIVE_BASELINE",
   "rebaseline_reason": "Canonical multi-regime baseline computed on full 2022-2026 authenticated dataset across 4 macro epochs",
   "rebaselining_policy": "FROZEN_UNTIL_QUARTERLY_CADENCE",
-  "provenance_hash": "3b0ba48cebf23b0e6b1c4316262decf1960a790e44f9ef647b65cd15b6c99dc6"
+  "provenance_hash": "3b0ba48cebf23b0e6b1c4316262decf1960a790e44f9ef647b65cd15b6c99dc6",
+  "_comment": "POINTER / MIRROR: Canonical source of truth is config.RESULTS_DIR -> experiments/results/baseline_neff_manifest.json",
+  "canonical_path": "experiments/results/baseline_neff_manifest.json"
 }

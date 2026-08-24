@@ -1,0 +1,18 @@
+{
+  "timestamp": "2026-08-24T15:16:51.697629+00:00",
+  "status": "STABLE",
+  "target_coverage_pct": 90.0,
+  "coverage_30d_pct": 98.61,
+  "coverage_90d_pct": 93.94,
+  "coverage_all_pct": 93.26,
+  "coverage_drift_30d_pct": 8.61,
+  "coverage_drift_90d_pct": 3.94,
+  "upper_breach_30d_pct": 0.0,
+  "lower_breach_30d_pct": 1.39,
+  "tail_asymmetry_30d_pct": 1.39,
+  "mean_width_30d": 0.41398,
+  "mean_winkler_30d": 0.41582,
+  "total_resolved_forecasts": 5056,
+  "pending_unresolved_forecasts": 168,
+  "status_rationale": "STABLE: Normal operation \u2014 calibration metrics within predefined operating bounds (30D Coverage: 98.6%, Upper Breach: 0.0%, Tail Balance: 1.39%)."
+}
