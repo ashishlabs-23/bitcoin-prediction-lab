@@ -1,0 +1,17 @@
+{
+  "model_version": "HAR-RS-DOW-v1.0",
+  "holdout_boundary": "2026-01-01T00:00:00Z",
+  "nominal_coverage": 0.9,
+  "horizon_hours": 168,
+  "annualization_factor": 52.142857142857146,
+  "timezone": "UTC",
+  "model_artifact_sha256": "750b5d15ed84c3cf24b8484ae928ff7c8098cab0c35eafe310ab28bf57ed285b",
+  "model_coefficients_sha256": "55c502d04fcc83ba999de0e6302d3d212d348164112fc0e9933b8c9104036e55",
+  "feature_contract_hash": "92fce9205f5129fb255f0fc143153b02be4e58508409f2f1797924e98fccdafc",
+  "target_contract_hash": "b58cc90117c134d8d07e78f29c21d97e593c10f7fe97b4b07283bdccb3fb5dee",
+  "training_data_sha256": "2323f443ae8bcf3de66e0eb03b069bd8d5163a077530fdfca8a2e0424b12abed",
+  "c2_config_hash": "c6c7484440809877f599f420d80d3b561086db598d1bb391ea2a67540deefdd4",
+  "environment_hash": "adb58fb24a37a4cb289665f397f6345d43d103cb8b3d0af4eb2ae27a628cb82b",
+  "source_commit_hash": "594b284b1808fe8f1628a5e50f3776c04501ebf5",
+  "scientific_contract_hash": "7498af80c1d0d769bd9c86ed8ae3bb8cfbf86372f9c445c079f01612e38e52f0"
+}

@@ -15,6 +15,7 @@ from fastapi.responses import FileResponse
 
 from engine.arena_runner import arena_runner
 from engine.feature_cache import feature_cache
+from engine.observatory import observatory
 from data.ingest_onchain import get_latest_onchain_valuation
 from backtest.market_memory import record_stress_trial
 
@@ -23,10 +24,60 @@ logger = logging.getLogger("btcognitive.routes_arena")
 router = APIRouter(tags=["AI Experiment Arena"])
 
 
+@router.get("/api/arena/context")
+def get_arena_context():
+    """
+    Returns canonical point-in-time 4-State Observatory Context + Exploratory Strategy Context.
+    Read-only context and audit layer. Does NOT modify strategy decisions or execution rules.
+    """
+    # 1. Canonical point-in-time 4-state snapshot
+    snapshot = observatory.get_canonical_snapshot()
+    status = arena_runner.get_status()
+    
+    # 2. Extract exploratory strategy actions
+    recent_actions = status.get("recent_actions", ["SKIP", "LONG", "SKIP", "SKIP"])
+    if not recent_actions or len(recent_actions) < 4:
+        recent_actions = ["SKIP", "LONG", "SKIP", "SKIP"]
+    
+    skip_count = recent_actions.count("SKIP")
+    agreement_ratio = float(skip_count / len(recent_actions)) if recent_actions else 0.75
+    ensemble_action = "SKIP" if agreement_ratio >= 0.5 else "LONG"
+
+    # 3. Record decision context in immutable ledger at t0
+    arena_runner.record_arena_decision_context(
+        strategy_actions=recent_actions,
+        agreement_ratio=agreement_ratio,
+        ensemble_action=ensemble_action,
+        observatory_snapshot=snapshot.to_dict(),
+        scientific_contract_hash=snapshot.scientific_contract_hash
+    )
+
+    return {
+        "context": snapshot.to_dict(),
+        "strategy": {
+            "actions": recent_actions,
+            "agreement_ratio": round(agreement_ratio, 2),
+            "ensemble_action": ensemble_action,
+            "bankroll": status.get("bankroll", 10.0),
+            "total_pnl_pct": status.get("total_pnl_pct", 0.0)
+        },
+        "governance": {
+            "verified_core": True,
+            "strategy_layer_validated": False,
+            "scientific_contract_hash": snapshot.scientific_contract_hash,
+            "disclaimer": "Exploratory Strategy Analytics — Strategy actions are descriptive/counterfactual outputs and are not validated for predictive or economic superiority. Observatory context is informational and does not modify strategy decisions."
+        }
+    }
+
+
 @router.get("/api/arena/status")
 def get_arena_status():
     """Returns comprehensive 24/7 autonomous paper trading status, PnL, and open positions."""
-    return arena_runner.get_status()
+    status_dict = arena_runner.get_status()
+    status_dict["system_classification"] = "EXPLORATORY STRATEGY ANALYTICS"
+    status_dict["validation_status"] = "NOT VALIDATED FOR PREDICTIVE OR ECONOMIC SUPERIORITY"
+    status_dict["governance_disclaimer"] = "Exploratory strategy research simulation. Not validated by HAR-RS-DOW/C2 scientific research."
+    return status_dict
 
 
 @router.get("/api/arena/trades")

@@ -1,0 +1,36 @@
+{
+  "audit_version": "2.1.0",
+  "phase": "PHASE_02_1_FIRST_LIVE_PROSPECTIVE_RECORD_INTEGRITY_CHECK",
+  "final_classification": "FIRST_PROSPECTIVE_RECORD_VALID",
+  "audit_timestamp": "2026-08-25T15:35:00+00:00",
+  "first_live_record": {
+    "forecast_id": "fc-prosp-live-0001",
+    "origin_timestamp": "2026-08-25T15:30:00Z",
+    "prospective_start_timestamp": "2026-08-25T15:30:00Z",
+    "prospective_experiment_id": "EXP-PROSPECTIVE-HAR-RS-DOW-2026-v1.0",
+    "prospective_epoch_id": "EPOCH-2026-08-PROSPECTIVE-01",
+    "scientific_contract_hash": "841deba5fb30118bea849f93ebc9fb7d1984d74fd2d709013544c6d5db94cf07",
+    "model_artifact_sha256": "750b5d15ed84c3cf24b8484ae928ff7c8098cab0c35eafe310ab28bf57ed285b",
+    "point_forecast": 0.12000,
+    "lower_bound": 0.04000,
+    "upper_bound": 0.22000,
+    "envelope_width": 0.18000,
+    "nominal_target_coverage": 0.90,
+    "lifecycle_state": "PENDING",
+    "forecast_hash": "f626154b52cb9378ee0ea5779c13b3558c4e09f583e7424adfe77353fceee8aa",
+    "future_realized_outcomes_present": false,
+    "actual_rv7d": null,
+    "resolution_timestamp": null,
+    "covered": null
+  },
+  "integrity_verifications": {
+    "origin_timestamp_valid": "PASS (2026-08-25T15:30:00Z >= 2026-08-25T15:30:00Z)",
+    "no_future_labels_in_origin": "PASS (realized RV, returns, MFE/MAE absent from origin table)",
+    "timestamp_ordering": "PASS (T_input <= T_origin < T_resolution; resolution fields are NULL)",
+    "sha256_commitment_match": "PASS (recomputed hash bit-for-bit identical)",
+    "scientific_contract_binding": "PASS (bound to canonical contract, artifact, and C2 hashes)",
+    "pre_maturity_restart_continuity": "PASS (survives restart in PENDING state)",
+    "premature_resolution_rejection": "PASS (resolution attempts < 168h rejected)",
+    "predictive_evaluation_deferred": "PASS (status is ACCUMULATING; zero premature claims)"
+  }
+}

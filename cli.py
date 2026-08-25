@@ -79,21 +79,57 @@ def cmd_terminal(args):
 
 
 def cmd_observatory(args):
-    print("\n\033[96m=== FORECAST ACCURACY OBSERVATORY AUDIT SUMMARY ===\033[0m")
+    print("\n\033[96m======================= FORECAST ACCURACY OBSERVATORY AUDIT SUMMARY =======================\033[0m")
     summary = query_api("/api/observatory/summary", args.url)
     if summary:
         status = summary.get("status", "UNKNOWN")
         color = "\033[92m" if status == "STABLE" else ("\033[93m" if status == "WATCH" else "\033[91m")
-        print(f"Operational Health:       {color}{status}\033[0m")
-        print(f"Rationale:                {summary.get('status_rationale')}")
-        print(f"Total Resolved (168h):    {summary.get('total_resolved_forecasts', 0):,}")
-        print(f"Pending Maturing (168h):  {summary.get('pending_unresolved_forecasts', 0):,}")
-        print(f"30D Rolling Coverage:     {summary.get('coverage_30d_pct', 0):.2f}% (Drift: {summary.get('coverage_drift_30d_pct', 0):+.2f}%)")
-        print(f"90D Persistent Coverage:  {summary.get('coverage_90d_pct', 0):.2f}%")
-        print(f"All-Time Holdout Coverage:{summary.get('coverage_all_pct', 0):.2f}%")
-        print(f"30D Upper / Lower Breach: {summary.get('upper_breach_30d_pct', 0):.2f}% / {summary.get('lower_breach_30d_pct', 0):.2f}% (Delta: {summary.get('tail_asymmetry_30d_pct', 0):.2f}%)")
-        print(f"30D Mean Winkler Score:   {summary.get('mean_winkler_30d', 0):.5f}")
-    print()
+        
+        exp_id = summary.get("prospective_experiment_id", "N/A")
+        epoch_id = summary.get("prospective_epoch_id", "N/A")
+        audit_status = summary.get("prospective_audit_status", "ACCUMULATING")
+        
+        print(f"\n\033[93mPROSPECTIVE EXPERIMENT IDENTITY\033[0m")
+        print(f"   • Experiment ID:          \033[97m{exp_id}\033[0m")
+        print(f"   • Epoch ID:               {epoch_id}")
+        print(f"   • Audit Status:           \033[96m{audit_status}\033[0m (Next Milestone: N_resolved = 720)")
+
+        print(f"\n\033[93mOPERATIONAL CONTROL STATUS\033[0m")
+        print(f"   • Health State:           {color}{status}\033[0m")
+        print(f"   • System Rationale:       {summary.get('status_rationale')}")
+
+        resolved_n = summary.get("valid_N", summary.get("total_resolved_forecasts", 0))
+        pending_n = summary.get("pending_N", summary.get("pending_unresolved_forecasts", 0))
+        invalid_n = summary.get("data_invalid_N", 0)
+        corrupted_n = summary.get("hash_failures", 0)
+        abstained_n = summary.get("abstained_N", 0)
+        total_n = resolved_n + pending_n + invalid_n + corrupted_n + abstained_n
+        census_ok = summary.get("census_verified", True)
+
+        print(f"\n\033[93mPROSPECTIVE CENSUS ACCOUNTING\033[0m")
+        print(f"   • Total Issued:           \033[97m{total_n:,}\033[0m")
+        print(f"   • Resolved (168h):        \033[92m{resolved_n:,}\033[0m")
+        print(f"   • Pending Maturing (168h):\033[90m{pending_n:,}\033[0m")
+        print(f"   • DATA_INVALID:           {invalid_n}")
+        print(f"   • AUDIT_CORRUPTED:        {corrupted_n}")
+        print(f"   • Abstained:              {abstained_n}")
+        print(f"   • Census Balance Check:   \033[92m{'BALANCED (ZERO SILENT LOSS)' if census_ok else 'FAILED'}\033[0m")
+
+        print(f"\n\033[93mEMPIRICAL CALIBRATION PANELS\033[0m")
+        print(f"   • 30D Rolling Coverage:   {summary.get('coverage_30d_pct', 0):.2f}% (Drift: {summary.get('coverage_drift_30d_pct', 0):+.2f}%)")
+        print(f"   • 90D Persistent Coverage:{summary.get('coverage_90d_pct', 0):.2f}%")
+        print(f"   • All-Time Holdout:       {summary.get('coverage_all_pct', 0):.2f}%")
+        print(f"   • 30D Upper / Lower Breach:{summary.get('upper_breach_30d_pct', 0):.2f}% / {summary.get('lower_breach_30d_pct', 0):.2f}% (Delta: {summary.get('tail_asymmetry_30d_pct', 0):.2f}%)")
+        print(f"   • 30D Mean Winkler Score: {summary.get('mean_winkler_30d', 0):.5f}")
+        
+        stress_n = summary.get("stress_N", 0)
+        stress_cov = summary.get("stress_coverage_pct")
+        stress_cov_str = f"{stress_cov:.2f}%" if stress_cov is not None else "N/A"
+        print(f"   • Stress Panel (Ex-Ante): N = {stress_n} | Coverage: {stress_cov_str}")
+
+    print("\n\033[90m--------------------------------------------------------------------------------------------\033[0m")
+    print(f"\033[90mRule: Observe != Optimize | Operational health states are control limits, not statistical validation.\033[0m")
+    print("\033[96m============================================================================================\033[0m\n")
 
 
 def cmd_health(args):

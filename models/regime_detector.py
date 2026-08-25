@@ -33,9 +33,17 @@ import logging
 from typing import Dict, List, Optional, Any, Union, Tuple
 import numpy as np
 import pandas as pd
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+try:
+    import torch
+    import torch.nn as nn
+    import torch.nn.functional as F
+    HAS_TORCH = True
+except ImportError:
+    torch = None
+    nn = None
+    F = None
+    HAS_TORCH = False
+
 from sklearn.cluster import KMeans
 
 # Ensure project root is in sys.path
@@ -61,23 +69,35 @@ REGIMES: List[str] = [
 NUM_REGIMES = len(REGIMES) # Exactly 7
 
 
-class RegimeClassifierNN(nn.Module):
-    """Deep refinement neural network for continuous regime classification."""
-    def __init__(self, input_dim: int = 7, hidden_dim: int = 32, num_classes: int = 7, dropout: float = 0.1):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.LayerNorm(hidden_dim),
-            nn.LeakyReLU(0.1),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.LayerNorm(hidden_dim),
-            nn.LeakyReLU(0.1),
-            nn.Linear(hidden_dim, num_classes)
-        )
+if HAS_TORCH:
+    class RegimeClassifierNN(nn.Module):
+        """Deep refinement neural network for continuous regime classification."""
+        def __init__(self, input_dim: int = 7, hidden_dim: int = 32, num_classes: int = 7, dropout: float = 0.1):
+            super().__init__()
+            self.net = nn.Sequential(
+                nn.Linear(input_dim, hidden_dim),
+                nn.LayerNorm(hidden_dim),
+                nn.LeakyReLU(0.1),
+                nn.Dropout(dropout),
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.LayerNorm(hidden_dim),
+                nn.LeakyReLU(0.1),
+                nn.Linear(hidden_dim, num_classes)
+            )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.net(x)
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return self.net(x)
+else:
+    class RegimeClassifierNN:
+        """Lightweight fallback when PyTorch is not installed."""
+        def __init__(self, *args, **kwargs):
+            pass
+        def eval(self):
+            pass
+        def train(self):
+            pass
+        def parameters(self):
+            return []
 
 
 class MarketRegimeDetector:
@@ -89,11 +109,13 @@ class MarketRegimeDetector:
     def __init__(self, checkpoint_path: Optional[str] = None):
         self.checkpoint_path = checkpoint_path or REGIME_CHECKPOINT_PATH
         self.kmeans: Optional[KMeans] = None
-        self.model: RegimeClassifierNN = RegimeClassifierNN(input_dim=7, hidden_dim=32, num_classes=NUM_REGIMES)
+        self.model = RegimeClassifierNN(input_dim=7, hidden_dim=32, num_classes=NUM_REGIMES) if HAS_TORCH else None
         self._load_or_initialize()
 
     def _load_or_initialize(self) -> None:
         """Loads trained model weights or initializes calibrated baseline weights."""
+        if not HAS_TORCH:
+            return
         if os.path.exists(self.checkpoint_path):
             try:
                 state = torch.load(self.checkpoint_path, map_location="cpu", weights_only=True)
@@ -109,10 +131,13 @@ class MarketRegimeDetector:
 
         # Initialize baseline heuristics into NN weights if no checkpoint exists
         self._seed_baseline_weights()
-        self.model.eval()
+        if self.model:
+            self.model.eval()
 
     def _seed_baseline_weights(self) -> None:
         """Seeds initial network weights with financial domain heuristics."""
+        if not HAS_TORCH or not self.model:
+            return
         with torch.no_grad():
             for p in self.model.parameters():
                 if p.dim() > 1:
@@ -185,7 +210,7 @@ class MarketRegimeDetector:
         X_data: Union[np.ndarray, pd.DataFrame],
         epochs: int = 15,
         lr: float = 0.005,
-        sample_weights: Optional[Union[np.ndarray, torch.Tensor]] = None,
+        sample_weights: Optional[Union[np.ndarray, Any]] = None,
         t1: Optional[pd.Series] = None,
         timestamps: Optional[pd.Series] = None
     ) -> Dict[str, Any]:
@@ -286,11 +311,31 @@ class MarketRegimeDetector:
           }
         """
         feats = self.extract_features(data)
-        self.model.eval()
-        with torch.no_grad():
-            tensor_x = torch.from_numpy(feats).float()
-            logits = self.model(tensor_x)
-            probs = F.softmax(logits, dim=-1)[0].cpu().numpy()
+        if HAS_TORCH and self.model is not None:
+            self.model.eval()
+            with torch.no_grad():
+                tensor_x = torch.from_numpy(feats).float()
+                logits = self.model(tensor_x)
+                probs = F.softmax(logits, dim=-1)[0].cpu().numpy()
+        else:
+            # Domain heuristic fallback when PyTorch is not installed
+            # Feats: 0: ATR, 1: ADX, 2: EMA20, 3: EMA50, 4: Vol, 5: VWAP, 6: Funding
+            row = feats[0]
+            trend = row[2] + row[3] + row[5]
+            vol = row[0]
+            adx = row[1]
+            
+            raw_scores = np.array([
+                max(0.1, trend * 10 + (1.0 if adx > 0.3 else 0.0)),  # Strong Uptrend
+                max(0.1, trend * 5),                                  # Weak Uptrend
+                max(0.1, 1.0 - abs(trend) * 5),                       # Sideways
+                max(0.1, (1.0 if trend > 0 and vol < 0.02 else 0.2)), # Accumulation
+                max(0.1, (1.0 if trend < 0 and vol < 0.02 else 0.2)), # Distribution
+                max(0.1, vol * 50),                                   # High Volatility
+                max(0.1, -trend * 10 + vol * 30)                      # Capitulation
+            ], dtype=np.float32)
+            exp_scores = np.exp(raw_scores - np.max(raw_scores))
+            probs = exp_scores / np.sum(exp_scores)
 
         best_idx = int(np.argmax(probs))
         regime_name = REGIMES[best_idx]

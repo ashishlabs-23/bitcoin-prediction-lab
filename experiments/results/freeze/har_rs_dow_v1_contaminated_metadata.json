@@ -1,0 +1,11 @@
+{
+  "status": "ARCHIVED_CONTAMINATED_DO_NOT_USE",
+  "contamination_reason": "Training labels for Dec 25-31, 2025 origins included realized returns from Jan 1-7, 2026 holdout.",
+  "artifact_path": "har_rs_dow_v1_CONTAMINATED_DO_NOT_USE.joblib",
+  "artifact_sha256": "c576c80c41096709ca824389354f25b77af9c8dd4d1aa24a033471fd5c02fb4e",
+  "archived_at": "2026-08-25T14:36:12.438689+00:00",
+  "contaminated_rows_count": 168,
+  "earliest_contaminated_origin": "2025-12-25 00:00:00+00:00",
+  "latest_contaminated_origin": "2025-12-31 23:00:00+00:00",
+  "max_target_maturity": "2026-01-07 23:00:00+00:00"
+}

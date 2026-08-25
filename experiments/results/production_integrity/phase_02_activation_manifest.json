@@ -1,0 +1,59 @@
+{
+  "manifest_version": "2.0.0",
+  "phase": "PHASE_02_PROSPECTIVE_EVIDENCE_COLLECTION_ACTIVATION",
+  "final_classification": "PROSPECTIVE_VALIDATION_ACTIVE",
+  "activation_timestamp": "2026-08-25T15:30:00+00:00",
+  "prospective_experiment_identity": {
+    "prospective_experiment_id": "EXP-PROSPECTIVE-HAR-RS-DOW-2026-v1.0",
+    "prospective_epoch_id": "EPOCH-2026-08-PROSPECTIVE-01",
+    "prospective_start_timestamp": "2026-08-25T15:30:00Z",
+    "scientific_contract_hash": "841deba5fb30118bea849f93ebc9fb7d1984d74fd2d709013544c6d5db94cf07",
+    "model_artifact_sha256": "750b5d15ed84c3cf24b8484ae928ff7c8098cab0c35eafe310ab28bf57ed285b",
+    "model_coefficients_sha256": "55c502d04fcc83ba999de0e6302d3d212d348164112fc0e9933b8c9104036e55",
+    "feature_contract_hash": "8654d2c3e02c9483fe1d5a4831630d6ed8459aa2c0e4e64ffcec552bb36fd1a8",
+    "target_contract_hash": "5fb146206d28990cf4910cf9dbb8364b6e5db8e62c125df9db8fcfe7eeb0c105",
+    "c2_config_hash": "c6c7484440809877f599f420d80d3b561086db598d1bb391ea2a67540deefdd4",
+    "holdout_boundary": "2026-01-01T00:00:00Z",
+    "source_commit": "594b284b1808fe8f1628a5e50f3776c04501ebf5"
+  },
+  "no_intervention_invariants": {
+    "methodology_frozen": true,
+    "calibration_frozen": true,
+    "threshold_frozen": true,
+    "feature_set_frozen": true,
+    "retraining_disabled": true,
+    "performance_driven_retraining": false,
+    "prospective_audit_status": "ACCUMULATING",
+    "interim_audit_threshold_N": 720,
+    "definitive_audit_threshold_N": 2160
+  },
+  "prospective_census_accounting": {
+    "accounting_identity": "issued_N == resolved_N + pending_N + data_invalid_N + audit_corrupted_N + abstained_N",
+    "census_status": "VERIFIED_APPEND_ONLY",
+    "silent_loss_tolerance": 0
+  },
+  "observatory_panels": {
+    "overall": "All accumulated prospective resolved forecasts",
+    "window_30d": "Exact trailing 30 wall-clock days (720h)",
+    "window_90d": "Exact trailing 90 wall-clock days (2160h)",
+    "stress_panel": "Predefined ex-ante rule: v_hat >= 0.30 or realized variance >= 0.25 (No holdout post-hoc quantile dependency)"
+  },
+  "operational_vs_statistical_separation": {
+    "operational_health_states": ["STABLE", "WATCH", "DEGRADED", "FAIL", "DATA_INVALID"],
+    "rule": "Operational health status regulates runtime risk-defense and containment; prospective statistical validation is reserved exclusively for the accumulated census audit."
+  },
+  "preflight_verification": {
+    "scientific_contract_valid": true,
+    "startup_gate_valid": true,
+    "model_artifact_valid": true,
+    "c2_config_valid": true,
+    "target_boundary_valid": true,
+    "observatory_persistent": true,
+    "forecast_hashing_valid": true,
+    "resolution_hashing_valid": true,
+    "exploratory_isolation_valid": true,
+    "no_runtime_retraining": true,
+    "no_synthetic_probabilities": true,
+    "global_preflight_status": "PASS"
+  }
+}

@@ -144,7 +144,7 @@ class RangeForecastService:
 
         # Mondrian Volatility-Adaptive Conformal Scaling
         # Dynamically scales residual quantiles based on term structure ratio (sigma_1h / sigma_24h)
-        vol_ratio = float(features.get('vol_ratio_1h_24h', 1.0)) if features else 1.0
+        vol_ratio = float(features.get('vol_ratio_1h_24h', 1.0)) if features is not None else 1.0
         mfe_scale = float(np.clip(1.0 + 0.35 * (vol_ratio - 1.0), 0.85, 1.45))
         mae_scale = float(np.clip(1.0 + 0.50 * (vol_ratio - 1.0), 0.85, 1.60))
 
@@ -257,7 +257,7 @@ class RangeForecastService:
             conn = _get_db()
             with conn:
                 conn.execute("""
-                    INSERT OR REPLACE INTO range_forecasts (
+                    INSERT INTO range_forecasts (
                         forecast_id, timestamp, symbol, horizon, current_price,
                         upper_p10, upper_p25, upper_p50, upper_p75, upper_p90,
                         lower_p10, lower_p25, lower_p50, lower_p75, lower_p90,
@@ -273,7 +273,7 @@ class RangeForecastService:
                 ))
 
                 conn.execute("""
-                    INSERT OR REPLACE INTO excursion_forecasts (
+                    INSERT INTO excursion_forecasts (
                         forecast_id, timestamp, symbol, horizon,
                         mfe_p10, mfe_p25, mfe_p50, mfe_p75, mfe_p90,
                         mae_p10, mae_p25, mae_p50, mae_p75, mae_p90,
@@ -287,7 +287,7 @@ class RangeForecastService:
                 ))
 
                 conn.execute("""
-                    INSERT OR REPLACE INTO uncertainty_forecasts (
+                    INSERT INTO uncertainty_forecasts (
                         forecast_id, timestamp, symbol, interval_width,
                         relative_uncertainty, data_quality_score, forecast_state, created_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);

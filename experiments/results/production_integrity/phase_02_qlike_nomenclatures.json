@@ -1,0 +1,27 @@
+{
+  "governance_status": "FREEZE_REPAIRED_AND_VERIFIED",
+  "provenance_resolution_date": "2026-08-25T15:30:00+00:00",
+  "metrics": {
+    "historical_cv_qlike": {
+      "metric_name": "Historical 5-Fold Purged Walk-Forward CV QLIKE",
+      "dataset": "ohlcv.parquet + iv7d.parquet (2022-2025)",
+      "temporal_span": "2022-01-01T00:00:00Z to 2025-12-24T23:00:00Z",
+      "evaluation_protocol": "5-Fold Purged Walk-Forward Cross-Validation with 168h purge boundary between folds",
+      "target": "Forward 168-Hour Realized Variance (Annualized)",
+      "model_version": "HAR-RS-DOW-v1.0",
+      "value": 0.19300,
+      "purpose": "Historical training benchmark and cross-validation baseline for feature/model selection."
+    },
+    "corrected_2026_holdout_qlike": {
+      "metric_name": "Corrected Out-of-Sample Holdout QLIKE",
+      "dataset": "ohlcv.parquet (2026)",
+      "temporal_span": "2026-01-01T00:00:00Z to 2026-08-13T15:00:00Z",
+      "evaluation_protocol": "Strict Zero-Leakage Holdout Simulation (No training labels past 2025-12-24T23:00:00Z)",
+      "target": "Forward 168-Hour Realized Variance (Annualized)",
+      "model_version": "HAR-RS-DOW-v1.0 (Frozen Canonical)",
+      "value": 0.156993,
+      "purpose": "Repaired retrospective holdout validation score proving post-repair generalization."
+    }
+  },
+  "reconciliation_summary": "Both metrics represent true and distinct evaluations of HAR-RS-DOW-v1.0 across different temporal partitions and evaluation methodologies. 0.19300 represents historical 5-fold CV loss (2022-2025), whereas 0.156993 represents the repaired 2026 holdout partition loss. Neither value was modified or tuned."
+}

@@ -23,7 +23,12 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from engine.observatory import (
     ForecastAccuracyObservatory,
     CalibrationHealthStatus,
-    ObservatoryHealthSummary
+    ObservatoryHealthSummary,
+    PROSPECTIVE_EXPERIMENT_ID,
+    PROSPECTIVE_EPOCH_ID,
+    PROSPECTIVE_START_TIMESTAMP,
+    PROSPECTIVE_AUDIT_STATUS,
+    PROSPECTIVE_INVARIANTS
 )
 from research.run_vol_edge_01_test import prepare_aligned_dataset
 from research.verify_observatory_integration import get_features
@@ -148,6 +153,15 @@ def get_terminal_live_state():
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "terminal_version": "BTCognitive-Terminal-v2.0",
+        "system_category": "VERIFIED VOLATILITY INTELLIGENCE",
+        "scientific_governance": "FREEZE_REPAIRED_AND_VERIFIED",
+        "scientific_contract_hash": "841deba5fb30118bea849f93ebc9fb7d1984d74fd2d709013544c6d5db94cf07",
+        "data_snapshot_id": "raw-ohlcv-deribit-iv7d-2022-2025",
+        "production_dependency_graph": ["ohlcv.parquet"],
+        "prospective_experiment_id": PROSPECTIVE_EXPERIMENT_ID,
+        "prospective_epoch_id": PROSPECTIVE_EPOCH_ID,
+        "prospective_audit_status": PROSPECTIVE_AUDIT_STATUS,
+        "prospective_invariants": PROSPECTIVE_INVARIANTS,
         "four_questions": {
             "1_expected_volatility": {
                 "metric": "Forward 7-Day Realized Variance (Annualized)",
@@ -181,6 +195,9 @@ def get_terminal_live_state():
                 "mean_winkler_score_30d": health.mean_winkler_30d,
                 "resolved_forecasts_count": health.total_resolved_forecasts,
                 "pending_forecasts_count": health.pending_unresolved_forecasts,
+                "valid_resolved_count": health.valid_N,
+                "data_invalid_count": health.invalid_N,
+                "hash_failures_count": health.hash_failures,
                 "risk_defense_abstain_active": health.status in [CalibrationHealthStatus.DEGRADED, CalibrationHealthStatus.FAIL]
             }
         },

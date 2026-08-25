@@ -44,7 +44,6 @@ env/
 web_dist/
 
 # Testing & Caches
-tests/
 .pytest_cache/
 .coverage
 htmlcov/
@@ -76,6 +75,7 @@ experiments/runs/
 *.ckpt
 *.onnx
 *.joblib
+!experiments/results/freeze/*.joblib
 
 # Jupyter Notebooks
 .ipynb_checkpoints/

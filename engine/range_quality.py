@@ -58,9 +58,11 @@ class RangeQualityService:
 
         if data_quality != "VALID":
             diagnostics.append(f"Data Quality Flag: {data_quality}")
+            status_val = "DATA_INVALID" if data_quality == "INVALID" else "DEGRADED"
+            score_val = 0.0 if data_quality == "INVALID" else 45.0
             return RangeQualityAssessment(
-                overall_status="DEGRADED",
-                reliability_score=45.0,
+                overall_status=status_val,
+                reliability_score=score_val,
                 mfe_coverage_pct=recent_mfe_coverage,
                 mae_coverage_pct=recent_mae_coverage,
                 joint_path_containment_pct=recent_path_containment,
@@ -101,7 +103,7 @@ class RangeQualityService:
             score -= 10.0
             diagnostics.append("Prediction interval wider than 8.0% nominal target.")
 
-        score = float(np.clip(score, 10.0, 100.0))
+        score = float(np.clip(score, 0.0, 100.0))
 
         if score >= 85.0:
             status = "EXCELLENT"
@@ -112,9 +114,12 @@ class RangeQualityService:
         elif score >= 55.0:
             status = "WATCH"
             diagnostics.append("Forecast reliability degraded; increased monitoring active.")
-        else:
+        elif score >= 30.0:
             status = "DEGRADED"
             diagnostics.append("Severe forecast degradation observed.")
+        else:
+            status = "SEVERELY_DEGRADED"
+            diagnostics.append("Critical forecast failure observed.")
 
         return RangeQualityAssessment(
             overall_status=status,

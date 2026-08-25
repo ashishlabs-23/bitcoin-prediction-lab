@@ -1,0 +1,78 @@
+{
+  "model_version": "HAR-RS-DOW-v1.0",
+  "holdout_boundary": "2026-01-01T00:00:00Z",
+  "nominal_coverage": 0.9,
+  "training_span": {
+    "start": "2022-01-31 00:00:00+00:00",
+    "end": "2025-12-24 23:00:00+00:00",
+    "max_target_maturity": "2025-12-31 23:00:00+00:00",
+    "n_bars": 34175,
+    "strict_separation_enforced": true
+  },
+  "feature_schema": [
+    "log_rv_down_1d",
+    "log_rv_up_1d",
+    "log_rv7d_var_ann_lag",
+    "log_rv30d_var_ann",
+    "dow_1",
+    "dow_2",
+    "dow_3",
+    "dow_4",
+    "dow_5",
+    "dow_6"
+  ],
+  "feature_schema_hash": "8654d2c3e02c9483fe1d5a4831630d6ed8459aa2c0e4e64ffcec552bb36fd1a8",
+  "training_data_snapshot": {
+    "ohlcv_parquet_sha256": "689390a737402fd2ea4ec78d3dcde2eaca2a34617d6bd4f002de87c65d8a2697",
+    "iv7d_parquet_sha256": "9aa8417bf5074126fed00ac5c64c8a4dec923d2c0da3a029e83590893c958f68",
+    "combined_training_data_sha256": "2323f443ae8bcf3de66e0eb03b069bd8d5163a077530fdfca8a2e0424b12abed"
+  },
+  "model_artifact": {
+    "path": "har_rs_dow_v1.joblib",
+    "size_bytes": 945,
+    "artifact_sha256": "750b5d15ed84c3cf24b8484ae928ff7c8098cab0c35eafe310ab28bf57ed285b"
+  },
+  "model_coefficients": {
+    "scaler_mean_sha256": "d73e1e0345969166c1f9640acc28e2befc758bfa9967e8d0838878b50daa6141",
+    "scaler_scale_sha256": "b13051982aad7e699802234f860b966ef4e1a37e5cdee91d57a656114bb317ac",
+    "ridge_coef_sha256": "b008b2d85e494cc9f9b57c2fb8997616263965ba4c1ae8d14362ba89241a458d",
+    "ridge_intercept_sha256": "2b94d60d3dd383d50015187c4ba47c926397e817bd73be046f6ba757a96f6fae",
+    "combined_coefficients_sha256": "55c502d04fcc83ba999de0e6302d3d212d348164112fc0e9933b8c9104036e55",
+    "n_features": 10,
+    "ridge_alpha": 1.0
+  },
+  "C2_config": {
+    "method": "Dependence-Aware Asymmetric Conformal Prediction",
+    "nominal_target_coverage": 0.9,
+    "alpha": 0.09999999999999998,
+    "conformity_score_upper": "max(0, (y_t - v_hat_t) / sigma_epsilon_t)",
+    "conformity_score_lower": "max(0, (v_hat_t - y_t) / sigma_epsilon_t)",
+    "scale_denominator": "EWM std of residuals, span=720h",
+    "pool_window_hours": 1000,
+    "pool_step_hours": 24,
+    "pool_description": "Trailing 1000h buffer sub-sampled at daily (24h) intervals",
+    "quantile_target": 0.95,
+    "quantile_formula": "ceil((N_pool + 1) * quantile_target)"
+  },
+  "C2_config_hash": "c6c7484440809877f599f420d80d3b561086db598d1bb391ea2a67540deefdd4",
+  "python_version": {
+    "version_string": "3.13.14 (tags/v3.13.14:fd17997, Jun 10 2026, 13:03:48) [MSC v.1944 64 bit (AMD64)]",
+    "major": 3,
+    "minor": 13,
+    "micro": 14,
+    "implementation": "cpython"
+  },
+  "critical_packages": {
+    "scikit-learn": "1.9.0",
+    "numpy": "2.4.4",
+    "pandas": "3.0.5",
+    "scipy": "1.18.0",
+    "joblib": "1.5.3"
+  },
+  "package_lock_hash": "adb58fb24a37a4cb289665f397f6345d43d103cb8b3d0af4eb2ae27a628cb82b",
+  "source_commit_hash": "594b284b1808fe8f1628a5e50f3776c04501ebf5",
+  "in_sample_qlike": 0.21579,
+  "manifest_created_at": "2026-08-25T14:36:13.128111+00:00",
+  "repair_protocol": "PHASE_0_2_STRICT_FORWARD_LABEL_HOLDOUT_REPAIR",
+  "manifest_hash": "917d817143078836f090a314ae8e86b468bf67315a17a43096f9b22de7ce289c"
+}

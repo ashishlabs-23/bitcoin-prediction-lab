@@ -1,0 +1,60 @@
+{
+  "timestamp": "2026-08-25T14:36:13.129787+00:00",
+  "phase": "PHASE_0_2_STRICT_FORWARD_LABEL_HOLDOUT_AUDIT",
+  "classification": "FREEZE_REPAIRED",
+  "contamination_found": true,
+  "contaminated_artifact_metadata": {
+    "status": "ARCHIVED_CONTAMINATED_DO_NOT_USE",
+    "contamination_reason": "Training labels for Dec 25-31, 2025 origins included realized returns from Jan 1-7, 2026 holdout.",
+    "artifact_path": "har_rs_dow_v1_CONTAMINATED_DO_NOT_USE.joblib",
+    "artifact_sha256": "c576c80c41096709ca824389354f25b77af9c8dd4d1aa24a033471fd5c02fb4e",
+    "archived_at": "2026-08-25T14:36:12.438689+00:00",
+    "contaminated_rows_count": 168,
+    "earliest_contaminated_origin": "2025-12-25 00:00:00+00:00",
+    "latest_contaminated_origin": "2025-12-31 23:00:00+00:00",
+    "max_target_maturity": "2026-01-07 23:00:00+00:00"
+  },
+  "old_training_rows": 34343,
+  "corrected_training_rows": 34175,
+  "removed_rows": 168,
+  "earliest_removed_origin": "2025-12-25 00:00:00+00:00",
+  "latest_removed_origin": "2025-12-31 23:00:00+00:00",
+  "max_contaminated_target_maturity": "2026-01-07 23:00:00+00:00",
+  "holdout_start": "2026-01-01 00:00:00+00:00",
+  "model_comparison": {
+    "intercept_old": -1.6266704378577521,
+    "intercept_clean": -1.6219052480572527,
+    "coef_old": [
+      0.14501075795397586,
+      0.0752955359209398,
+      0.2011864051598445,
+      0.1176356108620046,
+      -0.02007495412224182,
+      -0.020439646656777825,
+      -0.01999447678483937,
+      -0.021941686893823382,
+      0.018036414462784478,
+      0.06213680386158319
+    ],
+    "coef_clean": [
+      0.14434466791962594,
+      0.07552787158980154,
+      0.19722347973952092,
+      0.12039405728843665,
+      -0.020363809019479366,
+      -0.02130357034732243,
+      -0.021140156655382616,
+      -0.022085318961336742,
+      0.017857070105821393,
+      0.06144427948100517
+    ],
+    "qlike_holdout_old": 0.15704523054720632,
+    "qlike_holdout_clean": 0.15699259594090495,
+    "c2_holdout_coverage_pct": 92.99387442572741,
+    "c2_q5_coverage_pct": 89.47368421052632,
+    "c2_winkler_score": 0.4945627820379546
+  },
+  "new_artifact_sha256": "750b5d15ed84c3cf24b8484ae928ff7c8098cab0c35eafe310ab28bf57ed285b",
+  "new_coefficients_sha256": "55c502d04fcc83ba999de0e6302d3d212d348164112fc0e9933b8c9104036e55",
+  "new_scientific_contract_hash": "0cf26e348c490468e8ed65f352402bd4dbecb15395113ae9d72793de57065999"
+}

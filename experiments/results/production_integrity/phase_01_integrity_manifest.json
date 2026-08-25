@@ -1,0 +1,112 @@
+{
+  "manifest_version": "1.0.0",
+  "phase": "PHASE_01_PRODUCTION_INTEGRITY_REMEDIATION",
+  "governance_status": "INTEGRITY_REMEDIATED_AND_VERIFIED",
+  "timestamp": "2026-08-25T15:10:00+00:00",
+  "scientific_contract": {
+    "model_version": "HAR-RS-DOW-v1.0",
+    "scientific_contract_hash": "841deba5fb30118bea849f93ebc9fb7d1984d74fd2d709013544c6d5db94cf07",
+    "model_artifact_sha256": "750b5d15ed84c3cf24b8484ae928ff7c8098cab0c35eafe310ab28bf57ed285b",
+    "model_coefficients_sha256": "55c502d04fcc83ba999de0e6302d3d212d348164112fc0e9933b8c9104036e55",
+    "feature_contract_hash": "8654d2c3e02c9483fe1d5a4831630d6ed8459aa2c0e4e64ffcec552bb36fd1a8",
+    "target_contract_hash": "5fb146206d28990cf4910cf9dbb8364b6e5db8e62c125df9db8fcfe7eeb0c105",
+    "c2_config_hash": "c6c7484440809877f599f420d80d3b561086db598d1bb391ea2a67540deefdd4",
+    "data_snapshot_id": "raw-ohlcv-deribit-iv7d-2022-2025",
+    "nominal_coverage_target": 0.90,
+    "forecast_horizon_hours": 168
+  },
+  "verified_production_dependency_graph": [
+    "ohlcv.parquet",
+    "iv7d.parquet"
+  ],
+  "remediation_classifications": [
+    {
+      "item": "P0-1: Remove fabricated sub-model agreement probabilities and random perturbations",
+      "classification": "AUDIT/INTEGRITY CHANGE",
+      "files_modified": [
+        "engine/inference_service.py"
+      ],
+      "statistical_impact": "ZERO. Frozen HAR-RS-DOW point forecasts and C2 risk intervals unmodified."
+    },
+    {
+      "item": "P0-2: Remove artificial quality score floors (e.g. np.clip(score, 75, 96))",
+      "classification": "AUDIT/INTEGRITY CHANGE",
+      "files_modified": [
+        "engine/inference_service.py",
+        "engine/range_quality.py"
+      ],
+      "statistical_impact": "ZERO. Enables genuine operational health transitions (0-100)."
+    },
+    {
+      "item": "P0-3: Strict prohibition of unsafe future-label fallback training in production",
+      "classification": "AUDIT/INTEGRITY CHANGE",
+      "files_modified": [
+        "engine/inference_service.py"
+      ],
+      "statistical_impact": "ZERO. Enforces pre-trained frozen model inference only."
+    },
+    {
+      "item": "P1-1: Observatory durable, immutable SQLite persistence with dual tables & restart preservation",
+      "classification": "OPERATIONAL CHANGE",
+      "files_modified": [
+        "engine/observatory.py",
+        "engine/range_forecast_service.py",
+        "backtest/market_memory.py"
+      ],
+      "statistical_impact": "ZERO. Preserves prospective audit trail without INSERT OR REPLACE overwrite."
+    },
+    {
+      "item": "P1-2: Pre-resolution cryptographic hash verification and tamper isolation (AUDIT_CORRUPTED)",
+      "classification": "AUDIT/INTEGRITY CHANGE",
+      "files_modified": [
+        "engine/observatory.py"
+      ],
+      "statistical_impact": "ZERO. Aborts resolution and isolates tampered forecast payloads."
+    },
+    {
+      "item": "P1-3: Exact trailing wall-clock 30D/90D window semantics and DATA_INVALID isolation",
+      "classification": "OPERATIONAL CHANGE",
+      "files_modified": [
+        "engine/observatory.py"
+      ],
+      "statistical_impact": "ZERO. Corrects window calculation to real timestamps rather than record counts."
+    },
+    {
+      "item": "P1-4: Scientific startup gate installation in server lifespan",
+      "classification": "OPERATIONAL CHANGE",
+      "files_modified": [
+        "validation/startup_gate.py",
+        "api/server.py"
+      ],
+      "statistical_impact": "ZERO. Hard refusal of startup if artifact, coefficients, or manifest mismatch."
+    },
+    {
+      "item": "P1-5: Separation of verified volatility intelligence from exploratory strategy analytics",
+      "classification": "OPERATIONAL CHANGE",
+      "files_modified": [
+        "api/routes_terminal.py",
+        "api/routes_prediction.py",
+        "api/routes_arena.py"
+      ],
+      "statistical_impact": "ZERO. Explicit contract labeling preventing user confusion."
+    },
+    {
+      "item": "P2-1: Data snapshot and dependency graph alignment",
+      "classification": "AUDIT/INTEGRITY CHANGE",
+      "files_modified": [
+        "api/routes_terminal.py",
+        "validation/startup_gate.py"
+      ],
+      "statistical_impact": "ZERO. Dependency graph correctly restricted to ohlcv.parquet and iv7d.parquet."
+    }
+  ],
+  "verification_suite": {
+    "test_phase_01_production_integrity": "PASS (12/12)",
+    "verify_freeze_manifest": "PASS (13/13)",
+    "test_production_freeze": "PASS (1/1)",
+    "test_holdout_label_boundary": "PASS (3/3)",
+    "test_observatory": "PASS (2/2)",
+    "test_terminal_routes": "PASS (3/3)",
+    "overall_production_integrity_status": "VERIFIED_PASS"
+  }
+}

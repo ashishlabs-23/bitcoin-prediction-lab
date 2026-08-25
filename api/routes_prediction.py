@@ -82,6 +82,9 @@ async def get_prediction_latest(live: bool = False):
             resp = live_engine.latest_prediction.copy()
             resp["status"] = "online"
             resp["is_live"] = True
+            resp["system_classification"] = "EXPLORATORY STRATEGY ANALYTICS"
+            resp["validation_status"] = "NOT VALIDATED FOR PREDICTIVE OR ECONOMIC SUPERIORITY"
+            resp["governance_disclaimer"] = "Exploratory directional model. Not validated by HAR-RS-DOW/C2 scientific research."
             return resp
 
     # Fallback if engine is warming up
@@ -111,7 +114,10 @@ async def get_prediction_latest(live: bool = False):
         "confidence": 0.75,
         "horizon": PRODUCTION_RANGE_HORIZON_LABEL,
         "status": "warming_up",
-        "is_live": False
+        "is_live": False,
+        "system_classification": "EXPLORATORY STRATEGY ANALYTICS",
+        "validation_status": "NOT VALIDATED FOR PREDICTIVE OR ECONOMIC SUPERIORITY",
+        "governance_disclaimer": "Exploratory directional model. Not validated by HAR-RS-DOW/C2 scientific research."
     }
 
 

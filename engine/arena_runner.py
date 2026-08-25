@@ -14,6 +14,7 @@ import os
 import sys
 import json
 import sqlite3
+import hashlib
 import asyncio
 import time
 import math
@@ -206,6 +207,23 @@ class ArenaRunner:
                         INSERT INTO equity_history (experiment_id, timestamp, balance, trade_id, drawdown)
                         VALUES (?, ?, 10.00, NULL, 0.0);
                     """, (exp_id, now_str))
+
+                # 7. Arena Decision Ledger (t0 Context & Counterfactuals)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS arena_decision_ledger (
+                        decision_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        timestamp TEXT NOT NULL,
+                        strategy_actions_json TEXT NOT NULL,
+                        agreement_ratio REAL NOT NULL,
+                        ensemble_action TEXT NOT NULL,
+                        observatory_snapshot_json TEXT NOT NULL,
+                        scientific_contract_hash TEXT NOT NULL,
+                        forecast_hash TEXT,
+                        decision_hash TEXT NOT NULL,
+                        created_at TEXT NOT NULL
+                    );
+                """)
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_adl_ts ON arena_decision_ledger(timestamp);")
         finally:
             conn.close()
 
@@ -490,9 +508,45 @@ class ArenaRunner:
                         "size_usd": position_size_usd,
                         "risk_usd": risk_usd
                     }
-
         finally:
             conn.close()
+
+    def record_arena_decision_context(
+        self,
+        strategy_actions: List[str],
+        agreement_ratio: float,
+        ensemble_action: str,
+        observatory_snapshot: Dict[str, Any],
+        scientific_contract_hash: str,
+        forecast_hash: Optional[str] = None
+    ) -> str:
+        """
+        Persists atomic t0 decision record with complete 4-State Observatory Context.
+        Read-only context layer: does not alter strategy execution rules.
+        """
+        now_ts = datetime.now(timezone.utc).isoformat()
+        actions_str = json.dumps(strategy_actions)
+        obs_str = json.dumps(observatory_snapshot, sort_keys=True)
+        payload = f"{now_ts}|{actions_str}|{agreement_ratio:.4f}|{ensemble_action}|{scientific_contract_hash}|{forecast_hash or ''}"
+        decision_hash = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+        conn = self._get_connection()
+        try:
+            with conn:
+                conn.execute("""
+                    INSERT INTO arena_decision_ledger (
+                        timestamp, strategy_actions_json, agreement_ratio, ensemble_action,
+                        observatory_snapshot_json, scientific_contract_hash, forecast_hash,
+                        decision_hash, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+                """, (
+                    now_ts, actions_str, agreement_ratio, ensemble_action,
+                    obs_str, scientific_contract_hash, forecast_hash or "",
+                    decision_hash, now_ts
+                ))
+        finally:
+            conn.close()
+        return decision_hash
 
     def process_v3_candle(
         self,

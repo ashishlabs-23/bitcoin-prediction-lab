@@ -1,0 +1,326 @@
+{
+  "timestamp": "2026-08-25T14:37:03.372870+00:00",
+  "phase": "PHASE_0_1_FREEZE_INTEGRITY_AND_REPRODUCIBILITY_AUDIT",
+  "final_classification": "FREEZE_VALID",
+  "checks_passed_count": 14,
+  "checks_failed_count": 0,
+  "checks_warned_count": 0,
+  "checks_passed": [
+    "1.1 Tracked source tree is 100% clean at git HEAD commit",
+    "2.1 Exact training-data provenance traced and distinguished (direct vs alignment-only)",
+    "3.1 Feature contract specification & ordering verified",
+    "4.1 Target recomputation exact (max error: 4.44e-16 <= 1e-12)",
+    "5.1 Model artifact parameters match manifest hashes exactly",
+    "6.1 Model inference is bitwise deterministic across 100 runs and reload",
+    "7.1 Complete package lock environment matches freeze manifest",
+    "8.1 Training index strictly precedes holdout index (max(T_train) < min(T_holdout))",
+    "8.2 Target boundary forensic documented: 167 boundary bars noted",
+    "9.1 Dependency boundary matrix formally defined and decoupled",
+    "10.1 Unified scientific contract hash generated deterministically",
+    "11.1 Startup gate status audited (MISSING reported, insertion point specified)",
+    "12.1 Security protocol audited and pre-load hash verification rule formalized",
+    "13.1 All frozen statistical parameters asserted unchanged"
+  ],
+  "checks_failed": [],
+  "checks_warned": [],
+  "source_state": {
+    "git_head_commit": "594b284b1808fe8f1628a5e50f3776c04501ebf5",
+    "git_branch": "main",
+    "tracked_files_clean": true,
+    "git_diff_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "git_untracked_count": 5,
+    "git_untracked_manifest_hash": "35d8cebb00b594d0ecee46a41e0b7235440869dfe38420ff2bbb3f927cab6d98",
+    "core_source_hashes": {
+      "research/run_vol_edge_01_test.py": "05afe748a7c78680bbe83682622b19558e363d4c4a1bcfeb446b8bf0d76b6c3c",
+      "research/multi_regime_dataset.py": "aa8f47c0f9c0a8cafb218b8dc42eeba094b47175c2766c736c0df1a631dcc6d2",
+      "validation/purged_split.py": "637364469e234cdbcd01c4e8385e62287c6ae5e4efe7798061da39b986f8d0ee",
+      "config.py": "22f95b89e82b26d6617464c05258e759fdde76f62178762eb2823b70ffd5c5c0"
+    }
+  },
+  "data_dependencies": [
+    {
+      "name": "ohlcv.parquet",
+      "path": "C:\\Projects\\BTCognitive\\bitcoin-prediction-lab\\data\\raw\\ohlcv.parquet",
+      "sha256": "689390a737402fd2ea4ec78d3dcde2eaca2a34617d6bd4f002de87c65d8a2697",
+      "row_count": 40455,
+      "timestamp_min": "2022-01-01 00:00:00+00:00",
+      "timestamp_max": "2026-08-13 15:00:00+00:00",
+      "columns_available": [
+        "timestamp",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "available_time"
+      ],
+      "columns_used_by_model": [
+        "timestamp",
+        "close"
+      ],
+      "directly_used_in_model_math": true,
+      "role": "Source for hourly log returns, realized semivariances, trailing variance lags, DOW, and forward 7d realized variance target."
+    },
+    {
+      "name": "iv7d.parquet",
+      "path": "C:\\Projects\\BTCognitive\\bitcoin-prediction-lab\\data\\raw\\iv7d.parquet",
+      "sha256": "9aa8417bf5074126fed00ac5c64c8a4dec923d2c0da3a029e83590893c958f68",
+      "row_count": 40489,
+      "timestamp_min": "2022-01-01 00:00:00+00:00",
+      "timestamp_max": "2026-08-15 00:00:00+00:00",
+      "columns_available": [
+        "timestamp",
+        "available_time",
+        "iv7d_atm",
+        "iv7d_var_ann",
+        "ttm_days",
+        "maturity_error_days"
+      ],
+      "columns_used_by_model": [
+        "timestamp"
+      ],
+      "directly_used_in_model_math": false,
+      "role": "Research alignment mask only. Deribit IV7D columns (iv7d_atm, iv7d_var_ann) are used for M4/M5/M6 comparisons in VOL-EDGE-01 and inner-join timestamp filtering in prepare_aligned_dataset(), but are NOT regressors in HAR-RS-DOW."
+    }
+  ],
+  "feature_contract": {
+    "feature_count": 10,
+    "features": [
+      {
+        "name": "log_rv_down_1d",
+        "order_index": 0,
+        "dtype": "float64",
+        "mathematical_formula": "ln(max(1e-6, (8760 / 24) * sum_{i=0}^{23} (min(r_{t-i}, 0))^2))",
+        "source_columns": [
+          "close"
+        ],
+        "rolling_window_hours": 24,
+        "lag_hours": 0,
+        "timezone": "UTC",
+        "missing_value_policy": "dropna on warm-up"
+      },
+      {
+        "name": "log_rv_up_1d",
+        "order_index": 1,
+        "dtype": "float64",
+        "mathematical_formula": "ln(max(1e-6, (8760 / 24) * sum_{i=0}^{23} (max(r_{t-i}, 0))^2))",
+        "source_columns": [
+          "close"
+        ],
+        "rolling_window_hours": 24,
+        "lag_hours": 0,
+        "timezone": "UTC",
+        "missing_value_policy": "dropna on warm-up"
+      },
+      {
+        "name": "log_rv7d_var_ann_lag",
+        "order_index": 2,
+        "dtype": "float64",
+        "mathematical_formula": "ln(max(1e-6, (8760 / 168) * sum_{i=0}^{167} r_{t-i}^2))",
+        "source_columns": [
+          "close"
+        ],
+        "rolling_window_hours": 168,
+        "lag_hours": 0,
+        "timezone": "UTC",
+        "missing_value_policy": "dropna on warm-up"
+      },
+      {
+        "name": "log_rv30d_var_ann",
+        "order_index": 3,
+        "dtype": "float64",
+        "mathematical_formula": "ln(max(1e-6, (8760 / 720) * sum_{i=0}^{719} r_{t-i}^2))",
+        "source_columns": [
+          "close"
+        ],
+        "rolling_window_hours": 720,
+        "lag_hours": 0,
+        "timezone": "UTC",
+        "missing_value_policy": "dropna on warm-up"
+      },
+      {
+        "name": "dow_1",
+        "order_index": 4,
+        "dtype": "float64",
+        "mathematical_formula": "1.0 if dayofweek(t) == 1 (Tuesday) else 0.0",
+        "source_columns": [
+          "timestamp"
+        ],
+        "rolling_window_hours": 0,
+        "lag_hours": 0,
+        "timezone": "UTC",
+        "missing_value_policy": "0.0 default"
+      },
+      {
+        "name": "dow_2",
+        "order_index": 5,
+        "dtype": "float64",
+        "mathematical_formula": "1.0 if dayofweek(t) == 2 (Wednesday) else 0.0",
+        "source_columns": [
+          "timestamp"
+        ],
+        "rolling_window_hours": 0,
+        "lag_hours": 0,
+        "timezone": "UTC",
+        "missing_value_policy": "0.0 default"
+      },
+      {
+        "name": "dow_3",
+        "order_index": 6,
+        "dtype": "float64",
+        "mathematical_formula": "1.0 if dayofweek(t) == 3 (Thursday) else 0.0",
+        "source_columns": [
+          "timestamp"
+        ],
+        "rolling_window_hours": 0,
+        "lag_hours": 0,
+        "timezone": "UTC",
+        "missing_value_policy": "0.0 default"
+      },
+      {
+        "name": "dow_4",
+        "order_index": 7,
+        "dtype": "float64",
+        "mathematical_formula": "1.0 if dayofweek(t) == 4 (Friday) else 0.0",
+        "source_columns": [
+          "timestamp"
+        ],
+        "rolling_window_hours": 0,
+        "lag_hours": 0,
+        "timezone": "UTC",
+        "missing_value_policy": "0.0 default"
+      },
+      {
+        "name": "dow_5",
+        "order_index": 8,
+        "dtype": "float64",
+        "mathematical_formula": "1.0 if dayofweek(t) == 5 (Saturday) else 0.0",
+        "source_columns": [
+          "timestamp"
+        ],
+        "rolling_window_hours": 0,
+        "lag_hours": 0,
+        "timezone": "UTC",
+        "missing_value_policy": "0.0 default"
+      },
+      {
+        "name": "dow_6",
+        "order_index": 9,
+        "dtype": "float64",
+        "mathematical_formula": "1.0 if dayofweek(t) == 6 (Sunday) else 0.0",
+        "source_columns": [
+          "timestamp"
+        ],
+        "rolling_window_hours": 0,
+        "lag_hours": 0,
+        "timezone": "UTC",
+        "missing_value_policy": "0.0 default"
+      }
+    ],
+    "feature_contract_hash": "92fce9205f5129fb255f0fc143153b02be4e58508409f2f1797924e98fccdafc"
+  },
+  "target_contract": {
+    "target_variable": "rv7d_var_ann",
+    "target_domain": "annualized_realized_variance",
+    "model_target_transformation": "log_y = ln(max(1e-6, rv7d_var_ann))",
+    "return_definition": "hourly log return: r_t = ln(close_t / close_{t-1})",
+    "horizon_hours": 168,
+    "annualization_factor": 52.142857142857146,
+    "future_returns_window": "t+1 to t+168 inclusive",
+    "current_return_r_t_included": false,
+    "mathematical_formula": "RV_{7d,t}^2 = (8760 / 168) * sum_{i=1}^{168} r_{t+i}^2",
+    "target_contract_hash": "b58cc90117c134d8d07e78f29c21d97e593c10f7fe97b4b07283bdccb3fb5dee"
+  },
+  "model_artifact": {
+    "path": "C:\\Projects\\BTCognitive\\bitcoin-prediction-lab\\experiments\\results\\freeze\\har_rs_dow_v1.joblib",
+    "sha256": "750b5d15ed84c3cf24b8484ae928ff7c8098cab0c35eafe310ab28bf57ed285b",
+    "coefficients": {
+      "scaler_mean_sha256": "d73e1e0345969166c1f9640acc28e2befc758bfa9967e8d0838878b50daa6141",
+      "scaler_scale_sha256": "b13051982aad7e699802234f860b966ef4e1a37e5cdee91d57a656114bb317ac",
+      "ridge_coef_sha256": "b008b2d85e494cc9f9b57c2fb8997616263965ba4c1ae8d14362ba89241a458d",
+      "ridge_intercept_sha256": "2b94d60d3dd383d50015187c4ba47c926397e817bd73be046f6ba757a96f6fae",
+      "combined_coefficients_sha256": "55c502d04fcc83ba999de0e6302d3d212d348164112fc0e9933b8c9104036e55",
+      "n_features": 10,
+      "ridge_alpha": 1.0
+    }
+  },
+  "reproducibility_test": {
+    "canonical_input_hash": "9f2c226b112a463cf709dd564a86d78cae4df0572a15c133bf3f01fba94a8afa",
+    "canonical_output_hash": "c2daaa9c26f562e64094912d9c2df8b5e3b8f02371e715d7bbbb72baf1f92e94",
+    "max_run_variance_100_runs": 0.0,
+    "reload_difference": 0.0
+  },
+  "environment_contract": {
+    "python_version": "3.13.14 (tags/v3.13.14:fd17997, Jun 10 2026, 13:03:48) [MSC v.1944 64 bit (AMD64)]",
+    "python_major_minor_micro": [
+      3,
+      13,
+      14
+    ],
+    "critical_packages": {
+      "scikit-learn": "1.9.0",
+      "numpy": "2.4.4",
+      "pandas": "3.0.5",
+      "scipy": "1.18.0",
+      "joblib": "1.5.3"
+    },
+    "complete_environment_hash": "adb58fb24a37a4cb289665f397f6345d43d103cb8b3d0af4eb2ae27a628cb82b"
+  },
+  "holdout_contract": {
+    "holdout_boundary": "2026-01-01T00:00:00Z",
+    "training_timestamp_max": "2025-12-31 23:00:00+00:00",
+    "holdout_timestamp_min": "2026-01-01 00:00:00+00:00",
+    "boundary_strictly_separated": true,
+    "target_horizon_hours": 168,
+    "strict_zero_target_overlap_timestamp": "2025-12-25 00:00:00+00:00",
+    "training_bars_with_target_extending_into_holdout_period": 167,
+    "forensic_finding": "Training features strictly indexed < 2026-01-01 (34,343 bars). Note: The last 168 training bars (2025-12-25 00:00:00+00:00 to 2025-12-31 23:00:00+00:00) have 7-day forward targets that observe realized returns during Jan 1\u20138, 2026. This is standard in chronological window splits unless a 168h purge is applied at the holdout boundary."
+  },
+  "dependency_boundary": {
+    "har_rs_dow_direct_dependencies": [
+      "ohlcv.parquet (close prices for realized semivariance, lags, target)",
+      "StandardScaler (mean_, scale_)",
+      "Ridge (coef_, intercept_, alpha=1.0)"
+    ],
+    "c2_runtime_dependencies": [
+      "HAR-RS-DOW point forecasts (v_hat)",
+      "EWM residual scale standard deviation (span=720h, min_periods=72)",
+      "Trailing residual conformity pool (1000h buffer)",
+      "Daily sub-sampling step (24h step)",
+      "Asymmetric quantile calculator (alpha=0.10, target=0.95)"
+    ],
+    "shared_dependencies": [
+      "ohlcv.parquet (realized variance calculation for residual y - v_hat)",
+      "Canonical timestamp index (UTC)"
+    ],
+    "research_only_dependencies_not_used_in_production": [
+      "iv7d.parquet (Deribit IV7D for VOL-EDGE-01 M4/M5/M6 comparisons)",
+      "funding.parquet",
+      "open_interest.parquet",
+      "onchain.parquet"
+    ]
+  },
+  "startup_gate": {
+    "startup_verification_status": "MISSING",
+    "current_lifespan_actions": [
+      "get_shared_client()",
+      "feature_cache.initialize()",
+      "sanitize_market_memory()",
+      "live_engine.start()"
+    ],
+    "prescribed_insertion_point": "api/server.py -> lifespan() context manager, immediately before live_engine.start()",
+    "prescribed_behavior": "Execute verify_freeze_manifest.py programmatically. If return code != 0, raise RuntimeError and fail server startup to prevent unvalidated model serving."
+  },
+  "security_audit": {
+    "serialization_format": "joblib / pickle (scikit-learn Pipeline)",
+    "security_risk": "Arbitrary code execution upon unpickling untrusted data",
+    "current_safeguards": [
+      "Artifact is stored in local repository path (experiments/results/freeze/)",
+      "Artifact is never downloaded over network at runtime",
+      "Artifact SHA-256 is recorded in immutable baseline manifest",
+      "Artifact size is strictly bounded (941 bytes)"
+    ],
+    "mandatory_runtime_precondition": "SHA-256 of har_rs_dow_v1.joblib MUST be verified against manifest before joblib.load() is invoked."
+  },
+  "scientific_contract_hash": "7498af80c1d0d769bd9c86ed8ae3bb8cfbf86372f9c445c079f01612e38e52f0"
+}

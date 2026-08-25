@@ -110,6 +110,8 @@ class HardenedConnectionManager:
 ws_manager = HardenedConnectionManager()
 
 
+from validation.startup_gate import verify_scientific_contract
+
 # ---------------------------------------------------------------------------
 # Application Lifespan Context Manager
 # ---------------------------------------------------------------------------
@@ -117,6 +119,10 @@ ws_manager = HardenedConnectionManager()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manages initialization and graceful teardown of shared async resources."""
+    logger.info("Verifying scientific freeze contract before startup...")
+    # Priority 1 Scientific Startup Gate: refuses startup on tampered artifact or invalid contract
+    verify_scientific_contract()
+
     logger.info("Initializing BTCognitive Server...")
     app.state.http = get_shared_client()
     feature_cache.initialize()
@@ -127,7 +133,7 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Error sanitizing market memory: {e}")
 
     live_engine.start()
-    logger.info("BTCognitive Server is online and hardened.")
+    logger.info("BTCognitive Server is online, scientifically verified, and hardened.")
     yield
 
     logger.info("Shutting down BTCognitive Server...")

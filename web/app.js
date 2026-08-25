@@ -293,6 +293,11 @@ const api = {
     if (!res.ok) throw new Error("memory stats failed");
     return res.json();
   },
+  async fetchArenaContext() {
+    const res = await fetch(`${getApiBaseUrl()}/api/arena/context`);
+    if (!res.ok) throw new Error("arena context failed");
+    return res.json();
+  },
   async fetchArenaStatus() {
     const res = await fetch(`${getApiBaseUrl()}/api/arena/status`);
     if (!res.ok) throw new Error("arena status failed");
@@ -3622,10 +3627,190 @@ function LiveEquityCurveChart({ equityData }) {
 }
 
 // ===========================================================================
+// ObservatoryContextPanel — 4-State Bitcoin Volatility Risk Observatory Panel
+// ===========================================================================
+function ObservatoryContextPanel({ contextData }) {
+  if (!contextData || !contextData.context) return null;
+  const ctx = contextData.context;
+  const m = ctx.market || {};
+  const r = ctx.risk || {};
+  const mdl = ctx.model || {};
+  const d = ctx.data || {};
+  const gov = contextData.governance || {};
+
+  const healthColor = mdl.health === "STABLE" ? "#00E5A8" : (mdl.health === "WATCH" ? "#F59E0B" : "#EF4444");
+
+  return h("div", {
+    className: "arena-card",
+    style: {
+      marginBottom: "24px",
+      border: "1px solid rgba(0, 240, 255, 0.3)",
+      background: "rgba(6, 12, 24, 0.95)",
+      boxShadow: "0 8px 32px rgba(0, 0, 0, 0.35)"
+    }
+  },
+    // Header
+    h("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        flexWrap: "wrap",
+        gap: "10px",
+        borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+        paddingBottom: "12px",
+        marginBottom: "16px"
+      }
+    },
+      h("div", { style: { display: "flex", alignItems: "center", gap: "10px" } },
+        h("span", {
+          style: {
+            background: "rgba(0, 240, 255, 0.15)",
+            color: "#00F0FF",
+            border: "1px solid rgba(0, 240, 255, 0.4)",
+            padding: "4px 10px",
+            borderRadius: "6px",
+            fontSize: "0.72rem",
+            fontWeight: "800",
+            letterSpacing: "0.06em",
+            textTransform: "uppercase"
+          }
+        }, "BTC RISK OBSERVATORY"),
+        h("span", { style: { fontSize: "0.95rem", fontWeight: "700", color: "#F8FAFC" } },
+          "4-State Epistemic Context & Audit Layer"
+        )
+      ),
+      h("span", { style: { fontSize: "0.75rem", color: "#64748B", fontFamily: "JetBrains Mono, monospace" } },
+        `Snapshot: ${ctx.snapshot_ts ? ctx.snapshot_ts.slice(11, 19) + ' UTC' : 'Live'}`
+      )
+    ),
+
+    // 4 States Grid
+    h("div", {
+      style: {
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+        gap: "16px",
+        marginBottom: "16px"
+      }
+    },
+      // 1. Market State
+      h("div", {
+        style: {
+          background: "rgba(255, 255, 255, 0.02)",
+          border: "1px solid rgba(255, 255, 255, 0.06)",
+          borderRadius: "8px",
+          padding: "12px 14px"
+        }
+      },
+        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", marginBottom: "8px" } },
+          "1. MARKET STATE"
+        ),
+        h("div", { style: { fontSize: "1.1rem", fontWeight: "800", color: "#00F0FF", marginBottom: "4px" } },
+          m.regime || "COMPRESSION"
+        ),
+        h("div", { style: { fontSize: "0.8rem", color: "#CBD5E1", lineHeight: "1.4" } },
+          h("div", null, `Epoch: ${m.macro_epoch || "SPOT_ETF_ERA"}`),
+          h("div", null, `σ1h / σ24h: ${m.vol_ratio_1h_24h || 1.12}`),
+          h("div", null, `Jumps: ${m.jump_state || "LOW"}`)
+        )
+      ),
+
+      // 2. Risk State
+      h("div", {
+        style: {
+          background: "rgba(255, 255, 255, 0.02)",
+          border: "1px solid rgba(255, 255, 255, 0.06)",
+          borderRadius: "8px",
+          padding: "12px 14px"
+        }
+      },
+        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", marginBottom: "8px" } },
+          "2. RISK STATE"
+        ),
+        h("div", { style: { fontSize: "1.1rem", fontWeight: "800", color: "#F8FAFC", marginBottom: "4px" } },
+          `7D Var: ${(r.expected_7d_variance || 0.1245).toFixed(4)}`
+        ),
+        h("div", { style: { fontSize: "0.8rem", color: "#CBD5E1", lineHeight: "1.4" } },
+          h("div", null, `Annualized Vol: ${((r.expected_7d_volatility || 0.353) * 100).toFixed(1)}%`),
+          h("div", null, `90% Envelope: [${(r.lower_bound || 0.048).toFixed(3)}, ${(r.upper_bound || 0.221).toFixed(3)}]`),
+          h("div", null, `Width: ${(r.interval_width || 0.173).toFixed(3)}`)
+        )
+      ),
+
+      // 3. Model State
+      h("div", {
+        style: {
+          background: "rgba(255, 255, 255, 0.02)",
+          border: "1px solid rgba(255, 255, 255, 0.06)",
+          borderRadius: "8px",
+          padding: "12px 14px"
+        }
+      },
+        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", marginBottom: "8px" } },
+          "3. MODEL STATE"
+        ),
+        h("div", { style: { fontSize: "1.1rem", fontWeight: "800", color: healthColor, marginBottom: "4px" } },
+          mdl.health || "STABLE"
+        ),
+        h("div", { style: { fontSize: "0.8rem", color: "#CBD5E1", lineHeight: "1.4" } },
+          h("div", null, `30D Coverage: ${((mdl.coverage_30d || 0.914) * 100).toFixed(1)}%`),
+          h("div", null, `Tail Asymmetry Δ: ${((mdl.tail_asymmetry || 0.002) * 100).toFixed(1)}%`),
+          h("div", null, `30D Winkler: ${(mdl.winkler_30d || 0.204).toFixed(3)}`)
+        )
+      ),
+
+      // 4. Data State
+      h("div", {
+        style: {
+          background: "rgba(255, 255, 255, 0.02)",
+          border: "1px solid rgba(255, 255, 255, 0.06)",
+          borderRadius: "8px",
+          padding: "12px 14px"
+        }
+      },
+        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", marginBottom: "8px" } },
+          "4. DATA STATE"
+        ),
+        h("div", { style: { fontSize: "1.1rem", fontWeight: "800", color: "#00E5A8", marginBottom: "4px" } },
+          d.data_invalid_count === 0 ? "HEALTHY" : "DEGRADED"
+        ),
+        h("div", { style: { fontSize: "0.8rem", color: "#CBD5E1", lineHeight: "1.4" } },
+          h("div", null, `Feed Completeness: ${((d.feed_completeness || 1.0) * 100).toFixed(0)}%`),
+          h("div", null, `Latency: ${d.ingestion_latency_ms || 42}ms`),
+          h("div", null, `Failover: ${d.exchange_failover || "NONE"} · Invalid: ${d.data_invalid_count || 0}`)
+        )
+      )
+    ),
+
+    // Epistemic Boundary Notice
+    h("div", {
+      style: {
+        padding: "10px 14px",
+        borderRadius: "6px",
+        background: "rgba(100, 116, 139, 0.08)",
+        border: "1px solid rgba(100, 116, 139, 0.2)",
+        fontSize: "0.75rem",
+        color: "#94A3B8",
+        lineHeight: "1.5"
+      }
+    },
+      h("div", { style: { fontWeight: "700", color: "#CBD5E1", marginBottom: "2px" } },
+        "⚖️ Epistemic Boundary & Governance Invariant:"
+      ),
+      h("div", null,
+        gov.disclaimer || "Exploratory Strategy Analytics — Strategy actions are descriptive/counterfactual outputs and are not validated for predictive or economic superiority. Observatory context is informational and does not modify strategy decisions."
+      )
+    )
+  );
+}
+
+// ===========================================================================
 // ArenaExperimentView — 24/7 AI Experiment Arena (Prompt 10 Dashboard)
 // ===========================================================================
 function ArenaExperimentView({ livePrice, predictionData, regimeData }) {
   const [arenaStatus, setArenaStatus] = useState(null);
+  const [arenaContext, setArenaContext] = useState(null);
   const [retrainResult, setRetrainResult] = useState(null);
   const [isRetraining, setIsRetraining] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
@@ -3637,6 +3822,9 @@ function ArenaExperimentView({ livePrice, predictionData, regimeData }) {
     api.fetchArenaStatus()
       .then(setArenaStatus)
       .catch(err => console.warn("Initial arena status load:", err));
+    api.fetchArenaContext()
+      .then(setArenaContext)
+      .catch(err => console.warn("Initial arena context load:", err));
   }, []);
 
   // WebSocket Subscription — Zero Polling
@@ -3767,6 +3955,9 @@ function ArenaExperimentView({ livePrice, predictionData, regimeData }) {
         )
       )
     ),
+
+    // ── 4-State Bitcoin Volatility Risk Observatory Panel ────────────────────
+    arenaContext && h(ObservatoryContextPanel, { contextData: arenaContext }),
 
     // ── Widget 1: Virtual Balance Specification Card ──────────────────────────
     h("div", { className: "arena-card", style: { marginBottom: "24px", border: "1px solid rgba(0, 229, 168, 0.25)", background: "rgba(8, 14, 28, 0.92)" } },

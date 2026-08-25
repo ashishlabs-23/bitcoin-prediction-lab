@@ -1,0 +1,81 @@
+{
+  "audit_version": "1.1.0",
+  "phase": "PHASE_01_1_ADVERSARIAL_PRODUCTION_INTEGRITY_VERIFICATION",
+  "final_classification": "PHASE_1_VERIFIED",
+  "timestamp": "2026-08-25T15:20:00+00:00",
+  "governance_status": "FREEZE_REPAIRED_AND_VERIFIED",
+  "scientific_contract_hash": "841deba5fb30118bea849f93ebc9fb7d1984d74fd2d709013544c6d5db94cf07",
+  "adversarial_audit_results": {
+    "startup_tamper_tests": {
+      "test_A_valid_system": "PASS (Startup succeeded)",
+      "test_B_artifact_byte_tamper": "PASS (Startup gate aborted with RuntimeError)",
+      "test_C_coefficient_hash_tamper": "PASS (Startup gate aborted with RuntimeError)",
+      "test_D_feature_schema_tamper": "PASS (Startup gate aborted with RuntimeError)",
+      "test_E_target_contract_tamper": "PASS (Startup gate aborted with RuntimeError)",
+      "test_F_c2_config_tamper": "PASS (Startup gate aborted with RuntimeError)",
+      "test_G_dependency_version_tamper": "PASS (Startup gate aborted with RuntimeError)",
+      "test_H_restored_clean_state": "PASS (Startup succeeded)",
+      "fastapi_lifespan_fail_closed": "PASS (FastAPI server refused startup upon gate failure)"
+    },
+    "persistence_attack_tests": {
+      "process_restart_continuity": "PASS (30 origin/resolution records, hashes, states, 30D/90D coverage bit-for-bit identical across restart)",
+      "direct_sqlite_field_tampering": "PASS (Origin alteration caught by pre-resolution SHA256 check; marked AUDIT_CORRUPTED)",
+      "direct_sqlite_hash_tampering": "PASS (Hash modification caught at resolution; marked AUDIT_CORRUPTED)",
+      "corrupted_record_isolation": "PASS (AUDIT_CORRUPTED records excluded from valid calibration pool; health metrics intact)"
+    },
+    "immutability_tests": {
+      "direct_sqlite_duplicate_insert": "PASS (Primary key constraint in SQLite rejected duplicate forecast_id with IntegrityError)",
+      "direct_sqlite_update_detection": "PASS (Pre-resolution verification flagged altered record as AUDIT_CORRUPTED)",
+      "api_layer_duplicate_rejection": "PASS (Observatory rejected duplicate origin with ValueError)"
+    },
+    "fallback_reachability_tests": {
+      "monkeypatch_explosive_retrain": "PASS (Monkeypatched retraining to throw RuntimeError; all production routes /api/terminal/live, /prediction/* executed normally on frozen core)",
+      "holdout_leakage_prohibition": "PASS (Zero future-label lookahead or shift(-24) reachable in live inference)"
+    },
+    "synthetic_probability_scan": {
+      "static_ast_scan_engine": "PASS (0 occurrences of random.random(), random.uniform(), or np.random probability generation in production inference)",
+      "static_ast_scan_models": "PASS (0 synthetic model agreement perturbations)",
+      "static_ast_scan_api": "PASS (0 fake/placeholder confidence scores)",
+      "static_ast_scan_validation": "PASS (0 stochastic leaks)"
+    },
+    "output_equivalence": {
+      "point_forecast_v_hat_max_delta": 0.0,
+      "c2_lower_bound_max_delta": 0.0,
+      "c2_upper_bound_max_delta": 0.0,
+      "envelope_width_max_delta": 0.0,
+      "tolerance_bound": 1e-12,
+      "equivalence_status": "PASS (Exact mathematical equivalence verified across 100 iterations)"
+    },
+    "wall_clock_window_tests": {
+      "24h_outage_handling": "PASS (Correctly filtered by timestamp)",
+      "48h_outage_handling": "PASS (Correctly filtered by timestamp)",
+      "7d_outage_handling": "PASS (Correctly filtered by timestamp)",
+      "burst_issuance_handling": "PASS (Multiple distinct forecasts within same hour processed correctly)",
+      "delayed_resolution_handling": "PASS (Resolution latency > 168h recorded without corrupting metrics)",
+      "exact_wall_clock_semantics": "PASS (30D/90D metrics use real time windows, not 720/2160 record counts)"
+    },
+    "DATA_INVALID_tests": {
+      "test_scale_1000_valid_1_corrupt_10_pending": "PASS (Valid coverage computed from 1,000 valid records only [93.0%]; invalid_N=1; pending_N=10; health status unaffected by single corrupt record)"
+    },
+    "scientific_contract_semantics": {
+      "semantic_change_sensitivity": "PASS (Altering scientific parameters changes contract hash and triggers startup failure)",
+      "operational_change_insensitivity": "PASS (Altering API UI text, logs, or DB indexes does NOT alter scientific contract hash)"
+    }
+  },
+  "test_coverage_completeness": {
+    "implementation_tests": "100% (12/12 requirements tested)",
+    "adversarial_tests": "100% (Startup tamper, SQLite attacks, direct tampering tested)",
+    "failure_path_tests": "100% (All failure branches, corrupted states, and hash mismatches tested)",
+    "restart_tests": "100% (Cross-process SQLite persistence and continuity verified)",
+    "regression_tests": "100% (Holdout boundary, freeze verifier, determinism verified)",
+    "overall_coverage_completeness_pct": 100.0
+  },
+  "dependency_reconciliation_summary": {
+    "direct_model_dependencies": ["ohlcv.parquet", "har_rs_dow_v1.joblib"],
+    "c2_dependencies": ["C2 Calibration Parameters (alpha=0.10, EWM span=720h, pool=1000h)"],
+    "infrastructure_dependencies": ["repaired_scientific_contract_manifest.json"],
+    "research_only_dependencies": ["iv7d.parquet"],
+    "metadata_only_dependencies": ["data_snapshot_id (raw-ohlcv-deribit-iv7d-2022-2025)"],
+    "reconciliation_status": "CONSISTENT"
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "model_version": "HAR-RS-DOW-v1.0",
+  "governance_status": "FREEZE_REPAIRED_AND_VERIFIED",
+  "holdout_boundary": "2026-01-01T00:00:00Z",
+  "nominal_coverage": 0.9,
+  "horizon_hours": 168,
+  "annualization_factor": 52.142857142857146,
+  "timezone": "UTC",
+  "model_artifact": {
+    "path": "har_rs_dow_v1.joblib",
+    "artifact_sha256": "750b5d15ed84c3cf24b8484ae928ff7c8098cab0c35eafe310ab28bf57ed285b",
+    "coefficients_sha256": "55c502d04fcc83ba999de0e6302d3d212d348164112fc0e9933b8c9104036e55"
+  },
+  "quarantined_contaminated_artifact": {
+    "path": "har_rs_dow_v1_CONTAMINATED_DO_NOT_USE.joblib",
+    "artifact_sha256": "c576c80c41096709ca824389354f25b77af9c8dd4d1aa24a033471fd5c02fb4e",
+    "contamination_type": "Forward 168h target leakage into 2026 holdout (Dec 25\u201331, 2025 origins)",
+    "contaminated_rows_removed": 168
+  },
+  "feature_contract_hash": "8654d2c3e02c9483fe1d5a4831630d6ed8459aa2c0e4e64ffcec552bb36fd1a8",
+  "target_contract_hash": "620b718679b4747d4a0fe7086e32f01bebd2a5574460a4601f0f536d96542bdb",
+  "training_data_sha256": "2323f443ae8bcf3de66e0eb03b069bd8d5163a077530fdfca8a2e0424b12abed",
+  "c2_config_hash": "c6c7484440809877f599f420d80d3b561086db598d1bb391ea2a67540deefdd4",
+  "environment_hash": "adb58fb24a37a4cb289665f397f6345d43d103cb8b3d0af4eb2ae27a628cb82b",
+  "source_state": {
+    "git_head_commit": "594b284b1808fe8f1628a5e50f3776c04501ebf5",
+    "tracked_clean": true,
+    "git_diff_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "script_hashes": {
+      "research/freeze_har_rs_dow.py": "f6c7399660ff93089bda273678aacefc81b029bd79352454b570e8d469d0d6a4",
+      "research/verify_freeze_manifest.py": "af1a30a0125afb52ddf528deec3c670f48cef10cd9bc187ac57f9e57209157f4",
+      "research/run_phase_02_label_boundary_audit.py": "af8e357b460e966d45193ee76cfe3bd263b2a5be519cca38397e22b04aa4b74c",
+      "tests/test_holdout_label_boundary.py": "3357286bf3e2474c5d0eb98ca34a7f7c1332ae69bba0e8b7c2cf946f7110544e"
+    }
+  },
+  "training_span": {
+    "start": "2022-01-31 00:00:00+00:00",
+    "end": "2025-12-24 23:00:00+00:00",
+    "max_target_maturity": "2025-12-31 23:00:00+00:00",
+    "n_bars": 34175,
+    "holdout_label_overlap_count": 0
+  },
+  "reproducibility_verified": true,
+  "manifest_timestamp": "2026-08-25T14:40:08.923343+00:00",
+  "scientific_contract_hash": "841deba5fb30118bea849f93ebc9fb7d1984d74fd2d709013544c6d5db94cf07"
+}

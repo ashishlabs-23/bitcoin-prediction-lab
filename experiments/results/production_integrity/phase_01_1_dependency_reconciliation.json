@@ -1,0 +1,79 @@
+{
+  "reconciliation_version": "1.0.0",
+  "audit_phase": "PHASE_01_1_ADVERSARIAL_PRODUCTION_INTEGRITY_VERIFICATION",
+  "timestamp": "2026-08-25T15:18:00+00:00",
+  "reconciliation_status": "FULL_RECONCILIATION_CONSISTENT",
+  "execution_path_trace": {
+    "step_1_server_lifespan": "api/server.py (lifespan) invokes validation/startup_gate.py",
+    "step_2_startup_gate": "validation/startup_gate.py verifies sha256(har_rs_dow_v1.joblib), pipeline coefficients hash, feature schema, target contract, C2 config against repaired_scientific_contract_manifest.json",
+    "step_3_runtime_stream": "Live OHLCV price updates fed into feature cache; log returns and day-of-week calculated in-memory",
+    "step_4_model_inference": "har_rs_dow_v1.joblib predicts point forecast ln(v_hat) from 10 OHLCV features (4 RV regressors + 6 DOW dummies)",
+    "step_5_c2_envelope": "C2 Dependence-Aware Conformal computes asymmetric lower/upper risk bounds [L_t, U_t]",
+    "step_6_observatory": "Observatory logs immutable origin record into SQLite (forecast_origins) and resolves at t+168h into forecast_resolutions after pre-resolution SHA256 check"
+  },
+  "dependency_classification_table": [
+    {
+      "file_or_artifact": "data/raw/ohlcv.parquet",
+      "classification": "DIRECT_MODEL_DEPENDENCY",
+      "read_in_production": true,
+      "read_in_research": true,
+      "purpose": "Primary source for historical & live OHLCV price series to compute log returns, realized semivariance (down/up), lagged 7D/30D RV, and day-of-week dummies."
+    },
+    {
+      "file_or_artifact": "experiments/results/freeze/har_rs_dow_v1.joblib",
+      "classification": "DIRECT_MODEL_DEPENDENCY",
+      "read_in_production": true,
+      "read_in_research": true,
+      "purpose": "Frozen scikit-learn Ridge regression pipeline (Scaler + Ridge alpha=1.0) generating point forecasts for 7-day annualized realized variance."
+    },
+    {
+      "file_or_artifact": "C2 Calibration Specification",
+      "classification": "C2_DEPENDENCY",
+      "read_in_production": true,
+      "read_in_research": true,
+      "purpose": "Dependence-aware asymmetric conformal prediction parameters (alpha=0.10, EWM span=720h, pool window=1000h, pool step=24h, quantile=0.95)."
+    },
+    {
+      "file_or_artifact": "experiments/results/freeze/repaired_scientific_contract_manifest.json",
+      "classification": "INFRASTRUCTURE_DEPENDENCY",
+      "read_in_production": true,
+      "read_in_research": true,
+      "purpose": "Cryptographic manifest asserting frozen contract hashes before application lifespan allows traffic."
+    },
+    {
+      "file_or_artifact": "data/raw/iv7d.parquet",
+      "classification": "RESEARCH_ONLY",
+      "read_in_production": false,
+      "read_in_research": true,
+      "purpose": "Deribit 7-day implied volatility surface used strictly in research benchmark comparisons (VOL-EDGE-01 trials M5 vs M6) and historical timestamp index alignment. NOT a feature in HAR-RS-DOW-v1.0; NOT read in production runtime."
+    },
+    {
+      "file_or_artifact": "data_snapshot_id (raw-ohlcv-deribit-iv7d-2022-2025)",
+      "classification": "METADATA_ONLY",
+      "read_in_production": false,
+      "read_in_research": true,
+      "purpose": "Corpus version string documenting research data provenance spanning Jan 2022 to Dec 2025."
+    }
+  ],
+  "graph_reconciliation_matrix": {
+    "freeze_manifest_graph": {
+      "training_data_files": ["ohlcv.parquet", "iv7d.parquet"],
+      "direct_model_features": ["log_rv_down_1d", "log_rv_up_1d", "log_rv7d_var_ann_lag", "log_rv30d_var_ann", "dow_1", "dow_2", "dow_3", "dow_4", "dow_5", "dow_6"],
+      "iv_features_in_model": 0
+    },
+    "startup_gate_graph": {
+      "verified_artifacts": ["har_rs_dow_v1.joblib", "repaired_scientific_contract_manifest.json"],
+      "feature_schema_count": 10,
+      "verified_hash": "841deba5fb30118bea849f93ebc9fb7d1984d74fd2d709013544c6d5db94cf07"
+    },
+    "runtime_inference_graph": {
+      "production_dependencies": ["ohlcv.parquet"],
+      "iv_in_runtime_path": false
+    },
+    "research_graph": {
+      "research_trial_dependencies": ["ohlcv.parquet", "iv7d.parquet"],
+      "research_provenance_preserved": true
+    }
+  },
+  "reconciliation_conclusion": "iv7d.parquet is proven to be a RESEARCH_ONLY artifact required for historical baseline comparisons in VOL-EDGE-01 and preserved in research provenance. It is completely absent from the live production inference dependency identity and feature pipeline."
+}

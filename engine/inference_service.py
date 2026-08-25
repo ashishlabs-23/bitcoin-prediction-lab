@@ -10,7 +10,6 @@ import os
 import sys
 import math
 import time
-import random
 import asyncio
 import logging
 from typing import Dict, List, Optional, Any
@@ -77,20 +76,9 @@ class LiveInferenceEngine:
             logger.info("Inference Engine: Fitting completed successfully.")
             self.warmed_up = True
         except Exception as e:
-            logger.warning(f"Inference Engine startup fit failed ({e}). Loading fallback...")
-            try:
-                feat_path = os.path.join(DATA_PROCESSED_DIR, "features.parquet")
-                if os.path.exists(feat_path):
-                    df = pd.read_parquet(feat_path)
-                    y = (df['ret_24h'].shift(-24) > 0.01).fillna(0).astype(int)
-                    X = df.drop(columns=['timestamp', 'available_time'], errors='ignore')
-                    self.train_df = X
-                    self.model = AdaptiveRegimeEnsemble()
-                    self.model.fit(X, y)
-                    logger.info("Inference Engine: Fallback model fit successful.")
-                    self.warmed_up = True
-            except Exception as fe:
-                logger.error(f"Inference Engine: Fallback fit failed: {fe}")
+            logger.error(f"Inference Engine startup fit failed: {e}. Unsafe fallback training with future labels is strictly disabled in production.")
+            self.warmed_up = False
+            self.model = None
 
     def start(self):
         """Spawns background inference task."""
@@ -261,11 +249,22 @@ class LiveInferenceEngine:
             'BREAKOUT': 0.70 if current_regime == 'BREAKOUT' else 0.05,
             'HIGH_VOLATILITY': 0.70 if current_regime == 'HIGH_VOLATILITY' else 0.05,
         }
-        mod_probs_dict = {
-            'RandomForest': prob,
-            'XGBoost': np.clip(prob + (random.random() - 0.5) * 0.04, 0.01, 0.99),
-            'LogisticRegression': np.clip(prob + (random.random() - 0.5) * 0.06, 0.01, 0.99)
-        }
+        if self.model is not None:
+            try:
+                p_rf = float(self.model.rf.predict_proba(latest_row.fillna(0.0))[0, 1])
+                p_xgb = float(self.model.xgb.predict_proba(latest_row.fillna(0.0))[0, 1])
+                p_lr = float(self.model.logreg.predict_proba(latest_row.fillna(0.0))[0, 1])
+                mod_probs_dict = {
+                    'RandomForest': p_rf,
+                    'XGBoost': p_xgb,
+                    'LogisticRegression': p_lr
+                }
+            except Exception as e:
+                logger.warning(f"Sub-model probability extraction error: {e}")
+                mod_probs_dict = {'AdaptiveRegimeEnsemble': prob}
+        else:
+            mod_probs_dict = {'AdaptiveRegimeEnsemble': prob}
+
         unc_breakdown = compute_decomposed_uncertainty(
             df.iloc[-1],
             reg_probs_dict,
@@ -276,11 +275,12 @@ class LiveInferenceEngine:
         unc_narrative = format_uncertainty_narrative(unc_breakdown)
 
         confidence = unc_breakdown['composite_quality_score']
-        cal_score = int(np.clip(prob * 110, 75, 96))
-        reg_conf = int(np.clip(unc_breakdown['regime_certainty'] * 100, 70, 95))
-        dr_score = int(np.clip(unc_breakdown['data_reliability'] * 100, 85, 98))
-        ag_score = int(np.clip(unc_breakdown['model_agreement'] * 100, 75, 96))
-        quality_score = int(np.mean([cal_score, reg_conf, dr_score, ag_score]))
+        # Measured scores without artificial minimum floors
+        cal_score = int(round(prob * 100))
+        reg_conf = int(round(unc_breakdown['regime_certainty'] * 100))
+        dr_score = int(round(unc_breakdown['data_reliability'] * 100))
+        ag_score = int(round(unc_breakdown['model_agreement'] * 100))
+        quality_score = int(round(np.mean([cal_score, reg_conf, dr_score, ag_score])))
 
         async with self._lock:
             self.latest_prediction = {
@@ -340,10 +340,25 @@ class LiveInferenceEngine:
                 "summary": f"Model influenced by top indicators: {', '.join([c['feature'] for c in contributions_list[:2]])}"
             }
 
+            if unc_breakdown.get('data_reliability', 1.0) <= 0.0 or onchain_val.get('is_degraded', False) and quality_score == 0:
+                rating_str = "DATA_INVALID"
+            elif quality_score >= 80:
+                rating_str = "Excellent"
+            elif quality_score >= 65:
+                rating_str = "Good"
+            elif quality_score >= 45:
+                rating_str = "Fair"
+            elif quality_score >= 25:
+                rating_str = "Degraded"
+            elif quality_score > 0:
+                rating_str = "Severely Degraded"
+            else:
+                rating_str = "DATA_INVALID"
+
             self.latest_quality = {
                 "score": quality_score,
                 "max_score": 100,
-                "rating": "Excellent" if quality_score > 80 else ("Good" if quality_score > 65 else "Fair"),
+                "rating": rating_str,
                 "calibration_score": cal_score,
                 "regime_confidence": reg_conf,
                 "drift_score": dr_score,

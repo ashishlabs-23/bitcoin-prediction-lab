@@ -1,0 +1,39 @@
+{
+  "timestamp": "2026-08-25T14:40:08.924252+00:00",
+  "phase": "PHASE_0_3_REPAIRED_FREEZE_REANCHOR_AND_RESTART_GATE",
+  "final_classification": "FREEZE_REPAIRED_AND_VERIFIED",
+  "repaired_artifact_hash": "750b5d15ed84c3cf24b8484ae928ff7c8098cab0c35eafe310ab28bf57ed285b",
+  "repaired_contract_hash": "841deba5fb30118bea849f93ebc9fb7d1984d74fd2d709013544c6d5db94cf07",
+  "contaminated_artifact_hash": "c576c80c41096709ca824389354f25b77af9c8dd4d1aa24a033471fd5c02fb4e",
+  "training_rows": 34175,
+  "overlap_count": 0,
+  "source_state": {
+    "git_head": "594b284b1808fe8f1628a5e50f3776c04501ebf5",
+    "tracked_clean": true,
+    "diff_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "reproducibility": {
+    "pass_1": {
+      "qlike": 0.15699259594090495,
+      "coverage_pct": 92.99387442572741,
+      "q5_coverage_pct": 89.47368421052632,
+      "upper_breach_pct": 3.713629402756508,
+      "lower_breach_pct": 3.2924961715160794,
+      "tail_asymmetry_delta": 0.4211332312404288,
+      "mean_width": 0.4622062083222742,
+      "winkler_score": 0.4945627820379546
+    },
+    "pass_2": {
+      "qlike": 0.15699259594090495,
+      "coverage_pct": 92.99387442572741,
+      "q5_coverage_pct": 89.47368421052632,
+      "upper_breach_pct": 3.713629402756508,
+      "lower_breach_pct": 3.2924961715160794,
+      "tail_asymmetry_delta": 0.4211332312404288,
+      "mean_width": 0.4622062083222742,
+      "winkler_score": 0.4945627820379546
+    },
+    "max_metric_delta": 0.0
+  },
+  "stale_production_references": []
+}

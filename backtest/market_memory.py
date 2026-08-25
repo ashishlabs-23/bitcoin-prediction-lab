@@ -323,8 +323,10 @@ def record_prediction(
         with conn:
             cols = list(record_dict.keys())
             placeholders = ", ".join(["?" for _ in cols])
-            query = f"INSERT OR REPLACE INTO predictions ({', '.join(cols)}) VALUES ({placeholders})"
+            query = f"INSERT INTO predictions ({', '.join(cols)}) VALUES ({placeholders})"
             conn.execute(query, list(record_dict.values()))
+    except sqlite3.IntegrityError as ie:
+        logger.error(f"Duplicate prediction_id rejected: {ie}")
     except Exception as e:
         logger.error(f"Error inserting prediction into SQLite: {e}")
     finally:

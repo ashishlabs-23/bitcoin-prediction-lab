@@ -1,0 +1,116 @@
+{
+  "manifest_version": "1.2.0",
+  "phase": "PHASE_01_2_CLEAN_ROOM_PRODUCTION_VERIFICATION",
+  "final_classification": "READY_FOR_PROSPECTIVE_VALIDATION",
+  "timestamp": "2026-08-25T15:25:00+00:00",
+  "source_state": {
+    "git_head": "594b284b1808fe8f1628a5e50f3776c04501ebf5",
+    "scientific_scope_violation": false,
+    "scientific_contract_hash": "841deba5fb30118bea849f93ebc9fb7d1984d74fd2d709013544c6d5db94cf07",
+    "model_artifact_sha256": "750b5d15ed84c3cf24b8484ae928ff7c8098cab0c35eafe310ab28bf57ed285b",
+    "model_coefficients_sha256": "55c502d04fcc83ba999de0e6302d3d212d348164112fc0e9933b8c9104036e55",
+    "feature_contract_hash": "8654d2c3e02c9483fe1d5a4831630d6ed8459aa2c0e4e64ffcec552bb36fd1a8",
+    "target_contract_hash": "5fb146206d28990cf4910cf9dbb8364b6e5db8e62c125df9db8fcfe7eeb0c105",
+    "c2_config_hash": "c6c7484440809877f599f420d80d3b561086db598d1bb391ea2a67540deefdd4"
+  },
+  "file_classifications": [
+    {
+      "file": "research/freeze_har_rs_dow.py",
+      "classification": "scientific-core",
+      "modified_in_phase_1": false
+    },
+    {
+      "file": "models/ensemble.py",
+      "classification": "scientific-core",
+      "modified_in_phase_1": false
+    },
+    {
+      "file": "models/uncertainty.py",
+      "classification": "scientific-core",
+      "modified_in_phase_1": false
+    },
+    {
+      "file": "api/server.py",
+      "classification": "operational",
+      "modified_in_phase_1": true
+    },
+    {
+      "file": "api/routes_terminal.py",
+      "classification": "operational",
+      "modified_in_phase_1": true
+    },
+    {
+      "file": "api/routes_prediction.py",
+      "classification": "operational",
+      "modified_in_phase_1": true
+    },
+    {
+      "file": "api/routes_arena.py",
+      "classification": "operational",
+      "modified_in_phase_1": true
+    },
+    {
+      "file": "engine/observatory.py",
+      "classification": "operational",
+      "modified_in_phase_1": true
+    },
+    {
+      "file": "engine/inference_service.py",
+      "classification": "operational",
+      "modified_in_phase_1": true
+    },
+    {
+      "file": "engine/range_forecast_service.py",
+      "classification": "operational",
+      "modified_in_phase_1": true
+    },
+    {
+      "file": "backtest/market_memory.py",
+      "classification": "operational",
+      "modified_in_phase_1": true
+    },
+    {
+      "file": "validation/startup_gate.py",
+      "classification": "audit/integrity",
+      "modified_in_phase_1": true
+    },
+    {
+      "file": "engine/range_quality.py",
+      "classification": "audit/integrity",
+      "modified_in_phase_1": true
+    },
+    {
+      "file": "tests/*",
+      "classification": "tests",
+      "modified_in_phase_1": true
+    },
+    {
+      "file": "experiments/results/production_integrity/*",
+      "classification": "documentation",
+      "modified_in_phase_1": true
+    }
+  ],
+  "clean_room_verification_status": {
+    "cleanroom_startup_status": "PASS",
+    "tamper_fail_closed_status": "PASS",
+    "API_equivalence_status": "PASS (max |delta| <= 1e-12)",
+    "restart_continuity_status": "PASS (3 restart generations identical)",
+    "lifecycle_integrity_status": "PASS (t0 -> PENDING -> t+168h -> RESOLVED; double resolve rejected)",
+    "exploratory_isolation_status": "PASS (Exploratory routes cannot mutate scientific core or Observatory)",
+    "dependency_reconciliation_status": "PASS (ohlcv.parquet=DIRECT, iv7d.parquet=RESEARCH_ONLY)",
+    "health_state_status": "PASS (STABLE, WATCH, DEGRADED, FAIL, DATA_INVALID properly mapped)",
+    "census_accounting_status": "PASS (issued_N == resolved_N + pending_N + invalid_N + corrupted_N)",
+    "final_test_status": "PASS (40/40 tests passed)"
+  },
+  "scientific_baseline_comparison": {
+    "qlike_loss": 0.19300,
+    "holdout_c2_coverage_pct": 92.84,
+    "extreme_vol_q5_coverage_pct": 89.47,
+    "upper_breach_pct": 3.67,
+    "lower_breach_pct": 3.43,
+    "tail_delta_pct": 0.24,
+    "mean_interval_width": 0.14782,
+    "mean_winkler_score": 0.20359,
+    "baseline_comparison_status": "EXACT_REPAIRED_BASELINE_MATCH"
+  }
+}
