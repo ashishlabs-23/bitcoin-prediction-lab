@@ -17,6 +17,7 @@ import os
 import sqlite3
 import pandas as pd
 import numpy as np
+from datetime import datetime, timezone
 
 from config.paths import PROJECT_ROOT, RESULTS_DIR, DATA_RAW_DIR, DATA_PROCESSED_DIR
 from config.database import MARKET_MEMORY_DB_PATH, HAWKES_DB_PATH
@@ -73,7 +74,7 @@ def test_master_onchain_contract():
         "mvrv_ratio": 2.15,
         "nupl": 0.45,
         "cycle_phase": "NEUTRAL",
-        "timestamp": "2026-08-21T00:00:00Z",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "source": "coinmetrics_api",
         "is_live": True,
         "is_degraded": False,

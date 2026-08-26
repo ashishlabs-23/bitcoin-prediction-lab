@@ -1,5 +1,5 @@
 {
-  "evaluation_timestamp": "2026-08-25T16:18:40.075055+00:00",
+  "evaluation_timestamp": "2026-08-26T08:39:13.858518+00:00",
   "protocol": "MULTI_REGIME_PURGED_CROSS_VALIDATION (2020-2026)",
   "dataset_span": "2022-01-08 00:00:00+00:00 to 2024-05-31 01:00:00+00:00",
   "total_test_observations": 15734,

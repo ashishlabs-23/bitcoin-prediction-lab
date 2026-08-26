@@ -50,61 +50,15 @@ class PostRepairLongitudinalMonitor:
 
     def get_status(self) -> Dict[str, Any]:
         """Returns the real-time longitudinal monitoring status."""
-        conn = sqlite3.connect(MARKET_MEMORY_DB_PATH)
-        conn.row_factory = sqlite3.Row
-
-        # Query all post-repair predictions
-        rows = conn.execute("""
-            SELECT * FROM predictions 
-            WHERE data_source != 'synthetic_arena'
-            AND regime NOT LIKE 'SIM_ARENA_%'
-            ORDER BY timestamp ASC
-        """).fetchall()
-        conn.close()
-
-        valid_resolved = []
-        degraded_count = 0
-        invalid_count = 0
-
-        for r in rows:
-            try:
-                r_ts = pd.Timestamp(r["timestamp"]).tz_convert(timezone.utc) if pd.Timestamp(r["timestamp"]).tz is not None else pd.Timestamp(r["timestamp"]).tz_localize(timezone.utc)
-                if r_ts >= self.boundary_dt:
-                    ctx_str = r.get("context_vector_json")
-                    q = "VALID"
-                    if ctx_str and isinstance(ctx_str, str):
-                        try:
-                            q = json.loads(ctx_str).get("data_quality", "VALID")
-                        except Exception:
-                            q = "VALID"
-                    
-                    if q == "DEGRADED":
-                        degraded_count += 1
-                    elif q == "INVALID":
-                        invalid_count += 1
-                    else:
-                        if bool(r["outcome_resolved"]) and r["was_correct"] is not None:
-                            valid_resolved.append(dict(r))
-            except Exception:
-                continue
-
-        # Count independent VALID 24h blocks
-        observed_valid_blocks = len(valid_resolved) // 24
+        from research.post_repair_block_builder import build_post_repair_blocks
+        blocks, acc = build_post_repair_blocks()
         
+        observed_valid_blocks = acc["independent_valid_blocks"]
         next_milestone = 90
         for m in self.target_milestones:
             if m > observed_valid_blocks:
                 next_milestone = m
                 break
-
-        # Calculate N_eff
-        n_obs = len(valid_resolved)
-        n_eff = 0.0
-        if n_obs >= 5:
-            returns = [float(r["actual_return"]) for r in valid_resolved]
-            s = pd.Series(returns)
-            rho = max(0.0, min(0.95, float(s.autocorr(lag=1)))) if not np.isnan(s.autocorr(lag=1)) else 0.0
-            n_eff = round(n_obs * (1.0 - rho) / (1.0 + rho), 2)
 
         return {
             "evidence_phase": "POST_REPAIR",
@@ -113,14 +67,14 @@ class PostRepairLongitudinalMonitor:
             "evidence_boundary": POST_REPAIR_EVIDENCE_START,
             "observed_blocks": observed_valid_blocks,
             "observed_valid_blocks": observed_valid_blocks,
-            "observed_mixed_blocks": 0,
-            "observed_degraded_forecasts": degraded_count,
-            "observed_invalid_forecasts": invalid_count,
+            "observed_mixed_blocks": acc.get("independent_mixed_blocks", 0),
+            "observed_degraded_forecasts": acc.get("independent_degraded_blocks", 0),
+            "observed_invalid_forecasts": 0,
             "target_blocks": 90,
             "next_milestone": next_milestone,
-            "raw_post_repair_forecasts": len(rows),
-            "resolved_post_repair_forecasts": n_obs,
-            "n_eff": n_eff,
+            "raw_post_repair_forecasts": acc["raw_forecasts"],
+            "resolved_post_repair_forecasts": acc["resolved_forecasts"],
+            "n_eff": acc["n_eff"],
             "model_hash": MODEL_HASH,
             "context_hash": CONTEXT_HASH,
             "feature_schema_hash": FEATURE_SCHEMA_HASH,

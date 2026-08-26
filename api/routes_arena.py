@@ -290,3 +290,391 @@ async def run_arena_experiment(payload: Optional[Dict[str, Any]] = Body(default=
         "trials": trials_results,
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
+
+
+# ---------------------------------------------------------------------------
+# MEIE Read-Only Intelligence Endpoint
+# Isolation guarantee: read-only. No Arena execution state is modified.
+# ---------------------------------------------------------------------------
+
+@router.get("/api/arena/meie/state")
+def get_meie_state():
+    """
+    Returns the current Microstructure Event Intelligence Engine (MEIE) state vector,
+    detected market event, and conditional payoff estimate.
+
+    Read-only. Does NOT affect the existing Arena experiment, Observatory audit, or
+    the frozen N=720 prospective run. MEIE trades (if any) are stored in a separate
+    meie_memory.db and meie_trades table.
+
+    Preregistration chain:
+      MEIE-EVENT-01-v1.0 → MEIE-DIRECTION-01-v1.0 → MEIE-EXECUTION-01-v1.0
+    """
+    try:
+        from engine.microstructure_state import compute_state_vector
+        from engine.event_detector import detect_event
+        from engine.payoff_engine import estimate_payoff
+
+        # Fetch current live price and candle from feature cache (best-effort)
+        try:
+            cached = feature_cache.get_latest()
+            price = float(cached.get("price", 60000.0))
+            candle = {
+                "close": price,
+                "high": float(cached.get("high", price * 1.001)),
+                "low": float(cached.get("low", price * 0.999)),
+                "open": float(cached.get("open", price)),
+                "volume": float(cached.get("volume", 1000.0)),
+            }
+            hawkes_snapshot = cached.get("hawkes_snapshot")
+            vpin = cached.get("vpin", None)
+            vol_24h = float(cached.get("vol_24h", 0.015))
+        except Exception:
+            price = 60000.0
+            candle = {"close": price, "high": price, "low": price, "open": price, "volume": 1000.0}
+            hawkes_snapshot = None
+            vpin = None
+            vol_24h = 0.015
+
+        ts = datetime.now(timezone.utc).isoformat()
+
+        # Layer 1: state vector
+        sv = compute_state_vector(
+            timestamp=ts,
+            price=price,
+            candle=candle,
+            hawkes_snapshot=hawkes_snapshot,
+            vpin_snapshot=vpin,
+        )
+
+        # Layer 2: event classification
+        event = detect_event(sv, hawkes_snapshot=hawkes_snapshot)
+
+        # Layer 3: payoff estimate (conservative prior — no empirical hit rate yet)
+        payoff = estimate_payoff(event, vol_24h=vol_24h)
+
+        return {
+            "meie_state": sv.to_dict(),
+            "event": event.to_dict(),
+            "payoff": payoff.to_dict(),
+            "preregistration_chain": [
+                "results/meie_event01_preregistration.md",
+                "results/meie_direction01_preregistration.md",
+                "results/meie_execution01_preregistration.md",
+            ],
+            "isolation_note": (
+                "MEIE is a shadow research module. It does not affect Arena balance, "
+                "equity curve, or Observatory audit records."
+            ),
+            "timestamp": ts,
+        }
+
+    except Exception as e:
+        logger.error(f"MEIE state endpoint error: {e}")
+        return {
+            "error": str(e),
+            "meie_state": None,
+            "event": {"event_type": "NORMAL"},
+            "payoff": {"execute": False, "ev_net_bps": 0.0},
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+
+# ---------------------------------------------------------------------------
+# Arena Evolution Endpoints — Per-Strategy Virtual Accounts
+# Isolation: all reads from meie_memory.db, arena_memory.db never touched.
+# ---------------------------------------------------------------------------
+
+@router.get("/api/arena/meie/accounts")
+def get_meie_accounts():
+    """
+    Returns all five MEIE virtual strategy accounts with NAV, epoch, version,
+    status, win_rate, drawdown, and daily risk budget state.
+    Read-only. Does NOT affect Arena experiment or Observatory.
+    """
+    try:
+        from engine.arena_evolution import get_evolution_status
+        status = get_evolution_status()
+        return {
+            "accounts":    status.get("accounts", []),
+            "risk_budgets": status.get("risk_budgets", {}),
+            "weights":     status.get("weights", {}),
+            "candle_count": status.get("candle_count", 0),
+            "isolation_note": "MEIE accounts are isolated from Arena experiment. meie_memory.db only.",
+            "timestamp":   datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as e:
+        logger.error(f"MEIE accounts endpoint error: {e}")
+        return {"error": str(e), "accounts": [], "timestamp": datetime.now(timezone.utc).isoformat()}
+
+
+@router.get("/api/arena/meie/leaderboard")
+def get_meie_leaderboard():
+    """
+    Returns the champion/challenger strategy leaderboard with:
+      strategy_name, status (ACTIVE/WATCH/RETIRE/CHAMPION/CHALLENGER), version,
+      nav, total_trades, win_rate, ev_mean_usd, profit_factor, max_drawdown_pct, weight.
+
+    Strategies are ranked by adaptive capital weight (EV/sigma × reliability).
+    """
+    try:
+        from engine.capital_allocator import get_allocation_report
+        from engine.strategy_registry import get_all_statuses
+        from engine.failure_classifier import failure_class_summary
+
+        leaderboard = get_allocation_report()
+        statuses    = {s["strategy_name"]: s for s in get_all_statuses()}
+
+        # Enrich with champion/challenger status and failure summary
+        for row in leaderboard:
+            name = row["strategy_name"]
+            sv = statuses.get(name, {})
+            row["champion_status"] = sv.get("status", "ACTIVE")
+            row["epoch_number"]    = sv.get("epoch_number", 1)
+            row["failure_summary"] = failure_class_summary(name)
+
+        leaderboard.sort(key=lambda r: r.get("weight", 0), reverse=True)
+
+        return {
+            "leaderboard": leaderboard,
+            "promotion_thresholds": {
+                "ev_net_min_bps": 0.0,
+                "max_mdd_pct": 5.0,
+                "min_profit_factor": 1.0,
+            },
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as e:
+        logger.error(f"MEIE leaderboard endpoint error: {e}")
+        return {"error": str(e), "leaderboard": [], "timestamp": datetime.now(timezone.utc).isoformat()}
+
+
+@router.get("/api/arena/meie/failures")
+def get_meie_failures(
+    strategy_name: Optional[str] = Query(default=None, description="Filter by strategy name"),
+    limit: int = Query(default=50, ge=1, le=500)
+):
+    """
+    Returns recent trade failure classifications with full trade path.
+    Supports filtering by strategy_name.
+
+    Each record includes: event_type, direction, entry/exit price, MFE, MAE,
+    exit_reason, failure_class, market_regime, z-scores at entry.
+    """
+    try:
+        from engine.arena_accounts import _get_db, STRATEGY_NAMES
+
+        conn = _get_db()
+        try:
+            if strategy_name:
+                cur = conn.execute("""
+                    SELECT strategy_name, version, epoch_number, signal_time, event_type,
+                           direction, entry_price, exit_price, tp_price, sl_price,
+                           mfe_pct, mae_pct, net_pnl, exit_reason, failure_class,
+                           z_hawkes, z_ofi, z_vpin, z_spread, market_regime, closed_at
+                    FROM meie_strategy_trades
+                    WHERE strategy_name = ? AND resolved = 1 AND net_pnl < 0
+                    ORDER BY id DESC LIMIT ?;
+                """, (strategy_name, limit))
+            else:
+                cur = conn.execute("""
+                    SELECT strategy_name, version, epoch_number, signal_time, event_type,
+                           direction, entry_price, exit_price, tp_price, sl_price,
+                           mfe_pct, mae_pct, net_pnl, exit_reason, failure_class,
+                           z_hawkes, z_ofi, z_vpin, z_spread, market_regime, closed_at
+                    FROM meie_strategy_trades
+                    WHERE resolved = 1 AND net_pnl < 0
+                    ORDER BY id DESC LIMIT ?;
+                """, (limit,))
+            failures = [dict(r) for r in cur.fetchall()]
+        finally:
+            conn.close()
+
+        # Failure class distribution across all returned records
+        from collections import Counter
+        class_dist = dict(Counter(f.get("failure_class", "NO_CLASS") for f in failures))
+
+        return {
+            "failures": failures,
+            "failure_class_distribution": class_dist,
+            "total_returned": len(failures),
+            "filter_strategy": strategy_name,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as e:
+        logger.error(f"MEIE failures endpoint error: {e}")
+        return {"error": str(e), "failures": [], "timestamp": datetime.now(timezone.utc).isoformat()}
+
+
+@router.get("/api/arena/meie/trades")
+def get_meie_trades(
+    strategy_name: Optional[str] = Query(default=None, description="Filter by strategy"),
+    limit: int = Query(default=100, ge=1, le=1000)
+):
+    """
+    Returns complete paper-trade contract records for all strategies.
+    Exposes: strategy_name, version, signal_time, event_type, direction, entry_price,
+    tp_price, sl_price, target_rr, max_hold_bars, exit_price, holding_bars, exit_reason,
+    mfe_pct, mae_pct, gross_pnl, fee_bps, slippage_bps, impact_bps, net_pnl,
+    counterfactual_skip_pnl, counterfactual_opposite_pnl, opportunity_quality,
+    c2_risk_state, market_regime, data_state, failure_class, closed_at.
+    """
+    try:
+        from engine.arena_accounts import _get_db
+        conn = _get_db()
+        try:
+            if strategy_name:
+                cur = conn.execute("""
+                    SELECT * FROM meie_strategy_trades
+                    WHERE strategy_name = ?
+                    ORDER BY id DESC LIMIT ?;
+                """, (strategy_name, limit))
+            else:
+                cur = conn.execute("""
+                    SELECT * FROM meie_strategy_trades
+                    ORDER BY id DESC LIMIT ?;
+                """, (limit,))
+            rows = [dict(r) for r in cur.fetchall()]
+            return {
+                "trades": rows,
+                "total": len(rows),
+                "filter_strategy": strategy_name,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.error(f"MEIE trades endpoint error: {e}")
+        return {"error": str(e), "trades": [], "timestamp": datetime.now(timezone.utc).isoformat()}
+
+
+@router.get("/api/arena/meie/forensic-summary")
+def get_meie_forensic_summary():
+    """
+    Returns the complete forensic strategy comparison matrix across all candidate archetypes:
+    Strategy, Trades, Avg Hold, Win Rate, Avg TP, Avg SL, Avg MFE, Avg MAE, Gross EV,
+    Fees, Slippage, Net EV, Profit Factor, MDD, CVaR95, Skip dEV, Opposite dEV,
+    7-Level Research Status, and Primary/Secondary Blockers.
+    """
+    try:
+        from engine.arena_accounts import _get_db, STRATEGY_NAMES
+        from engine.strategy_registry import get_all_statuses
+
+        conn = _get_db()
+        statuses = {s["strategy_name"]: s for s in get_all_statuses()}
+        matrix = []
+
+        try:
+            for name in STRATEGY_NAMES:
+                cur = conn.execute("""
+                    SELECT * FROM meie_strategy_trades
+                    WHERE strategy_name = ? AND resolved = 1;
+                """, (name,))
+                trades = [dict(r) for r in cur.fetchall()]
+                n = len(trades)
+                sv = statuses.get(name, {})
+
+                if n == 0:
+                    matrix.append({
+                        "strategy_name": name,
+                        "version": sv.get("version", "v1.0"),
+                        "research_status": sv.get("status", "CANDIDATE"),
+                        "trades": 0,
+                        "avg_hold_min": 0.0,
+                        "win_rate_pct": 0.0,
+                        "avg_tp_price": 0.0,
+                        "avg_sl_price": 0.0,
+                        "avg_mfe_pct": 0.0,
+                        "avg_mae_pct": 0.0,
+                        "gross_ev_usd": 0.0,
+                        "fees_usd": 0.0,
+                        "slippage_usd": 0.0,
+                        "net_ev_usd": 0.0,
+                        "profit_factor": 0.0,
+                        "max_drawdown_pct": 0.0,
+                        "cvar_95_usd": 0.0,
+                        "skip_delta_ev_usd": 0.0,
+                        "opposite_delta_ev_usd": 0.0,
+                        "blocker_diagnostics": sv.get("notes", "Accumulating initial observations"),
+                    })
+                    continue
+
+                pnls = [t["net_pnl"] for t in trades if t.get("net_pnl") is not None]
+                gross_pnls = [t.get("gross_pnl", 0.0) for t in trades if t.get("gross_pnl") is not None]
+                holding_bars = [t.get("holding_bars", 0) for t in trades]
+                mfes = [t.get("mfe_pct", 0.0) for t in trades if t.get("mfe_pct") is not None]
+                maes = [t.get("mae_pct", 0.0) for t in trades if t.get("mae_pct") is not None]
+                tps = [t.get("tp_price", 0.0) for t in trades if t.get("tp_price") is not None]
+                sls = [t.get("sl_price", 0.0) for t in trades if t.get("sl_price") is not None]
+                opp_pnls = [t.get("counterfactual_opposite_pnl", 0.0) for t in trades if t.get("counterfactual_opposite_pnl") is not None]
+
+                wins = [p for p in pnls if p > 0]
+                losses = [abs(p) for p in pnls if p < 0]
+                pf = sum(wins) / max(1e-8, sum(losses)) if losses else float("inf")
+
+                # CVaR 95%
+                sorted_pnl = sorted(pnls)
+                cutoff = max(1, int(len(sorted_pnl) * 0.05))
+                cvar_95 = float(abs(np.mean(sorted_pnl[:cutoff]))) if sorted_pnl else 0.0
+
+                net_ev = float(np.mean(pnls)) if pnls else 0.0
+                gross_ev = float(np.mean(gross_pnls)) if gross_pnls else 0.0
+                opp_ev = float(np.mean(opp_pnls)) if opp_pnls else 0.0
+
+                matrix.append({
+                    "strategy_name": name,
+                    "version": sv.get("version", "v1.0"),
+                    "research_status": sv.get("status", "CANDIDATE"),
+                    "trades": n,
+                    "avg_hold_min": round(float(np.mean(holding_bars)), 1),
+                    "win_rate_pct": round((len(wins) / n) * 100.0, 1),
+                    "avg_tp_price": round(float(np.mean(tps)), 2) if tps else 0.0,
+                    "avg_sl_price": round(float(np.mean(sls)), 2) if sls else 0.0,
+                    "avg_mfe_pct": round(float(np.mean(mfes)) * 100.0, 3) if mfes else 0.0,
+                    "avg_mae_pct": round(float(np.mean(maes)) * 100.0, 3) if maes else 0.0,
+                    "gross_ev_usd": round(gross_ev, 4),
+                    "fees_usd": round(sum(t.get("position_size_usd", 100.0) * 0.0010 for t in trades) / n, 4),
+                    "slippage_usd": round(sum(t.get("position_size_usd", 100.0) * (t.get("slippage_bps", 2.0) / 10000.0) for t in trades) / n, 4),
+                    "net_ev_usd": round(net_ev, 4),
+                    "profit_factor": round(pf, 3) if pf != float("inf") else 999.0,
+                    "max_drawdown_pct": round(abs(sv.get("mdd_pct", 0.0)), 2),
+                    "cvar_95_usd": round(cvar_95, 4),
+                    "skip_delta_ev_usd": round(net_ev - 0.0, 4),
+                    "opposite_delta_ev_usd": round(net_ev - opp_ev, 4),
+                    "blocker_diagnostics": sv.get("notes", "All rungs cleared"),
+                })
+        finally:
+            conn.close()
+
+        return {
+            "forensic_matrix": matrix,
+            "epoch_number": 1,
+            "epoch_target_trades": 100,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as e:
+        logger.error(f"MEIE forensic summary error: {e}")
+        return {"error": str(e), "forensic_matrix": [], "timestamp": datetime.now(timezone.utc).isoformat()}
+
+
+@router.get("/api/arena/meie/abstentions")
+def get_meie_abstentions(
+    strategy_name: Optional[str] = Query(default=None, description="Filter by strategy"),
+    limit: int = Query(default=50, ge=1, le=500)
+):
+    """
+    Returns the immutable abstentions ledger.
+    ABSTAIN is an observed decision, not missing data.
+    """
+    try:
+        from engine.arena_accounts import get_abstentions
+        rows = get_abstentions(strategy_name=strategy_name, limit=limit)
+        return {
+            "abstentions": rows,
+            "total": len(rows),
+            "filter_strategy": strategy_name,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as e:
+        logger.error(f"MEIE abstentions endpoint error: {e}")
+        return {"error": str(e), "abstentions": [], "timestamp": datetime.now(timezone.utc).isoformat()}

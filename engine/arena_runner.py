@@ -220,10 +220,17 @@ class ArenaRunner:
                         scientific_contract_hash TEXT NOT NULL,
                         forecast_hash TEXT,
                         decision_hash TEXT NOT NULL,
-                        created_at TEXT NOT NULL
+                        created_at TEXT NOT NULL,
+                        meie_event_type TEXT DEFAULT 'NORMAL'
                     );
                 """)
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_adl_ts ON arena_decision_ledger(timestamp);")
+                # MEIE migration: add column to existing databases without meie_event_type
+                try:
+                    conn.execute("ALTER TABLE arena_decision_ledger ADD COLUMN meie_event_type TEXT DEFAULT 'NORMAL';"
+                    )
+                except Exception:
+                    pass  # Column already exists
         finally:
             conn.close()
 
