@@ -3987,32 +3987,6 @@ function ArenaExperimentView({ livePrice, predictionData, regimeData }) {
     const mfe = t.mfe_pct !== undefined ? `+${(Number(t.mfe_pct) * 100).toFixed(2)}%` : "___";
     const mae = t.mae_pct !== undefined ? `-${(Number(t.mae_pct) * 100).toFixed(2)}%` : "___";
 
-    return `${t.strategy_name || "MEIE-IGNITION"}-${t.version || "v1.0"}
-────────────────────────────────────────────────────────────
-Event Archetype:   ${t.event_type || "IGNITION"}
-Direction:         ${t.direction || "LONG"}
-Origin Timestamp:  ${origin}
-
-Entry Price:       ${entry}
-Take Profit (TP):  ${tp}
-Stop Loss (SL):    ${sl}
-
-Target R:R:        ${t.target_rr || "2.00"}
-Max Hold Duration: ${t.max_hold_bars || 30} min (Hard Timeout)
-
-Actual Exit:       ${t.exit_reason || "RESOLVED"}
-Exit Time:         ${exitTime}
-Exit Price:        ${exitP}
-Holding Duration:  ${t.holding_bars || 1} min
-
-MFE (Max Favorable): ${mfe}
-MAE (Max Adverse):   ${mae}
-Gross P&L:           ${gross}
-Round-Trip Fees:     ${fees}
-VPIN Slippage:       ${slip}
-Market Impact:       ${impact}
-Net Realized P&L:    ${net}
-
     let combinedSection = "";
     if (t.strategy_name === "MEIE-COMBINED" || t.selected_archetype) {
       combinedSection = `
