@@ -80,6 +80,12 @@ experiments/runs/
 # Jupyter Notebooks
 .ipynb_checkpoints/
 
+# Firebase & Cloud Secrets
+*service_account*.json
+*.serviceaccount.json
+.firebase/
+.firebaserc
+
 # OS Specific
 .DS_Store
 Thumbs.db

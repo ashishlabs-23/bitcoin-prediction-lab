@@ -65,12 +65,12 @@ MAX_WEBSOCKET_MESSAGE_BYTES: int = int(os.getenv("MAX_WS_MSG_BYTES", "65536"))  
 # ==============================================================================
 ALLOWED_ORIGINS: List[str] = os.getenv(
     "BTCOGNITIVE_ALLOWED_ORIGINS",
-    "http://localhost:8000,http://127.0.0.1:8000,https://btcognitive.netlify.app,https://ashishlabs.com"
+    "http://localhost:8000,http://127.0.0.1:8000,https://btcognitive.netlify.app,https://ashishlabs.com,https://*.web.app,https://*.firebaseapp.com"
 ).split(",")
 
 ALLOWED_HOSTS: List[str] = os.getenv(
     "BTCOGNITIVE_ALLOWED_HOSTS",
-    "localhost,127.0.0.1,testserver,btcognitive.netlify.app,*.netlify.app"
+    "localhost,127.0.0.1,testserver,btcognitive.netlify.app,*.netlify.app,*.web.app,*.firebaseapp.com"
 ).split(",")
 
 # ==============================================================================
