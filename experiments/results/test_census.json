@@ -1,0 +1,408 @@
+[
+  {
+    "trial_id": 1,
+    "trial_hash": "8478f66327374931",
+    "strategy_name": "MEIE-IGNITION",
+    "timestamp": "2026-08-31T09:22:41.151642+00:00",
+    "epoch": 1,
+    "params": {
+      "tp": 2.0,
+      "sl": 1.5,
+      "horizon": 24
+    },
+    "observed_sharpe": 1.85,
+    "observed_return_bps": 22.5
+  },
+  {
+    "trial_id": 2,
+    "trial_hash": "8478f66327374931",
+    "strategy_name": "MEIE-IGNITION",
+    "timestamp": "2026-08-31T09:22:51.692269+00:00",
+    "epoch": 1,
+    "params": {
+      "tp": 2.0,
+      "sl": 1.5,
+      "horizon": 24
+    },
+    "observed_sharpe": 1.85,
+    "observed_return_bps": 22.5
+  },
+  {
+    "trial_id": 3,
+    "trial_hash": "8478f66327374931",
+    "strategy_name": "MEIE-IGNITION",
+    "timestamp": "2026-08-31T09:23:03.035114+00:00",
+    "epoch": 1,
+    "params": {
+      "tp": 2.0,
+      "sl": 1.5,
+      "horizon": 24
+    },
+    "observed_sharpe": 1.85,
+    "observed_return_bps": 22.5
+  },
+  {
+    "trial_id": 4,
+    "trial_hash": "8478f66327374931",
+    "strategy_name": "MEIE-IGNITION",
+    "timestamp": "2026-08-31T09:23:21.538460+00:00",
+    "epoch": 1,
+    "params": {
+      "tp": 2.0,
+      "sl": 1.5,
+      "horizon": 24
+    },
+    "observed_sharpe": 1.85,
+    "observed_return_bps": 22.5
+  },
+  {
+    "trial_id": 5,
+    "trial_hash": "8478f66327374931",
+    "strategy_name": "MEIE-IGNITION",
+    "timestamp": "2026-08-31T09:24:07.063433+00:00",
+    "epoch": 1,
+    "params": {
+      "tp": 2.0,
+      "sl": 1.5,
+      "horizon": 24
+    },
+    "observed_sharpe": 1.85,
+    "observed_return_bps": 22.5
+  },
+  {
+    "trial_id": 6,
+    "trial_hash": "8478f66327374931",
+    "strategy_name": "MEIE-IGNITION",
+    "timestamp": "2026-08-31T09:26:45.056200+00:00",
+    "epoch": 1,
+    "scientific_eligible": true,
+    "dataset_class": "REAL_MARKET",
+    "params": {
+      "tp": 2.0,
+      "sl": 1.5,
+      "horizon": 24
+    },
+    "observed_sharpe": 1.85,
+    "observed_return_bps": 22.5
+  },
+  {
+    "trial_id": 7,
+    "trial_hash": "8478f66327374931",
+    "strategy_name": "MEIE-IGNITION",
+    "timestamp": "2026-08-31T09:49:02.225830+00:00",
+    "epoch": 1,
+    "scientific_eligible": true,
+    "dataset_class": "REAL_MARKET",
+    "params": {
+      "tp": 2.0,
+      "sl": 1.5,
+      "horizon": 24
+    },
+    "observed_sharpe": 1.85,
+    "observed_return_bps": 22.5
+  },
+  {
+    "trial_id": 8,
+    "trial_hash": "8478f66327374931",
+    "strategy_name": "MEIE-IGNITION",
+    "timestamp": "2026-08-31T09:55:08.468035+00:00",
+    "epoch": 1,
+    "scientific_eligible": true,
+    "dataset_class": "REAL_MARKET",
+    "params": {
+      "tp": 2.0,
+      "sl": 1.5,
+      "horizon": 24
+    },
+    "observed_sharpe": 1.85,
+    "observed_return_bps": 22.5
+  },
+  {
+    "trial_id": 9,
+    "trial_hash": "8478f66327374931",
+    "strategy_name": "MEIE-IGNITION",
+    "timestamp": "2026-08-31T09:56:35.084955+00:00",
+    "epoch": 1,
+    "scientific_eligible": true,
+    "dataset_class": "REAL_MARKET",
+    "params": {
+      "tp": 2.0,
+      "sl": 1.5,
+      "horizon": 24
+    },
+    "observed_sharpe": 1.85,
+    "observed_return_bps": 22.5
+  },
+  {
+    "trial_id": 10,
+    "trial_hash": "8478f66327374931",
+    "strategy_name": "MEIE-IGNITION",
+    "timestamp": "2026-08-31T10:00:03.293554+00:00",
+    "epoch": 1,
+    "scientific_eligible": true,
+    "dataset_class": "REAL_MARKET",
+    "params": {
+      "tp": 2.0,
+      "sl": 1.5,
+      "horizon": 24
+    },
+    "observed_sharpe": 1.85,
+    "observed_return_bps": 22.5
+  },
+  {
+    "trial_id": 11,
+    "trial_hash": "8478f66327374931",
+    "strategy_name": "MEIE-IGNITION",
+    "timestamp": "2026-08-31T10:02:58.126167+00:00",
+    "epoch": 1,
+    "scientific_eligible": true,
+    "dataset_class": "REAL_MARKET",
+    "params": {
+      "tp": 2.0,
+      "sl": 1.5,
+      "horizon": 24
+    },
+    "observed_sharpe": 1.85,
+    "observed_return_bps": 22.5
+  },
+  {
+    "trial_id": 12,
+    "trial_hash": "8478f66327374931",
+    "strategy_name": "MEIE-IGNITION",
+    "timestamp": "2026-08-31T10:04:21.460938+00:00",
+    "epoch": 1,
+    "scientific_eligible": true,
+    "dataset_class": "REAL_MARKET",
+    "params": {
+      "tp": 2.0,
+      "sl": 1.5,
+      "horizon": 24
+    },
+    "observed_sharpe": 1.85,
+    "observed_return_bps": 22.5
+  },
+  {
+    "trial_id": 13,
+    "trial_hash": "8478f66327374931",
+    "strategy_name": "MEIE-IGNITION",
+    "timestamp": "2026-08-31T10:07:24.406704+00:00",
+    "epoch": 1,
+    "scientific_eligible": true,
+    "dataset_class": "REAL_MARKET",
+    "params": {
+      "tp": 2.0,
+      "sl": 1.5,
+      "horizon": 24
+    },
+    "observed_sharpe": 1.85,
+    "observed_return_bps": 22.5
+  },
+  {
+    "trial_id": 14,
+    "trial_hash": "8478f66327374931",
+    "strategy_name": "MEIE-IGNITION",
+    "timestamp": "2026-08-31T10:07:54.905054+00:00",
+    "epoch": 1,
+    "scientific_eligible": true,
+    "dataset_class": "REAL_MARKET",
+    "params": {
+      "tp": 2.0,
+      "sl": 1.5,
+      "horizon": 24
+    },
+    "observed_sharpe": 1.85,
+    "observed_return_bps": 22.5
+  },
+  {
+    "trial_id": 15,
+    "trial_hash": "8478f66327374931",
+    "strategy_name": "MEIE-IGNITION",
+    "timestamp": "2026-08-31T10:10:07.487089+00:00",
+    "epoch": 1,
+    "scientific_eligible": true,
+    "dataset_class": "REAL_MARKET",
+    "params": {
+      "tp": 2.0,
+      "sl": 1.5,
+      "horizon": 24
+    },
+    "observed_sharpe": 1.85,
+    "observed_return_bps": 22.5
+  },
+  {
+    "trial_id": 16,
+    "trial_hash": "8478f66327374931",
+    "strategy_name": "MEIE-IGNITION",
+    "timestamp": "2026-08-31T10:10:35.499935+00:00",
+    "epoch": 1,
+    "scientific_eligible": true,
+    "dataset_class": "REAL_MARKET",
+    "params": {
+      "tp": 2.0,
+      "sl": 1.5,
+      "horizon": 24
+    },
+    "observed_sharpe": 1.85,
+    "observed_return_bps": 22.5
+  },
+  {
+    "trial_id": 17,
+    "trial_hash": "8478f66327374931",
+    "strategy_name": "MEIE-IGNITION",
+    "timestamp": "2026-08-31T10:11:09.558288+00:00",
+    "epoch": 1,
+    "scientific_eligible": true,
+    "dataset_class": "REAL_MARKET",
+    "params": {
+      "tp": 2.0,
+      "sl": 1.5,
+      "horizon": 24
+    },
+    "observed_sharpe": 1.85,
+    "observed_return_bps": 22.5
+  },
+  {
+    "trial_id": 18,
+    "trial_hash": "8478f66327374931",
+    "strategy_name": "MEIE-IGNITION",
+    "timestamp": "2026-08-31T10:30:11.496725+00:00",
+    "epoch": 1,
+    "scientific_eligible": true,
+    "dataset_class": "REAL_MARKET",
+    "params": {
+      "tp": 2.0,
+      "sl": 1.5,
+      "horizon": 24
+    },
+    "observed_sharpe": 1.85,
+    "observed_return_bps": 22.5
+  },
+  {
+    "trial_id": 19,
+    "trial_hash": "8478f66327374931",
+    "strategy_name": "MEIE-IGNITION",
+    "timestamp": "2026-08-31T10:34:55.288466+00:00",
+    "epoch": 1,
+    "scientific_eligible": true,
+    "dataset_class": "REAL_MARKET",
+    "params": {
+      "tp": 2.0,
+      "sl": 1.5,
+      "horizon": 24
+    },
+    "observed_sharpe": 1.85,
+    "observed_return_bps": 22.5
+  },
+  {
+    "trial_id": 20,
+    "trial_hash": "8478f66327374931",
+    "strategy_name": "MEIE-IGNITION",
+    "timestamp": "2026-08-31T10:51:27.486552+00:00",
+    "epoch": 1,
+    "scientific_eligible": true,
+    "dataset_class": "REAL_MARKET",
+    "params": {
+      "tp": 2.0,
+      "sl": 1.5,
+      "horizon": 24
+    },
+    "observed_sharpe": 1.85,
+    "observed_return_bps": 22.5
+  },
+  {
+    "trial_id": 21,
+    "trial_hash": "8478f66327374931",
+    "strategy_name": "MEIE-IGNITION",
+    "timestamp": "2026-08-31T10:51:57.331812+00:00",
+    "epoch": 1,
+    "scientific_eligible": true,
+    "dataset_class": "REAL_MARKET",
+    "params": {
+      "tp": 2.0,
+      "sl": 1.5,
+      "horizon": 24
+    },
+    "observed_sharpe": 1.85,
+    "observed_return_bps": 22.5
+  },
+  {
+    "trial_id": 22,
+    "trial_hash": "8478f66327374931",
+    "strategy_name": "MEIE-IGNITION",
+    "timestamp": "2026-08-31T10:52:11.275897+00:00",
+    "epoch": 1,
+    "scientific_eligible": true,
+    "dataset_class": "REAL_MARKET",
+    "params": {
+      "tp": 2.0,
+      "sl": 1.5,
+      "horizon": 24
+    },
+    "observed_sharpe": 1.85,
+    "observed_return_bps": 22.5
+  },
+  {
+    "trial_id": 23,
+    "trial_hash": "8478f66327374931",
+    "strategy_name": "MEIE-IGNITION",
+    "timestamp": "2026-09-01T04:06:42.984299+00:00",
+    "epoch": 1,
+    "scientific_eligible": true,
+    "dataset_class": "REAL_MARKET",
+    "params": {
+      "tp": 2.0,
+      "sl": 1.5,
+      "horizon": 24
+    },
+    "observed_sharpe": 1.85,
+    "observed_return_bps": 22.5
+  },
+  {
+    "trial_id": 24,
+    "trial_hash": "8478f66327374931",
+    "strategy_name": "MEIE-IGNITION",
+    "timestamp": "2026-09-01T04:14:45.240745+00:00",
+    "epoch": 1,
+    "scientific_eligible": true,
+    "dataset_class": "REAL_MARKET",
+    "params": {
+      "tp": 2.0,
+      "sl": 1.5,
+      "horizon": 24
+    },
+    "observed_sharpe": 1.85,
+    "observed_return_bps": 22.5
+  },
+  {
+    "trial_id": 25,
+    "trial_hash": "8478f66327374931",
+    "strategy_name": "MEIE-IGNITION",
+    "timestamp": "2026-09-02T08:58:06.746068+00:00",
+    "epoch": 1,
+    "scientific_eligible": true,
+    "dataset_class": "REAL_MARKET",
+    "params": {
+      "tp": 2.0,
+      "sl": 1.5,
+      "horizon": 24
+    },
+    "observed_sharpe": 1.85,
+    "observed_return_bps": 22.5
+  },
+  {
+    "trial_id": 26,
+    "trial_hash": "8478f66327374931",
+    "strategy_name": "MEIE-IGNITION",
+    "timestamp": "2026-09-03T08:47:40.369558+00:00",
+    "epoch": 1,
+    "scientific_eligible": true,
+    "dataset_class": "REAL_MARKET",
+    "params": {
+      "tp": 2.0,
+      "sl": 1.5,
+      "horizon": 24
+    },
+    "observed_sharpe": 1.85,
+    "observed_return_bps": 22.5
+  }
+]

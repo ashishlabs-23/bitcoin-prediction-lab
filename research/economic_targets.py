@@ -1,4 +1,4 @@
-"""
+r"""
 research/economic_targets.py — Multi-Task & Cost-Aware Economic Targets Engine
 ==============================================================================
 Formulates and evaluates:

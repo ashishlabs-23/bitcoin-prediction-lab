@@ -11,12 +11,12 @@ The perceived discrepancy between the **99.2% joint path containment** and the *
 
 | Coverage Metric | Mathematical Formulation | Empirical Value % | Nominal Target % |
 | --- | --- | --- | --- |
-| 1. Future High Containment | realized_high <= upper_P90 | 99.28% | 90.0% |
-| 2. Future Low Containment | realized_low >= lower_P90 | 100.00% | 90.0% |
-| 3. MFE P90 Coverage | actual_mfe <= pred_mfe_P90 | 99.28% | 90.0% |
-| 4. MAE P90 Coverage | actual_mae <= pred_mae_P90 | 100.00% | 90.0% |
-| 5. Joint Full-Path Containment | high_contained AND low_contained | 99.28% | 78.87% |
-| 6. Endpoint Containment (24h Close) | lower_P90 <= realized_close <= upper_P90 | 100.00% | 95.0% |
+| 1. Future High Containment | realized_high <= upper_P90 | 65.58% | 90.0% |
+| 2. Future Low Containment | realized_low >= lower_P90 | 91.30% | 90.0% |
+| 3. MFE P90 Coverage | actual_mfe <= pred_mfe_P90 | 65.58% | 90.0% |
+| 4. MAE P90 Coverage | actual_mae <= pred_mae_P90 | 91.30% | 90.0% |
+| 5. Joint Full-Path Containment | high_contained AND low_contained | 56.88% | 78.87% |
+| 6. Endpoint Containment (24h Close) | lower_P90 <= realized_close <= upper_P90 | 81.52% | 95.0% |
 
 ## 3. Data Lineage Summary
 

@@ -214,9 +214,9 @@ class HistoricalAnalogEngine:
         self,
         query_timestamp: Optional[str] = None,
         max_k: int = 20,
-        min_similarity: float = 0.70,
+        min_similarity: float = 0.35,
         embargo_hours: int = 48,
-        min_separation_days: float = 7.0,
+        min_separation_days: float = 14.0,
         current_p10_p90_band: Optional[Tuple[float, float]] = (-0.05, 0.05)
     ) -> Dict[str, Any]:
         """

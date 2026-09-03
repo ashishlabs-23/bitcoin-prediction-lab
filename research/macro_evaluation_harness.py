@@ -34,16 +34,30 @@ MANIFEST_PATH = os.path.join(RESULTS_DIR, "baseline_neff_manifest.json")
 SCORECARD_PATH = os.path.join(RESULTS_DIR, "macro_evaluation_scorecard.json")
 
 
-def compute_newey_west_neff(residuals: np.ndarray, max_lag: Optional[int] = None) -> float:
+def compute_canonical_newey_west_neff(
+    residuals: np.ndarray,
+    max_lag: Optional[int] = None
+) -> Tuple[float, Dict[str, Any]]:
     """
-    Computes Newey-West / Bartlett autocorrelation-adjusted effective sample size.
+    Authoritative canonical Newey-West / Bartlett effective sample size estimator with metadata.
     N_eff = N / [ 1 + 2 * sum_{k=1}^L (1 - k/(L+1)) * rho_k ]
+    
+    Returns:
+        (neff: float, metadata: Dict[str, Any])
     """
     N = len(residuals)
     if N <= 5:
-        return float(N)
+        neff = float(N)
+        return neff, {
+            "n_eff": neff,
+            "n_eff_estimator": "NEWEY_WEST_BARTLETT_CANONICAL",
+            "autocorrelation_method": "SAMPLE_AUTOCORRELATION_BARTLETT_KERNEL",
+            "bandwidth": 1,
+            "raw_N": N,
+            "independent_block_N": int(N)
+        }
 
-    # Optimal automatic bandwidth
+    # Optimal automatic bandwidth: L = floor(4 * (N / 100)^(2/9))
     L = max_lag or int(np.floor(4.0 * (N / 100.0) ** (2.0 / 9.0)))
     L = max(1, min(L, N // 4))
 
@@ -51,7 +65,15 @@ def compute_newey_west_neff(residuals: np.ndarray, max_lag: Optional[int] = None
     e = residuals - np.mean(residuals)
     var_0 = np.mean(e ** 2)
     if var_0 <= 1e-12:
-        return float(N)
+        neff = float(N)
+        return neff, {
+            "n_eff": neff,
+            "n_eff_estimator": "NEWEY_WEST_BARTLETT_CANONICAL",
+            "autocorrelation_method": "SAMPLE_AUTOCORRELATION_BARTLETT_KERNEL",
+            "bandwidth": L,
+            "raw_N": N,
+            "independent_block_N": int(N)
+        }
 
     rho_sum = 0.0
     for k in range(1, L + 1):
@@ -61,7 +83,24 @@ def compute_newey_west_neff(residuals: np.ndarray, max_lag: Optional[int] = None
         rho_sum += bartlett_w * rho_k
 
     inflation_factor = max(1.0, 1.0 + 2.0 * rho_sum)
-    return float(N / inflation_factor)
+    neff = float(N / inflation_factor)
+    return neff, {
+        "n_eff": round(neff, 2),
+        "n_eff_estimator": "NEWEY_WEST_BARTLETT_CANONICAL",
+        "autocorrelation_method": "SAMPLE_AUTOCORRELATION_BARTLETT_KERNEL",
+        "bandwidth": L,
+        "raw_N": N,
+        "independent_block_N": int(round(neff))
+    }
+
+
+def compute_newey_west_neff(residuals: np.ndarray, max_lag: Optional[int] = None) -> float:
+    """
+    Computes Newey-West / Bartlett autocorrelation-adjusted effective sample size.
+    N_eff = N / [ 1 + 2 * sum_{k=1}^L (1 - k/(L+1)) * rho_k ]
+    """
+    neff, _ = compute_canonical_newey_west_neff(residuals, max_lag=max_lag)
+    return neff
 
 
 def freeze_baseline_neff(n_bootstraps: int = 1000, force_recompute: bool = False) -> Dict[str, Any]:

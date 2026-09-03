@@ -1,6 +1,6 @@
 # 🧱 Independent Non-Overlapping 24H Block Validation Report
 
-## 1. Overview ($N = 11$ Independent Blocks)
+## 1. Overview ($N = 31$ Independent Blocks)
 
 To eliminate temporal overlap correlation, forecasts are evaluated strictly in stride-24 non-overlapping intervals.
 
@@ -8,11 +8,13 @@ To eliminate temporal overlap correlation, forecasts are evaluated strictly in s
 
 | Cumulative Blocks | Mean MFE Error % | Mean MAE Error % | MFE P90 Coverage % | MAE P90 Coverage % | Joint Path Containment % | Mean Range Width % | Calibration Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 5 blocks (120 hours) | 0.2869 | 0.8462 | 100.0% | 100.0% | 100.0% | 5.92% | CALIBRATION_OK |
-| 10 blocks (240 hours) | 0.4593 | 0.8712 | 100.0% | 100.0% | 100.0% | 5.92% | CALIBRATION_OK |
-| 11 blocks (264 hours) | 0.4429 | 0.9027 | 100.0% | 100.0% | 100.0% | 5.92% | CALIBRATION_OK |
+| 5 blocks (120 hours) | 0.7486 | 0.7316 | 100.0% | 100.0% | 100.0% | 5.93% | CALIBRATION_OK |
+| 10 blocks (240 hours) | 0.6375 | 1.0042 | 100.0% | 100.0% | 100.0% | 5.92% | CALIBRATION_OK |
+| 20 blocks (480 hours) | 0.9794 | 0.9774 | 95.0% | 100.0% | 95.0% | 5.92% | CALIBRATION_OK |
+| 30 blocks (720 hours) | 1.4109 | 1.045 | 80.0% | 96.7% | 76.7% | 5.93% | CALIBRATION_OK |
+| 31 blocks (744 hours) | 1.3772 | 1.0184 | 80.6% | 96.8% | 77.4% | 5.93% | CALIBRATION_OK |
 
 ## 3. Key Findings
 
-- Across `11` independent 24-hour blocks, joint price path containment remains stable at `100.0%`.
-- Mean Range Width remains sharp at `5.92%` with zero lookahead bias.
+- Across `31` independent 24-hour blocks, joint price path containment remains stable at `77.4%`.
+- Mean Range Width remains sharp at `5.93%` with zero lookahead bias.

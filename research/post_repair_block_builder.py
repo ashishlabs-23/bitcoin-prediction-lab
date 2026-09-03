@@ -70,7 +70,7 @@ def build_post_repair_blocks() -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
 
     if post_repair_records:
         df_pr = pd.DataFrame(post_repair_records)
-        df_pr["dt"] = pd.to_datetime(df_pr["timestamp"], utc=True)
+        df_pr["dt"] = pd.to_datetime(df_pr["timestamp"], utc=True, format="mixed")
         df_pr = df_pr.sort_values("dt").reset_index(drop=True)
 
         curr_block_start = start_dt

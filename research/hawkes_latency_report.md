@@ -4,10 +4,10 @@
 
 | Pipeline Stage | Latency (per event) | Budget | Status |
 | --- | --- | --- | --- |
-| 1. Event-to-Feature Extraction | 0.016 ms | < 5.000 ms | PASS |
-| 2. Hawkes Intensity Kernel Scan | 0.107 ms | < 2.000 ms | PASS |
-| 3. Quantile Neural Inference | 1.039 ms | < 2.000 ms | PASS |
-| 4. Total Pipeline Latency | 1.162 ms | < 10.000 ms | PASS |
+| 1. Event-to-Feature Extraction | 0.003 ms | < 5.000 ms | PASS |
+| 2. Hawkes Intensity Kernel Scan | 0.019 ms | < 2.000 ms | PASS |
+| 3. Quantile Neural Inference | 0.165 ms | < 2.000 ms | PASS |
+| 4. Total Pipeline Latency | 0.187 ms | < 10.000 ms | PASS |
 | 5. Stale Order Book Tolerance | 1500 ms max | > 500 ms | PASS |
 
 ## 2. Latency Invariants

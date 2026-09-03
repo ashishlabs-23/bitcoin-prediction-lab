@@ -430,7 +430,7 @@ def run_full_vol_edge_trial():
         json.dump(manifest_payload, f, indent=2)
 
     # Write Markdown Report
-    report_content = f"""# Scientific Report: VOL-EDGE-01 Incremental Volatility Information Trial
+    report_content = rf"""# Scientific Report: VOL-EDGE-01 Incremental Volatility Information Trial
 **Protocol**: Locked Multi-Regime Purged Walk-Forward Evaluation (Purge: 168h, Embargo: 168h)  
 **Pre-Registration Source**: [`results/vol_edge_01_preregistration.md`](file:///c:/Projects/BTCognitive/bitcoin-prediction-lab/results/vol_edge_01_preregistration.md)  
 **Execution Timestamp**: {datetime.now(timezone.utc).isoformat()}  

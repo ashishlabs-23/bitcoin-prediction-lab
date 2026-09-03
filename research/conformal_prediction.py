@@ -1,4 +1,4 @@
-"""
+r"""
 research/conformal_prediction.py — Time-Series Conformal Uncertainty & Prediction Intervals
 ============================================================================================
 Implements distribution-free, non-IID rolling block conformal prediction intervals:
