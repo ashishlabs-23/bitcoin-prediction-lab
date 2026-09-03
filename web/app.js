@@ -2252,7 +2252,7 @@ function Navbar({ currentPath, setPath, engineState = "offline", alerts = [], on
         onClick: () => setMobileOpen(!mobileOpen),
         "aria-label": "Toggle Menu"
       }, mobileOpen ? "✕" : "☰"),
-      h("a", { href: "#/", onClick: () => { setPath("/"); setMobileOpen(false); }, className: "logo" },
+      h("a", { href: "#/landing", onClick: () => { setPath("/landing"); setMobileOpen(false); }, className: "logo" },
         h("div", { className: "logo-icon" }, "B"),
         h("span", { className: "logo-text" }, "BTCognitive")
       )
@@ -2261,8 +2261,19 @@ function Navbar({ currentPath, setPath, engineState = "offline", alerts = [], on
     /* ── Center: Navigation tabs ─────────────────── */
     h("ul", { className: `nav-links ${mobileOpen ? "mobile-active" : ""}` },
       h("li", null, h("a", {
+        href: "#/landing",
+        className: `nav-link-pill ${(currentPath === "/landing" || currentPath === "/" || !currentPath) ? "active" : ""}`,
+        onClick: () => { setPath("/landing"); setMobileOpen(false); }
+      },
+        h("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" },
+          h("path", { d: "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" }),
+          h("polyline", { points: "9 22 9 12 15 12 15 22" })
+        ),
+        "Overview"
+      )),
+      h("li", null, h("a", {
         href: "#/terminal",
-        className: `nav-link-pill ${(currentPath === "/terminal" || currentPath === "/") ? "active" : ""}`,
+        className: `nav-link-pill ${currentPath === "/terminal" ? "active" : ""}`,
         onClick: () => { setPath("/terminal"); setMobileOpen(false); }
       },
         h("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" },
@@ -2280,17 +2291,6 @@ function Navbar({ currentPath, setPath, engineState = "offline", alerts = [], on
           h("path", { d: "M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" })
         ),
         "AI Experiment Arena"
-      )),
-      h("li", null, h("a", {
-        href: "#/landing",
-        className: `nav-link-pill ${currentPath === "/landing" ? "active" : ""}`,
-        onClick: () => { setPath("/landing"); setMobileOpen(false); }
-      },
-        h("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" },
-          h("path", { d: "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" }),
-          h("polyline", { points: "9 22 9 12 15 12 15 22" })
-        ),
-        "Overview"
       ))
     ),
 
@@ -7631,7 +7631,7 @@ Failure Mode Class:  ${t.failure_class || "NO_CLASS"}
 // App — main router + state management
 // ===========================================================================
 function App() {
-  const [path,            setPath]            = useState(window.location.hash ? window.location.hash.replace("#", "") : "/terminal");
+  const [path,            setPath]            = useState(window.location.hash ? window.location.hash.replace("#", "") : "/landing");
   const [engineConnected, setEngineConnected] = useState(false);
   const [binanceWsStatus, setBinanceWsStatus] = useState("disconnected");
   const [activeInterval,  setActiveInterval]  = useState("1h");
@@ -7936,7 +7936,7 @@ function App() {
       }
     }),
 
-    path === "/landing" ? (
+    (path === "/landing" || path === "/" || !path) ? (
       h("div", null,
         h(HeroSection, { setPath: navigate, livePrice, changePct, predictionData, regimeData, qualityData, decisionData })
       )
