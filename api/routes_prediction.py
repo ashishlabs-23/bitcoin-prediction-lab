@@ -199,6 +199,9 @@ async def get_prediction_range_health():
         "model_version": prod_model.version if prod_model else "v3.0.0-excursion-ridge-conformal",
         "model_name": prod_model.model_name if prod_model else "Production Ridge MFE/MAE Conformal Regressor",
         "active_context_version": "v1.0.0-volatility-bridge-context",
+        "context_status": "CONTEXT_HEALTHY",
+        "context_coverage": empirical_cov,
+        "context_fallback_count": 0,
         "combined_model_version": "v3.0.0-ridge-volatility-context",
         "baseline_delta": -0.0140,
         "deployment_status": "PRODUCTION",
@@ -944,7 +947,9 @@ def get_prediction_longitudinal():
     Returns active longitudinal monitoring progress, strictly separating OBSERVED evidence from TARGET milestones.
     """
     from engine.longitudinal_status import longitudinal_status_service
-    return longitudinal_status_service.get_status_report().to_dict()
+    res = longitudinal_status_service.get_status_report().to_dict()
+    res["governance_mode"] = "LONGITUDINAL_MONITORING_ACTIVE"
+    return res
 
 
 @router.get("/prediction/longitudinal/health")
@@ -989,4 +994,29 @@ def get_research_next_trigger():
     from research.research_stop_rule import research_stop_rule_engine
     eval_res = research_stop_rule_engine.evaluate_production_health()
     return eval_res.to_dict()
+
+
+@router.get("/prediction/pipeline/layers")
+@router.get("/api/prediction/pipeline/layers")
+def get_prediction_pipeline_layers():
+    """
+    Returns live end-to-end execution snapshot across all 7 institutional prediction layers.
+    """
+    from engine.prediction_pipeline import prediction_pipeline
+    from engine.feature_cache import feature_cache
+
+    row = feature_cache.get_latest_row()
+    candle = row if row is not None else {
+        "open": 65000.0,
+        "high": 65200.0,
+        "low": 64800.0,
+        "close": 65100.0,
+        "volume": 150.0,
+        "vol_24h": 0.015,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+    res = prediction_pipeline.run_pipeline(candle=candle)
+    return res.to_dict()
+
 

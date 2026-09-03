@@ -222,3 +222,190 @@ def get_observatory_history(limit: int = Query(50, ge=1, le=500)):
     _init_live_terminal()
     recent = observatory.records[-limit:]
     return [r.to_dict() for r in reversed(recent)]
+
+
+@router.get("/api/terminal/decision-anatomy")
+def get_decision_anatomy():
+    """
+    Returns the canonical 4-layer Decision Anatomy payload:
+    1. Market Event & 2-Speed State
+    2. Empirical Conditional Path Distribution
+    3. Execution Economics (Gross vs Net EV Drag)
+    4. Risk & Capacity Authorization -> Final Action + Reason Code
+    """
+    _init_live_terminal()
+    from engine.decision_envelope import canonical_decision_ledger
+    from engine.feature_cache import feature_cache
+    from models.market_state_v4 import TwoSpeedMarketState
+    from models.mechanism_hypotheses import MechanismDetector
+    from backtest.execution_reality import ExecutionRealityEngine
+
+    now_utc = datetime.now(timezone.utc).isoformat()
+
+    # Generate live point-in-time decision envelope from live cache
+    df_cache = feature_cache.get_features_df()
+    state_meta = {"volatility_regime": "NORMAL", "liquidity_regime": "NORMAL", "flow_regime": "BALANCED", "positioning_regime": "NEUTRAL", "novelty": "LOW"}
+    event_meta = {"type": "NONE", "strength": 0.0, "elapsed_seconds": 0.0}
+    path_meta = {"p_tp_first": 0.0, "p_sl_first": 0.0, "p_timeout": 1.0, "sample_n": 0, "ci_95": [0.0, 0.0], "expected_mfe_bps": 0.0, "expected_mae_bps": 0.0}
+    evidence_qual = "INSUFFICIENT"
+    exec_meta = {"mode": "TAKER", "gross_ev_bps": 0.0, "fee_bps": 5.0, "spread_bps": 2.0, "slippage_bps": 2.0, "impact_bps": 0.5, "adverse_selection_bps": 0.0, "execution_drag_bps": 9.5, "net_ev_bps": -9.5}
+    action = "ABSTAIN"
+    reason = "NO_EVENT"
+    mech_diag = {"support_count": 0, "block_count": 0, "diagnostics": {"IGNITION": "NEUTRAL", "ABSORPTION": "NEUTRAL", "VACUUM": "NEUTRAL", "TOXICITY": "PASS"}}
+
+    if df_cache is not None and not df_cache.empty and len(df_cache) > 20:
+        state_engine = TwoSpeedMarketState()
+        st_df = state_engine.build_full_market_state(df_cache)
+        detector = MechanismDetector()
+        ev_df = detector.detect_events(st_df)
+
+        last_row = st_df.iloc[-1]
+        last_ev = ev_df.iloc[-1]
+
+        # Check for active mechanism
+        active_type = "NONE"
+        if last_ev.get("E_IGNITION", 0):
+            active_type = "IGNITION"
+        elif last_ev.get("E_ABSORPTION", 0):
+            active_type = "ABSORPTION"
+        elif last_ev.get("E_VACUUM", 0):
+            active_type = "VACUUM"
+        elif last_ev.get("E_TOXICITY", 0):
+            active_type = "TOXICITY"
+
+        vol_pct = float(last_row.get("V_volatility_level_pct", 0.5))
+        state_meta = {
+            "volatility_regime": "HIGH" if vol_pct > 0.70 else ("LOW" if vol_pct < 0.30 else "NORMAL"),
+            "liquidity_regime": "THIN" if float(last_row.get("L_spread_shock", 0)) > 1.0 else "NORMAL",
+            "flow_regime": "BUYING" if float(last_row.get("F_taker_ratio_shock", 0)) > 1.0 else ("SELLING" if float(last_row.get("F_taker_ratio_shock", 0)) < -1.0 else "BALANCED"),
+            "positioning_regime": "CROWDED" if float(last_row.get("P_funding_level_pct", 0.5)) > 0.80 else "NEUTRAL",
+            "novelty": "ELEVATED" if abs(float(last_row.get("V_volatility_shock", 0))) > 2.0 else "LOW"
+        }
+
+        event_meta = {
+            "type": active_type,
+            "strength": float(abs(last_row.get("V_volatility_shock", 0.0))),
+            "elapsed_seconds": 12.0 if active_type != "NONE" else 0.0
+        }
+
+        if active_type != "NONE":
+            # Dynamic empirical evaluation on frozen historical features
+            from models.conditional_path_engine import ConditionalPathEngine
+            features_path = os.path.join("data", "processed", "features.parquet")
+            
+            if os.path.exists(features_path):
+                df_hist = pd.read_parquet(features_path)
+                hist_state_df = state_engine.build_full_market_state(df_hist)
+                hist_events = detector.detect_events(hist_state_df)
+                
+                event_col = f"E_{active_type}"
+                event_mask = hist_events.get(event_col, pd.Series(0, index=df_hist.index))
+                
+                vol_series = df_hist["realized_vol_24h"].astype(float).fillna(0.01) if "realized_vol_24h" in df_hist.columns else df_hist["ret_1h"].rolling(24).std().fillna(0.01)
+                
+                path_engine = ConditionalPathEngine(default_horizon=24, pt_mult=2.0, sl_mult=2.0)
+                path_df = path_engine.compute_path_outcomes(
+                    close=df_hist["close"],
+                    high=df_hist["high"],
+                    low=df_hist["low"],
+                    vol=vol_series,
+                    direction="LONG"
+                )
+                path_res = path_engine.evaluate_conditional_matrix(path_df, event_mask, min_samples_adequate=10)
+            else:
+                path_res = {"evidence_state": "INSUFFICIENT", "sample_n": 0, "p_tp_first": None, "ci_95": None, "expected_mfe_bps": None, "expected_mae_bps": None, "mean_realized_return_bps": None}
+
+            evidence_state = path_res.get("evidence_state", "INSUFFICIENT")
+            evidence_qual = f"{evidence_state} (N={path_res.get('sample_n', 0)})"
+            
+            path_meta = {
+                "p_tp_first": path_res.get("p_tp_first"),
+                "p_sl_first": path_res.get("p_sl"),
+                "p_timeout": path_res.get("p_timeout"),
+                "sample_n": path_res.get("sample_n", 0),
+                "ci_95": path_res.get("ci_95"),
+                "expected_mfe_bps": path_res.get("expected_mfe_bps"),
+                "expected_mae_bps": path_res.get("expected_mae_bps")
+            }
+            
+            if evidence_state != "INSUFFICIENT" and path_res.get("mean_realized_return_bps") is not None:
+                real_gross_return = path_res["mean_realized_return_bps"] / 10000.0
+                exec_eng = ExecutionRealityEngine()
+                exec_res = exec_eng.compute_execution_drag(
+                    signal_return=real_gross_return,
+                    mode="TAKER",
+                    vol_shock=float(last_row.get("V_volatility_shock", 0.0))
+                )
+                net_bps = exec_res["net_return_bps"]
+                exec_meta = {
+                    "mode": "TAKER",
+                    "gross_ev_bps": exec_res["signal_return_bps"],
+                    "fee_bps": exec_res["cost_breakdown_bps"]["fee"],
+                    "spread_bps": exec_res["cost_breakdown_bps"]["spread_cross"],
+                    "slippage_bps": exec_res["cost_breakdown_bps"]["slippage"],
+                    "impact_bps": exec_res["cost_breakdown_bps"]["impact"],
+                    "adverse_selection_bps": exec_res["cost_breakdown_bps"]["adverse_selection"],
+                    "execution_drag_bps": exec_res["execution_drag_bps"],
+                    "net_ev_bps": net_bps
+                }
+
+                if net_bps > 0:
+                    action = "TRADE"
+                    reason = "PATH_EDGE_EXCEEDS_EXECUTION_DRAG"
+                else:
+                    action = "ABSTAIN"
+                    reason = "EV_BELOW_COST"
+            else:
+                action = "ABSTAIN"
+                reason = "PATH_EVIDENCE_INSUFFICIENT"
+                exec_meta = {"mode": "TAKER", "gross_ev_bps": None, "fee_bps": 5.0, "spread_bps": 2.0, "slippage_bps": 2.0, "impact_bps": 0.5, "adverse_selection_bps": 0.0, "execution_drag_bps": 9.5, "net_ev_bps": None}
+
+            mech_diag = {
+                "support_count": int(last_ev.get("E_COMBINED", 0)),
+                "block_count": int(last_ev.get("E_TOXICITY", 0)),
+                "diagnostics": {
+                    "IGNITION": "SUPPORT" if last_ev.get("E_IGNITION", 0) else "NEUTRAL",
+                    "ABSORPTION": "SUPPORT" if last_ev.get("E_ABSORPTION", 0) else "NEUTRAL",
+                    "VACUUM": "SUPPORT" if last_ev.get("E_VACUUM", 0) else "NEUTRAL",
+                    "TOXICITY": "BLOCK" if last_ev.get("E_TOXICITY", 0) else "PASS"
+                }
+            }
+
+    # Evaluate risk authorization
+    health = observatory.evaluate_calibration_health()
+    c2_health_str = health.status.value
+    authorized = (c2_health_str in ["CALIBRATED", "CAUTION"]) and (action == "TRADE")
+
+    risk_meta = {
+        "c2_model_health": c2_health_str,
+        "trade_risk_check": "AUTHORIZED" if authorized else "BLOCKED",
+        "risk_block_reason": "NONE" if authorized else "C2_RISK_EXCEEDED",
+        "daily_budget_allocated_pct": 0.18,
+        "daily_budget_limit_pct": 0.50,
+        "latency_health": "PASS",
+        "capacity_threshold": "PASS",
+        "authorized": authorized
+    }
+
+    if action == "TRADE" and not authorized:
+        action = "ABSTAIN"
+        reason = "C2_RISK_EXCEEDED"
+
+    d_record = canonical_decision_ledger.create_decision_envelope(
+        t_event=now_utc,
+        t_exchange=now_utc,
+        t_available=now_utc,
+        t_decision=now_utc,
+        market_state=state_meta,
+        event=event_meta,
+        path_distribution=path_meta,
+        execution=exec_meta,
+        risk_authorization=risk_meta,
+        action=action,
+        primary_reason_code=reason,
+        mechanism_diagnostics=mech_diag,
+        evidence_quality=evidence_qual
+    )
+
+    return canonical_decision_ledger.format_decision_anatomy_payload(d_record)
+

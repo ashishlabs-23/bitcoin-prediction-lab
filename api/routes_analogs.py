@@ -18,8 +18,8 @@ router = APIRouter(prefix="/research", tags=["Research Analogs"])
 @router.get("/analogs")
 def get_historical_analogs(
     k: int = Query(20, ge=1, le=50, description="Maximum number of historical analogs to retrieve"),
-    min_similarity: float = Query(0.80, ge=0.0, le=1.0, description="Minimum similarity threshold (0.0 to 1.0)"),
-    min_separation_days: float = Query(7.0, ge=0.0, le=90.0, description="Minimum temporal separation in days between analogs"),
+    min_similarity: float = Query(0.35, ge=0.0, le=1.0, description="Minimum similarity threshold (0.0 to 1.0)"),
+    min_separation_days: float = Query(14.0, ge=0.0, le=90.0, description="Minimum temporal separation in days between analogs"),
     p10_pct: float = Query(-5.0, description="Current lower P10 band percentage for containment check"),
     p90_pct: float = Query(5.0, description="Current upper P90 band percentage for containment check")
 ):
