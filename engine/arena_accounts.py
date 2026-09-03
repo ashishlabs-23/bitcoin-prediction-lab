@@ -40,6 +40,8 @@ STRATEGY_NAMES = [
     "MEIE-ABSORPTION",
     "MEIE-VACUUM",
     "MEIE-TOXICITY",
+    "MEIE-FUNDING-SQUEEZE",
+    "MEIE-HAWKES-JUMP",
     "MEIE-COMBINED",
 ]
 
@@ -140,10 +142,22 @@ def _init_account_tables():
             "selected_archetype TEXT",
             "selection_reason TEXT",
             "allocation_weight REAL",
-            "component_scores TEXT"
+            "component_scores TEXT",
+            "decision_id TEXT",
+            "opportunity_id TEXT",
+            "contract_hash TEXT",
+            "provenance_hash TEXT"
         ]:
             try:
                 conn.execute(f"ALTER TABLE meie_strategy_trades ADD COLUMN {col_def};")
+            except Exception:
+                pass
+            try:
+                conn.execute(f"ALTER TABLE meie_open_positions ADD COLUMN {col_def};")
+            except Exception:
+                pass
+            try:
+                conn.execute(f"ALTER TABLE meie_abstentions ADD COLUMN {col_def};")
             except Exception:
                 pass
 
@@ -226,11 +240,19 @@ def _init_account_tables():
                 risk_budget_daily REAL,
                 c2_risk_state TEXT DEFAULT 'CALIBRATED',
                 data_state TEXT DEFAULT 'VALID',
-                market_regime TEXT
+                market_regime TEXT,
+                decision_id TEXT,
+                opportunity_id TEXT
             );
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_mab_sn ON meie_abstentions(strategy_name);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_mab_ts ON meie_abstentions(timestamp);")
+
+        for col_def in ["decision_id TEXT", "opportunity_id TEXT"]:
+            try:
+                conn.execute(f"ALTER TABLE meie_abstentions ADD COLUMN {col_def};")
+            except Exception:
+                pass
 
         # Seed accounts if not present
         now = datetime.now(timezone.utc).isoformat()
@@ -288,6 +310,15 @@ def get_open_position(strategy_name: str) -> Optional[Dict[str, Any]]:
         )
         row = cur.fetchone()
         return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def get_all_open_positions() -> List[Dict[str, Any]]:
+    conn = _get_db()
+    try:
+        cur = conn.execute("SELECT * FROM meie_open_positions ORDER BY id DESC;")
+        return [dict(r) for r in cur.fetchall()]
     finally:
         conn.close()
 
@@ -352,6 +383,10 @@ def open_position(
     selection_reason: Optional[str] = None,
     allocation_weight: Optional[float] = None,
     component_scores: Optional[str] = None,
+    decision_id: Optional[str] = None,
+    opportunity_id: Optional[str] = None,
+    contract_hash: Optional[str] = None,
+    provenance_hash: Optional[str] = None,
 ) -> Optional[int]:
     """
     Opens a paper position for a strategy account with full trade contract specification
@@ -377,13 +412,15 @@ def open_position(
                  entry_price, tp_price, sl_price, position_size_usd, quantity,
                  target_rr, max_hold_bars, opportunity_quality, c2_risk_state, data_state, impact_bps,
                  selected_archetype, selection_reason, allocation_weight, component_scores,
+                 decision_id, opportunity_id, contract_hash, provenance_hash,
                  z_hawkes, z_ofi, z_vpin, z_spread, market_regime)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """, (
                 strategy_name, acc["version"], acc["epoch_number"], now, event_type, direction,
                 entry_price, tp_price, sl_price, position_size_usd, quantity,
                 target_rr, max_hold_bars, opportunity_quality, c2_risk_state, data_state, impact_bps,
                 selected_archetype, selection_reason, allocation_weight, component_scores,
+                decision_id, opportunity_id, contract_hash, provenance_hash,
                 sv.get("z_hawkes"), sv.get("z_ofi"), sv.get("z_vpin"), sv.get("z_spread"),
                 market_regime
             ))
@@ -396,13 +433,15 @@ def open_position(
                  tp_price, sl_price, position_size_usd, quantity, bars_held,
                  target_rr, max_hold_bars, opportunity_quality, c2_risk_state, data_state,
                  selected_archetype, selection_reason, allocation_weight, component_scores,
+                 decision_id, opportunity_id, contract_hash, provenance_hash,
                  z_hawkes, z_ofi, z_vpin, z_spread, market_regime, trade_record_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """, (
                 strategy_name, acc["version"], now, event_type, direction, entry_price,
                 tp_price, sl_price, position_size_usd, quantity,
                 target_rr, max_hold_bars, opportunity_quality, c2_risk_state, data_state,
                 selected_archetype, selection_reason, allocation_weight, component_scores,
+                decision_id, opportunity_id, contract_hash, provenance_hash,
                 sv.get("z_hawkes"), sv.get("z_ofi"), sv.get("z_vpin"), sv.get("z_spread"),
                 market_regime, trade_id
             ))
@@ -429,6 +468,8 @@ def record_abstention(
     c2_risk_state: str = "CALIBRATED",
     data_state: str = "VALID",
     market_regime: str = "Unknown",
+    decision_id: Optional[str] = None,
+    opportunity_id: Optional[str] = None,
 ) -> None:
     """
     Records an observed ABSTAIN decision into the immutable ledger.
@@ -442,12 +483,14 @@ def record_abstention(
                 INSERT INTO meie_abstentions
                 (strategy_name, timestamp, event_type, direction, candidate_entry, candidate_tp,
                  candidate_sl, opportunity_quality, expected_ev_bps, blocker_reason,
-                 risk_budget_spent, risk_budget_daily, c2_risk_state, data_state, market_regime)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                 risk_budget_spent, risk_budget_daily, c2_risk_state, data_state, market_regime,
+                 decision_id, opportunity_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """, (
                 strategy_name, now, event_type, direction, candidate_entry, candidate_tp,
                 candidate_sl, opportunity_quality, expected_ev_bps, blocker_reason,
-                risk_budget_spent, risk_budget_daily, c2_risk_state, data_state, market_regime
+                risk_budget_spent, risk_budget_daily, c2_risk_state, data_state, market_regime,
+                decision_id, opportunity_id
             ))
     except Exception as e:
         logger.error(f"record_abstention [{strategy_name}]: {e}")
@@ -491,8 +534,8 @@ def evaluate_candle(
 
     high_p  = float(candle.get("high", candle.get("close", 0)))
     low_p   = float(candle.get("low", candle.get("close", 0)))
-    close_p = float(candle.get("close", 0))
-    now     = candle.get("timestamp", datetime.now(timezone.utc).isoformat())
+    now_raw = candle.get("timestamp", datetime.now(timezone.utc).isoformat())
+    now     = now_raw.isoformat() if hasattr(now_raw, "isoformat") else str(now_raw)
 
     bars_held = pos.get("bars_held", 0) + 1
     max_hold  = int(pos.get("max_hold_bars") or MAX_HOLD_BARS)

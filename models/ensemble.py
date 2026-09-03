@@ -21,18 +21,59 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 
 class AdaptiveRegimeEnsemble:
-    """Regime-aware adaptive ensemble classifier."""
+    """Regime-aware adaptive ensemble classifier with dynamic performance weighting."""
 
-    def __init__(self):
+    def __init__(self, dynamic_weighting: bool = True):
         self.rf = RandomForestClassifier(n_estimators=300, random_state=42, n_jobs=-1)
         self.xgb = XGBClassifier(n_estimators=100, eval_metric='logloss', random_state=42, n_jobs=-1)
         self.logreg = make_pipeline(StandardScaler(), LogisticRegression(max_iter=200))
+        self.dynamic_weighting = dynamic_weighting
+        self.weights_trending = {"rf": 0.60, "xgb": 0.40}
+        self.weights_default = {"rf": 0.40, "xgb": 0.30, "lr": 0.30}
 
     def fit(self, X: pd.DataFrame, y: pd.Series):
         X_clean = X.fillna(0.0)
         self.rf.fit(X_clean, y)
         self.xgb.fit(X_clean, y)
         self.logreg.fit(X_clean, y)
+
+        if self.dynamic_weighting and len(X_clean) >= 50:
+            try:
+                # Dynamically weight models based on out-of-fold calibration performance
+                from sklearn.metrics import log_loss
+                from sklearn.model_selection import KFold
+
+                kf = KFold(n_splits=3, shuffle=False)
+                losses = {"rf": [], "xgb": [], "lr": []}
+
+                for train_idx, val_idx in kf.split(X_clean):
+                    X_tr, X_val = X_clean.iloc[train_idx], X_clean.iloc[val_idx]
+                    y_tr, y_val = y.iloc[train_idx], y.iloc[val_idx]
+
+                    rf_f = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1).fit(X_tr, y_tr)
+                    xgb_f = XGBClassifier(n_estimators=50, eval_metric='logloss', random_state=42, n_jobs=-1).fit(X_tr, y_tr)
+                    lr_f = make_pipeline(StandardScaler(), LogisticRegression(max_iter=200)).fit(X_tr, y_tr)
+
+                    p_rf = np.clip(rf_f.predict_proba(X_val)[:, 1], 1e-4, 1.0 - 1e-4)
+                    p_xgb = np.clip(xgb_f.predict_proba(X_val)[:, 1], 1e-4, 1.0 - 1e-4)
+                    p_lr = np.clip(lr_f.predict_proba(X_val)[:, 1], 1e-4, 1.0 - 1e-4)
+
+                    losses["rf"].append(log_loss(y_val, p_rf))
+                    losses["xgb"].append(log_loss(y_val, p_xgb))
+                    losses["lr"].append(log_loss(y_val, p_lr))
+
+                # Inverse loss weighting
+                inv_losses_3 = np.array([1.0 / np.mean(losses["rf"]), 1.0 / np.mean(losses["xgb"]), 1.0 / np.mean(losses["lr"])])
+                w3 = inv_losses_3 / np.sum(inv_losses_3)
+                self.weights_default = {"rf": float(w3[0]), "xgb": float(w3[1]), "lr": float(w3[2])}
+
+                inv_losses_2 = np.array([1.0 / np.mean(losses["rf"]), 1.0 / np.mean(losses["xgb"])])
+                w2 = inv_losses_2 / np.sum(inv_losses_2)
+                self.weights_trending = {"rf": float(w2[0]), "xgb": float(w2[1])}
+            except Exception:
+                # Keep robust default heuristics if dynamic fitting encounters any data issue
+                pass
+
         return self
 
     def predict_proba_regime(self, X: pd.DataFrame, regime: str) -> np.ndarray:
@@ -41,20 +82,21 @@ class AdaptiveRegimeEnsemble:
         """
         X_clean = X.fillna(0.0)
 
-        if regime in ['RANGING', 'HIGH_VOLATILITY']:
-            # Noisy regimes: return neutral 0.5 to trigger SKIP signal, no models needed
-            return np.full(len(X_clean), 0.5)
-
         p_rf = self.rf.predict_proba(X_clean)[:, 1]
         p_xgb = self.xgb.predict_proba(X_clean)[:, 1]
+        p_lr = self.logreg.predict_proba(X_clean)[:, 1]
 
         if regime in ['TRENDING_BULL', 'BREAKOUT']:
-            # High-confidence regimes: 60% RF + 40% XGBoost
-            return 0.6 * p_rf + 0.4 * p_xgb
+            # High-confidence regimes: dynamic weighted RF + XGBoost
+            w_rf = self.weights_trending.get("rf", 0.60)
+            w_xgb = self.weights_trending.get("xgb", 0.40)
+            return w_rf * p_rf + w_xgb * p_xgb
         else:
-            # Default ensemble: 40% RF + 30% XGBoost + 30% LogisticRegression
-            p_lr = self.logreg.predict_proba(X_clean)[:, 1]
-            return 0.4 * p_rf + 0.3 * p_xgb + 0.3 * p_lr
+            # Default / Ranging ensemble: dynamic weighted RF + XGBoost + LogisticRegression
+            w_rf = self.weights_default.get("rf", 0.40)
+            w_xgb = self.weights_default.get("xgb", 0.30)
+            w_lr = self.weights_default.get("lr", 0.30)
+            return w_rf * p_rf + w_xgb * p_xgb + w_lr * p_lr
 
     def predict_proba_soft_regimes(self, X: pd.DataFrame, regime_probs_df: pd.DataFrame) -> np.ndarray:
         """
@@ -66,7 +108,9 @@ class AdaptiveRegimeEnsemble:
         p_rf = self.rf.predict_proba(X_clean)[:, 1]
         p_xgb = self.xgb.predict_proba(X_clean)[:, 1]
 
-        p_directional = 0.6 * p_rf + 0.4 * p_xgb
+        w_rf = self.weights_trending.get("rf", 0.60)
+        w_xgb = self.weights_trending.get("xgb", 0.40)
+        p_directional = w_rf * p_rf + w_xgb * p_xgb
 
         p_bull = regime_probs_df.get('TRENDING_BULL', pd.Series(0.0, index=X.index)).values
         p_bear = regime_probs_df.get('TRENDING_BEAR', pd.Series(0.0, index=X.index)).values

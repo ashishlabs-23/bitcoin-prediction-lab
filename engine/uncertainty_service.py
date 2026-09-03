@@ -74,3 +74,8 @@ class UncertaintyService:
             coverage_confidence_pct=round(cal_cov, 2),
             explanation=expl
         )
+
+
+# Global Singleton Instance
+uncertainty_service = UncertaintyService()
+

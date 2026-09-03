@@ -225,7 +225,7 @@ def _compute_epoch_metrics(strategy_name: str, epoch_number: int) -> Dict[str, f
     losses = [abs(p) for p in pnl_series if p < 0]
 
     ev_mean = sum(pnl_series) / n
-    pf = sum(wins) / max(1e-8, sum(losses)) if losses else float("inf")
+    pf = (sum(wins) / max(1e-8, sum(losses))) if losses else 999.0
     wr = len(wins) / n
 
     # Rolling NAV to compute MDD

@@ -54,32 +54,18 @@ class DirectionOverlayService:
         """
         asym = exp_mfe / (exp_mae + 1e-6)
 
-        if uncertainty_level in ["LOW_CONFIDENCE", "HIGH_DISPERSION", "HIGH"]:
-            return DirectionOverlayResult(
-                state="HIGH_UNCERTAINTY_ABSTAIN",
-                raw_direction_prob=round(directional_prob, 4),
-                asymmetry_ratio=round(asym, 3),
-                confidence="LOW",
-                explanation="Elevated model uncertainty: widen defensive risk buffers and abstain from tight boundary assumptions.",
-                is_directional_trade_signal=False
-            )
-
-        if asym >= self.min_asymmetry_upside:
-            state = "UPWARD_VOLATILITY_SKEW"
-            conf = "HIGH"
-            expl = f"Upward excursion potential is wider than downside (asymmetry {asym:.2f}x). Recommended for upside target spacing, not directional entry."
-        elif asym <= self.max_asymmetry_downside:
-            state = "DOWNWARD_VOLATILITY_SKEW"
-            conf = "HIGH"
-            expl = f"Downside adverse excursion is wider than upside (asymmetry {asym:.2f}x). Recommended for widening stop-loss buffers."
-        elif 0.85 <= asym <= 1.15:
-            state = "SYMMETRIC_VOLATILITY"
-            conf = "HIGH"
-            expl = f"Balanced two-sided excursion risk (asymmetry {asym:.2f}x). Standard symmetric volatility envelope applies."
+        if directional_prob >= 0.65 and asym >= self.min_asymmetry_upside:
+            state = "BULLISH"
+            conf = "HIGH" if uncertainty_level == "NORMAL" else "MODERATE"
+            expl = f"Bullish excursion asymmetry ({asym:.2f}x) with elevated directional probability ({directional_prob*100:.1f}%). Secondary exploratory signal only."
+        elif directional_prob <= 0.35 and asym <= self.max_asymmetry_downside:
+            state = "BEARISH"
+            conf = "HIGH" if uncertainty_level == "NORMAL" else "MODERATE"
+            expl = f"Bearish adverse excursion ({asym:.2f}x) with downside directional probability ({directional_prob*100:.1f}%). Secondary exploratory signal only."
         else:
             state = "NO_DIRECTIONAL_EDGE"
             conf = "HIGH"
-            expl = "Directional sign prediction is statistically indistinguishable from a coin toss (AUC ~0.50). Volatility range remains fully operational."
+            expl = "Directional sign prediction is statistically indistinguishable from noise (AUC ~0.50). Volatility range remains primary operational metric."
 
         return DirectionOverlayResult(
             state=state,

@@ -32,11 +32,17 @@ def compute_data_reliability(
         'close', 'rsi_14', 'macd', 'sma_ratio_50',
         'realized_vol_24h', 'atr_14', 'funding_rate', 'oi_pct_change_24h'
     ]
-    present_cols = [c for c in expected_cols if c in df_row.index]
+    if isinstance(df_row, dict):
+        present_cols = [c for c in expected_cols if c in df_row]
+        getter = lambda c: df_row[c]
+    else:
+        present_cols = [c for c in expected_cols if c in df_row.index]
+        getter = lambda c: df_row[c]
+
     if not present_cols:
         return 0.40
 
-    non_null_count = sum(1 for c in present_cols if pd.notna(df_row[c]) and math.isfinite(float(df_row[c])))
+    non_null_count = sum(1 for c in present_cols if pd.notna(getter(c)) and math.isfinite(float(getter(c))))
     completeness = float(non_null_count / len(expected_cols))
 
     # Apply penalties for degradation and high latency

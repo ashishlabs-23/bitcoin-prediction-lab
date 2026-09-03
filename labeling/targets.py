@@ -15,6 +15,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from config import DATA_PROCESSED_DIR
 
 
+from typing import Optional
+
+
 def fixed_horizon_label(close: pd.Series, horizon_bars: int) -> pd.Series:
     """
     y = log(close.shift(-horizon_bars) / close)
@@ -63,17 +66,22 @@ def triple_barrier_label(
     sl_mult: float = 2.0,
     max_bars: int = 24,
     adaptive_width: bool = True,
+    high: Optional[pd.Series] = None,
+    low: Optional[pd.Series] = None,
 ) -> pd.DataFrame:
     """
     For each timestamp t: upper barrier = close[t] * (1 + eff_pt * vol[t]),
     lower barrier = close[t] * (1 - eff_sl * vol[t]), vertical barrier = t + max_bars.
 
+    If high and low series are provided, evaluates true intra-bar wicks against barriers.
     If adaptive_width is True, recalibrates barrier width dynamically based on
     the rolling volatility percentile to adapt to shifting regimes.
     """
     n = len(close)
     close_vals = close.values
     vol_vals = vol.values
+    high_vals = high.values if high is not None else None
+    low_vals = low.values if low is not None else None
 
     if adaptive_width and len(vol.dropna()) > 50:
         vol_pct = vol.rank(pct=True).fillna(0.5).values
@@ -114,15 +122,34 @@ def triple_barrier_label(
         hit_offset = max_bars
 
         for step in range(1, max_bars + 1):
-            curr_price = close_vals[i + step]
-            if curr_price >= upper:
-                label = 1
-                hit_offset = step
-                break
-            elif curr_price <= lower:
-                label = -1
-                hit_offset = step
-                break
+            if high_vals is not None and low_vals is not None:
+                curr_h = high_vals[i + step]
+                curr_l = low_vals[i + step]
+                hit_u = curr_h >= upper
+                hit_l = curr_l <= lower
+                if hit_u and hit_l:
+                    # Conservative: stop-out before take-profit if both hit in the same bar
+                    label = -1
+                    hit_offset = step
+                    break
+                elif hit_l:
+                    label = -1
+                    hit_offset = step
+                    break
+                elif hit_u:
+                    label = 1
+                    hit_offset = step
+                    break
+            else:
+                curr_price = close_vals[i + step]
+                if curr_price >= upper:
+                    label = 1
+                    hit_offset = step
+                    break
+                elif curr_price <= lower:
+                    label = -1
+                    hit_offset = step
+                    break
 
         labels[i] = label
         t1_idx = i + hit_offset

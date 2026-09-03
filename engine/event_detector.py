@@ -56,6 +56,10 @@ PREREGISTRATION_THRESHOLDS = {
     "long_z_ofi_min":  0.5,
     "short_z_ofi_max": -0.5,
 
+    # FUNDING_SQUEEZE and HAWKES_JUMP thresholds
+    "funding_z_abs_min": 1.8,
+    "hawkes_jump_z_min": 1.8,
+
     # Minimum candles between events (de-duplication)
     "min_event_gap_candles": 15,
 }
@@ -67,6 +71,8 @@ class MarketEvent(str, Enum):
     VACUUM          = "VACUUM"            # Liquidity collapse
     TOXICITY_SHOCK  = "TOXICITY_SHOCK"    # VPIN spike → jump risk
     ABSORPTION      = "ABSORPTION"        # Large OFI, no price response
+    FUNDING_SQUEEZE = "FUNDING_SQUEEZE"   # Perpetual funding rate dislocation & liquidation cascade
+    HAWKES_JUMP     = "HAWKES_JUMP"       # Self-exciting point process micro-burst acceleration
 
 
 class EventDirection(str, Enum):
@@ -137,6 +143,17 @@ def _classify_absorption(sv: MicrostructureStateVector) -> bool:
         abs(sv.z_ofi)   >= th["absorption_z_ofi_abs_min"] and
         sv.z_impact     <= th["absorption_z_impact_max"]
     )
+
+
+def _classify_funding_squeeze(sv: MicrostructureStateVector) -> bool:
+    """FUNDING_SQUEEZE: Extreme directional OFI accompanied by elevated VPIN / volume pressure."""
+    th = PREREGISTRATION_THRESHOLDS
+    return abs(sv.z_ofi) >= th.get("funding_z_abs_min", 1.8) and sv.z_vpin >= 1.5
+
+
+def _classify_hawkes_jump(sv: MicrostructureStateVector) -> bool:
+    """HAWKES_JUMP: Pure self-exciting point process acceleration exceeding 1.8 sigma."""
+    return sv.z_hawkes >= PREREGISTRATION_THRESHOLDS.get("hawkes_jump_z_min", 1.8)
 
 
 def _resolve_direction(sv: MicrostructureStateVector,
@@ -248,7 +265,7 @@ def detect_event(
     if sv.data_quality == "INSUFFICIENT":
         notes = "Insufficient rolling window — no event classification."
     else:
-        # Priority order: VACUUM > TOXICITY_SHOCK > IGNITION > ABSORPTION
+        # Priority order: VACUUM > TOXICITY_SHOCK > FUNDING_SQUEEZE > HAWKES_JUMP > IGNITION > ABSORPTION
         gap_ok = (_candle_counter - _last_event_candle) >= PREREGISTRATION_THRESHOLDS["min_event_gap_candles"]
 
         if _classify_vacuum(sv):
@@ -257,6 +274,16 @@ def detect_event(
         elif _classify_toxicity_shock(sv):
             event_type = MarketEvent.TOXICITY_SHOCK
             notes = "VPIN toxicity shock: extreme order-flow toxicity."
+        elif _classify_funding_squeeze(sv):
+            event_type = MarketEvent.FUNDING_SQUEEZE
+            direction  = _resolve_direction(sv, hawkes_snapshot)
+            notes = f"Funding squeeze / liquidation cascade risk. Direction: {direction.value}."
+            preregistration_id = "MEIE-FUNDING-01-v1.0"
+        elif _classify_hawkes_jump(sv):
+            event_type = MarketEvent.HAWKES_JUMP
+            direction  = _resolve_direction(sv, hawkes_snapshot)
+            notes = f"Hawkes jump point-process microburst. Direction: {direction.value}."
+            preregistration_id = "MEIE-HAWKES-01-v1.0"
         elif gap_ok and _classify_ignition(sv, _prior_spread_z_mean(PREREGISTRATION_THRESHOLDS["ignition_prior_window"])):
             event_type = MarketEvent.IGNITION
             direction  = _resolve_direction(sv, hawkes_snapshot)

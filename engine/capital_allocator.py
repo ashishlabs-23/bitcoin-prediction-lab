@@ -151,7 +151,7 @@ def get_allocation_report() -> List[Dict[str, Any]]:
         ev_mean = float(np.mean(pnl_series)) if pnl_series else 0.0
         pf_wins  = sum(p for p in pnl_series if p > 0)
         pf_losses = sum(abs(p) for p in pnl_series if p < 0)
-        profit_factor = round(pf_wins / max(1e-8, pf_losses), 3) if pf_losses else float("inf")
+        profit_factor = round(pf_wins / max(1e-8, pf_losses), 3) if pf_losses else 999.0
 
         rows.append({
             "strategy_name": name,

@@ -241,7 +241,11 @@ def compute_state_vector(
         raw_hawkes = 0.0
         raw_ofi = 0.0
 
-    raw_vpin = float(np.clip(vpin_snapshot or 0.30, 0.0, 1.0))
+    if isinstance(vpin_snapshot, dict):
+        vpin_val = float(vpin_snapshot.get("vpin", 0.30))
+    else:
+        vpin_val = float(vpin_snapshot) if vpin_snapshot is not None else 0.30
+    raw_vpin = float(np.clip(vpin_val, 0.0, 1.0))
     raw_depth = volume                              # higher volume = deeper book proxy
     raw_spread = (high - low) / max(1e-8, close)  # normalized candle range
     raw_impact = abs(close - open_) / volume       # price-per-unit-volume

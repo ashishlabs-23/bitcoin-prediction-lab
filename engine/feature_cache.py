@@ -129,6 +129,11 @@ class FeatureCache:
         df = self.get_features_df()
         return df.iloc[-1] if not df.empty else None
 
+    def get_latest_price(self) -> float:
+        """Returns the latest close price from cache."""
+        row = self.get_latest_row()
+        return float(row.get("close", 0.0)) if row is not None else 0.0
+
     @property
     def is_ready(self) -> bool:
         return self._is_initialized and self._df is not None and not self._df.empty

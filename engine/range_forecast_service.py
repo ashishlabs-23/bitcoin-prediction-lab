@@ -78,6 +78,8 @@ class BTCUSDRangeForecast:
     direction_state: str  # NO_DIRECTIONAL_EDGE, BULLISH, BEARISH, NEUTRAL, LOW_CONFIDENCE
     tradeability_category: str  # HIGH, MEDIUM, LOW
     natural_language_explanation: str
+    volatility_harvest_signal: str = "RANGE_NEUTRAL"  # CONFORMAL_ACCUMULATION_BUY, CONFORMAL_DISTRIBUTION_SELL, RANGE_NEUTRAL
+    conformal_trade_setup: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -211,6 +213,33 @@ class RangeForecastService:
             f"This forecast is a probabilistic risk/range estimate, not a guaranteed price target."
         )
 
+        # Conformal Range Volatility Harvesting Strategy
+        vol_harvest_signal = "RANGE_NEUTRAL"
+        trade_setup = None
+
+        if current_price <= lower_p25 and unc_eval.confidence_level != "LOW_CONFIDENCE":
+            vol_harvest_signal = "CONFORMAL_ACCUMULATION_BUY"
+            trade_setup = {
+                "strategy": "CONFORMAL_RANGE_HARVESTER",
+                "action": "ACCUMULATE_LONG",
+                "entry_price": current_price,
+                "target_tp_price": upper_p50,
+                "defensive_sl_price": lower_p90,
+                "expected_rr": round((upper_p50 - current_price) / max(1.0, current_price - lower_p90), 2),
+                "rationale": "Price situated at lower 25th percentile conformal band with 90% empirical boundary containment."
+            }
+        elif current_price >= upper_p75 and unc_eval.confidence_level != "LOW_CONFIDENCE":
+            vol_harvest_signal = "CONFORMAL_DISTRIBUTION_SELL"
+            trade_setup = {
+                "strategy": "CONFORMAL_RANGE_HARVESTER",
+                "action": "DISTRIBUTE_SHORT",
+                "entry_price": current_price,
+                "target_tp_price": lower_p50,
+                "defensive_sl_price": upper_p90,
+                "expected_rr": round((current_price - lower_p50) / max(1.0, upper_p90 - current_price), 2),
+                "rationale": "Price situated at upper 75th percentile conformal band with 90% empirical boundary containment."
+            }
+
         forecast = BTCUSDRangeForecast(
             forecast_id=forecast_id,
             timestamp=ts_str,
@@ -245,7 +274,9 @@ class RangeForecastService:
             model_version=self.model_version,
             direction_state=dir_res.state,
             tradeability_category=trade_res.category,
-            natural_language_explanation=nl_text
+            natural_language_explanation=nl_text,
+            volatility_harvest_signal=vol_harvest_signal,
+            conformal_trade_setup=trade_setup
         )
 
         self._persist_forecast(forecast, unc_eval)
