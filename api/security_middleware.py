@@ -90,7 +90,10 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         limit = RATE_LIMITS.get(role, 60)
         client_key = f"{client_ip}:{role.value}"
 
-        # Exclude local health checks from aggressive throttling
+        # Exclude local health checks & loopback UI polling from aggressive throttling
+        is_loopback = client_ip in ["127.0.0.1", "localhost", "::1"]
+        limit = 3000 if is_loopback else RATE_LIMITS.get(role, 60)
+        
         if path not in ["/health", "/api/health"]:
             allowed, remaining = rate_limiter.is_allowed(client_key, limit)
             if not allowed:

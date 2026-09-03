@@ -20,6 +20,8 @@ from config.database import (
 
 SYMBOL: str = "BTCUSD"
 EXCHANGE: str = "binance"
+TIMEFRAME: str = "1h"
+DATA_START: str = "2022-01-01T00:00:00Z"
 
 __all__ = [
     "PROJECT_ROOT",
@@ -35,4 +37,6 @@ __all__ = [
     "LEGACY_HAWKES_DB_PATH",
     "SYMBOL",
     "EXCHANGE",
+    "TIMEFRAME",
+    "DATA_START",
 ]

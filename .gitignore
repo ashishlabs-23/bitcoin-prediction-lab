@@ -67,6 +67,8 @@ WORKING_CONTEXT.md
 *.sqlite
 *.sqlite3
 *.db
+*.db-wal
+*.db-shm
 
 # ML Model checkpoints & serialized artifacts
 experiments/runs/

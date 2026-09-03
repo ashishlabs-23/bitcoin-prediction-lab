@@ -9,6 +9,7 @@ ccxt
 # models
 scikit-learn
 xgboost
+torch
 
 # explainability / calibration
 shap
