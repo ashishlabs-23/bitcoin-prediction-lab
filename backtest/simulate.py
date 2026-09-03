@@ -40,15 +40,17 @@ def check_position_closure_high_low(
 
     dir_upper = str(direction).upper()
     if dir_upper == "LONG":
-        if candle_high >= tp:
-            return {'closed': True, 'reason': 'TP_HIT', 'close_price': tp}
-        elif candle_low <= sl:
+        # Conservative risk management: evaluate stop-loss first if both triggered in same bar
+        if candle_low <= sl:
             return {'closed': True, 'reason': 'SL_HIT', 'close_price': sl}
+        elif candle_high >= tp:
+            return {'closed': True, 'reason': 'TP_HIT', 'close_price': tp}
     elif dir_upper == "SHORT":
-        if candle_low <= tp:
-            return {'closed': True, 'reason': 'TP_HIT', 'close_price': tp}
-        elif candle_high >= sl:
+        # Conservative risk management: evaluate stop-loss first if both triggered in same bar
+        if candle_high >= sl:
             return {'closed': True, 'reason': 'SL_HIT', 'close_price': sl}
+        elif candle_low <= tp:
+            return {'closed': True, 'reason': 'TP_HIT', 'close_price': tp}
 
     return {'closed': False, 'reason': None, 'close_price': 0.0}
 

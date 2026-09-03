@@ -36,7 +36,8 @@ DEFAULT_COLUMNS = [
     'context_vector_json', 'macro_cycle', 'mvrv_val', 'nupl_val',
     'data_reliability', 'regime_certainty', 'model_agreement', 'volatility_stress',
     'composite_quality_score', 'expected_return_gross_pct', 'expected_return_net_pct',
-    'outcome_resolved', 'outcome_resolved_at', 'data_source'
+    'outcome_resolved', 'outcome_resolved_at', 'data_source',
+    'strategy_name', 'target_rr', 'realized_pnl_usd', 'realized_pnl_pct', 'exit_reason'
 ]
 
 STRESS_TRIAL_COLUMNS = [
@@ -100,12 +101,29 @@ def _init_tables(conn: sqlite3.Connection):
                 volatility_stress REAL,
                 composite_quality_score REAL,
                 expected_return_gross_pct REAL,
-                expected_return_net_pct REAL,
                 outcome_resolved INTEGER DEFAULT 0,
                 outcome_resolved_at TEXT,
-                data_source TEXT DEFAULT 'live_terminal'
+                data_source TEXT DEFAULT 'live_terminal',
+                strategy_name TEXT DEFAULT 'MEIE-IGNITION',
+                target_rr REAL DEFAULT 2.50,
+                realized_pnl_usd REAL DEFAULT 0.0,
+                realized_pnl_pct REAL DEFAULT 0.0,
+                exit_reason TEXT DEFAULT 'OPEN'
             );
         """)
+        # Safe table migration for existing databases
+        for col_name, col_type in [
+            ('strategy_name', 'TEXT DEFAULT "MEIE-IGNITION"'),
+            ('target_rr', 'REAL DEFAULT 2.50'),
+            ('realized_pnl_usd', 'REAL DEFAULT 0.0'),
+            ('realized_pnl_pct', 'REAL DEFAULT 0.0'),
+            ('exit_reason', 'TEXT DEFAULT "OPEN"')
+        ]:
+            try:
+                conn.execute(f"ALTER TABLE predictions ADD COLUMN {col_name} {col_type};")
+            except Exception:
+                pass
+
         conn.execute("CREATE INDEX IF NOT EXISTS idx_pred_ts ON predictions(timestamp);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_pred_resolved ON predictions(outcome_resolved);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_pred_resolved_ts ON predictions(outcome_resolved, timestamp);")
@@ -265,7 +283,12 @@ def record_prediction(
     expected_return_gross_pct: float = 0.10,
     expected_return_net_pct: float = 0.00,
     outcome_resolved: bool = False,
-    outcome_resolved_at: str = None
+    outcome_resolved_at: str = None,
+    strategy_name: str = "MEIE-IGNITION",
+    target_rr: float = 2.50,
+    realized_pnl_usd: float = 0.0,
+    realized_pnl_pct: float = 0.0,
+    exit_reason: str = "OPEN"
 ) -> pd.DataFrame:
     """Appends a new versioned prediction record into SQLite WAL and syncs CSV."""
     if not prediction_id:
@@ -279,7 +302,8 @@ def record_prediction(
             "raw_prob": raw_prob,
             "direction": direction,
             "price": price,
-            "macro_cycle": macro_cycle
+            "macro_cycle": macro_cycle,
+            "strategy_name": strategy_name
         })
 
     record_dict = {
@@ -313,7 +337,12 @@ def record_prediction(
         'expected_return_net_pct': float(expected_return_net_pct),
         'outcome_resolved': 1 if outcome_resolved else 0,
         'outcome_resolved_at': str(outcome_resolved_at) if outcome_resolved_at else None,
-        'data_source': 'live_terminal'
+        'data_source': 'live_terminal',
+        'strategy_name': str(strategy_name),
+        'target_rr': float(target_rr),
+        'realized_pnl_usd': float(realized_pnl_usd),
+        'realized_pnl_pct': float(realized_pnl_pct),
+        'exit_reason': str(exit_reason)
     }
 
     # 1. Insert into SQLite
@@ -361,10 +390,12 @@ def load_market_memory() -> pd.DataFrame:
             for col in DEFAULT_COLUMNS:
                 if col not in df.columns:
                     df[col] = np.nan
-            if 'was_correct' in df.columns:
-                df['was_correct'] = df['was_correct'].astype('boolean')
             if 'outcome_resolved' in df.columns:
                 df['outcome_resolved'] = df['outcome_resolved'].astype(bool)
+            if 'was_correct' in df.columns:
+                df['was_correct'] = df['was_correct'].astype('boolean')
+                if 'outcome_resolved' in df.columns:
+                    df.loc[~df['outcome_resolved'], 'was_correct'] = pd.NA
             return df
         except Exception:
             pass
@@ -373,8 +404,12 @@ def load_market_memory() -> pd.DataFrame:
     _init_tables(conn)
     try:
         df = pd.read_sql_query("SELECT * FROM predictions ORDER BY timestamp ASC", conn)
-        df['was_correct'] = df['was_correct'].astype('boolean')
-        df['outcome_resolved'] = df['outcome_resolved'].astype(bool)
+        if 'outcome_resolved' in df.columns:
+            df['outcome_resolved'] = df['outcome_resolved'].astype(bool)
+        if 'was_correct' in df.columns:
+            df['was_correct'] = df['was_correct'].astype('boolean')
+            if 'outcome_resolved' in df.columns:
+                df.loc[~df['outcome_resolved'], 'was_correct'] = pd.NA
         return df
     except Exception as e:
         logger.error(f"Error loading market memory from SQLite: {e}")
