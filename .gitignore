@@ -50,6 +50,7 @@ htmlcov/
 .tox/
 .nox/
 experiments/logs/
+experiments/results/*.jsonl
 
 # Temporary & Scratch Files
 scratch/
