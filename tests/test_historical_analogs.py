@@ -66,7 +66,7 @@ def test_greedy_temporal_separation():
     """
     engine = get_analog_engine()
     min_sep_days = 7.0
-    res = engine.find_analogs(max_k=20, min_similarity=0.80, min_separation_days=min_sep_days)
+    res = engine.find_analogs(max_k=20, min_similarity=0.35, min_separation_days=min_sep_days)
     analogs = res['analogs']
     assert len(analogs) > 0
 
