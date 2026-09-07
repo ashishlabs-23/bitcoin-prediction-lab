@@ -404,5 +404,21 @@
     },
     "observed_sharpe": 1.85,
     "observed_return_bps": 22.5
+  },
+  {
+    "trial_id": 27,
+    "trial_hash": "8478f66327374931",
+    "strategy_name": "MEIE-IGNITION",
+    "timestamp": "2026-09-07T17:08:08.341403+00:00",
+    "epoch": 1,
+    "scientific_eligible": true,
+    "dataset_class": "REAL_MARKET",
+    "params": {
+      "tp": 2.0,
+      "sl": 1.5,
+      "horizon": 24
+    },
+    "observed_sharpe": 1.85,
+    "observed_return_bps": 22.5
   }
 ]

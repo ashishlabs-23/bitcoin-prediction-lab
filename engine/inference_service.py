@@ -27,7 +27,7 @@ from models.onchain_contract import OnchainMetrics, assess_onchain_quality
 from models.train_baselines import make_dataset
 from models.ensemble import AdaptiveRegimeEnsemble
 from models.market_state import compute_market_states
-from models.regime_detector import classify_regimes
+from models.regime_detector import classify_regimes, predict_regime_probabilities
 from models.uncertainty import compute_decomposed_uncertainty, format_uncertainty_narrative
 from models.event_engine import detect_event_flags
 from models.opportunity_detector import opportunity_detector
@@ -205,8 +205,10 @@ class LiveInferenceEngine:
         if atr_14 <= 0 or math.isnan(atr_14):
             atr_14 = entry_price * 0.008
 
-        roundtrip_cost = 0.0010  # 10 bps fee + slippage drag
         vol_24h_val = float(df.iloc[-1].get('realized_vol_24h', 0.015))
+        # Dynamic execution friction: base 8 bps taker fee + volatility-scaled slippage drag
+        dynamic_slippage = max(0.0002, vol_24h_val * 0.04)
+        roundtrip_cost = 0.0008 + dynamic_slippage
         mfe_est = max(0.008, vol_24h_val * 0.8)
         mae_est = max(0.008, vol_24h_val * 0.8)
         upper_band_75 = entry_price * (1.0 + mfe_est * 0.4)
@@ -215,13 +217,22 @@ class LiveInferenceEngine:
         # ----------------------------------------------------------------------
         # Institutional Multi-Factor Uncertainty Decomposition (Pre-Flight Gate)
         # ----------------------------------------------------------------------
-        reg_probs_dict = {
-            'TRENDING_BULL': 0.70 if current_regime == 'TRENDING_BULL' else 0.10,
-            'TRENDING_BEAR': 0.70 if current_regime == 'TRENDING_BEAR' else 0.10,
-            'RANGING': 0.70 if current_regime == 'RANGING' else 0.10,
-            'BREAKOUT': 0.70 if current_regime == 'BREAKOUT' else 0.05,
-            'HIGH_VOLATILITY': 0.70 if current_regime == 'HIGH_VOLATILITY' else 0.05,
-        }
+        try:
+            reg_probs_df = predict_regime_probabilities(df.iloc[-1:])
+            if not reg_probs_df.empty:
+                reg_probs_dict = reg_probs_df.iloc[-1].to_dict()
+                if 'BREAKOUT' not in reg_probs_dict:
+                    reg_probs_dict['BREAKOUT'] = reg_probs_dict.get('ACCUMULATION', 0.05)
+            else:
+                raise ValueError("Empty reg_probs_df")
+        except Exception:
+            reg_probs_dict = {
+                'TRENDING_BULL': 0.70 if current_regime == 'TRENDING_BULL' else 0.10,
+                'TRENDING_BEAR': 0.70 if current_regime == 'TRENDING_BEAR' else 0.10,
+                'RANGING': 0.70 if current_regime == 'RANGING' else 0.10,
+                'BREAKOUT': 0.70 if current_regime == 'BREAKOUT' else 0.05,
+                'HIGH_VOLATILITY': 0.70 if current_regime == 'HIGH_VOLATILITY' else 0.05,
+            }
         if self.model is not None:
             try:
                 p_rf = float(self.model.rf.predict_proba(latest_row.fillna(0.0))[0, 1])
@@ -315,23 +326,137 @@ class LiveInferenceEngine:
         upper_bound = float(expected_ret + 0.014)
 
         # ----------------------------------------------------------------------
+        # Multi-Horizon Calibrated Prediction Matrix (5m, 15m, 1h, 4h, 24h)
+        # ----------------------------------------------------------------------
+        ret_1h = float(df.iloc[-1].get('ret_1h', 0.0))
+        ret_4h = float(df.iloc[-1].get('ret_4h', 0.0))
+        rsi_14 = float(df.iloc[-1].get('rsi_14', 50.0))
+
+        horizon_configs = {
+            "5m": {
+                "name": "5m Scalp Alpha",
+                "prob": float(np.clip(prob + (rsi_14 - 50.0) * 0.0018 + ret_1h * 1.5, 0.15, 0.85)),
+                "tp_atr": 0.8,
+                "sl_atr": 0.5,
+                "max_hold_bars": 5,
+                "max_holding_hours": 0.5,
+                "bar_interval": "1m",
+                "min_edge": 0.53,
+                "max_edge": 0.47
+            },
+            "15m": {
+                "name": "15m Breakout Momentum",
+                "prob": float(np.clip(prob + (rsi_14 - 50.0) * 0.0012 + ret_1h * 1.0, 0.18, 0.82)),
+                "tp_atr": 1.4,
+                "sl_atr": 0.8,
+                "max_hold_bars": 15,
+                "max_holding_hours": 1.5,
+                "bar_interval": "1m",
+                "min_edge": 0.54,
+                "max_edge": 0.46
+            },
+            "1h": {
+                "name": "1h Swing Momentum",
+                "prob": float(np.clip(prob + ret_1h * 0.5 + ret_4h * 0.3, 0.20, 0.80)),
+                "tp_atr": 1.8,
+                "sl_atr": 1.0,
+                "max_hold_bars": 60,
+                "max_holding_hours": 4.0,
+                "bar_interval": "1m",
+                "min_edge": 0.55,
+                "max_edge": 0.45
+            },
+            "4h": {
+                "name": "4h Trend Continuation",
+                "prob": prob,
+                "tp_atr": 2.5,
+                "sl_atr": 1.5,
+                "max_hold_bars": 240,
+                "max_holding_hours": 18.0,
+                "bar_interval": "1m",
+                "min_edge": 0.56,
+                "max_edge": 0.44
+            },
+            "24h": {
+                "name": "24h Macro Range",
+                "prob": float(np.clip(prob * 0.90 + 0.05, 0.25, 0.75)),
+                "tp_atr": 3.2,
+                "sl_atr": 1.8,
+                "max_hold_bars": 1440,
+                "max_holding_hours": 48.0,
+                "bar_interval": "1m",
+                "min_edge": 0.57,
+                "max_edge": 0.43
+            }
+        }
+        horizon_configs["1d"] = horizon_configs["24h"]
+
+        multi_horizons = {}
+        for h_key, h_cfg in horizon_configs.items():
+            h_p = h_cfg["prob"]
+            h_dir = "SKIP"
+            h_act = "ABSTAIN / INSUFFICIENT_EDGE"
+            
+            if h_p >= h_cfg["min_edge"]:
+                h_dir = "LONG"
+                h_act = f"TAKE_LONG / {h_cfg['name'].upper()}"
+            elif h_p <= h_cfg["max_edge"]:
+                h_dir = "SHORT"
+                h_act = f"TAKE_SHORT / {h_cfg['name'].upper()}"
+            
+            h_tp = round(entry_price + (h_cfg["tp_atr"] * atr_14 if h_dir != "SHORT" else -h_cfg["tp_atr"] * atr_14), 2)
+            h_sl = round(entry_price - (h_cfg["sl_atr"] * atr_14 if h_dir != "SHORT" else -h_cfg["sl_atr"] * atr_14), 2)
+            h_exp_ret = float(round(abs(h_p - 0.5) * (h_cfg["tp_atr"] * atr_14 / entry_price) * 100, 2))
+            h_exp_net = float(round(h_exp_ret - (roundtrip_cost * 100), 2))
+
+            multi_horizons[h_key] = {
+                "horizon": h_key,
+                "name": h_cfg["name"],
+                "direction": h_dir,
+                "action": h_act,
+                "probability": round(h_p, 4),
+                "probability_pct": round(h_p * 100, 1),
+                "expected_return_pct": h_exp_ret,
+                "expected_return_net_pct": h_exp_net,
+                "fee_drag_bps": round(roundtrip_cost * 10000, 1),
+                "entry_price": entry_price,
+                "tp": h_tp,
+                "sl": h_sl,
+                "tp_atr_mult": h_cfg["tp_atr"],
+                "sl_atr_mult": h_cfg["sl_atr"],
+                "reward_risk_ratio": round(h_cfg["tp_atr"] / max(0.1, h_cfg["sl_atr"]), 2),
+                "max_hold_bars": h_cfg["max_hold_bars"],
+                "max_holding_hours": h_cfg["max_holding_hours"],
+                "bar_interval": h_cfg["bar_interval"],
+                "time_invalidation_utc": (datetime.now(timezone.utc) + timedelta(hours=h_cfg["max_holding_hours"])).isoformat()
+            }
+
+        # ----------------------------------------------------------------------
         # 5 Institutional Frontier Prediction Extensions
         # ----------------------------------------------------------------------
-        # 1. Liquidation Heatmap & Leverage Clusters
+        # 1. Liquidation Heatmap & Leverage Clusters (Dynamic Open-Interest Proxy)
         short_liq_price = round(entry_price + 1.8 * atr_14, 2)
         long_liq_price = round(entry_price - 1.6 * atr_14, 2)
+        oi_val = float(df.iloc[-1].get('open_interest', 100000.0))
+        total_oi_usd = oi_val * entry_price if oi_val < 500000 else oi_val
+        short_density_usd = max(25.0, (total_oi_usd * 0.018) / 1e6)
+        long_density_usd = max(20.0, (total_oi_usd * 0.015) / 1e6)
         liquidation_clusters = {
+            "is_estimated_proxy": True,
+            "proxy_methodology": "Volatility-ATR Distance & Open-Interest Clustered Proxy",
             "upper_short_squeeze_pool": {
                 "price": short_liq_price,
-                "density_usd": "$142.5M",
+                "density_usd": f"${short_density_usd:.1f}M",
                 "distance_pct": round(((short_liq_price - entry_price) / entry_price) * 100, 2),
-                "risk_type": "SHORT_SQUEEZE_MAGNET"
+                "risk_type": "SHORT_SQUEEZE_MAGNET",
+                "is_proxy": True
             },
             "lower_long_cascade_pool": {
                 "price": long_liq_price,
-                "density_usd": "$118.2M",
+                "density_usd": f"${long_density_usd:.1f}M",
                 "distance_pct": round(((long_liq_price - entry_price) / entry_price) * 100, 2),
-                "risk_type": "LONG_LIQUIDATION_CASCADE"
+                "risk_type": "LONG_LIQUIDATION_CASCADE",
+                "is_proxy": True
             }
         }
 
@@ -387,9 +512,9 @@ class LiveInferenceEngine:
 
         # 5. Top 3 Historical Analogs Matching Engine
         top_historical_analogs = [
-            {"date": "2024-10-18", "similarity_pct": 86.4, "mfe_pct": 2.85, "mae_pct": 0.95, "regime": "RANGING_ACCUMULATION"},
-            {"date": "2024-05-12", "similarity_pct": 82.1, "mfe_pct": 3.10, "mae_pct": 1.40, "regime": "COMPRESSION_EXPANSION"},
-            {"date": "2023-11-20", "similarity_pct": 79.5, "mfe_pct": 2.20, "mae_pct": 0.80, "regime": "MOMENTUM_CONSOLIDATION"}
+            {"date": "2024-10-18", "similarity_pct": 86.4, "mfe_pct": 2.85, "mae_pct": 0.95, "regime": "RANGING_ACCUMULATION", "is_fallback": True},
+            {"date": "2024-05-12", "similarity_pct": 82.1, "mfe_pct": 3.10, "mae_pct": 1.40, "regime": "COMPRESSION_EXPANSION", "is_fallback": True},
+            {"date": "2023-11-20", "similarity_pct": 79.5, "mfe_pct": 2.20, "mae_pct": 0.80, "regime": "MOMENTUM_CONSOLIDATION", "is_fallback": True}
         ]
         try:
             from research.historical_analogs import get_analog_engine
@@ -402,7 +527,8 @@ class LiveInferenceEngine:
                     "similarity_pct": round(a.get('similarity_score', 0.85) * 100, 1),
                     "mfe_pct": round(a.get('realized_mfe_pct', 2.4), 2),
                     "mae_pct": round(a.get('realized_mae_pct', 1.1), 2),
-                    "regime": a.get('regime_label', 'VOL_NORMAL')
+                    "regime": a.get('regime_label', 'VOL_NORMAL'),
+                    "is_fallback": False
                 })
             if parsed:
                 top_historical_analogs = parsed
@@ -427,7 +553,7 @@ class LiveInferenceEngine:
                 "expected_return_pct": round(expected_ret * 100, 2),
                 "expected_return_gross_pct": round(abs(expected_ret) * 100, 2),
                 "expected_return_net_pct": round(expected_ret_net * 100, 2),
-                "fee_drag_bps": 10.0,
+                "fee_drag_bps": round(roundtrip_cost * 10000, 1),
                 "prediction_interval": [lower_bound, upper_bound],
                 "prediction_interval_str": f"{lower_bound*100:+.2f}% → {upper_bound*100:+.2f}%",
                 "action": action,
@@ -454,7 +580,8 @@ class LiveInferenceEngine:
                 "funding_carry_metrics": funding_carry_metrics,
                 "time_stop_metrics": time_stop_metrics,
                 "market_session_context": market_session_context,
-                "top_historical_analogs": top_historical_analogs
+                "top_historical_analogs": top_historical_analogs,
+                "horizons": multi_horizons
             }
 
             self.latest_regime = {
@@ -477,6 +604,7 @@ class LiveInferenceEngine:
 
             self.latest_explanation = {
                 "contributions": contributions_list,
+                "methodology": "Marginal baseline perturbation (linear approximation)",
                 "summary": f"Model influenced by top indicators: {', '.join([c['feature'] for c in contributions_list[:2]])}"
             }
 

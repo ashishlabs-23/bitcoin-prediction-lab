@@ -75,11 +75,25 @@ def health_check():
 # ---------------------------------------------------------------------------
 
 @router.get("/prediction/latest")
-async def get_prediction_latest(live: bool = False):
-    """Returns the live AI prediction output with TP, SL, confidence, and uncertainty narrative."""
+async def get_prediction_latest(live: bool = False, horizon: Optional[str] = None):
+    """Returns the live AI prediction output with TP, SL, confidence, multi-horizon matrix, and uncertainty narrative."""
     async with live_engine._lock:
         if live_engine.latest_prediction is not None:
             resp = live_engine.latest_prediction.copy()
+            if horizon and "horizons" in resp and horizon in resp["horizons"]:
+                h_data = resp["horizons"][horizon]
+                resp["horizon"] = horizon
+                resp["direction"] = h_data.get("direction", resp["direction"])
+                resp["action"] = h_data.get("action", resp["action"])
+                resp["probability"] = h_data.get("probability", resp["probability"])
+                resp["probability_pct"] = h_data.get("probability_pct", resp["probability_pct"])
+                resp["expected_return_pct"] = h_data.get("expected_return_pct", resp["expected_return_pct"])
+                resp["expected_return_net_pct"] = h_data.get("expected_return_net_pct", resp["expected_return_net_pct"])
+                resp["tp"] = h_data.get("tp", resp["tp"])
+                resp["sl"] = h_data.get("sl", resp["sl"])
+                resp["tp_atr_mult"] = h_data.get("tp_atr_mult", resp.get("tp_atr_mult", 2.0))
+                resp["sl_atr_mult"] = h_data.get("sl_atr_mult", resp.get("sl_atr_mult", 1.5))
+                resp["reward_risk_ratio"] = h_data.get("reward_risk_ratio", 2.0)
             resp["status"] = "online"
             resp["is_live"] = True
             resp["system_classification"] = "EXPLORATORY STRATEGY ANALYTICS"

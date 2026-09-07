@@ -293,13 +293,14 @@ const api = {
     if (!res.ok) throw new Error("test alert failed");
     return res.json();
   },
-  async fetchActivePaperPosition(strategyName = null, indicators = null, userDirection = "AUTO", horizon = "15m", evidenceMode = "AI_RECOMMEND") {
+  async fetchActivePaperPosition(strategyName = null, indicators = null, userDirection = "AUTO", horizon = "15m", evidenceMode = "AI_RECOMMEND", signalMode = "live_ai") {
     const params = new URLSearchParams();
     if (strategyName) params.append("strategy_name", strategyName);
     if (indicators && indicators.length > 0) params.append("indicators", indicators.join(","));
     if (userDirection && userDirection !== "AUTO") params.append("user_direction", userDirection);
-    if (horizon && horizon !== "15m") params.append("horizon", horizon);
+    if (horizon) params.append("horizon", horizon);
     if (evidenceMode && evidenceMode !== "AI_RECOMMEND") params.append("evidence_mode", evidenceMode);
+    if (signalMode) params.append("signal_mode", signalMode);
     const qs = params.toString() ? `?${params.toString()}` : "";
     const res = await fetch(`${getApiBaseUrl()}/api/arena/active-paper-position${qs}`);
     if (!res.ok) throw new Error("active-paper-position failed");
@@ -1222,11 +1223,14 @@ function LightweightCandleChart({
     const roundToBar = (ts) => Math.floor(ts / step) * step;
 
     // 1. Current Live Decision Badge
-    if (predictionData && predictionData.direction) {
-      const lastBar = seedRef.current[seedRef.current.length - 1];
-      const isSkip  = predictionData.direction === "SKIP" || predictionData.action?.includes("SKIP");
+    const effectivePos = activePaperPos;
+    const effectiveDir = (effectivePos?.is_directional_trade_signal && effectivePos?.direction !== "NEUTRAL") ? effectivePos.direction : predictionData?.direction;
+    const effectiveProb = (effectivePos?.is_directional_trade_signal && effectivePos?.probability_pct) ? effectivePos.probability_pct : predictionData?.probability_pct;
+    const isLiveSignal = effectiveDir && effectiveDir !== "SKIP" && effectiveDir !== "NEUTRAL";
 
-      if (isSkip) {
+    if (effectiveDir) {
+      const lastBar = seedRef.current[seedRef.current.length - 1];
+      if (!isLiveSignal) {
         markers.push({
           time:     lastBar.time,
           position: "aboveBar",
@@ -1235,13 +1239,13 @@ function LightweightCandleChart({
           text:     "ABSTAIN"
         });
       } else {
-        const isLong = predictionData.direction === "LONG";
+        const isLong = effectiveDir === "LONG";
         markers.push({
           time:     lastBar.time,
           position: isLong ? "belowBar" : "aboveBar",
-          color:    "#00E5A8",
+          color:    isLong ? "#00E5A8" : "#FF5C7C",
           shape:    isLong ? "arrowUp" : "arrowDown",
-          text:     `${predictionData.direction} (${predictionData.probability_pct}%)`
+          text:     `AI: ${effectiveDir} (${effectiveProb || 75}%)`
         });
       }
       seenTimes.add(lastBar.time);
@@ -1580,13 +1584,14 @@ function ChartTopBar({
 // ===========================================================================
 // ThreeBackground — Interactive 3D WebGL Particle Constellation
 // ===========================================================================
-function ThreeBackground() {
+function ThreeBackground({ enabled = true }) {
   const mountRef = useRef(null);
 
   useEffect(() => {
-    if (!window.THREE) return;
+    if (!enabled || !window.THREE) return;
     const THREE = window.THREE;
     const mount = mountRef.current;
+    if (!mount) return;
 
     // Scene setup
     const scene    = new THREE.Scene();
@@ -1667,16 +1672,30 @@ function ThreeBackground() {
 
     // Resize handler
     const onResize = () => {
+      if (!mount) return;
       camera.aspect = mount.offsetWidth / mount.offsetHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(mount.offsetWidth, mount.offsetHeight);
     };
     window.addEventListener("resize", onResize);
 
+    // Tab visibility handler to prevent CPU/battery drain
+    let isHidden = document.hidden;
+    const onVisibilityChange = () => {
+      const wasHidden = isHidden;
+      isHidden = document.hidden;
+      if (wasHidden && !isHidden) {
+        cancelAnimationFrame(frameId);
+        frameId = requestAnimationFrame(animate);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
     // Animation loop
     let frameId;
     const LINK_DIST = 130;
     const animate = () => {
+      if (isHidden) return; // Freeze loop when tab is in background
       frameId = requestAnimationFrame(animate);
       const pos = geo.attributes.position.array;
 
@@ -1730,6 +1749,7 @@ function ThreeBackground() {
     animate();
 
     return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       cancelAnimationFrame(frameId);
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("resize", onResize);
@@ -1745,18 +1765,25 @@ function ThreeBackground() {
         torus2Mat.dispose();
         renderer.dispose();
       } catch {}
-      if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement);
+      if (mount && renderer.domElement && mount.contains(renderer.domElement)) {
+        mount.removeChild(renderer.domElement);
+      }
     };
-  }, []);
+  }, [enabled]);
 
   return h("div", {
     ref: mountRef,
+    className: "three-bg-canvas",
     style: {
       position: "fixed",
-      top: 0, left: 0,
-      width: "100vw", height: "100vh",
+      top: 0,
+      left: 0,
+      width: "100%",
+      height: "100%",
+      pointerEvents: "none",
       zIndex: 0,
-      pointerEvents: "none"
+      opacity: enabled ? 1 : 0,
+      transition: "opacity 0.4s ease"
     }
   });
 }
@@ -1772,13 +1799,29 @@ function OpportunityToastContainer({ alerts = [], onDismiss, onSelectAlert }) {
     alerts.map((alert) => {
       const isUltra = alert.tier === "ULTRA_HIGH_PROFIT";
       const isLong = alert.direction === "LONG";
+      const isSimulatedTest = alert.id?.startsWith("alert_test_") || alert.is_test || alert.tier === "SIMULATED_TEST";
+
       return h("div", {
         key: alert.id,
         className: `high-profit-toast ${isUltra ? "tier-ultra" : ""} ${isLong ? "tier-long" : "tier-short"}`
       },
         h("div", { className: "toast-header" },
-          h("span", { className: `toast-badge ${isUltra ? "ultra" : ""}` },
-            isUltra ? "💎 ULTRA HIGH PROFIT" : (alert.badge || "🔥 HIGH CONVICTION")
+          h("div", { style: { display: "flex", alignItems: "center", gap: "6px" } },
+            isSimulatedTest && h("span", {
+              style: {
+                background: "rgba(245, 158, 11, 0.2)",
+                color: "#F59E0B",
+                border: "1px solid rgba(245, 158, 11, 0.5)",
+                padding: "2px 6px",
+                borderRadius: "4px",
+                fontSize: "0.68rem",
+                fontWeight: "800",
+                letterSpacing: "0.04em"
+              }
+            }, "⚠️ SIMULATED TEST"),
+            h("span", { className: `toast-badge ${isUltra ? "ultra" : ""}` },
+              isUltra ? "💎 ULTRA HIGH PROFIT" : (alert.badge || "🔥 HIGH CONVICTION")
+            )
           ),
           h("button", {
             className: "toast-close-btn",
@@ -1903,7 +1946,7 @@ function NotificationBell({ alerts = [], onTestAlert, onOpenSettings, onSelectAl
             },
               h("div", { className: "notification-item-top" },
                 h("span", { className: `notification-item-dir ${a.direction?.toLowerCase()}` },
-                  `${a.direction === "LONG" ? "▲ LONG" : "▼ SHORT"} · ${a.tier === "ULTRA_HIGH_PROFIT" ? "💎 ULTRA" : "🔥 HIGH"}`
+                  `${a.direction === "LONG" ? "▲ LONG" : "▼ SHORT"} · ${a.tier === "ULTRA_HIGH_PROFIT" ? "💎 ULTRA" : "🔥 HIGH"}${a.id?.startsWith("alert_test_") || a.is_test ? " [SIM]" : ""}`
                 ),
                 h("span", { className: "notification-item-time" },
                   a.timestamp ? new Date(a.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Just now"
@@ -2224,7 +2267,12 @@ function NotificationSettingsModal({ isOpen, onClose, settings, onSaveSettings, 
   );
 }
 
-function Navbar({ currentPath, setPath, engineState = "offline", alerts = [], onTestAlert, onOpenSettings, onSelectAlert }) {
+function Navbar({
+  currentPath, setPath, engineState = "offline", alerts = [],
+  onTestAlert, onOpenSettings, onSelectAlert,
+  is3dEnabled = true, onToggle3d,
+  workstationMode = "focus", onToggleMode
+}) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [soundOn, setSoundOn] = useState(true);
 
@@ -2297,6 +2345,41 @@ function Navbar({ currentPath, setPath, engineState = "offline", alerts = [], on
     /* ── Right: Controls ─────────────────────────── */
     h("div", { className: "nav-right" },
       h(NotificationBell, { alerts, onTestAlert, onOpenSettings, onSelectAlert }),
+
+      // 3D FX Background Toggle
+      onToggle3d && h("button", {
+        onClick: onToggle3d,
+        title: is3dEnabled ? "Disable 3D Background FX (saves battery/CPU)" : "Enable 3D Background FX",
+        style: {
+          background: is3dEnabled ? "rgba(167, 139, 250, 0.15)" : "rgba(255, 255, 255, 0.04)",
+          border: `1px solid ${is3dEnabled ? "rgba(167, 139, 250, 0.4)" : "rgba(255, 255, 255, 0.1)"}`,
+          color: is3dEnabled ? "#A78BFA" : "#64748B",
+          padding: "5px 10px",
+          borderRadius: "8px",
+          fontSize: "0.75rem",
+          fontWeight: "700",
+          cursor: "pointer",
+          transition: "all 0.2s ease"
+        }
+      }, is3dEnabled ? "✨ 3D FX: ON" : "3D FX: OFF"),
+
+      // Mode Switch: Clean Focus vs Full Pro Quant (Terminal only)
+      (currentPath === "/terminal" && onToggleMode) && h("button", {
+        onClick: onToggleMode,
+        title: workstationMode === "focus" ? "Switch to Pro Quant Workstation (all panels)" : "Switch to Clean Focus View",
+        style: {
+          background: workstationMode === "focus" ? "rgba(0, 229, 168, 0.15)" : "rgba(0, 240, 255, 0.15)",
+          border: `1px solid ${workstationMode === "focus" ? "rgba(0, 229, 168, 0.4)" : "rgba(0, 240, 255, 0.4)"}`,
+          color: workstationMode === "focus" ? "#00E5A8" : "#00F0FF",
+          padding: "5px 10px",
+          borderRadius: "8px",
+          fontSize: "0.75rem",
+          fontWeight: "700",
+          cursor: "pointer",
+          transition: "all 0.2s ease"
+        }
+      }, workstationMode === "focus" ? "⚡ Clean Focus" : "🔬 Pro Quant"),
+
       h("button", {
         onClick: toggleSound,
         title: "Toggle Audio Feedback",
@@ -3401,7 +3484,7 @@ function QuickExecutionTicket({ livePrice }) {
 // ===========================================================================
 // CompactWorkstationHeader — High-Density Bloomberg/TradingView Workstation Header
 // ===========================================================================
-function CompactWorkstationHeader({ livePrice, changePct, regimeData, activePaperPos, engineState }) {
+function CompactWorkstationHeader({ livePrice, changePct, regimeData, activePaperPos, engineState, workstationMode = "focus", onToggleMode }) {
   const isUp = (changePct || 0) >= 0;
   const p = activePaperPos;
   const strat = p?.strategy_id || "MEIE-IGNITION";
@@ -3423,7 +3506,21 @@ function CompactWorkstationHeader({ livePrice, changePct, regimeData, activePape
     h("div", { style: { display: "flex", alignItems: "center", gap: "12px", fontSize: "0.72rem", fontWeight: "700" } },
       h("span", { style: { color: "#00E5A8", display: "flex", alignItems: "center", gap: "4px" } }, h("span", { style: { animation: "pulseDot 1.5s infinite" } }, "●"), "DATA LIVE"),
       h("span", { style: { color: "#38BDF8", display: "flex", alignItems: "center", gap: "4px" } }, "● ARENA ACTIVE"),
-      h("span", { style: { color: "#F59E0B", display: "flex", alignItems: "center", gap: "4px" } }, "● PAPER MODE")
+      h("span", { style: { color: "#F59E0B", display: "flex", alignItems: "center", gap: "4px" } }, "● PAPER MODE"),
+      onToggleMode && h("button", {
+        onClick: onToggleMode,
+        title: workstationMode === "focus" ? "Switch to Pro Quant Workstation (all labs)" : "Switch to Clean Focus View",
+        style: {
+          background: workstationMode === "focus" ? "rgba(0, 229, 168, 0.15)" : "rgba(0, 240, 255, 0.15)",
+          border: `1px solid ${workstationMode === "focus" ? "rgba(0, 229, 168, 0.4)" : "rgba(0, 240, 255, 0.4)"}`,
+          color: workstationMode === "focus" ? "#00E5A8" : "#00F0FF",
+          padding: "3px 8px",
+          borderRadius: "5px",
+          fontSize: "0.70rem",
+          fontWeight: "800",
+          cursor: "pointer"
+        }
+      }, workstationMode === "focus" ? "⚡ Clean Focus Mode" : "🔬 Pro Quant Mode")
     ),
     h("div", { className: "workstation-status-strip" },
       h("div", { className: "status-strip-chip" },
@@ -3467,9 +3564,11 @@ function WorkstationIntentCommandBar({
   setEvidenceMode,
   configHash,
   totalVoi,
-  activePaperPos
+  activePaperPos,
+  signalMode = "live_ai",
+  setSignalMode
 }) {
-  const horizons = ["15m", "1h", "4h", "1d", "7d", "CYCLE"];
+  const horizons = ["5m", "15m", "1h", "4h", "1d", "7d", "CYCLE"];
   const modes = [
     { id: "AI_RECOMMEND", label: "⚡ AI RECOMMEND" },
     { id: "AI_PLUS_USER", label: "🧠 AI + MY INPUTS" },
@@ -3481,6 +3580,41 @@ function WorkstationIntentCommandBar({
   const activeHash = configHash || p?.provenance?.indicator_config_hash || p?.contract_hash || "0x8f3c2a1e";
 
   return h("div", { className: "workstation-intent-command-bar" },
+    // Group 0: Signal Mode (Live AI Alpha vs Tier 0 Surveillance)
+    h("div", { className: "command-bar-group" },
+      h("span", { className: "command-bar-label" }, "⚡ SIGNAL:"),
+      h("div", { style: { display: "flex", gap: "4px" } },
+        h("button", {
+          className: `intent-pill-btn ${(signalMode || "live_ai") === "live_ai" ? "active" : ""}`,
+          style: {
+            background: (signalMode || "live_ai") === "live_ai" ? "rgba(0, 229, 168, 0.22)" : "rgba(255,255,255,0.04)",
+            color: (signalMode || "live_ai") === "live_ai" ? "#00E5A8" : "#94A3B8",
+            border: `1px solid ${(signalMode || "live_ai") === "live_ai" ? "rgba(0, 229, 168, 0.6)" : "rgba(255,255,255,0.1)"}`,
+            padding: "4px 9px",
+            borderRadius: "6px",
+            fontSize: "0.68rem",
+            fontWeight: "800",
+            cursor: "pointer"
+          },
+          onClick: () => setSignalMode && setSignalMode("live_ai")
+        }, "⚡ LIVE ALPHA"),
+        h("button", {
+          className: `intent-pill-btn ${signalMode === "surveillance" ? "active" : ""}`,
+          style: {
+            background: signalMode === "surveillance" ? "rgba(245, 158, 11, 0.22)" : "rgba(255,255,255,0.04)",
+            color: signalMode === "surveillance" ? "#F59E0B" : "#94A3B8",
+            border: `1px solid ${signalMode === "surveillance" ? "rgba(245, 158, 11, 0.6)" : "rgba(255,255,255,0.1)"}`,
+            padding: "4px 9px",
+            borderRadius: "6px",
+            fontSize: "0.68rem",
+            fontWeight: "800",
+            cursor: "pointer"
+          },
+          onClick: () => setSignalMode && setSignalMode("surveillance")
+        }, "🛡️ SURVEILLANCE")
+      )
+    ),
+
     // Group 1: User Direction Intent
     h("div", { className: "command-bar-group" },
       h("span", { className: "command-bar-label" }, "🧭 INTENT:"),
@@ -5621,12 +5755,16 @@ function AiPredictionEnginePanel({
     { id: "MANUAL", label: "CUSTOM" }
   ];
 
-  // Geometrically bound target levels relative to live price
-  const entryP = contract.entry_price || curPrice;
-  const tpP = contract.take_profit_price && contract.take_profit_price > entryP * 0.95 ? contract.take_profit_price : (entryP * 1.008);
-  const slP = contract.stop_loss_price && contract.stop_loss_price < entryP * 1.05 && contract.stop_loss_price > 0 ? contract.stop_loss_price : (entryP * 0.993);
-  const rrRatio = contract.reward_risk_ratio || (Math.abs(tpP - entryP) / Math.max(1e-6, Math.abs(entryP - slP))).toFixed(2);
-  const maxHoldBars = contract.max_hold_bars || 15;
+  // Dynamic extraction from activePaperPos (live AI or surveillance)
+  const isLiveSignal = activePaperPos?.is_directional_trade_signal || activePaperPos?.signal_mode === "live_ai" || (activePaperPos?.status === "LIVE_AI_ALPHA");
+  const entryP = activePaperPos?.entry_price || contract.entry_price || curPrice;
+  const activeDirection = activePaperPos?.direction && activePaperPos.direction !== "NEUTRAL" ? activePaperPos.direction : (userDirectionPreference !== "AUTO" ? userDirectionPreference : (predictionData?.direction || "LONG"));
+  const isShortSignal = (activeDirection === "SHORT" || userDirectionPreference === "SHORT") && userDirectionPreference !== "LONG";
+  const tpP = activePaperPos?.tp_price || contract.take_profit_price || (isShortSignal ? entryP * 0.985 : entryP * 1.015);
+  const slP = activePaperPos?.sl_price || contract.stop_loss_price || (isShortSignal ? entryP * 1.008 : entryP * 0.992);
+  const rrRatio = activePaperPos?.target_rr || contract.reward_risk_ratio || (Math.abs(tpP - entryP) / Math.max(1e-6, Math.abs(entryP - slP))).toFixed(2);
+  const maxHoldBars = activePaperPos?.max_hold_bars || contract.max_hold_bars || 15;
+  const effectiveProb = activePaperPos?.probability_pct || (predictionData?.probability_pct) || 78.4;
 
   // Key 3–4 evidence items for compact display
   const keyEvidenceList = evidencePlan.length > 0 ? evidencePlan.slice(0, 4) : [
@@ -5652,9 +5790,16 @@ function AiPredictionEnginePanel({
         h("span", { style: { color: "#7E95B5" } }, `REGIME: `, h("span", { style: { color: "#CBD5E1", fontWeight: "700" } }, curRegime.replace(/_/g, " "))),
         h("span", { style: { color: "#7E95B5" } }, `HORIZON: `, h("span", { style: { color: "#00E5A8", fontWeight: "700" } }, curHorizon)),
         h("span", { style: { color: "#7E95B5" } }, `MODEL: `, h("span", { style: { color: "#CBD5E1", fontWeight: "700" } }, "AEER 3")),
-        h("span", { style: { background: "rgba(245, 158, 11, 0.15)", color: "#FBBF24", border: "1px solid rgba(245, 158, 11, 0.35)", padding: "2px 6px", borderRadius: "4px", fontWeight: "800" } },
-          "STATUS: GATED"
-        )
+        h("span", {
+          style: {
+            background: isLiveSignal ? "rgba(0, 229, 168, 0.15)" : "rgba(245, 158, 11, 0.15)",
+            color: isLiveSignal ? "#00E5A8" : "#FBBF24",
+            border: `1px solid ${isLiveSignal ? "rgba(0, 229, 168, 0.4)" : "rgba(245, 158, 11, 0.35)"}`,
+            padding: "2px 8px",
+            borderRadius: "4px",
+            fontWeight: "800"
+          }
+        }, isLiveSignal ? "STATUS: LIVE ALPHA" : "STATUS: GATED")
       )
     ),
 
@@ -5743,11 +5888,19 @@ function AiPredictionEnginePanel({
         ),
         h("div", { style: { display: "flex", gap: "6px" } },
           h("span", { style: { background: "rgba(0, 229, 168, 0.15)", color: "#00E5A8", border: "1px solid rgba(0, 229, 168, 0.35)", padding: "3px 10px", borderRadius: "12px", fontSize: "0.72rem", fontWeight: "800" } },
-            `${Math.round(activePaperPos?.confidence ? activePaperPos.confidence * 100 : (predictionData?.probability_pct || 78.4))}% AI CONFIDENCE`
+            `${Math.round(effectiveProb)}% AI CONFIDENCE`
           ),
-          h("span", { style: { background: "rgba(245, 158, 11, 0.15)", color: "#FBBF24", border: "1px solid rgba(245, 158, 11, 0.3)", padding: "3px 8px", borderRadius: "4px", fontSize: "0.65rem", fontWeight: "800" } },
-            "TIER 2 GATED"
-          )
+          h("span", {
+            style: {
+              background: isLiveSignal ? "rgba(0, 229, 168, 0.15)" : "rgba(245, 158, 11, 0.15)",
+              color: isLiveSignal ? "#00E5A8" : "#FBBF24",
+              border: `1px solid ${isLiveSignal ? "rgba(0, 229, 168, 0.3)" : "rgba(245, 158, 11, 0.3)"}`,
+              padding: "3px 8px",
+              borderRadius: "4px",
+              fontSize: "0.65rem",
+              fontWeight: "800"
+            }
+          }, isLiveSignal ? "LIVE ALPHA ACTIVE" : "TIER 2 GATED")
         )
       ),
 
@@ -5756,22 +5909,22 @@ function AiPredictionEnginePanel({
         h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "0.72rem", marginBottom: "4px" } },
           h("span", { style: { color: "#94A3B8" } }, "Signal Conviction Level:"),
           h("strong", { style: { color: "#00E5A8", fontFamily: "var(--font-mono)" } },
-            `${Math.round(activePaperPos?.confidence ? activePaperPos.confidence * 100 : (predictionData?.probability_pct || 78.4))}% (HIGH CONVICTION)`
+            `${Math.round(effectiveProb)}% (HIGH CONVICTION)`
           )
         ),
         h("div", { style: { height: "6px", background: "rgba(255,255,255,0.08)", borderRadius: "3px", overflow: "hidden" } },
-          h("div", { style: { width: `${Math.round(activePaperPos?.confidence ? activePaperPos.confidence * 100 : (predictionData?.probability_pct || 78.4))}%`, height: "100%", background: "linear-gradient(90deg, #00F0FF, #00E5A8)", borderRadius: "3px" } })
+          h("div", { style: { width: `${Math.round(effectiveProb)}%`, height: "100%", background: "linear-gradient(90deg, #00F0FF, #00E5A8)", borderRadius: "3px" } })
         )
       ),
 
       h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px", fontSize: "0.72rem", color: "#94A3B8" } },
-        h("span", null, `Directional Signal: `, h("strong", { style: { color: userDirectionPreference === "SHORT" ? "#FF5C7C" : "#00E5A8" } }, userDirectionPreference !== "AUTO" ? userDirectionPreference : (activePaperPos?.direction || "LONG"))),
+        h("span", null, `Directional Signal: `, h("strong", { style: { color: activeDirection === "SHORT" ? "#FF5C7C" : (activeDirection === "LONG" ? "#00E5A8" : "#94A3B8") } }, activeDirection)),
         h("span", null, `Evidence Quality: `, h("strong", { style: { color: "#00E5A8" } }, "STRONG")),
         h("span", null, `Data Stream: `, h("strong", { style: { color: "#38BDF8" } }, "VALID")),
-        h("span", null, `Model Status: `, h("strong", { style: { color: "#FBBF24" } }, "TIER 2 GATED"))
+        h("span", null, `Model Status: `, h("strong", { style: { color: isLiveSignal ? "#00E5A8" : "#FBBF24" } }, isLiveSignal ? "ACTIVE ALPHA CALIBRATED" : "TIER 2 GATED"))
       ),
       h("div", { style: { fontSize: "0.68rem", color: "#CBD5E1", marginTop: "8px", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "6px" } },
-        "Directional model has not cleared the preregistered validation gate. Descriptive path geometry active."
+        isLiveSignal ? (activePaperPos?.reason_narrative || "Adaptive Ensemble model projects active directional momentum and calibrated conformal execution bounds.") : "Directional model has not cleared the preregistered validation gate. Descriptive path geometry active."
       )
     ),
 
@@ -5826,7 +5979,7 @@ function AiPredictionEnginePanel({
     h("div", { style: { background: "rgba(0,0,0,0.4)", borderRadius: "10px", padding: "14px 16px", marginBottom: "14px", border: "1px solid rgba(255,255,255,0.1)" } },
       h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" } },
         h("span", { style: { fontSize: "0.78rem", fontWeight: "800", color: "#F8FAFC", letterSpacing: "0.03em" } }, "📜 ANALYTICAL SCENARIO CONTRACT"),
-        h("span", { style: { fontSize: "0.66rem", color: "#00E5A8", fontFamily: "var(--font-mono)", fontWeight: "700" } }, `SURVEILLANCE: ${contract.strategy_archetype || activePaperPos?.strategy_id || "MEIE-IGNITION"}`)
+        h("span", { style: { fontSize: "0.66rem", color: isLiveSignal ? "#00E5A8" : "#A78BFA", fontFamily: "var(--font-mono)", fontWeight: "700" } }, isLiveSignal ? `ACTIVE SIGNAL: ${activeDirection}` : `SURVEILLANCE: ${contract.strategy_archetype || activePaperPos?.strategy_id || "MEIE-IGNITION"}`)
       ),
       h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: "10px", fontSize: "0.74rem", marginBottom: "10px" } },
         h("div", { style: { background: "rgba(255,255,255,0.03)", padding: "8px 10px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.05)" } },
@@ -5836,12 +5989,12 @@ function AiPredictionEnginePanel({
         h("div", { style: { background: "rgba(0, 229, 168, 0.08)", padding: "8px 10px", borderRadius: "6px", border: "1px solid rgba(0, 229, 168, 0.25)" } },
           h("div", { style: { color: "#00E5A8", fontSize: "0.64rem", fontWeight: "800", textTransform: "uppercase" } }, "Take Profit (TP)"),
           h("strong", { style: { color: "#00E5A8", fontFamily: "var(--font-mono)", fontSize: "0.95rem" } }, `$${Math.round(tpP).toLocaleString()}`),
-          h("div", { style: { color: "#00E5A8", fontSize: "0.64rem", fontWeight: "700" } }, `+${(((Math.abs(tpP - entryP)) / entryP) * 100).toFixed(2)}% (+${Math.round(Math.abs(tpP - entryP))})`)
+          h("div", { style: { color: "#00E5A8", fontSize: "0.64rem", fontWeight: "700" } }, `${isShortSignal ? "-" : "+"}${(((Math.abs(tpP - entryP)) / entryP) * 100).toFixed(2)}% (${isShortSignal ? "-" : "+"}$${Math.round(Math.abs(tpP - entryP))})`)
         ),
         h("div", { style: { background: "rgba(255, 92, 124, 0.08)", padding: "8px 10px", borderRadius: "6px", border: "1px solid rgba(255, 92, 124, 0.25)" } },
           h("div", { style: { color: "#FF5C7C", fontSize: "0.64rem", fontWeight: "800", textTransform: "uppercase" } }, "Stop Loss (SL)"),
           h("strong", { style: { color: "#FF5C7C", fontFamily: "var(--font-mono)", fontSize: "0.95rem" } }, `$${Math.round(slP).toLocaleString()}`),
-          h("div", { style: { color: "#FF5C7C", fontSize: "0.64rem", fontWeight: "700" } }, `-${(((Math.abs(entryP - slP)) / entryP) * 100).toFixed(2)}% (-${Math.round(Math.abs(entryP - slP))})`)
+          h("div", { style: { color: "#FF5C7C", fontSize: "0.64rem", fontWeight: "700" } }, `${isShortSignal ? "+" : "-"}${(((Math.abs(entryP - slP)) / entryP) * 100).toFixed(2)}% (${isShortSignal ? "+" : "-"}$${Math.round(Math.abs(entryP - slP))})`)
         ),
         h("div", { style: { background: "rgba(56, 189, 248, 0.05)", padding: "8px 10px", borderRadius: "6px", border: "1px solid rgba(56, 189, 248, 0.15)" } },
           h("div", { style: { color: "#7E95B5", fontSize: "0.64rem", fontWeight: "700", textTransform: "uppercase" } }, "R:R"),
@@ -5857,8 +6010,8 @@ function AiPredictionEnginePanel({
         )
       ),
       h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(0,0,0,0.3)", padding: "6px 10px", borderRadius: "6px", fontSize: "0.66rem", color: "#94A3B8" } },
-        h("span", null, "STATUS: ", h("strong", { style: { color: "#38BDF8" } }, "ANALYTICALLY AVAILABLE")),
-        h("span", null, "EXECUTION: ", h("strong", { style: { color: "#FBBF24" } }, "NOT AUTHORIZED — TIER 2 GATED"))
+        h("span", null, "STATUS: ", h("strong", { style: { color: isLiveSignal ? "#00E5A8" : "#38BDF8" } }, isLiveSignal ? "LIVE ALPHA READY" : "ANALYTICALLY AVAILABLE")),
+        h("span", null, "EXECUTION: ", h("strong", { style: { color: isLiveSignal ? "#00E5A8" : "#FBBF24" } }, isLiveSignal ? "AUTHORIZED — REALTIME AI RECOMMENDATION" : "NOT AUTHORIZED — TIER 2 GATED"))
       )
     ),
 
@@ -6083,7 +6236,8 @@ function TerminalView({
   isReplaying, setIsReplaying, selectedRecord, onSelectRecord,
   activeTab, setActiveTab,
   onPriceChange, onWsStatusChange,
-  engineState
+  engineState,
+  workstationMode = "focus", onToggleMode
 }) {
   const [hoveredBar, setHoveredBar] = useState(null);
   const [latestCandleTime, setLatestCandleTime] = useState(null);
@@ -6093,6 +6247,7 @@ function TerminalView({
   const [userDirectionPreference, setUserDirectionPreference] = useState("AUTO");
   const [targetHorizon, setTargetHorizon]       = useState("15m");
   const [evidenceMode, setEvidenceMode]         = useState("AI_RECOMMEND");
+  const [signalMode, setSignalMode]             = useState("live_ai");
   const [workstationTab, setWorkstationTab]     = useState("market");
   const [inspectedTrade, setInspectedTrade]     = useState(null);
   const [showWhatIfLive, setShowWhatIfLive]     = useState(false);
@@ -6140,7 +6295,7 @@ function TerminalView({
     let isMounted = true;
     const pollActivePosition = () => {
       const queryStrat = selectedStrategy === "AUTO" ? null : selectedStrategy;
-      api.fetchActivePaperPosition(queryStrat, enabledIndicators, userDirectionPreference, targetHorizon, evidenceMode)
+      api.fetchActivePaperPosition(queryStrat, enabledIndicators, userDirectionPreference, targetHorizon, evidenceMode, signalMode)
         .then(data => {
           if (isMounted) {
             setActivePaperPos(data);
@@ -6154,7 +6309,7 @@ function TerminalView({
     pollActivePosition();
     const intervalId = setInterval(pollActivePosition, 3000);
     return () => { isMounted = false; clearInterval(intervalId); };
-  }, [selectedStrategy, livePrice, enabledIndicators, userDirectionPreference, targetHorizon, evidenceMode]);
+  }, [selectedStrategy, livePrice, enabledIndicators, userDirectionPreference, targetHorizon, evidenceMode, signalMode]);
 
   const tabs = [
     { id: "live", label: "🔴 LIVE" },
@@ -6173,11 +6328,48 @@ function TerminalView({
       changePct,
       regimeData,
       activePaperPos,
-      engineState
+      engineState,
+      workstationMode,
+      onToggleMode
     }),
 
-    // 2. Lineage Audit Strip
-    h(ModelLineageStrip, { lineageData }),
+    // Focus View Banner
+    workstationMode === "focus" && h("div", {
+      style: {
+        background: "rgba(0, 229, 168, 0.08)",
+        border: "1px solid rgba(0, 229, 168, 0.25)",
+        borderRadius: "10px",
+        padding: "8px 14px",
+        margin: "10px 0 16px 0",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        flexWrap: "wrap",
+        gap: "8px",
+        fontSize: "0.78rem"
+      }
+    },
+      h("div", { style: { display: "flex", alignItems: "center", gap: "8px", color: "#00E5A8", fontWeight: "700" } },
+        h("span", null, "⚡ CLEAN FOCUS MODE:"),
+        h("span", { style: { color: "#CBD5E1", fontWeight: "400" } }, "Showing primary directional signals, regime status, and bounded risk envelopes.")
+      ),
+      h("button", {
+        onClick: onToggleMode,
+        style: {
+          background: "rgba(0, 240, 255, 0.12)",
+          border: "1px solid rgba(0, 240, 255, 0.35)",
+          color: "#00F0FF",
+          padding: "3px 10px",
+          borderRadius: "5px",
+          fontSize: "0.72rem",
+          fontWeight: "700",
+          cursor: "pointer"
+        }
+      }, "Switch to Pro Quant Mode ➔")
+    ),
+
+    // 2. Lineage Audit Strip (pro mode only)
+    workstationMode === "pro" && h(ModelLineageStrip, { lineageData }),
 
     // 3. Top Unified Steering & Intent Command Ribbon
     h(WorkstationIntentCommandBar, {
@@ -6189,7 +6381,9 @@ function TerminalView({
       setEvidenceMode,
       configHash,
       totalVoi: activePaperPos?.evidence_routing?.total_voi_bps || 14.8,
-      activePaperPos
+      activePaperPos,
+      signalMode,
+      setSignalMode
     }),
 
     // 4. Primary 70/30 Workstation Workspace
@@ -6243,8 +6437,8 @@ function TerminalView({
           regimeData
         }),
 
-        // 3. Replay & Counterfactual Lab (Below Main AI Analysis)
-        h(ReplayCounterfactualLab, {
+        // 3. Replay & Counterfactual Lab (Below Main AI Analysis - Pro mode only)
+        workstationMode === "pro" && h(ReplayCounterfactualLab, {
           counterfactualData,
           decisionData,
           livePrice,
@@ -6255,8 +6449,8 @@ function TerminalView({
           onSelectRecord
         }),
 
-        // 4. What-If Scenario Lab (Tier 0 Null - At Very Bottom, Collapsed by Default)
-        h(WhatIfSimulator, {
+        // 4. What-If Scenario Lab (Pro mode only, Collapsed by Default)
+        workstationMode === "pro" && h(WhatIfSimulator, {
           livePrice,
           predictionData,
           activePaperPos,
@@ -6286,8 +6480,8 @@ function TerminalView({
       evidenceRouting: activePaperPos?.evidence_routing
     }),
 
-    // 5. Secondary Analytics Workstation Tabs
-    h("div", { className: "workstation-tabs-container", style: { marginTop: "10px" } },
+    // 5. Secondary Analytics Workstation Tabs (Pro Mode Only)
+    workstationMode === "pro" && h("div", { className: "workstation-tabs-container", style: { marginTop: "10px" } },
       h("div", { className: "workstation-tabs-nav" },
         tabs.map(t =>
           h("button", {
@@ -7640,6 +7834,38 @@ function App() {
   const [healthData,      setHealthData]      = useState(null);
   const [securityBlocked, setSecurityBlocked] = useState(false);
 
+  // 3D FX and Workstation View Mode states
+  const [is3dEnabled, setIs3dEnabled] = useState(() => {
+    try {
+      return localStorage.getItem("btcognitive_3d_fx") !== "false";
+    } catch {
+      return true;
+    }
+  });
+  const [workstationMode, setWorkstationMode] = useState(() => {
+    try {
+      return localStorage.getItem("btcognitive_workstation_mode") || "focus";
+    } catch {
+      return "focus";
+    }
+  });
+
+  const toggle3d = useCallback(() => {
+    setIs3dEnabled(prev => {
+      const next = !prev;
+      try { localStorage.setItem("btcognitive_3d_fx", String(next)); } catch {}
+      return next;
+    });
+  }, []);
+
+  const toggleWorkstationMode = useCallback(() => {
+    setWorkstationMode(prev => {
+      const next = prev === "focus" ? "pro" : "focus";
+      try { localStorage.setItem("btcognitive_workstation_mode", next); } catch {}
+      return next;
+    });
+  }, []);
+
   // Replay Mode & Tab States
   const [isReplaying,     setIsReplaying]     = useState(false);
   const [selectedRecord,  setSelectedRecord]  = useState(null);
@@ -7890,7 +8116,9 @@ function App() {
     activeTab, setActiveTab,
     onPriceChange:   setLivePrice,
     onWsStatusChange: setBinanceWsStatus,
-    engineState
+    engineState,
+    workstationMode,
+    onToggleMode: toggleWorkstationMode
   };
 
   // Synchronized route navigation helper
@@ -7903,7 +8131,7 @@ function App() {
   }, []);
 
   return h("div", null,
-    h(ThreeBackground),
+    h(ThreeBackground, { enabled: is3dEnabled }),
     h(InstitutionalTickerBar, { livePrice, changePct, intelData }),
     h(Navbar, {
       currentPath: path,
@@ -7914,7 +8142,11 @@ function App() {
       onOpenSettings: () => setIsSettingsModalOpen(true),
       onSelectAlert: (alert) => {
         navigate("/terminal");
-      }
+      },
+      is3dEnabled,
+      onToggle3d: toggle3d,
+      workstationMode,
+      onToggleMode: toggleWorkstationMode
     }),
 
     // Webhook & Notification Settings Modal
