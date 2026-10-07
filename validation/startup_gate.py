@@ -17,6 +17,7 @@ import sys
 import json
 import hashlib
 import logging
+import subprocess
 from typing import Dict, Any, Tuple, Optional
 import numpy as np
 
@@ -34,6 +35,18 @@ logger = logging.getLogger("btcognitive.startup_gate")
 FREEZE_DIR = os.path.join(RESULTS_DIR, "freeze")
 REPAIRED_MANIFEST_PATH = os.path.join(FREEZE_DIR, "repaired_scientific_contract_manifest.json")
 MODEL_ARTIFACT_PATH = os.path.join(FREEZE_DIR, "har_rs_dow_v1.joblib")
+FULL_FREEZE_VERIFIER_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "research",
+    "verify_freeze_manifest.py",
+)
+
+
+class FreezeIntegrityError(RuntimeError):
+    def __init__(self, state: str, code: str, details: str):
+        self.state = state
+        self.code = code
+        super().__init__(details)
 
 
 def sha256_file(path: str) -> str:
@@ -60,6 +73,72 @@ def sha256_numpy_array(arr: np.ndarray) -> str:
     h.update(header)
     h.update(arr.tobytes())
     return h.hexdigest()
+
+
+def verify_full_freeze_integrity() -> bool:
+    """Run the full verifier; changed frozen inputs or numeric packages block production."""
+    env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "utf-8"
+    try:
+        result = subprocess.run(
+            [sys.executable, FULL_FREEZE_VERIFIER_PATH],
+            cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=env,
+            timeout=120,
+            check=False,
+        )
+    except Exception as exc:
+        raise FreezeIntegrityError(
+            "MODEL_FAILURE",
+            "FULL_FREEZE_VERIFIER_DID_NOT_RUN",
+            f"Full freeze verifier could not run: {type(exc).__name__}",
+        ) from exc
+
+    output = result.stdout or ""
+    blocking_warnings = [
+        line.strip()
+        for line in output.splitlines()
+        if "WARN   Training data" in line
+        or "WARN   Package" in line
+        or "WARN   Python version" in line
+    ]
+    if result.returncode != 0 or blocking_warnings:
+        lines = output.splitlines()
+        missing_data = any("FAIL   Training data" in line for line in lines)
+        changed_data = any("WARN   Training data" in line for line in lines)
+        runtime_drift = any(
+            "WARN   Package" in line or "WARN   Python version" in line
+            for line in lines
+        )
+        model_failure = any(
+            "FAIL   Model artifact" in line
+            or "FAIL   Model coefficient" in line
+            or "FAIL   Package" in line
+            or "FAIL   Python version" in line
+            for line in lines
+        )
+        if missing_data:
+            state, code = "DATA_UNAVAILABLE", "FROZEN_INPUT_MISSING"
+        elif model_failure:
+            state, code = "MODEL_FAILURE", "FROZEN_MODEL_OR_RUNTIME_INVALID"
+        elif changed_data:
+            state, code = "PROVENANCE_FAILURE", "FROZEN_INPUT_HASH_MISMATCH"
+        elif runtime_drift:
+            state, code = "MODEL_FAILURE", "FROZEN_RUNTIME_MISMATCH"
+        else:
+            state, code = "PROVENANCE_FAILURE", "FREEZE_VERIFICATION_FAILED"
+        details = output[-4000:] if result.returncode != 0 else "\n".join(blocking_warnings)
+        raise FreezeIntegrityError(
+            state,
+            code,
+            "Full scientific freeze verification failed. Canonical forecasts are unavailable.\n"
+            f"{details}",
+        )
+    return True
 
 
 def extract_pipeline_coefficients_hash(pipe) -> str:

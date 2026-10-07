@@ -290,3 +290,140 @@ def test_tier_0_geometric_touch_martingale_null():
     t0_geom = res_geom_sym["tier_0_geometric_touch"]
     assert t0_geom["log_symmetry"]["is_log_symmetric"] is True
     assert abs(t0_geom["p_upper_p90"] - 0.50) < 1e-4
+
+
+def test_prospective_features_5_arm_ablation():
+    """
+    Ablation Study: 5-Arm Protocol for Prospective Contextual Features
+      Arm 1: BASELINE (Core microstructure & volatility only)
+      Arm 2: BASELINE + SESSION
+      Arm 3: BASELINE + SWEEP
+      Arm 4: BASELINE + DERIVATIVES
+      Arm 5: BASELINE + ALL_THREE
+
+    Verifies:
+      - Systematic, isolated measurement of incremental routing change.
+      - Absence of directional trade signal across all 5 arms (epistemic isolation).
+      - Registration of PROSPECTIVE_ROUTING_PRIOR in provenance.
+    """
+    snap = {
+        "spot_price": 64000.0,
+        "conformal_p90": 64800.0,
+        "conformal_p10": 63200.0,
+        "ofi": 0.45,
+        "hawkes": 1.9,
+        "vpin": 0.32,
+        "funding": 0.00018,
+        "open_interest": 2.5,
+        "rv_5m": 0.0025,
+        "session_state": "NY_LONDON_OVERLAP",
+        "sweep_candidate": True,
+        "derivatives_quadrant": "PRICE_UP_OI_UP"
+    }
+
+    base_set = ["ofi", "hawkes", "vpin", "rv_5m"]
+
+    # Arm 1: BASELINE
+    arm1 = adaptive_evidence_router.decompose_decision_questions(
+        horizon="15m", market_snapshot=snap, active_sparse_indicators=base_set
+    )
+    # Arm 2: BASELINE + SESSION
+    arm2 = adaptive_evidence_router.decompose_decision_questions(
+        horizon="15m", market_snapshot=snap, active_sparse_indicators=base_set + ["session_state"]
+    )
+    # Arm 3: BASELINE + SWEEP
+    arm3 = adaptive_evidence_router.decompose_decision_questions(
+        horizon="15m", market_snapshot=snap, active_sparse_indicators=base_set + ["sweep_candidate"]
+    )
+    # Arm 4: BASELINE + DERIVATIVES
+    arm4 = adaptive_evidence_router.decompose_decision_questions(
+        horizon="15m", market_snapshot=snap, active_sparse_indicators=base_set + ["derivatives_quadrant"]
+    )
+    # Arm 5: BASELINE + ALL_THREE
+    arm5 = adaptive_evidence_router.decompose_decision_questions(
+        horizon="15m", market_snapshot=snap, active_sparse_indicators=base_set + ["session_state", "sweep_candidate", "derivatives_quadrant"]
+    )
+
+    arms = [arm1, arm2, arm3, arm4, arm5]
+
+    # Invariance and arm tagging across all 5 arms
+    assert arm1["provenance"]["ablation_arm"] == "A1_BASELINE"
+    assert arm2["provenance"]["ablation_arm"] == "A2_BASELINE_PLUS_SESSION"
+    assert arm3["provenance"]["ablation_arm"] == "A3_BASELINE_PLUS_SWEEP"
+    assert arm4["provenance"]["ablation_arm"] == "A4_BASELINE_PLUS_DERIVATIVES"
+    assert arm5["provenance"]["ablation_arm"] == "A5_BASELINE_PLUS_ALL_THREE"
+
+    for i, arm in enumerate(arms, start=1):
+        prov = arm["provenance"]
+        assert prov["is_directional_trade_signal"] is False, f"Arm {i} leaked directional bias"
+        assert prov["epistemic_classification"] == "PROSPECTIVE_ROUTING_PRIOR"
+        assert "routing_prior_config_hash" in prov
+        assert prov["observation_id"].startswith("obs_")
+        assert prov["decision_timestamp"] is not None
+        assert prov["outcome_timestamp"] is None
+        assert prov["feature_set_hash"] is not None
+
+    # Arm 2: session_state enters Q7
+    assert "session_state" in arm2["questions"]["Q7_REGIME_COMPATIBILITY"]["assigned_indicators"]
+    assert "session_state" not in arm1["questions"]["Q7_REGIME_COMPATIBILITY"]["assigned_indicators"]
+
+    # Arm 3: sweep_candidate enters Q2
+    assert "sweep_candidate" in arm3["questions"]["Q2_CONTINUATION"]["assigned_indicators"]
+    assert "sweep_candidate" not in arm1["questions"]["Q2_CONTINUATION"]["assigned_indicators"]
+
+    # Arm 4: derivatives_quadrant enters Q3
+    assert "derivatives_quadrant" in arm4["questions"]["Q3_EXHAUSTION"]["assigned_indicators"]
+    assert "derivatives_quadrant" not in arm1["questions"]["Q3_EXHAUSTION"]["assigned_indicators"]
+
+    # Arm 5: contains all three
+    arm5_assigned = {
+        ind for q in arm5["questions"].values() for ind in q.get("assigned_indicators", [])
+    }
+    assert {"session_state", "sweep_candidate", "derivatives_quadrant"}.issubset(arm5_assigned)
+
+
+def test_information_value_vs_heuristic_weighting_ablation():
+    """
+    Distinguishes raw information value from heuristic weighting:
+      RAW FEATURE (use_neutral_priors=True, multiplier=1.0)
+      vs
+      FEATURE + CURRENT MULTIPLIER (use_neutral_priors=False)
+    """
+    snap_active = {
+        "session_state": "NY_LONDON_OVERLAP",
+        "sweep_candidate": True,
+        "derivatives_quadrant": "PRICE_UP_OI_UP"
+    }
+
+    # 1. Sweep candidate
+    rel_raw_sweep = adaptive_evidence_router.compute_routing_relevance(
+        "sweep_candidate", [], "15m", market_snapshot=snap_active, use_neutral_priors=True
+    )
+    rel_weighted_sweep = adaptive_evidence_router.compute_routing_relevance(
+        "sweep_candidate", [], "15m", market_snapshot=snap_active, use_neutral_priors=False
+    )
+    # Raw has positive base utility * affinity
+    assert rel_raw_sweep["routing_relevance_bps"] > 0.0
+    # Heuristic multiplier scales relevance up by 1.35x
+    assert rel_weighted_sweep["routing_relevance_bps"] > rel_raw_sweep["routing_relevance_bps"]
+
+    # 2. Session state
+    rel_raw_sess = adaptive_evidence_router.compute_routing_relevance(
+        "session_state", [], "15m", market_snapshot=snap_active, use_neutral_priors=True
+    )
+    rel_weighted_sess = adaptive_evidence_router.compute_routing_relevance(
+        "session_state", [], "15m", market_snapshot=snap_active, use_neutral_priors=False
+    )
+    assert rel_raw_sess["routing_relevance_bps"] > 0.0
+    assert rel_weighted_sess["routing_relevance_bps"] > rel_raw_sess["routing_relevance_bps"]
+
+    # 3. Derivatives quadrant
+    rel_raw_dq = adaptive_evidence_router.compute_routing_relevance(
+        "derivatives_quadrant", [], "15m", market_snapshot=snap_active, use_neutral_priors=True
+    )
+    rel_weighted_dq = adaptive_evidence_router.compute_routing_relevance(
+        "derivatives_quadrant", [], "15m", market_snapshot=snap_active, use_neutral_priors=False
+    )
+    assert rel_raw_dq["routing_relevance_bps"] > 0.0
+    assert rel_weighted_dq["routing_relevance_bps"] > rel_raw_dq["routing_relevance_bps"]
+

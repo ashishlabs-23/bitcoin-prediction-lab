@@ -1,0 +1,13 @@
+# Entry/TP/SL research-track direct dependency pins.
+# Resolve and hash transitives into requirements.lock for the target platform.
+numpy==2.3.2
+pandas==3.0.5
+scipy==1.18.0
+scikit-learn==1.9.0
+lightgbm==4.7.0
+pytest==8.4.1
+pytest-asyncio==0.23.7
+anyio==4.13.0
+pytest-timeout==2.4.0
+jsonschema==4.26.0
+hypothesis==6.168.5

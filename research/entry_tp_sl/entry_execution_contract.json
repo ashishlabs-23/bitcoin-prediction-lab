@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract_id": "BTC_ENTRY_TP_SL_ENTRY_EXECUTION_CONTRACT_V1",
+  "version": "1.0.0",
+  "created_at_utc": "2026-10-07T16:30:00Z",
+  "status": "FROZEN",
+  "execution_mechanism": {
+    "order_type": "MARKETABLE_TAKER_ORDER",
+    "liquidity_role": "TAKER",
+    "execution_trigger": "CLOSE_OF_DECISION_BAR",
+    "fill_timing_model": "NEXT_1M_BAR_OPEN",
+    "fill_timestamp_formula": "decision_timestamp + 60 seconds",
+    "entry_price_basis": "OPEN_PRICE_OF_NEXT_1M_BAR"
+  },
+  "fill_failure_and_gap_policy": {
+    "missing_fill_bar_policy": "FAIL_CLOSED_DATA_GAP",
+    "gap_at_open_policy": "FILL_AT_ACTUAL_OPEN",
+    "max_allowed_entry_gap_pct": 2.0,
+    "cancellation_on_gap_exceeded": true
+  },
+  "execution_cost_scenarios": {
+    "BASE": {
+      "scenario_name": "BASE",
+      "entry_taker_fee_bps": 10.0,
+      "exit_taker_fee_bps": 10.0,
+      "entry_slippage_bps": 5.0,
+      "exit_slippage_bps": 5.0,
+      "half_spread_bps": 2.5,
+      "total_round_trip_cost_bps": 35.0,
+      "total_round_trip_cost_fraction": 0.0035
+    },
+    "CONSERVATIVE": {
+      "scenario_name": "CONSERVATIVE",
+      "entry_taker_fee_bps": 15.0,
+      "exit_taker_fee_bps": 15.0,
+      "entry_slippage_bps": 10.0,
+      "exit_slippage_bps": 15.0,
+      "half_spread_bps": 5.0,
+      "total_round_trip_cost_bps": 65.0,
+      "total_round_trip_cost_fraction": 0.0065
+    }
+  },
+  "invariants": {
+    "no_limit_retest_assumption": true,
+    "no_data_snooped_slippage_tuning": true,
+    "costs_are_strictly_positive_deductions": true
+  }
+}

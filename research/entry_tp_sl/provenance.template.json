@@ -1,0 +1,52 @@
+{
+  "record_version": "1.0.0",
+  "track_id": "BTC-ENTRY-TP-SL-V3",
+  "record_id": "CANDIDATE-KAGGLE-mczielinski-bitcoin-historical-data-v745",
+  "status": "UNVERIFIED",
+  "observed_at_utc": "2026-10-07T00:00:00Z",
+  "source": {
+    "provider": "Kaggle",
+    "dataset_ref": "mczielinski/bitcoin-historical-data",
+    "version": 745,
+    "source_url": "https://www.kaggle.com/datasets/mczielinski/bitcoin-historical-data",
+    "license": "CC BY-SA 4.0 (Kaggle-declared)",
+    "license_status": "REVIEW_REQUIRED",
+    "upstream_source": "Bitstamp BTC/USD spot OHLCV API per publisher documentation",
+    "source_commit": null
+  },
+  "artifact": {
+    "name": "btcusd_1-min_data.csv",
+    "sha256": null,
+    "immutable_object_id": null,
+    "bytes": 393952273
+  },
+  "instrument": {
+    "venue": "Bitstamp",
+    "symbol": "BTC/USD",
+    "product_type": "spot",
+    "base_asset": "BTC",
+    "quote_asset": "USD",
+    "settlement_asset": "USD"
+  },
+  "time_semantics": {
+    "timestamp_unit": "unix_seconds",
+    "timestamp_role": "UNVERIFIED",
+    "timezone": "UTC",
+    "event_time_rule": null,
+    "available_time_rule": null,
+    "status": "UNVERIFIED"
+  },
+  "transformations": [],
+  "exclusions": {
+    "har_ohlcv": true,
+    "har_artifact": true,
+    "iv7d": true
+  },
+  "parent_record_hash": null,
+  "record_hash": null,
+  "notes": [
+    "Metadata candidate only; the dataset archive is not present in the workspace or a Drive object.",
+    "The publisher's automation indicates Unix-second timestamps but does not establish open-versus-close labeling or historical available_time.",
+    "Do not use until source rights, timestamps, PIT availability, byte hash, and gap audit pass."
+  ]
+}

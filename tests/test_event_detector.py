@@ -161,3 +161,16 @@ class TestDetectEvent:
         sv = make_sv()
         event = detect_event(sv)
         assert event.timestamp is not None and len(event.timestamp) > 0
+
+    def test_detected_event_has_sweep_observables(self):
+        sv = make_sv()
+        event = detect_event(sv)
+        assert hasattr(event, "extreme_pierced")
+        assert event.extreme_pierced in ("HIGH_PIERCED", "LOW_PIERCED", "NONE")
+        assert hasattr(event, "sweep_candidate")
+        assert isinstance(event.sweep_candidate, bool)
+
+        d = event.to_dict()
+        assert "extreme_pierced" in d
+        assert "sweep_candidate" in d
+

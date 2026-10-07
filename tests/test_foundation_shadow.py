@@ -34,5 +34,25 @@ def test_get_research_foundation_models_endpoint():
 
     data = resp.json()
     assert data["title"] == "BTCUSD FORECAST MODEL BENCHMARK"
-    assert len(data["leaderboard"]) >= 8
-    assert data["leaderboard"][0]["model"] == "Ridge + Volatility Context"
+    assert data["status"] == "UNAVAILABLE_NOT_EXECUTED"
+    assert data["authoritative"] is False
+    assert data["leaderboard"] == []
+
+
+def test_model_leaderboards_do_not_publish_synthetic_foundation_scores(monkeypatch):
+    from types import SimpleNamespace
+    from engine.forecast_intelligence import forecast_intelligence_orchestrator
+
+    monkeypatch.setattr(
+        forecast_intelligence_orchestrator.range_service,
+        "generate_forecast",
+        lambda **kwargs: SimpleNamespace(upper_p90=1.0, lower_p90=0.5),
+    )
+    all_models = client.get("/research/models").json()
+    assert all_models["foundation_models"]["status"] == "UNAVAILABLE_NOT_EXECUTED"
+    assert all_models["foundation_models"]["leaderboard"] == []
+
+    intelligence = client.get("/prediction/intelligence").json()
+    research = intelligence["research_forecasts"]
+    assert research["status"] == "UNAVAILABLE_NOT_EXECUTED"
+    assert research["models"] == {}

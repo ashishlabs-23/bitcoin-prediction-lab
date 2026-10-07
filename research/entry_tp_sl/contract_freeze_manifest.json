@@ -1,0 +1,18 @@
+{
+  "contract_file_hashes": {
+    "PREREGISTRATION_v1.md": "38050919334b13d91a91d9e84ad726ab819cd7b3f8884621a31a362379c8ee89",
+    "data_intake_manifest.json": "1cbebacf4083d8b2f18eed41fc7bc762a5ca934741a04e1e25da604b52b4f976",
+    "decision_contract.json": "3ac4f0d2b93488abda84dc78a907749d6ae08acb22ff651c41749b9a4a3d1268",
+    "entry_execution_contract.json": "0dc17ced1be5f7fd9219bfb22c49fc19b45618e04799a6f8067c02f10b4b6361",
+    "instrument_contract.json": "ce441c4a1e63bd209ad478ceb234d35114d8c86e851ded46b72ee47c2007f9e7",
+    "outcome_accounting_contract.json": "fc9578c0195249faed6912001add1356355c513e38771bf8d37a8168a93d5a28",
+    "resolver_contract.md": "3b076bd5c21244e32347dba3f0ee466f034730437b270e82714e32ca6700163f",
+    "resolver_decision.md": "0de45db4b93324aab1e7c45b0cbb758e55e09a203e3cd7290eef29f1b4d38947"
+  },
+  "contract_version": "1.0.0",
+  "dataset_sha256": "1bf91f2789846af29d60a9c15e780b565b63a85c286e83080ac28bf4bf7d1287",
+  "environment_fingerprint": "1f327cf5edf52a160282f6f2f08ad8b4536a161851dc5cea4e25cfa770c6ea62",
+  "freeze_timestamp_utc": "2026-10-07T16:30:00Z",
+  "git_commit": "cd1017aa90637bb81b1edf263f620e89346d84ca",
+  "manifest_sha256": "b6b94d69e576be0357ce9249f24ca05fb44430e6e9050a940054833204e0013f"
+}

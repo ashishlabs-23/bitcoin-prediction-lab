@@ -1,0 +1,71 @@
+{
+  "schema_version": "1.0.0",
+  "track_id": "BTC-ENTRY-TP-SL-V3",
+  "status": "DATA_UNAVAILABLE",
+  "candidate_source": {
+    "provider": "Kaggle",
+    "dataset_ref": "mczielinski/bitcoin-historical-data",
+    "version": 745,
+    "version_created_at_utc": "2026-10-07T03:21:34.673Z",
+    "file_name": "btcusd_1-min_data.csv",
+    "file_bytes": 393952273,
+    "source_url": "https://www.kaggle.com/datasets/mczielinski/bitcoin-historical-data",
+    "declared_license": "CC BY-SA 4.0",
+    "upstream_source": "Bitstamp BTC/USD spot OHLCV API (per publisher's updater repository)",
+    "license_review": "REVIEW_REQUIRED"
+  },
+  "instrument": {
+    "status": "CANDIDATE_NOT_FROZEN",
+    "base_asset": "BTC",
+    "quote_asset": "USD",
+    "venue": "Bitstamp",
+    "product_type": "spot",
+    "symbol": "BTC/USD",
+    "settlement_asset": "USD",
+    "margin_mode": null,
+    "tick_size": null,
+    "contract_multiplier": null
+  },
+  "bars": {
+    "decision_interval_seconds": 900,
+    "path_interval_seconds": 60,
+    "timestamp_unit": "unix_seconds",
+    "timestamp_role": "unknown",
+    "timestamp_semantics_status": "UNVERIFIED",
+    "required_columns": ["Timestamp", "Open", "High", "Low", "Close", "Volume"],
+    "available_time_rule": null,
+    "timezone": "UTC"
+  },
+  "availability": {
+    "status": "DATA_UNAVAILABLE",
+    "local_snapshot_present": false,
+    "sha256": null,
+    "row_count": null,
+    "coverage_start_utc": null,
+    "coverage_end_utc": null,
+    "gap_audit_status": "NOT_RUN",
+    "duplicate_count": null,
+    "invalid_ohlc_count": null
+  },
+  "storage": {
+    "preferred_backend": "google_drive",
+    "selected_backend": null,
+    "remote_uri": null,
+    "immutable_object_id": null,
+    "local_cache_path": null
+  },
+  "exclusions": {
+    "har_ohlcv_reused": false,
+    "iv7d_used": false,
+    "har_artifacts_used": false
+  },
+  "rights_status": "REVIEW_REQUIRED",
+  "created_at_utc": "2026-10-07T00:00:00Z",
+  "notes": [
+    "Candidate metadata only; no Kaggle data archive was downloaded or copied into this repository.",
+    "Kaggle lists version 745, 393952273 bytes, CC BY-SA 4.0, and a Bitstamp-derived 1-minute BTC/USD CSV.",
+    "The publisher warns that timestamps may be missing or discontinuous.",
+    "Timestamp open/close boundary, available_time/PIT semantics, exchange data terms, and ShareAlike compatibility require review.",
+    "A Drive file ID plus content SHA-256 is required before a Google Drive object can serve as an immutable snapshot."
+  ]
+}

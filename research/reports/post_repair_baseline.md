@@ -1,6 +1,6 @@
 # 📊 Post-Repair Production Baseline & Hawkes Revalidation Report
 
-**Execution Timestamp:** 2026-09-02T09:00:09.702040+00:00  
+**Execution Timestamp:** 2026-10-07T14:00:58.278131+00:00  
 **Evidence Boundary:** `2026-08-21T12:15:00Z`  
 **Longitudinal State:** `PAUSED_INTEGRITY_REPAIR`  
 
@@ -21,13 +21,13 @@
 
 | Parameter | Value | Provenance Note |
 | :--- | :--- | :--- |
-| Total Shadow Forecasts | 30 | Consolidated full shadow ledger (migrated from secondary DB) |
-| Resolved 5m Outcomes | 4 | Verified closed 5m outcome horizons |
+| Total Shadow Forecasts | 36 | Consolidated full shadow ledger (migrated from secondary DB) |
+| Resolved 5m Outcomes | 5 | Verified closed 5m outcome horizons |
 | Empirical P90 Coverage | 100.00% | Nominal target 88.67% satisfied |
-| Mean MFE Error | 0.0100% | Microstructure excursion accuracy |
-| Mean MAE Error | 0.0651% | Adverse excursion accuracy |
-| Mean Winkler Score | 42.6925 | Conformal interval penalty |
-| N_eff | 4 | Effective independent shadow sample size |
+| Mean MFE Error | 0.0098% | Microstructure excursion accuracy |
+| Mean MAE Error | 0.0627% | Adverse excursion accuracy |
+| Mean Winkler Score | 42.5640 | Conformal interval penalty |
+| N_eff | 5 | Effective independent shadow sample size |
 | Production Promotion Status | BLOCKED (Shadow Model Only) | Hawkes remains non-executing challenger |
 
 

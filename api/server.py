@@ -13,7 +13,6 @@ Configures FastAPI with:
 
 import os
 import sys
-import json
 import logging
 from contextlib import asynccontextmanager
 from typing import List, Dict
@@ -110,7 +109,7 @@ class HardenedConnectionManager:
 ws_manager = HardenedConnectionManager()
 
 
-from validation.startup_gate import verify_scientific_contract
+from validation.startup_gate import verify_full_freeze_integrity, verify_scientific_contract
 
 # ---------------------------------------------------------------------------
 # Application Lifespan Context Manager
@@ -122,6 +121,7 @@ async def lifespan(app: FastAPI):
     logger.info("Verifying scientific freeze contract before startup...")
     # Priority 1 Scientific Startup Gate: refuses startup on tampered artifact or invalid contract
     verify_scientific_contract()
+    verify_full_freeze_integrity()
 
     logger.info("Initializing BTCognitive Server...")
     app.state.http = get_shared_client()

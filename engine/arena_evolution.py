@@ -427,7 +427,7 @@ def get_evolution_status() -> Dict[str, Any]:
         from engine.arena_accounts import get_all_accounts
         from engine.strategy_registry import get_all_statuses
         from engine.capital_allocator import get_allocation_report
-        from engine.risk_budget import get_daily_summary, STRATEGY_NAMES as _SN
+        from engine.risk_budget import get_daily_summary
         from engine.arena_accounts import STRATEGY_NAMES
 
         accounts    = get_all_accounts()

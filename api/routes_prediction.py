@@ -861,15 +861,17 @@ def get_research_all_models_leaderboard():
                 {"model": "Hawkes Microstructure", "version": "v1.0.0-challenger-hawkes-microstructure", "horizon": "5m", "mfe_error": "9.30 bps", "winkler": 96.90, "status": "VALIDATED_SHADOW"}
             ],
             "RESEARCH": [
-                {"model": "Google TimesFM 2.5 (Adapted)", "version": "timesfm-v2.5-research", "horizon": "24h", "mfe_error": "0.4080%", "winkler": 621.50, "status": "FOUNDATION_RESEARCH"},
-                {"model": "Salesforce Moirai 2.0 (Adapted)", "version": "moirai-v2.0-research", "horizon": "24h", "mfe_error": "0.4190%", "winkler": 642.00, "status": "FOUNDATION_RESEARCH"},
-                {"model": "Amazon Chronos-2", "version": "chronos-v2.0-research", "horizon": "24h", "mfe_error": "0.4650%", "winkler": 725.00, "status": "FOUNDATION_RESEARCH"},
                 {"model": "Intermediate Horizon 1H", "version": "1h-tech-ofi-vol", "horizon": "1h", "mfe_error": "42.50 bps", "winkler": 240.10, "status": "RESEARCH_ONLY"},
                 {"model": "Intermediate Horizon 4H", "version": "4h-tech-deriv-vol", "horizon": "4h", "mfe_error": "88.40 bps", "winkler": 380.50, "status": "RESEARCH_ONLY"}
             ],
             "REJECTED": [
                 {"model": "Mamba State-Space Model v1", "version": "v1.0.0-challenger-mamba-selective-ssm", "horizon": "24h", "rejection_reason": "Worse MFE/MAE than Ridge; no paired improvement"}
             ]
+        },
+        "foundation_models": {
+            "status": "UNAVAILABLE_NOT_EXECUTED",
+            "authoritative": False,
+            "leaderboard": []
         }
     }
 

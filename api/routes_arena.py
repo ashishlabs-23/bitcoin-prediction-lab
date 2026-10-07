@@ -638,7 +638,7 @@ def get_meie_forensic_summary():
                     "slippage_usd": round(sum(t.get("position_size_usd", 100.0) * (t.get("slippage_bps", 2.0) / 10000.0) for t in trades) / n, 4),
                     "net_ev_usd": round(net_ev, 4),
                     "profit_factor": round(pf, 3) if pf != float("inf") else 999.0,
-                    "max_drawdown_pct": round(abs(sv.get("mdd_pct", 0.0)), 2),
+                    "max_drawdown_pct": round(abs(float(sv.get("mdd_pct") or 0.0)), 2),
                     "cvar_95_usd": round(cvar_95, 4),
                     "skip_delta_ev_usd": round(net_ev - 0.0, 4),
                     "opposite_delta_ev_usd": round(net_ev - opp_ev, 4),

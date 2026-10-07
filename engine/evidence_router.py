@@ -190,7 +190,7 @@ SUPPORTED_HORIZONS = ["15m", "1h", "4h", "1d", "7d", "CYCLE"]
 EVIDENCE_DOMAINS = {
     "ORDER_FLOW": {
         "name": "Order Flow & Imbalance",
-        "members": ["ofi", "hawkes", "aggr_flow", "cvd"],
+        "members": ["ofi", "hawkes", "aggr_flow", "cvd", "sweep_candidate"],
         "primary_horizon_affinity": ["15m", "1h"],
         "max_sparse_representatives": 2
     },
@@ -202,13 +202,13 @@ EVIDENCE_DOMAINS = {
     },
     "POSITIONING": {
         "name": "Derivatives & Leverage Positioning",
-        "members": ["funding", "open_interest"],
+        "members": ["funding", "open_interest", "derivatives_quadrant"],
         "primary_horizon_affinity": ["15m", "1h", "4h", "1d"],
         "max_sparse_representatives": 1
     },
     "VOLATILITY_JUMPS": {
         "name": "Volatility Term Structure & Jumps",
-        "members": ["rv_5m", "rv_1h", "rv_4h", "rv_24h", "jump_intensity"],
+        "members": ["rv_5m", "rv_1h", "rv_4h", "rv_24h", "jump_intensity", "session_state"],
         "primary_horizon_affinity": ["15m", "1h", "4h", "1d", "7d"],
         "max_sparse_representatives": 2
     },
@@ -265,37 +265,43 @@ HORIZON_FEATURE_AFFINITY: Dict[str, Dict[str, float]] = {
         "ofi": 0.98, "hawkes": 0.95, "vpin": 0.90, "liquidations": 0.85,
         "rv_5m": 0.92, "jump_intensity": 0.88, "funding": 0.55, "open_interest": 0.50,
         "rv_1h": 0.40, "rv_4h": 0.20, "rv_24h": 0.10, "options_iv": 0.15,
-        "mvrv": 0.05, "sth_mvrv": 0.08, "mayer": 0.02, "puell": 0.02
+        "mvrv": 0.05, "sth_mvrv": 0.08, "mayer": 0.02, "puell": 0.02,
+        "sweep_candidate": 0.85, "session_state": 0.60, "derivatives_quadrant": 0.45
     },
     "1h": {
         "ofi": 0.85, "hawkes": 0.80, "vpin": 0.82, "liquidations": 0.88,
         "funding": 0.80, "open_interest": 0.78, "rv_5m": 0.70, "rv_1h": 0.90,
         "rv_4h": 0.65, "jump_intensity": 0.75, "rv_24h": 0.35, "options_iv": 0.40,
-        "mvrv": 0.10, "sth_mvrv": 0.15, "mayer": 0.05, "puell": 0.05
+        "mvrv": 0.10, "sth_mvrv": 0.15, "mayer": 0.05, "puell": 0.05,
+        "sweep_candidate": 0.70, "session_state": 0.75, "derivatives_quadrant": 0.70
     },
     "4h": {
         "funding": 0.92, "open_interest": 0.90, "rv_1h": 0.85, "rv_4h": 0.95,
         "options_iv": 0.80, "rv_24h": 0.75, "liquidations": 0.70, "ofi": 0.50,
         "hawkes": 0.45, "vpin": 0.55, "jump_intensity": 0.60, "sth_mvrv": 0.45,
-        "mvrv": 0.35, "mayer": 0.25, "puell": 0.20, "rv_5m": 0.30
+        "mvrv": 0.35, "mayer": 0.25, "puell": 0.20, "rv_5m": 0.30,
+        "sweep_candidate": 0.40, "session_state": 0.65, "derivatives_quadrant": 0.85
     },
     "1d": {
         "funding": 0.88, "open_interest": 0.85, "rv_4h": 0.90, "rv_24h": 0.95,
         "options_iv": 0.90, "sth_mvrv": 0.82, "mvrv": 0.75, "mayer": 0.65,
         "puell": 0.60, "liquidations": 0.50, "jump_intensity": 0.40, "rv_1h": 0.55,
-        "ofi": 0.20, "hawkes": 0.15, "vpin": 0.25, "rv_5m": 0.10
+        "ofi": 0.20, "hawkes": 0.15, "vpin": 0.25, "rv_5m": 0.10,
+        "sweep_candidate": 0.15, "session_state": 0.40, "derivatives_quadrant": 0.80
     },
     "7d": {
         "mvrv": 0.95, "sth_mvrv": 0.92, "mayer": 0.90, "puell": 0.88,
         "options_iv": 0.85, "rv_24h": 0.82, "funding": 0.65, "open_interest": 0.60,
         "rv_4h": 0.50, "liquidations": 0.30, "rv_1h": 0.20, "jump_intensity": 0.20,
-        "vpin": 0.10, "ofi": 0.05, "hawkes": 0.05, "rv_5m": 0.02
+        "vpin": 0.10, "ofi": 0.05, "hawkes": 0.05, "rv_5m": 0.02,
+        "sweep_candidate": 0.05, "session_state": 0.10, "derivatives_quadrant": 0.40
     },
     "CYCLE": {
         "mvrv": 0.98, "mayer": 0.96, "puell": 0.95, "sth_mvrv": 0.90,
         "options_iv": 0.75, "rv_24h": 0.65, "funding": 0.40, "open_interest": 0.35,
         "rv_4h": 0.25, "liquidations": 0.15, "rv_1h": 0.10, "jump_intensity": 0.10,
-        "rv_5m": 0.02, "vpin": 0.05, "ofi": 0.02, "hawkes": 0.02
+        "rv_5m": 0.02, "vpin": 0.05, "ofi": 0.02, "hawkes": 0.02,
+        "sweep_candidate": 0.01, "session_state": 0.05, "derivatives_quadrant": 0.20
     }
 }
 
@@ -317,7 +323,10 @@ BASELINE_SIGNAL_STABILITY: Dict[str, Dict[str, Any]] = {
     "mvrv": {"score": 0.90, "status": "VERY_HIGH_STABILITY", "note": "Multi-cycle valuation anchor (macro only)"},
     "sth_mvrv": {"score": 0.85, "status": "HIGH_STABILITY", "note": "Short-term holder cost basis threshold"},
     "mayer": {"score": 0.88, "status": "VERY_HIGH_STABILITY", "note": "200-day moving average cycle multiple"},
-    "puell": {"score": 0.84, "status": "HIGH_STABILITY", "note": "Miner revenue cycle multiple"}
+    "puell": {"score": 0.84, "status": "HIGH_STABILITY", "note": "Miner revenue cycle multiple"},
+    "derivatives_quadrant": {"score": 0.75, "status": "STABLE", "note": "Neutral 4-quadrant price/OI leverage positioning state"},
+    "sweep_candidate": {"score": 0.70, "status": "STABLE", "note": "Observational local extreme piercing with flow absorption"},
+    "session_state": {"score": 0.88, "status": "VERY_HIGH_STABILITY", "note": "Deterministic UTC session clock conditioning"}
 }
 
 # 3b. Empirical Validation Status Registry (OOS Empirical Verification against H_0)
@@ -340,8 +349,59 @@ EMPIRICAL_VALIDATION_STATUS: Dict[str, str] = {
     "mvrv": "VALIDATED",             # Validated macro valuation anchor
     "sth_mvrv": "VALIDATED",         # Validated short-term holder cost basis
     "mayer": "VALIDATED",            # Validated 200d MA multiple
-    "puell": "VALIDATED"             # Validated miner revenue multiple
+    "puell": "VALIDATED",            # Validated miner revenue multiple
+    "derivatives_quadrant": "PROSPECTIVE", # Neutral price/OI quadrant under surveillance
+    "sweep_candidate": "PROSPECTIVE",      # Observational extreme-pierce absorption under surveillance
+    "session_state": "PROSPECTIVE"         # Intraday UTC session conditioning under surveillance
 }
+
+# 3c. Prospective Routing Priors (Researcher-Selected Heuristic Weights Under Surveillance)
+# NOTE: These multipliers are explicit a priori hypotheses, NOT empirically validated alpha.
+# They are registered and hashed to enable strict OOS ablation against uniform/neutral weighting.
+PROSPECTIVE_ROUTING_PRIORS: Dict[str, Any] = {
+    "sweep_multiplier_active": 1.35,
+    "sweep_multiplier_inactive": 0.85,
+    "derivatives_multiplier_active": 1.25,
+    "derivatives_multiplier_inactive": 0.85,
+    "session_multiplier_active": 1.30,
+    "session_multiplier_inactive": 0.85,
+    "epistemic_classification": "PROSPECTIVE_ROUTING_PRIOR",
+    "scientific_status": "UNVALIDATED_RESEARCHER_HEURISTIC",
+    "audit_note": "A priori heuristic weights for initial surveillance; subject to empirical OOS hypothesis testing against uniform null."
+}
+
+ROUTING_PRIOR_CONFIG_HASH = hashlib.sha256(
+    json.dumps(PROSPECTIVE_ROUTING_PRIORS, sort_keys=True).encode("utf-8")
+).hexdigest()[:16]
+
+
+def classify_ablation_arm(active_indicators: List[str]) -> str:
+    """
+    Classifies the active indicator portfolio into one of the 5 canonical ablation arms:
+      - A1_BASELINE: Core indicators only (zero prospective features)
+      - A2_BASELINE_PLUS_SESSION: Baseline + session_state only
+      - A3_BASELINE_PLUS_SWEEP: Baseline + sweep_candidate only
+      - A4_BASELINE_PLUS_DERIVATIVES: Baseline + derivatives_quadrant only
+      - A5_BASELINE_PLUS_ALL_THREE: Baseline + session_state + sweep_candidate + derivatives_quadrant
+      - A_CUSTOM_SUBSET: Any other experimental subset
+    """
+    has_sess = "session_state" in active_indicators
+    has_swp = "sweep_candidate" in active_indicators
+    has_dq = "derivatives_quadrant" in active_indicators
+
+    if not has_sess and not has_swp and not has_dq:
+        return "A1_BASELINE"
+    elif has_sess and not has_swp and not has_dq:
+        return "A2_BASELINE_PLUS_SESSION"
+    elif has_swp and not has_sess and not has_dq:
+        return "A3_BASELINE_PLUS_SWEEP"
+    elif has_dq and not has_sess and not has_swp:
+        return "A4_BASELINE_PLUS_DERIVATIVES"
+    elif has_sess and has_swp and has_dq:
+        return "A5_BASELINE_PLUS_ALL_THREE"
+    else:
+        return "A_CUSTOM_SUBSET"
+
 
 # 4. Mechanism Matching Specs: Strategy_i x Mechanism x Target Regimes x Target Horizons
 STRATEGY_MECHANISM_SPECS = {
@@ -417,14 +477,14 @@ DECISION_QUESTIONS = {
     "Q2_CONTINUATION": {
         "title": "Microstructure Dynamics & Pressure",
         "question": "Do order flow imbalance (OFI) and point-process clustering (Hawkes) support path persistence?",
-        "primary_features": ["ofi", "hawkes", "rv_5m", "liquidations", "open_interest", "jump_intensity"],
+        "primary_features": ["ofi", "hawkes", "rv_5m", "liquidations", "open_interest", "jump_intensity", "sweep_candidate"],
         "active_horizons": ["15m", "1h", "4h", "1d", "7d", "CYCLE"],
         "reason_template": "Point-process clustering and forced-flow expansion support path continuation"
     },
     "Q3_EXHAUSTION": {
         "title": "Move Exhaustion & Crowding",
         "question": "Is the move already exhausted, over-leveraged, or running into absorption?",
-        "primary_features": ["funding", "open_interest", "depth_imbalance", "vpin"],
+        "primary_features": ["funding", "open_interest", "depth_imbalance", "vpin", "derivatives_quadrant"],
         "active_horizons": ["15m", "1h", "4h", "1d", "7d", "CYCLE"],
         "reason_template": "Measures structural exhaustion, book depth, and leverage crowding"
     },
@@ -452,7 +512,7 @@ DECISION_QUESTIONS = {
     "Q7_REGIME_COMPATIBILITY": {
         "title": "Mechanism-Regime Compatibility",
         "question": "Is the candidate strategy operational mechanism appropriate for current regime and horizon?",
-        "primary_features": ["rv_5m", "rv_1h", "vpin", "depth_imbalance", "funding"],
+        "primary_features": ["rv_5m", "rv_1h", "vpin", "depth_imbalance", "funding", "session_state"],
         "active_horizons": ["15m", "1h", "4h", "1d", "7d", "CYCLE"],
         "reason_template": "Evaluates concordance between strategy mechanism, regime state, and target horizon"
     }
@@ -500,7 +560,8 @@ class AdaptiveEvidenceRouterV2:
         currently_selected: List[str],
         horizon: str = "15m",
         regime: str = "VOL_EXPANDING",
-        market_snapshot: Optional[Dict[str, Any]] = None
+        market_snapshot: Optional[Dict[str, Any]] = None,
+        use_neutral_priors: bool = False
     ) -> Dict[str, Any]:
         """
         Computes the a priori Routing Relevance R_j(t) in basis points:
@@ -525,20 +586,35 @@ class AdaptiveEvidenceRouterV2:
         # Signal Intensity from live market snapshot
         snap = market_snapshot or {}
         intensity = 1.0
-        if ind == "ofi":
-            intensity = 1.2 if abs(float(snap.get("ofi", 0.65))) > 0.5 else 0.8
-        elif ind == "hawkes":
-            intensity = 1.3 if float(snap.get("hawkes", 2.2)) > 2.0 else 0.8
-        elif ind == "vpin":
-            intensity = 1.4 if float(snap.get("vpin", 0.28)) > 0.5 else 0.9
-        elif ind == "funding":
-            intensity = 1.25 if abs(float(snap.get("funding", 0.00015))) > 0.0002 else 0.85
+
+        if use_neutral_priors:
+            # Neutral baseline for OOS ablation: no heuristic multiplier scaling
+            intensity = 1.0
+        else:
+            if ind == "ofi":
+                intensity = 1.2 if abs(float(snap.get("ofi", 0.65))) > 0.5 else 0.8
+            elif ind == "hawkes":
+                intensity = 1.3 if float(snap.get("hawkes", 2.2)) > 2.0 else 0.8
+            elif ind == "vpin":
+                intensity = 1.4 if float(snap.get("vpin", 0.28)) > 0.5 else 0.9
+            elif ind == "funding":
+                intensity = 1.25 if abs(float(snap.get("funding", 0.00015))) > 0.0002 else 0.85
+            elif ind == "sweep_candidate":
+                is_cand = bool(snap.get("sweep_candidate", False))
+                intensity = PROSPECTIVE_ROUTING_PRIORS["sweep_multiplier_active"] if is_cand else PROSPECTIVE_ROUTING_PRIORS["sweep_multiplier_inactive"]
+            elif ind == "derivatives_quadrant":
+                dq = snap.get("derivatives_quadrant", "STABLE")
+                intensity = PROSPECTIVE_ROUTING_PRIORS["derivatives_multiplier_active"] if dq != "STABLE" else PROSPECTIVE_ROUTING_PRIORS["derivatives_multiplier_inactive"]
+            elif ind == "session_state":
+                ss = snap.get("session_state", "ASIA_RANGE")
+                intensity = PROSPECTIVE_ROUTING_PRIORS["session_multiplier_active"] if ss in ["NY_LONDON_OVERLAP", "LONDON_EXPANSION"] else PROSPECTIVE_ROUTING_PRIORS["session_multiplier_inactive"]
 
         base_utility_bps = {
             "ofi": 5.5, "hawkes": 4.2, "vpin": 3.8, "liquidations": 3.2,
             "funding": 3.5, "open_interest": 3.0, "rv_5m": 3.5, "rv_1h": 3.0,
             "rv_4h": 3.0, "rv_24h": 2.5, "jump_intensity": 3.2, "options_iv": 3.8,
-            "mvrv": 5.0, "sth_mvrv": 4.5, "mayer": 3.5, "puell": 3.2
+            "mvrv": 5.0, "sth_mvrv": 4.5, "mayer": 3.5, "puell": 3.2,
+            "sweep_candidate": 3.6, "derivatives_quadrant": 3.2, "session_state": 2.8
         }.get(ind, 2.0)
 
         # Routing Relevance score in bps
@@ -1164,6 +1240,12 @@ class AdaptiveEvidenceRouterV2:
                 r_desc = "Perpetual funding rate skew measuring leveraged positioning crowding"
             elif ind == "open_interest":
                 r_desc = "Aggregate open interest net accumulation tracking capital commitment"
+            elif ind == "sweep_candidate":
+                r_desc = f"Observational local extreme piercing and flow absorption check (candidate={snap.get('sweep_candidate', False)})"
+            elif ind == "derivatives_quadrant":
+                r_desc = f"Neutral 4-quadrant price/OI leverage positioning state ({snap.get('derivatives_quadrant', 'STABLE')})"
+            elif ind == "session_state":
+                r_desc = f"Deterministic UTC session conditioning context ({snap.get('session_state', 'LONDON_EXPANSION')})"
             else:
                 r_desc = f"Selected to evaluate {self.decision_questions.get(primary_q, {}).get('title', 'Market Structure')}"
 
@@ -1223,17 +1305,55 @@ class AdaptiveEvidenceRouterV2:
                     )
                 }
 
+        prospective_manifest = [
+            {
+                "feature": "session_state",
+                "value": snap.get("session_state", "UNKNOWN"),
+                "source": "engine.market_state.classify_utc_session",
+                "validation_status": "PROSPECTIVE"
+            },
+            {
+                "feature": "derivatives_quadrant",
+                "value": snap.get("derivatives_quadrant", "UNKNOWN"),
+                "source": "engine.market_state.classify_derivatives_quadrant",
+                "validation_status": "PROSPECTIVE"
+            },
+            {
+                "feature": "sweep_candidate",
+                "value": snap.get("sweep_candidate", False),
+                "source": "engine.event_detector._observe_extreme_pierced",
+                "validation_status": "PROSPECTIVE"
+            }
+        ]
+        ablation_arm = classify_ablation_arm(active_set)
+        decision_ts = datetime.now(timezone.utc).isoformat()
+        obs_id_str = f"OBS|{h_clean}|{round(s0, 2)}|{decision_ts}|{ablation_arm}"
+        observation_id = "obs_" + hashlib.sha256(obs_id_str.encode("utf-8")).hexdigest()[:12]
+        feature_set_hash = compute_indicator_config_hash(active_set, h_clean)
+
+        prov_str = f"AEER-v3.1|{observation_id}|{round(s0, 2)}|{snap.get('session_state')}|{snap.get('derivatives_quadrant')}|{snap.get('sweep_candidate')}|{ablation_arm}"
+        prov_hash = hashlib.sha256(prov_str.encode("utf-8")).hexdigest()[:16]
+
         return {
             "questions": questions_meta,
             "why_these_indicators": why_list,
             "user_advisory_audit": user_advisory_audit,
             "tier_0_geometric_touch": tier_0_meta,
             "provenance": {
+                "observation_id": observation_id,
+                "ablation_arm": ablation_arm,
+                "decision_timestamp": decision_ts,
+                "outcome_timestamp": None,
+                "feature_set_hash": feature_set_hash,
+                "routing_prior_config_hash": ROUTING_PRIOR_CONFIG_HASH,
+                "provenance_hash": prov_hash,
                 "question_definition_version": "AEER-v3.1-Tier-0-Geometric",
+                "epistemic_classification": PROSPECTIVE_ROUTING_PRIORS["epistemic_classification"],
                 "drift_model": "TIER_0_MARTINGALE_DRIFTLESS",
                 "is_directional_trade_signal": False,
                 "indicator_selection_policy": "FROZEN_POINT_IN_TIME",
-                "horizon": h_clean
+                "horizon": h_clean,
+                "prospective_feature_manifest": prospective_manifest
             }
         }
 
@@ -1365,14 +1485,21 @@ class AdaptiveEvidenceRouterV2:
             "provenance": {
                 "router_version": "AEER-v3.1-Geometric-Barrier-Router",
                 "question_definition_version": "AEER-v3.1-Tier-0-Geometric",
+                "observation_id": dq_result["provenance"].get("observation_id"),
+                "ablation_arm": classify_ablation_arm(active_set),
+                "decision_timestamp": dq_result["provenance"].get("decision_timestamp"),
+                "outcome_timestamp": None,
+                "feature_set_hash": config_hash,
+                "routing_prior_config_hash": ROUTING_PRIOR_CONFIG_HASH,
+                "provenance_hash": dq_result["provenance"].get("provenance_hash", config_hash),
                 "drift_model": "TIER_0_MARTINGALE_DRIFTLESS",
                 "is_directional_trade_signal": False,
-                "indicator_selection_policy": "FROZEN_POINT_IN_TIME",
                 "indicator_selection_policy": "FROZEN_POINT_IN_TIME",
                 "horizon": h_clean,
                 "mode": mode_clean,
                 "config_hash": config_hash,
-                "timestamp": datetime.now(timezone.utc).isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "prospective_feature_manifest": dq_result["provenance"].get("prospective_feature_manifest", [])
             }
         }
 

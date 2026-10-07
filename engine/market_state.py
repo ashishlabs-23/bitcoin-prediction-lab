@@ -19,12 +19,71 @@ from typing import Dict, List, Tuple, Any, Optional
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from datetime import datetime, timezone
 from engine.volatility_bridge import volatility_bridge_service, VolatilityTermStructure
 from engine.market_state_explanation import generate_market_state_narrative
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 RESULTS_DIR = os.path.join(ROOT_DIR, "results")
 os.makedirs(RESULTS_DIR, exist_ok=True)
+
+
+def classify_utc_session(dt: Optional[datetime] = None) -> Dict[str, Any]:
+    """
+    Classifies the current UTC time into empirical trading session regimes using
+    explicit, disjoint half-open minute intervals:
+      - 00:00 <= t < 07:00 (0 <= m < 420):   ASIA_RANGE
+      - 07:00 <= t < 13:30 (420 <= m < 810):  LONDON_EXPANSION
+      - 13:30 <= t < 16:30 (810 <= m < 990):  NY_LONDON_OVERLAP
+      - 16:30 <= t < 21:00 (990 <= m < 1260): US_AFTERNOON
+      - 21:00 <= t < 24:00 (1260 <= m < 1440): POST_CLOSE_CHOP
+    """
+    if dt is None:
+        dt = datetime.now(timezone.utc)
+    hour = dt.hour
+    minute = dt.minute
+    m = hour * 60 + minute
+
+    if 0 <= m < 420:
+        state = "ASIA_RANGE"
+    elif 420 <= m < 810:
+        state = "LONDON_EXPANSION"
+    elif 810 <= m < 990:
+        state = "NY_LONDON_OVERLAP"
+    elif 990 <= m < 1260:
+        state = "US_AFTERNOON"
+    else:
+        state = "POST_CLOSE_CHOP"
+
+    return {
+        "session_state": state,
+        "utc_hour": hour,
+        "utc_minute": minute,
+        "session_version": "1.0.0"
+    }
+
+
+def classify_derivatives_quadrant(price_change_pct: float, oi_change_pct: float, threshold: float = 0.05) -> str:
+    """
+    Neutral 4-quadrant state classification of price change vs open interest change:
+      - PRICE_UP_OI_UP
+      - PRICE_DOWN_OI_UP
+      - PRICE_DOWN_OI_DOWN
+      - PRICE_UP_OI_DOWN
+      - STABLE
+    Avoids prescriptive directional interpretations; provides empirical conditioning state.
+    """
+    if abs(price_change_pct) < threshold and abs(oi_change_pct) < threshold:
+        return "STABLE"
+    if price_change_pct >= threshold and oi_change_pct >= threshold:
+        return "PRICE_UP_OI_UP"
+    elif price_change_pct < -threshold and oi_change_pct >= threshold:
+        return "PRICE_DOWN_OI_UP"
+    elif price_change_pct < -threshold and oi_change_pct < -threshold:
+        return "PRICE_DOWN_OI_DOWN"
+    elif price_change_pct >= threshold and oi_change_pct < -threshold:
+        return "PRICE_UP_OI_DOWN"
+    return "STABLE"
 
 
 @dataclass
@@ -42,6 +101,7 @@ class MarketState:
     explanation: Dict[str, str]
     overall_data_quality: str
     model_versions: Dict[str, str]
+    session_context: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -59,8 +119,9 @@ class MarketStateEngine:
         hawkes_direction: str = "BEARISH",
         uncertainty: float = 1.6
     ) -> MarketState:
-        from datetime import datetime, timezone
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_dt = datetime.now(timezone.utc)
+        now_iso = now_dt.isoformat()
+        session_ctx = classify_utc_session(now_dt)
 
         # Volatility term structure
         vol_ts = volatility_bridge_service.analyze_term_structure(vol_24h=vol_24h)
@@ -92,10 +153,16 @@ class MarketStateEngine:
             "governance_status": "RESEARCH_ONLY"
         }
 
+        deriv_quadrant = classify_derivatives_quadrant(
+            price_change_pct=float(short_state["short_term_momentum"]) * 100.0,
+            oi_change_pct=3.2
+        )
+
         deriv_state = {
             "perp_funding_rate_8h": 0.00015,
             "open_interest_24h_change_pct": 3.2,
-            "funding_regime": "MILD_LONG_BIAS"
+            "funding_regime": "MILD_LONG_BIAS",
+            "derivatives_quadrant": deriv_quadrant
         }
 
         long_state = {
@@ -139,7 +206,8 @@ class MarketStateEngine:
                 "production_ridge": "v3.0.0-excursion-ridge-conformal",
                 "shadow_hawkes": "v1.0.0-challenger-hawkes-microstructure",
                 "volatility_bridge": "v1.0.0-deterministic-term-structure"
-            }
+            },
+            session_context=session_ctx
         )
 
         df_ms = pd.DataFrame([{

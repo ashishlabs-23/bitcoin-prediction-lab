@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract_id": "BTC_ENTRY_TP_SL_INSTRUMENT_CONTRACT_V1",
+  "version": "1.0.0",
+  "created_at_utc": "2026-10-07T16:30:00Z",
+  "status": "FROZEN",
+  "instrument": {
+    "symbol": "BTC/USD",
+    "base_currency": "BTC",
+    "quote_currency": "USD",
+    "market_type": "SPOT",
+    "venue": "Bitstamp",
+    "feed_source": "Kaggle mczielinski Historical Dataset v745",
+    "granularity": "1m",
+    "timezone": "UTC",
+    "is_synthetic": false,
+    "is_pooled": false
+  },
+  "price_field_semantics": {
+    "barrier_high_source": "High",
+    "barrier_low_source": "Low",
+    "entry_price_source": "Open",
+    "timeout_price_source": "Close",
+    "path_source_type": "SPOT_1M_OHLCV",
+    "rounding_precision_usd": 2,
+    "tick_size_usd": 0.01
+  },
+  "bar_interval_semantics": {
+    "path_interval_seconds": 60,
+    "timestamp_convention": "INTERVAL_CLOSE",
+    "timestamp_unit": "UNIX_SECONDS",
+    "timezone": "UTC",
+    "interpretation": "Timestamp t represents the completed discrete 60-second window (t-60s, t]"
+  },
+  "invariants": {
+    "no_cross_exchange_pooling": true,
+    "no_perpetual_funding_bleed_in_spot": true,
+    "no_future_timestamp_usage": true
+  }
+}

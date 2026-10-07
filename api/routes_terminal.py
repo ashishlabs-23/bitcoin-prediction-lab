@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 import numpy as np
 import pandas as pd
-from fastapi import APIRouter, Request, Query
+from fastapi import APIRouter, HTTPException, Request, Query
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -32,9 +32,13 @@ from engine.observatory import (
 )
 from research.run_vol_edge_01_test import prepare_aligned_dataset
 from research.verify_observatory_integration import get_features
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import Ridge
+import joblib
+from validation.startup_gate import (
+    FreezeIntegrityError,
+    MODEL_ARTIFACT_PATH,
+    verify_full_freeze_integrity,
+    verify_scientific_contract,
+)
 
 logger = logging.getLogger("btcognitive.routes_terminal")
 router = APIRouter(tags=["BTC Volatility Intelligence Terminal"])
@@ -48,24 +52,25 @@ _rolling_std_last = 0.05
 _q_u_c2 = 1.645
 _q_l_c2 = 1.645
 _initialized = False
+_initialization_failure: Optional[Dict[str, str]] = None
 
 
 def _init_live_terminal():
-    global _pipeline, _rolling_std_last, _q_u_c2, _q_l_c2, _initialized
+    global _pipeline, _rolling_std_last, _q_u_c2, _q_l_c2, _initialized, _initialization_failure
     if _initialized:
         return
     try:
+        verify_scientific_contract()
+        verify_full_freeze_integrity()
         df = prepare_aligned_dataset()
         holdout_start_dt = pd.to_datetime("2026-01-01T00:00:00Z")
         df_train = df[df.index < holdout_start_dt].copy()
         df_holdout = df[df.index >= holdout_start_dt].copy()
         
-        log_y_train = np.log(np.maximum(1e-6, df_train['rv7d_var_ann'].values))
         X_train = get_features(df_train)
         X_holdout = get_features(df_holdout)
         
-        pipe = Pipeline([("scaler", StandardScaler()), ("ridge", Ridge(alpha=1.0))])
-        pipe.fit(X_train, log_y_train)
+        pipe = joblib.load(MODEL_ARTIFACT_PATH)
         _pipeline = pipe
         
         v_hat_train = np.exp(pipe.predict(X_train))
@@ -122,7 +127,21 @@ def _init_live_terminal():
                 )
         _initialized = True
         logger.info("Live Terminal & Observatory initialized successfully with %d records.", len(observatory.records))
+    except FreezeIntegrityError as e:
+        _initialization_failure = {"state": e.state, "code": e.code}
+        _initialized = True
+        logger.error("Canonical forecast unavailable: %s", e.code)
+    except FileNotFoundError:
+        _initialization_failure = {"state": "DATA_UNAVAILABLE", "code": "FROZEN_INPUT_MISSING"}
+        _initialized = True
+        logger.error("Canonical forecast unavailable: a required frozen input is missing.")
+    except RuntimeError:
+        _initialization_failure = {"state": "PROVENANCE_FAILURE", "code": "FREEZE_VERIFICATION_FAILED"}
+        _initialized = True
+        logger.error("Canonical forecast unavailable: full freeze verification failed.")
     except Exception as e:
+        _initialization_failure = {"state": "MODEL_FAILURE", "code": "CANONICAL_INITIALIZATION_FAILED"}
+        _initialized = True
         logger.error("Failed to initialize Live Terminal: %s", e)
 
 
@@ -132,14 +151,29 @@ def get_terminal_live_state():
     Returns real-time decision-support state answering the 4 foundational questions.
     """
     _init_live_terminal()
+    if _initialization_failure is not None or _pipeline is None or not observatory.records:
+        failure = _initialization_failure or {
+            "state": "DATA_UNAVAILABLE",
+            "code": "CANONICAL_FORECAST_NOT_READY",
+        }
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "UNAVAILABLE",
+                "state": failure["state"],
+                "code": failure["code"],
+                "forecast": None,
+            },
+        )
+
     health = observatory.evaluate_calibration_health()
     
     # Latest resolved / active record
-    last_rec = observatory.records[-1] if observatory.records else None
-    point_forecast = last_rec.point_forecast_har_rs_dow if last_rec else 0.1200
-    lower_bound = last_rec.risk_envelope_lower if last_rec else 0.0400
-    upper_bound = last_rec.risk_envelope_upper if last_rec else 0.2200
-    regime = last_rec.macro_regime if last_rec else "SPOT_ETF_ERA"
+    last_rec = observatory.records[-1]
+    point_forecast = last_rec.point_forecast_har_rs_dow
+    lower_bound = last_rec.risk_envelope_lower
+    upper_bound = last_rec.risk_envelope_upper
+    regime = last_rec.macro_regime
     
     # Volatility state descriptor
     vol_state = "NORMAL"

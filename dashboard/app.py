@@ -38,8 +38,18 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-st.title(f"⚡ {SYMBOL} Quantitative Prediction Terminal")
-st.caption(f"Exchange: `{EXCHANGE.upper()}` | Timeframe: `{TIMEFRAME}` | UTC Timestamp Grid | Model Stack: XGBoost / Random Forest")
+st.title(f"⚡ {SYMBOL} Quantitative Research Terminal")
+st.caption(f"Exchange: `{EXCHANGE.upper()}` | Timeframe: `{TIMEFRAME}` | Status: `COST_ERASED (C2 Research Only)`")
+
+# ------------------------------------------------------------------------------
+# RESEARCH INTEGRITY & STATUS BANNER
+# ------------------------------------------------------------------------------
+st.warning("""
+### 🔬 BTCognitive Research Status: `COST_ERASED`
+- **Track Status:** Conditional predictive pattern observed ($C_2$), but **no robust net-of-cost trading edge** established.
+- **Walk-Forward Outcome:** Mean net expectancy is negative after standard friction ($-0.57R$ BASE / $-1.10R$ CONSERVATIVE).
+- **Capital Safety Order:** Live capital deployment is **STRICTLY PROHIBITED**. All displays represent scientific/historical research observations.
+""")
 
 
 # ------------------------------------------------------------------------------
@@ -119,12 +129,12 @@ except Exception as e:
 
 
 # ------------------------------------------------------------------------------
-# 3. PREDICTION ENGINE
+# 3. RESEARCH DIAGNOSTICS & ABSTENTION ENGINE (NON-ACTIONABLE)
 # ------------------------------------------------------------------------------
-st.header("3. Live Signal & Probability Engine")
+st.header("3. Research Model Diagnostics (Non-Actionable)")
 
 try:
-    with st.spinner("Executing model pipeline and calibrating probabilities..."):
+    with st.spinner("Evaluating research model state..."):
         X, y, t1 = make_dataset(horizon_bars=24)
 
         model = XGBClassifier(n_estimators=100, eval_metric='logloss', random_state=42, n_jobs=-1)
@@ -142,38 +152,46 @@ try:
         raw_prob = float(model.predict_proba(latest_X)[:, 1][0])
         cal_prob = float(iso.predict([raw_prob])[0])
 
-        pos_val = position_size(np.array([cal_prob]), method="fixed")[0]
-        if pos_val > 0:
-            signal_label = "TAKE (LONG)"
-            signal_color = "#00FF66"
-        elif pos_val < 0:
-            signal_label = "TAKE (SHORT)"
-            signal_color = "#FF3366"
+        # Scientific state classification instead of trade recommendation
+        if abs(cal_prob - 0.5) < 0.05:
+            state_label = "MODEL_UNCERTAIN"
+            state_desc = "Probability near prior base rate (abstain)."
+            state_color = "#FFAA00"
+        elif cal_prob >= 0.55:
+            state_label = "EV_BELOW_COST (LONG BIAS)"
+            state_desc = "Statistical upward tilt observed, but edge cost-erased after fees."
+            state_color = "#888888"
+        elif cal_prob <= 0.45:
+            state_label = "EV_BELOW_COST (SHORT BIAS)"
+            state_desc = "Statistical downward tilt observed, but edge cost-erased after fees."
+            state_color = "#888888"
         else:
-            signal_label = "SKIP / LOW-CONFIDENCE"
-            signal_color = "#FFAA00"
+            state_label = "NO_SETUP"
+            state_desc = "No structural entry conditions detected."
+            state_color = "#555555"
 
         lower_bound = max(0.0, cal_prob - 0.08)
         upper_bound = min(1.0, cal_prob + 0.08)
 
-    st.subheader(f"Prediction for Bar: `{latest_time}`")
+    st.subheader(f"Diagnostic Observation for Bar: `{latest_time}`")
 
     p_col1, p_col2, p_col3, p_col4 = st.columns(4)
-    p_col1.metric("Raw XGBoost Prob", f"{raw_prob*100:.1f}%")
-    p_col2.metric("Calibrated Prob (Isotonic)", f"{cal_prob*100:.1f}%")
-    p_col3.metric("90% Prediction Interval", f"[{lower_bound*100:.1f}%, {upper_bound*100:.1f}%]")
+    p_col1.metric("Raw Model Prob", f"{raw_prob*100:.1f}%")
+    p_col2.metric("Calibrated Prob", f"{cal_prob*100:.1f}%")
+    p_col3.metric("90% Uncertainty Interval", f"[{lower_bound*100:.1f}%, {upper_bound*100:.1f}%]")
     p_col4.markdown(
         f"""
-        <div style="background-color: #1E1E2E; padding: 12px; border-radius: 8px; border-left: 5px solid {signal_color}; text-align: center;">
-            <span style="color: #888888; font-size: 12px; font-weight: bold;">ACTION SIGNAL</span><br/>
-            <span style="color: {signal_color}; font-size: 18px; font-weight: bold;">{signal_label}</span>
+        <div style="background-color: #1E1E2E; padding: 12px; border-radius: 8px; border-left: 5px solid {state_color}; text-align: center;">
+            <span style="color: #888888; font-size: 11px; font-weight: bold;">SCIENTIFIC STATE</span><br/>
+            <span style="color: {state_color}; font-size: 15px; font-weight: bold;">{state_label}</span><br/>
+            <span style="color: #AAAAAA; font-size: 10px;">{state_desc}</span>
         </div>
         """,
         unsafe_allow_html=True
     )
 
 except Exception as e:
-    st.warning(f"Could not compute live prediction: {e}")
+    st.warning(f"Could not compute model diagnostics: {e}")
 
 
 # ------------------------------------------------------------------------------
@@ -181,7 +199,60 @@ except Exception as e:
 # ------------------------------------------------------------------------------
 st.header("4. Systematic Research & Empirical Audits")
 
-tab1, tab2, tab3, tab4 = st.tabs(["Prediction Horizon Sweep", "Regime Performance", "Feature Predictive Audit", "Cost Sensitivity"])
+tab_wf, tab1, tab2, tab3, tab4 = st.tabs([
+    "🔬 Entry + TP/SL Walk-Forward (Track V3)",
+    "Prediction Horizon Sweep",
+    "Regime Performance",
+    "Feature Predictive Audit",
+    "Cost Sensitivity"
+])
+
+with tab_wf:
+    st.subheader("Entry + TP/SL Walk-Forward Results (Phases 6C-6K)")
+    st.markdown("""
+    **Track Status:** `COST_ERASED` | **Evaluated Sample:** $N = 20,244$ out-of-sample trades across 7.76M 1m bars  
+    **Formal Promotion Decision:** `ARCHIVED_RESEARCH_ONLY (Live capital deployment strictly prohibited)`
+    """)
+    
+    wf_data = {
+        "Baseline / Model": [
+            "B0: Matched Random",
+            "B0b: Always Long",
+            "B0b: Always Short",
+            "B3: Structural Rule (A1/A2)",
+            "B3b: Setup + Trend Filter",
+            "B4-lite: Logistic Meta-Model",
+            "B4: LightGBM (BASE: 35 bps)",
+            "B4: LightGBM (CONSERVATIVE: 65 bps)"
+        ],
+        "Evaluated Trades (N)": [10105, 10142, 10102, 20244, 1665, 2916, 1553, 1553],
+        "Win Rate": ["25.7%", "26.1%", "25.7%", "25.9%", "18.7%", "46.9%", "47.1%", "25.2%"],
+        "Mean Net R": ["-1.2112R", "-1.1900R", "-1.2110R", "-1.2005R", "-1.5708R", "-0.4673R", "-0.5678R", "-1.0954R"],
+        "95% Bootstrap CI Lower": ["-1.2577R", "-1.2394R", "-1.2598R", "-1.2361R", "-1.7242R", "-0.4984R", "-0.6220R", "-1.1657R"],
+        "Profit Factor": [0.07, 0.08, 0.07, 0.07, 0.04, 0.37, 0.29, 0.07],
+        "Status": [
+            "Negative Expectancy",
+            "Baseline Reference",
+            "Baseline Reference",
+            "Unfiltered Setups",
+            "Simple Rule",
+            "Linear Probability Filter",
+            "Primary Meta-Model (Cost-Erased)",
+            "Friction Stressed"
+        ]
+    }
+    st.dataframe(pd.DataFrame(wf_data), use_container_width=True)
+    
+    st.markdown("""
+    **Barrier Sensitivity Analysis (B4 LightGBM):**
+    - `barrier_pair_01` ($k_{\\text{TP}}=1.0, k_{\\text{SL}}=1.0$): Mean Net R = **$-0.5678R$**, Profit Factor = 0.29
+    - `barrier_pair_02` ($k_{\\text{TP}}=2.0, k_{\\text{SL}}=1.0$): Mean Net R = **$-0.5683R$**, Profit Factor = 0.39
+    - `barrier_pair_03` ($k_{\\text{TP}}=3.0, k_{\\text{SL}}=1.0$): Mean Net R = **$-0.5813R$**, Profit Factor = 0.42
+    - `barrier_pair_04` ($k_{\\text{TP}}=1.0, k_{\\text{SL}}=1.0$): Mean Net R = **$-0.7523R$**, Profit Factor = 0.18
+    - `barrier_pair_05` ($k_{\\text{TP}}=2.0, k_{\\text{SL}}=1.5$): Mean Net R = **$-0.3842R$**, Profit Factor = 0.47
+    
+    **Diagnostics:** Deflated Sharpe Ratio (DSR) = `0.0000`, Probability of Backtest Overfitting (PBO) = `0.2000`.
+    """)
 
 with tab1:
     st.subheader("Horizon Performance Sweep (1h -> 72h)")
@@ -214,7 +285,6 @@ with tab4:
         st.dataframe(pd.read_csv(c_path), use_container_width=True)
     else:
         st.warning(f"File `{c_path}` not found. Run `backtest/simulate.py` to generate.")
-
 
 # ------------------------------------------------------------------------------
 # 5. MARKET MEMORY PANEL

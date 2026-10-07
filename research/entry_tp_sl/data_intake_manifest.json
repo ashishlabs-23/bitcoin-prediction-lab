@@ -1,0 +1,39 @@
+{
+  "$schema": "./schemas/dataset_manifest.schema.json",
+  "dataset_status": "VERIFIED_LOCAL_SNAPSHOT",
+  "dataset_name": "Kaggle Bitstamp BTC/USD 1-Minute Historical Data (v745)",
+  "venue": "Bitstamp",
+  "instrument": "BTC/USD",
+  "granularity": "1m",
+  "timezone": "UTC",
+  "source_uri": "https://www.kaggle.com/datasets/mczielinski/bitcoin-historical-data",
+  "immutable_object_id": "local:data/raw/btcusd_1-min_data.csv",
+  "sha256": "1bf91f2789846af29d60a9c15e780b565b63a85c286e83080ac28bf4bf7d1287",
+  "snapshot_timestamp": "2026-10-07T03:11:00Z",
+  "license": "CC BY-SA 4.0",
+  "rights_status": "APPROVED_BY_USER_CC_BY_SA_4.0",
+  "timestamp_contract_status": "VERIFIED_MONOTONIC_UNIX_SECONDS_UTC",
+  "pit_contract_status": "VERIFIED_60S_BAR_CLOSE",
+  "missing_data_policy": "FAIL_CLOSED_ON_GAPS_GREATER_THAN_TOLERANCE",
+  "duplicate_policy": "FAIL_CLOSED_ON_DUPLICATE_TIMESTAMPS",
+  "approved_for_research": true,
+  "snapshot_metrics": {
+    "total_rows": 7766111,
+    "byte_size": 393952273,
+    "start_timestamp_unix": 1325376060,
+    "start_datetime_utc": "2012-01-01T00:01:00Z",
+    "end_timestamp_unix": 1791342660,
+    "end_datetime_utc": "2026-10-07T03:11:00Z",
+    "columns": ["Timestamp", "Open", "High", "Low", "Close", "Volume"],
+    "null_count": 0,
+    "is_monotonic_increasing": true,
+    "has_duplicate_timestamps": false,
+    "boundary_sanity_checks_passed": true
+  },
+  "exclusions": {
+    "har_ohlcv_reused": false,
+    "iv7d_used": false,
+    "har_artifacts_used": false,
+    "hourly_ohlcv_substitute_used": false
+  }
+}
