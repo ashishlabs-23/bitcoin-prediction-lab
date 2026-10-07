@@ -13,6 +13,7 @@ Configures FastAPI with:
 
 import os
 import sys
+import json
 import logging
 from contextlib import asynccontextmanager
 from typing import List, Dict
