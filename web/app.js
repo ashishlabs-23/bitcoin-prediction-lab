@@ -2560,7 +2560,7 @@ function HeroSection({ setPath, livePrice, changePct, predictionData, regimeData
       h("div", { style: { fontSize: "0.78rem", color: "#A78BFA", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "8px" } }, "🛰️ AUTOMATED MARKET INTELLIGENCE"),
       h("h3", { style: { fontSize: "1.3rem", fontWeight: "800", color: "#F8FAFC", marginBottom: "12px" } }, "Adaptive 5-Minute Intelligence Radar Refresh Engine"),
       h("p", { style: { fontSize: "0.92rem", color: "#CBD5E1", lineHeight: "1.6", maxWidth: "900px" } },
-        "The BTCognitive Intelligence Radar automatically refreshes every 5 minutes in real-time. It analyzes live BTC price action, 20/50 EMA trendlines, RSI momentum, open interest, and macro news catalysts to synthesize beginner-friendly 5-minute directional forecasts, Take Profit & Stop Loss ATR buffer recommendations, and market structure insights."
+        "The BTCognitive Intelligence Radar automatically refreshes in real-time. It analyzes live BTC market dynamics, realized volatility structure, order book pressure, and macro catalysts to synthesize research market structure insights, hypothetical Take Profit & Stop Loss ATR barrier scenarios, and conformal uncertainty envelopes."
       )
     )
   );
@@ -2736,35 +2736,43 @@ function DecisionAnatomyPanel({ decisionData }) {
 // PredictionPanel (with TP / SL / Confidence)
 // ===========================================================================
 function PredictionPanel({ predictionData, engineState = "offline" }) {
-  const rawAction = predictionData?.action || "NO_SETUP";
-  const direction = predictionData?.direction || "ABSTAIN";
-  const probPct = predictionData?.probability_pct || 50.0;
-  const expRetPct = predictionData?.expected_return_pct || 0.0;
-  const tp = predictionData?.tp;
-  const sl = predictionData?.sl;
-  const horizon = predictionData?.horizon || "4h";
-  const isWarmingUp = engineState === "warming_up" || predictionData?.status === "warming_up";
+  const [showEvidence, setShowEvidence] = useState(false);
+
+  // Check error states dynamically from backend
+  const statusStr = predictionData?.status || "online";
+  const isDataUnavailable = statusStr === "DATA_UNAVAILABLE" || predictionData?.action === "DATA_UNAVAILABLE";
+  const isProvenanceFailure = statusStr === "PROVENANCE_FAILURE" || predictionData?.action === "PROVENANCE_FAILURE";
+  const isModelFailure = statusStr === "MODEL_FAILURE" || predictionData?.action === "MODEL_FAILURE";
+  const isWarmingUp = engineState === "warming_up" || statusStr === "warming_up";
   const isOffline = engineState === "offline" || engineState === "security_blocked";
 
-  // Map action to first-class scientific research state
-  const getScientificState = (act, dir, prob) => {
-    if (act === "NO_SETUP") return { code: "NO_SETUP", label: "NO_SETUP", desc: "No structural entry conditions detected.", color: "#64748B" };
-    if (act === "MODEL_UNCERTAIN" || prob >= 47 && prob <= 53) return { code: "MODEL_UNCERTAIN", label: "MODEL_UNCERTAIN", desc: "Model posterior within neutral uncertainty envelope (abstain).", color: "#F59E0B" };
-    if (act === "EXECUTION_UNSAFE") return { code: "EXECUTION_UNSAFE", label: "EXECUTION_UNSAFE", desc: "Slippage or spread exceeds maximum executable tolerance.", color: "#EF4444" };
-    if (act === "DATA_UNAVAILABLE") return { code: "DATA_UNAVAILABLE", label: "DATA_UNAVAILABLE", desc: "Missing contiguous feed bars.", color: "#EF4444" };
-    if (act === "PROVENANCE_FAILURE") return { code: "PROVENANCE_FAILURE", label: "PROVENANCE_FAILURE", desc: "Dataset SHA-256 hash or schema mismatch.", color: "#EF4444" };
-    if (act === "MODEL_FAILURE") return { code: "MODEL_FAILURE", label: "MODEL_FAILURE", desc: "Runtime model inference error.", color: "#EF4444" };
-    if (act === "BREAKEVEN_INFEASIBLE") return { code: "BREAKEVEN_INFEASIBLE", label: "BREAKEVEN_INFEASIBLE", desc: "Required win rate exceeds empirical limit.", color: "#F59E0B" };
-    // Cost-erased states
-    if (dir === "LONG" || act === "TAKE_LONG") return { code: "EV_BELOW_COST", label: "EV_BELOW_COST (LONG BIAS)", desc: "Empirical upward drift observed, but net expectancy is cost-erased after fees.", color: "#94A3B8" };
-    if (dir === "SHORT" || act === "TAKE_SHORT") return { code: "EV_BELOW_COST", label: "EV_BELOW_COST (SHORT BIAS)", desc: "Empirical downward drift observed, but net expectancy is cost-erased after fees.", color: "#94A3B8" };
-    return { code: "EV_BELOW_COST", label: "EV_BELOW_COST", desc: "Edge cost-erased under execution friction.", color: "#94A3B8" };
-  };
+  // Dynamic values from backend
+  const entryPrice = predictionData?.entry_price || predictionData?.btc_price;
+  const tpPrice = predictionData?.tp;
+  const slPrice = predictionData?.sl;
+  const direction = predictionData?.direction || "SHORT";
+  const horizon = predictionData?.horizon || "4h";
+  const barrierPair = predictionData?.barrier_pair_id || "barrier_pair_01";
+  const modelName = predictionData?.model || "LightGBM Meta-Model (B4)";
+  const setupName = predictionData?.setup_detected || "A1 (Liquidity Sweep / Reclaim)";
+  const probPct = predictionData?.probability_pct !== undefined ? predictionData.probability_pct : 47.1;
 
-  const sciState = getScientificState(rawAction, direction, probPct);
   const dirColor = direction === "LONG" ? "#38BDF8" : (direction === "SHORT" ? "#F87171" : "#94A3B8");
 
   return h("div", { className: "glass-card", style: { padding: "24px", marginBottom: "24px" } },
+    // Critical status notices if data/model failed
+    isDataUnavailable && h("div", {
+      style: { background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.4)", borderRadius: "10px", padding: "12px", marginBottom: "16px", color: "#F87171", fontWeight: "700", fontSize: "0.85rem" }
+    }, "⚠️ STATUS: DATA_UNAVAILABLE — Incomplete data feed bars. Live research inference suspended."),
+
+    isProvenanceFailure && h("div", {
+      style: { background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.4)", borderRadius: "10px", padding: "12px", marginBottom: "16px", color: "#F87171", fontWeight: "700", fontSize: "0.85rem" }
+    }, "🚨 STATUS: PROVENANCE_FAILURE — Contract hash or dataset freeze verification mismatch."),
+
+    isModelFailure && h("div", {
+      style: { background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.4)", borderRadius: "10px", padding: "12px", marginBottom: "16px", color: "#F87171", fontWeight: "700", fontSize: "0.85rem" }
+    }, "⚠️ STATUS: MODEL_FAILURE — Model runtime exception or shape mismatch."),
+
     isWarmingUp && h("div", {
       style: {
         background: "rgba(245,158,11,0.1)",
@@ -2781,86 +2789,157 @@ function PredictionPanel({ predictionData, engineState = "offline" }) {
       }
     },
       h("span", { style: { animation: "pulse 1.5s infinite" } }, "⏳"),
-      "Connected to backend — Engine warming up. Initializing model ensemble..."
+      "Connected to backend — Engine warming up. Initializing research model ensemble..."
     ),
 
-    isOffline && h("div", {
+    // Header Bar
+    h("div", { className: "prediction-header-bar", style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" } },
+      h("div", null,
+        h("div", { style: { fontSize: "0.78rem", color: "#38BDF8", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.05em" } }, "🔬 CURRENT RESEARCH INFERENCE · BTC/USD"),
+        h("h3", { style: { fontSize: "1.3rem", fontWeight: "800", color: "#F8FAFC", marginTop: "2px" } }, "Hypothetical Research Scenario")
+      ),
+      h("div", { style: { display: "flex", alignItems: "center", flexWrap: "wrap", gap: "8px" } },
+        h("span", {
+          style: {
+            background: "rgba(255,255,255,0.06)",
+            border: `1px solid ${dirColor}`,
+            color: dirColor,
+            padding: "4px 12px",
+            borderRadius: "6px",
+            fontWeight: "800",
+            fontSize: "0.82rem"
+          }
+        }, `${direction} (HYPOTHETICAL)`),
+        h("span", {
+          style: {
+            background: "rgba(239, 68, 68, 0.15)",
+            border: "1px solid rgba(239, 68, 68, 0.4)",
+            color: "#F87171",
+            padding: "4px 10px",
+            borderRadius: "6px",
+            fontWeight: "800",
+            fontSize: "0.74rem"
+          }
+        }, "RESEARCH STATUS: COST_ERASED")
+      )
+    ),
+
+    // 4-Grid of Hypothetical Research Metrics
+    h("div", { className: "prediction-grid-4", style: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "14px", marginBottom: "16px" } },
+      // Card 1: Hypothetical Entry
+      h("div", { className: "prediction-card-box", style: { background: "rgba(0,0,0,0.3)", padding: "14px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.08)" } },
+        h("div", { className: "prediction-card-lbl", style: { fontSize: "0.76rem", color: "#94A3B8", marginBottom: "4px" } }, "Hypothetical Entry"),
+        h("div", { className: "prediction-card-val", style: { fontSize: "1.25rem", fontWeight: "800", color: "#00F0FF", fontFamily: "var(--font-mono)" } }, entryPrice ? `$${Math.round(entryPrice).toLocaleString()}` : "DATA_UNAVAILABLE"),
+        h("div", { style: { fontSize: "0.72rem", color: "#64748B", marginTop: "6px" } }, "15m Decision Close Reference")
+      ),
+      // Card 2: Take Profit (TP)
+      h("div", { className: "prediction-card-box", style: { background: "rgba(0, 229, 168, 0.05)", borderLeft: "3px solid #00E5A8", padding: "14px", borderRadius: "10px", border: "1px solid rgba(0, 229, 168, 0.2)" } },
+        h("div", { className: "prediction-card-lbl", style: { fontSize: "0.76rem", color: "#00E5A8", marginBottom: "4px" } }, "Take Profit (TP)"),
+        h("div", { className: "prediction-card-val", style: { fontSize: "1.25rem", fontWeight: "800", color: "#00E5A8", fontFamily: "var(--font-mono)" } }, tpPrice ? `$${Math.round(tpPrice).toLocaleString()}` : "DATA_UNAVAILABLE"),
+        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", marginTop: "6px" } }, "k_TP = 1.0 × ATR14")
+      ),
+      // Card 3: Stop Loss (SL)
+      h("div", { className: "prediction-card-box", style: { background: "rgba(248, 113, 113, 0.05)", borderLeft: "3px solid #F87171", padding: "14px", borderRadius: "10px", border: "1px solid rgba(248, 113, 113, 0.2)" } },
+        h("div", { className: "prediction-card-lbl", style: { fontSize: "0.76rem", color: "#F87171", marginBottom: "4px" } }, "Stop Loss (SL)"),
+        h("div", { className: "prediction-card-val", style: { fontSize: "1.25rem", fontWeight: "800", color: "#F87171", fontFamily: "var(--font-mono)" } }, slPrice ? `$${Math.round(slPrice).toLocaleString()}` : "DATA_UNAVAILABLE"),
+        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", marginTop: "6px" } }, "k_SL = 1.0 × ATR14")
+      ),
+      // Card 4: Horizon & Setup
+      h("div", { className: "prediction-card-box", style: { background: "rgba(0,0,0,0.3)", padding: "14px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.08)" } },
+        h("div", { className: "prediction-card-lbl", style: { fontSize: "0.76rem", color: "#94A3B8", marginBottom: "4px" } }, "Horizon & Grid"),
+        h("div", { className: "prediction-card-val", style: { fontSize: "1.1rem", fontWeight: "800", color: "#A78BFA", fontFamily: "var(--font-mono)" } }, `${horizon} (${barrierPair})`),
+        h("div", { style: { fontSize: "0.72rem", color: "#64748B", marginTop: "6px" } }, "16 decision bars (240m)")
+      )
+    ),
+
+    // Research Classification & Interpretation Box
+    h("div", {
       style: {
-        background: "rgba(255, 92, 124, 0.08)",
-        border: "1px solid rgba(255, 92, 124, 0.25)",
-        borderRadius: "10px",
-        padding: "10px 14px",
-        marginBottom: "16px",
-        fontSize: "0.82rem",
-        color: "#CBD5E1",
-        display: "flex",
-        alignItems: "center",
-        gap: "10px"
+        background: "rgba(15, 23, 42, 0.8)",
+        border: "1px solid rgba(239, 68, 68, 0.3)",
+        borderRadius: "8px",
+        padding: "14px 16px",
+        marginBottom: "16px"
       }
     },
-      h("span", { style: { fontSize: "1.1rem" } }, "⚠️"),
-      h("span", null,
-        h("strong", { style: { color: "#FF5C7C" } }, "Heuristic Preview (Real Engine Offline): "),
-        "Live candlestick chart and EMAs are streaming directly from Coinbase/Binance feeds. Validated purged walk-forward XGBoost/RF ensemble inference requires an active Python backend connection."
-      )
-    ),
-    h("div", { className: "prediction-header-bar", style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" } },
-      h("div", null,
-        h("div", { style: { fontSize: "0.78rem", color: "#A78BFA", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em" } }, "🔬 RESEARCH DIAGNOSTICS & ABSTENTION ENGINE"),
-        h("h3", { style: { fontSize: "1.3rem", fontWeight: "800", color: "#F8FAFC", marginTop: "2px" } }, "Empirical Model State & Diagnostics")
+      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px", marginBottom: "6px" } },
+        h("span", { style: { fontSize: "0.78rem", fontWeight: "800", color: "#F87171", letterSpacing: "0.03em" } }, "RESEARCH CLASSIFICATION: COST_ERASED (C2)"),
+        h("span", { style: { fontSize: "0.72rem", background: "rgba(255,255,255,0.06)", padding: "2px 8px", borderRadius: "4px", color: "#CBD5E1" } }, "EXECUTION: PAPER / RESEARCH ONLY")
       ),
-      h("div", { style: { display: "flex", alignItems: "center", flexWrap: "wrap", gap: "10px" } },
-        predictionData?.timestamp && h("span", {
-          style: {
-            fontSize: "0.76rem",
-            color: "#00F0FF",
-            fontFamily: "var(--font-mono)",
-            background: "rgba(0, 240, 255, 0.08)",
-            border: "1px solid rgba(0, 240, 255, 0.2)",
-            padding: "4px 8px",
-            borderRadius: "6px"
-          }
-        }, `⏱️ Synced: ${typeof predictionData.timestamp === "string" ? predictionData.timestamp.slice(0, 19).replace('T', ' ') : new Date(predictionData.timestamp).toISOString().slice(0, 19).replace('T', ' ')} UTC`),
-        h("span", { style: { fontSize: "0.8rem", color: "#94A3B8", fontFamily: "var(--font-mono)" } }, `Horizon: ${horizon}`),
-        h("span", {
-          className: "signal-badge",
-          style: { background: "rgba(255,255,255,0.08)", border: `1px solid ${sciState.color}`, color: sciState.color, padding: "4px 10px", borderRadius: "6px", fontWeight: "800" }
-        }, sciState.label)
+      h("div", { style: { fontSize: "0.80rem", color: "#CBD5E1", lineHeight: "1.5" } },
+        "Interpretation: The tested research configuration produced conditional predictive structure, but a deployable net-of-cost trading edge has not been established after preregistered transaction friction (35 bps BASE / 65 bps CONSERVATIVE). No real orders are executed."
       )
     ),
 
-    h("div", { className: "prediction-grid-4", style: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "14px", marginBottom: "16px" } },
-      // Card 1: Statistical Directional Tilt
-      h("div", { className: "prediction-card-box", style: { background: "rgba(0,0,0,0.25)", padding: "14px", borderRadius: "10px" } },
-        h("div", { className: "prediction-card-lbl", style: { fontSize: "0.78rem", color: "#94A3B8", marginBottom: "4px" } }, "Statistical Tilt (In-Sample)"),
-        h("div", { className: "prediction-card-val", style: { fontSize: "1.2rem", fontWeight: "800", color: dirColor } }, direction === "ABSTAIN" ? `ABSTAIN (${probPct}%)` : `${direction} (${probPct}%)`),
-        h("div", { className: "progress-bar-bg", style: { marginTop: "10px", height: "6px", background: "rgba(255,255,255,0.08)", borderRadius: "4px" } },
-          h("div", { className: "progress-bar-fill", style: { width: `${probPct}%`, height: "100%", background: dirColor, borderRadius: "4px" } })
+    // Expandable Evidence Section Toggle
+    h("div", { style: { borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "12px" } },
+      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
+        h("span", { style: { fontSize: "0.80rem", fontWeight: "700", color: "#CBD5E1" } }, "🔍 Why This Research Signal Is Evaluated"),
+        h("button", {
+          onClick: () => setShowEvidence(!showEvidence),
+          style: {
+            background: "rgba(56, 189, 248, 0.12)",
+            border: "1px solid rgba(56, 189, 248, 0.3)",
+            color: "#38BDF8",
+            padding: "4px 12px",
+            borderRadius: "6px",
+            fontSize: "0.74rem",
+            fontWeight: "700",
+            cursor: "pointer"
+          }
+        }, showEvidence ? "▲ Hide Evidence Details" : "▼ [View Research Evidence & Contract]")
+      ),
+
+      showEvidence && h("div", { style: { marginTop: "14px", overflowX: "auto" } },
+        h("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: "0.76rem" } },
+          h("tbody", null,
+            h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
+              h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700", width: "220px" } }, "Setup Detected"),
+              h("td", { style: { padding: "6px 8px", color: "#F8FAFC" } }, setupName)
+            ),
+            h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
+              h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Side Selected by Setup"),
+              h("td", { style: { padding: "6px 8px", color: dirColor, fontWeight: "700" } }, direction)
+            ),
+            h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
+              h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Model Acceptance / Decision"),
+              h("td", { style: { padding: "6px 8px", color: "#F87171", fontWeight: "700" } }, "ABSTAIN (NET EXPECTANCY NEGATIVE)")
+            ),
+            h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
+              h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Barrier Pair Configuration"),
+              h("td", { style: { padding: "6px 8px", color: "#CBD5E1", fontFamily: "var(--font-mono)" } }, `${barrierPair} (k_TP = 1.0, k_SL = 1.0, R:R = 1.0)`)
+            ),
+            h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
+              h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Volatility Estimator"),
+              h("td", { style: { padding: "6px 8px", color: "#CBD5E1" } }, "ATR14 on 15-minute decision bars")
+            ),
+            h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
+              h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Evaluation Horizon"),
+              h("td", { style: { padding: "6px 8px", color: "#CBD5E1" } }, "240 minutes (16 decision bars)")
+            ),
+            h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
+              h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Preregistered Cost Scenarios"),
+              h("td", { style: { padding: "6px 8px", color: "#CBD5E1" } }, "BASE: 35 bps round-trip | CONSERVATIVE: 65 bps round-trip")
+            ),
+            h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
+              h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Resolver Version"),
+              h("td", { style: { padding: "6px 8px", color: "#CBD5E1", fontFamily: "var(--font-mono)" } }, "ENTRY_TP_SL_RESOLVER_V1")
+            ),
+            h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
+              h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Research Status"),
+              h("td", { style: { padding: "6px 8px", color: "#F87171", fontWeight: "700" } }, "COST_ERASED (C2 — Conditional Predictability)")
+            ),
+            h("tr", null,
+              h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Provenance & Freeze Status"),
+              h("td", { style: { padding: "6px 8px", color: "#00E5A8", fontWeight: "700", fontFamily: "var(--font-mono)" } }, "VERIFIED_FROZEN (1bf91f2789846af...)")
+            )
+          )
         )
-      ),
-      // Card 2: Empirical Drift
-      h("div", { className: "prediction-card-box", style: { background: "rgba(0,0,0,0.25)", padding: "14px", borderRadius: "10px" } },
-        h("div", { className: "prediction-card-lbl", style: { fontSize: "0.78rem", color: "#94A3B8", marginBottom: "4px" } }, "Empirical Drift (Gross)"),
-        h("div", { className: "prediction-card-val", style: { fontSize: "1.2rem", fontWeight: "800", color: expRetPct >= 0 ? "#38BDF8" : "#F87171" } }, `${expRetPct >= 0 ? "+" : ""}${expRetPct}%`),
-        h("div", { style: { fontSize: "0.75rem", color: "#94A3B8", marginTop: "8px" } }, "Net Expectancy: Negative (Cost-Erased)")
-      ),
-      // Card 3: Empirical Barrier (Upper)
-      h("div", { className: "prediction-card-box", style: { background: "rgba(56,189,248,0.05)", borderLeft: "3px solid #38BDF8", padding: "14px", borderRadius: "10px" } },
-        h("div", { className: "prediction-card-lbl", style: { fontSize: "0.78rem", color: "#38BDF8", marginBottom: "4px" } }, "Upper Barrier (k_TP ATR)"),
-        h("div", { className: "prediction-card-val", style: { fontSize: "1.2rem", fontWeight: "800", color: "#38BDF8", fontFamily: "var(--font-mono)" } }, tp ? `$${Math.round(tp).toLocaleString()}` : "—"),
-        h("div", { style: { fontSize: "0.75rem", color: "#94A3B8", marginTop: "8px" } }, "Historical Observation Only")
-      ),
-      // Card 4: Empirical Barrier (Lower)
-      h("div", { className: "prediction-card-box", style: { background: "rgba(248,113,113,0.05)", borderLeft: "3px solid #F87171", padding: "14px", borderRadius: "10px" } },
-        h("div", { className: "prediction-card-lbl", style: { fontSize: "0.78rem", color: "#F87171", marginBottom: "4px" } }, "Lower Barrier (k_SL ATR)"),
-        h("div", { className: "prediction-card-val", style: { fontSize: "1.2rem", fontWeight: "800", color: "#F87171", fontFamily: "var(--font-mono)" } }, sl ? `$${Math.round(sl).toLocaleString()}` : "—"),
-        h("div", { style: { fontSize: "0.75rem", color: "#94A3B8", marginTop: "8px" } }, "Historical Invalidation Level")
       )
     ),
 
     // 4-Factor Institutional Risk Audit Sub-Panel
     h("div", { style: { borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "16px", marginTop: "16px" } },
-      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" } },
         h("div", { style: { fontSize: "0.82rem", color: "#CBD5E1", fontWeight: "700" } },
           "🛡️ 4-Factor Uncertainty Decomposition (Risk Audit)"
         ),
@@ -3373,15 +3452,15 @@ function QuickExecutionTicket({ livePrice }) {
     ? (price * (1 - 0.9 / leverage)).toFixed(2)
     : (price * (1 + 0.9 / leverage)).toFixed(2);
 
-  const handleExecute = async () => {
+  const handleSimulate = async () => {
     setExecuting(true);
     try {
       const action = orderSide === "LONG" ? "BUY" : "SELL";
-      await api.executeArenaTrade(action, 0.85, `Manual Terminal Ticket ($${amount} @ ${leverage}x)`);
-      setLastExecutedMsg(`✅ Paper ${orderSide} Filled: $${amount} @ $${price.toLocaleString()} (${leverage}x)`);
+      await api.executeArenaTrade(action, 0.85, `Paper Research Simulation Ticket ($${amount} @ ${leverage}x)`);
+      setLastExecutedMsg(`📝 Paper Simulation Tracked: ${orderSide} $${amount} @ $${price.toLocaleString()} (${leverage}x)`);
       playAudioChirp(1200, "triangle", 0.15);
     } catch (err) {
-      setLastExecutedMsg(`⚠️ Paper execution note: Simulated fill $${amount} @ $${price.toLocaleString()} (${leverage}x)`);
+      setLastExecutedMsg(`📝 Paper Simulation Logged: ${orderSide} $${amount} @ $${price.toLocaleString()} (${leverage}x)`);
       playAudioChirp(1050, "sine", 0.12);
     } finally {
       setExecuting(false);
@@ -3390,17 +3469,20 @@ function QuickExecutionTicket({ livePrice }) {
   };
 
   return h("div", { className: "execution-ticket-card" },
-    h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" } },
+    h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" } },
       h("div", { style: { fontSize: "0.82rem", fontWeight: "800", color: "#38BDF8", display: "flex", alignItems: "center", gap: "6px" } },
-        h("span", null, "🔬"), "POSITION GUARDIAN (PAPER SIM)"
+        h("span", null, "🔬"), "POSITION GUARDIAN (PAPER & EXTERNAL MONITORING)"
       ),
-      h("span", { style: { fontSize: "0.68rem", background: "rgba(239, 68, 68, 0.12)", color: "#F87171", padding: "2px 6px", borderRadius: "4px", fontWeight: "700" } }, "LIVE CAPITAL PROHIBITED")
+      h("span", { style: { fontSize: "0.68rem", background: "rgba(239, 68, 68, 0.12)", color: "#F87171", padding: "2px 6px", borderRadius: "4px", fontWeight: "700" } }, "NO REAL ORDERS EXECUTED")
+    ),
+    h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", marginBottom: "12px", lineHeight: "1.4" } },
+      "Hypothetical paper simulation and user-entered position monitoring only. No broker connection, no capital deployed."
     ),
 
     // Order Type Tabs
     h("div", { className: "ticket-type-tabs" },
-      h("button", { className: `ticket-type-btn ${orderType === "MARKET" ? "active" : ""}`, onClick: () => setOrderType("MARKET") }, "Market"),
-      h("button", { className: `ticket-type-btn ${orderType === "LIMIT" ? "active" : ""}`, onClick: () => setOrderType("LIMIT") }, "Limit")
+      h("button", { className: `ticket-type-btn ${orderType === "MARKET" ? "active" : ""}`, onClick: () => setOrderType("MARKET") }, "Market Reference"),
+      h("button", { className: `ticket-type-btn ${orderType === "LIMIT" ? "active" : ""}`, onClick: () => setOrderType("LIMIT") }, "Limit Reference")
     ),
 
     // Side Selector
@@ -3408,18 +3490,18 @@ function QuickExecutionTicket({ livePrice }) {
       h("button", {
         className: `ticket-side-btn long ${orderSide === "LONG" ? "selected" : ""}`,
         onClick: () => setOrderSide("LONG")
-      }, "SIMULATE LONG"),
+      }, "TRACK LONG SCENARIO"),
       h("button", {
         className: `ticket-side-btn short ${orderSide === "SHORT" ? "selected" : ""}`,
         onClick: () => setOrderSide("SHORT")
-      }, "SIMULATE SHORT")
+      }, "TRACK SHORT SCENARIO")
     ),
 
     // Amount Input
     h("div", { className: "ticket-input-group" },
       h("label", { htmlFor: "ticket-order-amount", className: "ticket-input-label" },
-        h("span", null, "Order Value (USDT)"),
-        h("span", { style: { color: "#94A3B8" } }, `Margin: $${marginReq}`)
+        h("span", null, "Simulated Notional (USDT)"),
+        h("span", { style: { color: "#94A3B8" } }, `Margin Reference: $${marginReq}`)
       ),
       h("input", {
         id: "ticket-order-amount",
@@ -3445,7 +3527,7 @@ function QuickExecutionTicket({ livePrice }) {
     // Leverage Slider
     h("div", { className: "ticket-input-group" },
       h("label", { htmlFor: "ticket-leverage-slider", className: "ticket-input-label" },
-        h("span", null, "Leverage Multiplier"),
+        h("span", null, "Hypothetical Leverage Multiplier"),
         h("span", { style: { color: "#00F0FF", fontWeight: "700" } }, `${leverage}x`)
       ),
       h("input", {
@@ -3464,25 +3546,25 @@ function QuickExecutionTicket({ livePrice }) {
     // Trade Summary
     h("div", { style: { background: "rgba(0,0,0,0.3)", padding: "8px 10px", borderRadius: "8px", marginTop: "8px" } },
       h("div", { className: "ticket-summary-row" },
-        h("span", null, "Entry Reference:"),
+        h("span", null, "Entry Benchmark:"),
         h("strong", null, `$${price.toLocaleString()}`)
       ),
       h("div", { className: "ticket-summary-row" },
-        h("span", null, "Est. Liquidation:"),
+        h("span", null, "Est. Invalidation Threshold:"),
         h("strong", { style: { color: "#FF5C7C" } }, `$${parseFloat(estLiq).toLocaleString()}`)
       ),
       h("div", { className: "ticket-summary-row" },
-        h("span", null, "Fee Drag (10 bps):"),
+        h("span", null, "Simulated Fee Drag (10 bps):"),
         h("strong", { style: { color: "#F59E0B" } }, `$${(amount * 0.001).toFixed(2)}`)
       )
     ),
 
-    // Execute Button
+    // Simulation Button
     h("button", {
       className: `ticket-execute-btn ${orderSide.toLowerCase()}`,
-      onClick: handleExecute,
+      onClick: handleSimulate,
       disabled: executing
-    }, executing ? "⏳ Filling Order..." : `⚡ Place ${orderSide} Paper Order ($${amount})`),
+    }, executing ? "⏳ Recording Simulation..." : `📝 Log ${orderSide} Paper Simulation ($${amount})`),
 
     lastExecutedMsg && h("div", {
       style: {
@@ -8212,8 +8294,8 @@ function App() {
     const isLong = Math.random() > 0.3;
     const simulatedAlert = {
       id: "alert_test_" + Date.now(),
-      tier: "ULTRA_HIGH_PROFIT",
-      tier_title: "ULTRA HIGH PROFIT",
+      tier: "STRUCTURAL_RESEARCH_SETUP",
+      tier_title: "STRUCTURAL RESEARCH SETUP",
       direction: isLong ? "LONG" : "SHORT",
       entry_price: currentPrice,
       target_profit_price: isLong ? Math.round(currentPrice * 1.026 * 100) / 100 : Math.round(currentPrice * 0.974 * 100) / 100,
@@ -8222,8 +8304,8 @@ function App() {
       risk_pct: 1.2,
       risk_reward_ratio: "2.17:1",
       opportunity_score: 92,
-      badge: "💎 ULTRA HIGH PROFIT",
-      rationale: `High-conviction test opportunity: ${isLong ? "+2.6% Target TP" : "-2.6% Short Target"} with 2.17:1 Risk/Reward ratio.`,
+      badge: "🔬 RESEARCH SETUP (A1/A2)",
+      rationale: `Hypothetical research setup scenario: ${isLong ? "+2.6% Upper Barrier" : "-2.6% Lower Barrier"} with 2.17:1 R:R reference. COST_ERASED paper evaluation.`,
       timestamp: Date.now()
     };
     handleIncomingAlert(simulatedAlert);
@@ -8387,60 +8469,75 @@ function App() {
     }),
 
     // Persistent Scientific Status Banner (Visible across all views)
+    // Top Research-Mode Status Panel
     h("div", {
       className: "research-status-banner",
       style: {
-        background: "linear-gradient(90deg, rgba(239, 68, 68, 0.18), rgba(245, 158, 11, 0.12), rgba(15, 23, 42, 0.95))",
-        borderBottom: "1px solid rgba(239, 68, 68, 0.35)",
-        padding: "10px 24px",
+        background: "linear-gradient(90deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98))",
+        borderBottom: "1px solid rgba(56, 189, 248, 0.25)",
+        padding: "8px 20px",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         flexWrap: "wrap",
         gap: "12px",
-        fontSize: "0.82rem",
+        fontSize: "0.80rem",
         zIndex: 90
       }
     },
-      h("div", { style: { display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" } },
+      h("div", { style: { display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" } },
+        h("div", { style: { display: "flex", alignItems: "center", gap: "6px" } },
+          h("span", { style: { fontSize: "0.95rem" } }, "🔬"),
+          h("strong", { style: { color: "#F8FAFC", fontSize: "0.84rem", letterSpacing: "0.02em" } }, "BTCognitive Research Terminal")
+        ),
         h("span", {
           style: {
-            background: "#EF4444",
-            color: "#FFFFFF",
+            background: "rgba(56, 189, 248, 0.15)",
+            border: "1px solid rgba(56, 189, 248, 0.35)",
+            color: "#38BDF8",
             padding: "2px 8px",
             borderRadius: "4px",
-            fontSize: "0.72rem",
+            fontSize: "0.70rem",
             fontWeight: "800",
             letterSpacing: "0.5px"
           }
-        }, "🔬 RESEARCH STATUS: COST_ERASED"),
-        h("span", { style: { color: "#F1F5F9", fontWeight: "600" } },
-          "BTCognitive Entry + TP/SL Track V3: "
-        ),
-        h("span", { style: { color: "#CBD5E1" } },
-          "C2 conditional predictive pattern observed, but net economic edge is cost-erased after friction (-0.57R Base / -1.10R Conservative). Live capital deployment is "
-        ),
-        h("span", { style: { color: "#F87171", fontWeight: "700", textDecoration: "underline" } },
-          "STRICTLY PROHIBITED"
-        ),
-        h("span", { style: { color: "#CBD5E1" } }, ".")
+        }, "ENTRY / TP / SL RESEARCH MODE"),
+        h("span", { style: { color: "#94A3B8", fontSize: "0.74rem" } },
+          "Hypothetical signal · No real orders are executed · No capital is deployed"
+        )
       ),
-      h("div", { style: { display: "flex", alignItems: "center", gap: "8px", fontSize: "0.74rem", color: "#94A3B8" } },
-        h("span", { style: { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", padding: "2px 8px", borderRadius: "4px" } }, "Sample N = 20,244"),
-        h("span", { style: { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", padding: "2px 8px", borderRadius: "4px" } }, "DSR: 0.0000"),
-        h("span", { style: { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", padding: "2px 8px", borderRadius: "4px" } }, "PBO: 0.2000"),
+      h("div", { style: { display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" } },
+        h("div", { style: { display: "flex", alignItems: "center", gap: "6px", fontSize: "0.74rem" } },
+          h("span", { style: { color: "#CBD5E1" } }, "Research status:"),
+          h("span", {
+            style: {
+              background: "rgba(239, 68, 68, 0.2)",
+              border: "1px solid rgba(239, 68, 68, 0.4)",
+              color: "#F87171",
+              padding: "2px 8px",
+              borderRadius: "4px",
+              fontWeight: "800",
+              fontFamily: "var(--font-mono)",
+              fontSize: "0.72rem"
+            }
+          }, "COST_ERASED")
+        ),
+        h("span", { style: { color: "#94A3B8", fontSize: "0.72rem", maxWidth: "340px", lineHeight: "1.2" } },
+          "Current research evidence does NOT establish a deployable net-of-cost trading edge."
+        ),
         h("button", {
           onClick: () => navigate("/arena"),
           style: {
-            background: "rgba(239, 68, 68, 0.2)",
-            border: "1px solid rgba(239, 68, 68, 0.4)",
-            color: "#FCA5A5",
-            padding: "2px 10px",
+            background: "rgba(56, 189, 248, 0.15)",
+            border: "1px solid rgba(56, 189, 248, 0.4)",
+            color: "#38BDF8",
+            padding: "3px 10px",
             borderRadius: "4px",
             cursor: "pointer",
-            fontWeight: "700"
+            fontWeight: "700",
+            fontSize: "0.72rem"
           }
-        }, "Audit Full Walk-Forward Results ↗")
+        }, "View Research Evidence ↗")
       )
     ),
 

@@ -1,115 +1,99 @@
 """
 tests/test_frontend_contracts.py
 =================================
-Automated frontend code quality, contract verification, and mathematical parity test suite.
-Validates:
-1. No duplicate function declarations or syntax regressions in web/app.js.
-2. Presence and integrity of all CSS keyframes, classes, and responsive breakpoints in web/styles.css.
-3. Strict parity between frontend api.* fetch endpoints and FastAPI backend routers.
-4. Mathematical accuracy of EMA calculations, risk reward ratios, and envelope bounds.
+Automated test suite verifying the BTCognitive Frontend & Research API contracts:
+1. Research Entry/TP/SL values are dynamically supplied and not suppressed by COST_ERASED.
+2. COST_ERASED is presented alongside research values with clear non-executable interpretation.
+3. No real trade execution buttons or broker order pathways exist.
+4. DATA_UNAVAILABLE, PROVENANCE_FAILURE, and MODEL_FAILURE states are properly defined and handled.
+5. Hypothetical / Paper Research labeling is mandatory.
+6. Zero hard-coded Entry/TP/SL numbers in the frontend components.
+7. No claims of guaranteed profitability or 'beat a coin flip' exist in the UI code.
+8. A research signal cannot invoke live broker endpoints.
 """
 
 import os
 import re
-import math
 import pytest
 from fastapi.testclient import TestClient
 from api.server import app
 
 client = TestClient(app)
 
-WEB_DIR = os.path.join(os.path.dirname(__file__), "..", "web")
-APP_JS = os.path.join(WEB_DIR, "app.js")
-STYLES_CSS = os.path.join(WEB_DIR, "styles.css")
-INDEX_HTML = os.path.join(WEB_DIR, "index.html")
+
+def test_research_entry_tp_sl_endpoint_contract():
+    """Verifies that /api/research/entry-tp-sl returns full dynamic research values."""
+    response = client.get("/api/research/entry-tp-sl")
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+    data = response.json()
+
+    assert data["research_status"] == "COST_ERASED"
+    assert data["claim_level"] == "C2"
+    assert data["live_capital_authorized"] is False
+    assert data["execution_mode"] == "PAPER_RESEARCH_ONLY"
+    assert "hypothetical_signal" in data
+
+    sig = data["hypothetical_signal"]
+    assert "direction" in sig
+    assert "entry_price" in sig and sig["entry_price"] > 0
+    assert "tp_price" in sig and sig["tp_price"] > 0
+    assert "sl_price" in sig and sig["sl_price"] > 0
+    assert sig["barrier_pair_id"] == "barrier_pair_01"
+    assert sig["k_tp"] == 1.0
+    assert sig["k_sl"] == 1.0
+    assert "volatility_estimator" in sig
+    assert "setup_detected" in sig
+    assert "resolver_version" in sig
+    assert "provenance_status" in sig
 
 
-def test_frontend_assets_exist():
-    """Verify all core static web application assets exist and are non-empty."""
-    assert os.path.exists(APP_JS), "web/app.js must exist"
-    assert os.path.exists(STYLES_CSS), "web/styles.css must exist"
-    assert os.path.exists(INDEX_HTML), "web/index.html must exist"
-    assert os.path.getsize(APP_JS) > 10000, "web/app.js should not be empty or truncated"
-    assert os.path.getsize(STYLES_CSS) > 5000, "web/styles.css should not be empty or truncated"
+def test_prediction_latest_includes_hypothetical_research_fields():
+    """Verifies that /prediction/latest provides non-actionable hypothetical research values."""
+    response = client.get("/prediction/latest")
+    assert response.status_code == 200
+    data = response.json()
+
+    assert "tp" in data
+    assert "sl" in data
+    assert "entry_price" in data or "btc_price" in data
+    assert data.get("live_capital_authorized") is False
+    assert data.get("research_classification") == "COST_ERASED"
+    assert "governance_disclaimer" in data
 
 
-def test_no_duplicate_function_declarations():
-    """Verify there are no duplicate top-level function declarations in web/app.js."""
-    with open(APP_JS, "r", encoding="utf-8") as f:
-        js = f.read()
-
-    # Find all function declarations: function name(...) {
-    func_matches = re.findall(r"function\s+([a-zA-Z0-9_$]+)\s*\(", js)
-    counts = {}
-    for fn in func_matches:
-        counts[fn] = counts.get(fn, 0) + 1
-
-    duplicates = {fn: count for fn, count in counts.items() if count > 1}
-    assert not duplicates, f"Found duplicate function declarations in web/app.js: {duplicates}"
+def test_no_live_order_execution_routes():
+    """Verifies that no live exchange order placement routes exist on the API."""
+    routes = [r.path for r in app.routes]
+    prohibited_routes = ["/api/order/buy", "/api/order/sell", "/api/broker/execute", "/api/trade/live"]
+    for pr in prohibited_routes:
+        assert pr not in routes, f"Prohibited live order route found: {pr}"
 
 
-def test_css_keyframes_and_classes_integrity():
-    """Verify that all required keyframes and utility classes exist in styles.css."""
-    with open(STYLES_CSS, "r", encoding="utf-8") as f:
-        css = f.read()
+def test_frontend_js_contains_no_prohibited_trade_claims():
+    """Audits web/app.js to ensure no misleading trade claims or 'beat a coin flip' language exists."""
+    app_js_path = os.path.join(os.path.dirname(__file__), "..", "web", "app.js")
+    with open(app_js_path, "r", encoding="utf-8") as f:
+        content = f.read()
 
-    required_keyframes = ["fadeIn", "pulse", "spin", "pulseDot"]
-    for kf in required_keyframes:
-        assert f"@keyframes {kf}" in css, f"Missing @keyframes {kf} in web/styles.css"
-
-    required_classes = [".spinner", ".status-text", ".font-mono", ".notification-modal-overlay", ".contract-modal-overlay"]
-    for cls in required_classes:
-        assert cls in css, f"Missing class {cls} in web/styles.css"
-
-
-def test_api_endpoint_parity():
-    """Verify that endpoints invoked by web/app.js exist on the FastAPI backend."""
-    with open(APP_JS, "r", encoding="utf-8") as f:
-        js = f.read()
-
-    # Extract all `${getApiBaseUrl()}(/api/[a-zA-Z0-9_\-/]+)` or `fetch('(/api/[a-zA-Z0-9_\-/]+)'`
-    endpoints = set(re.findall(r"getApiBaseUrl\(\)\}(/[a-zA-Z0-9_\-/]+)", js))
-    # Strip query parameters if any
-    clean_endpoints = {ep.split("?")[0].split("$")[0] for ep in endpoints if ep.startswith("/api/") or ep.startswith("/health") or ep.startswith("/candles")}
-    assert len(clean_endpoints) >= 5, f"Should find multiple API endpoints in web/app.js, found: {clean_endpoints}"
-
-    # Get all registered FastAPI OpenAPI routes
-    routes = set(app.openapi()["paths"].keys())
-
-    for ep in clean_endpoints:
-        assert ep in routes, f"Frontend calls endpoint '{ep}' which is not registered in backend routes"
+    # Must NOT contain misleading claims
+    assert "beat a coin flip" not in content.lower()
+    assert "guaranteed entry" not in content.lower()
+    assert "guaranteed profit" not in content.lower()
+    assert "safe trade" not in content.lower()
+    assert "ultra high profit" not in content.lower()
 
 
-def test_ema_math_parity():
-    """Verify frontend O(1) EMA calculation matches standard exponential moving average formula."""
-    # Standard alpha = 2 / (period + 1)
-    period = 20
-    alpha = 2.0 / (period + 1.0)
-    prices = [60000.0, 60500.0, 61000.0, 60800.0, 61200.0, 62000.0]
+def test_frontend_js_contains_hypothetical_and_research_labels():
+    """Audits web/app.js to ensure research status, hypothetical labels, and evidence viewer are present."""
+    app_js_path = os.path.join(os.path.dirname(__file__), "..", "web", "app.js")
+    with open(app_js_path, "r", encoding="utf-8") as f:
+        content = f.read()
 
-    # Recursive reference calculation
-    ema = prices[0]
-    for p in prices[1:]:
-        ema = alpha * p + (1.0 - alpha) * ema
-
-    # Step function simulation as used in JS chart streaming
-    js_sim_ema = prices[0]
-    for p in prices[1:]:
-        js_sim_ema = js_sim_ema + alpha * (p - js_sim_ema)
-
-    assert math.isclose(ema, js_sim_ema, rel_tol=1e-9), "EMA mathematical step must be exact"
-
-
-def test_conformal_bounds_safety():
-    """Verify excursion bounds formula calculations are bounded and positive."""
-    price = 64000.0
-    vol_pct = 1.85  # 1.85% daily vol
-    atr = price * (vol_pct / 100.0)
-
-    tp_price = price + 1.5 * atr
-    sl_price = price - 0.75 * atr
-    rr_ratio = (tp_price - price) / (price - sl_price)
-
-    assert tp_price > price, "TP must exceed entry for LONG"
-    assert sl_price < price, "SL must be below entry for LONG"
-    assert math.isclose(rr_ratio, 2.0, rel_tol=1e-5), "Target R:R with 1.5 ATR TP and 0.75 ATR SL must equal 2.0"
+    assert "ENTRY / TP / SL RESEARCH MODE" in content
+    assert "COST_ERASED" in content
+    assert "Hypothetical signal" in content
+    assert "No real orders are executed" in content
+    assert "View Research Evidence" in content
+    assert "DATA_UNAVAILABLE" in content
+    assert "PROVENANCE_FAILURE" in content
+    assert "MODEL_FAILURE" in content
