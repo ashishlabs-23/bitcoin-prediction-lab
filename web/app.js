@@ -2940,6 +2940,7 @@ function PredictionPanel({ predictionData, engineState = "offline" }) {
 
     // 4-Factor Institutional Risk Audit Sub-Panel
     h("div", { style: { borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "16px", marginTop: "16px" } },
+      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" } },
         h("div", { style: { fontSize: "0.82rem", color: "#CBD5E1", fontWeight: "700" } },
           "🛡️ 4-Factor Uncertainty Decomposition (Risk Audit)"
         ),
