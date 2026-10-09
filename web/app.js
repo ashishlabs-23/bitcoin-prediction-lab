@@ -8,6 +8,78 @@
      • Backend WSS   → engine connection status only
    ========================================================================== */
 
+if (window.BTCOGNITIVE_LOCAL_SAFE_MODE === true) {
+  const root = document.getElementById("root");
+  const shell = document.createElement("main");
+  shell.className = "terminal-container";
+  shell.style.maxWidth = "960px";
+  shell.style.margin = "8vh auto";
+  shell.style.padding = "24px";
+  shell.innerHTML = `
+    <section class="glass-card" style="padding:28px">
+      <div style="color:#38BDF8;font-weight:800;letter-spacing:.06em">BTCognitive · LOCAL SAFE MODE</div>
+      <h1 style="color:#F8FAFC;margin:10px 0">Research Terminal</h1>
+      <p style="color:#CBD5E1">Read-only interface inspection. Market data and model inference are not enabled.</p>
+      <div id="local-safe-status" aria-live="polite" style="display:grid;gap:12px;margin:24px 0"></div>
+      <div style="border:1px solid rgba(239,68,68,.5);background:rgba(239,68,68,.12);padding:16px;border-radius:10px;color:#FCA5A5">
+        Research execution is blocked. Historical results are unverified. Real order execution is disabled.
+      </div>
+      <p style="color:#94A3B8;margin-top:18px">No Entry / TP / SL signal or performance estimate is available in this mode.</p>
+    </section>`;
+  root?.replaceChildren(shell);
+
+  const statusContainer = shell.querySelector("#local-safe-status");
+  const addStatus = (label, value, detail = "") => {
+    const card = document.createElement("div");
+    card.className = "glass-card";
+    card.style.padding = "14px 16px";
+    const heading = document.createElement("strong");
+    heading.style.color = "#F8FAFC";
+    heading.textContent = label;
+    const state = document.createElement("div");
+    state.style.color = "#FBBF24";
+    state.style.fontFamily = "var(--font-mono)";
+    state.style.marginTop = "6px";
+    state.textContent = value;
+    card.append(heading, state);
+    if (detail) {
+      const description = document.createElement("div");
+      description.style.color = "#94A3B8";
+      description.style.marginTop = "6px";
+      description.textContent = detail;
+      card.append(description);
+    }
+    statusContainer?.append(card);
+  };
+
+  Promise.all([
+    fetch("/health").then(response => {
+      if (!response.ok) throw new Error(`health HTTP ${response.status}`);
+      return response.json();
+    }),
+    fetch("/api/local/status").then(response => {
+      if (!response.ok) throw new Error(`status HTTP ${response.status}`);
+      return response.json();
+    })
+  ]).then(([health, local]) => {
+    addStatus("Application health", health.status || "DATA_UNAVAILABLE");
+    addStatus("Market data", local.market_data || "DATA_UNAVAILABLE");
+    addStatus("Model inference", local.model_inference || "DATA_UNAVAILABLE");
+    addStatus(
+      "Research authorization",
+      local.research?.authorization?.status || "PROVENANCE_FAILURE",
+      local.research?.authorization?.reason || ""
+    );
+    addStatus(
+      "Historical research outputs",
+      local.research?.historical_outputs || "PROVENANCE_FAILURE",
+      `Manifest integrity: ${local.research?.manifest_integrity?.status || "PROVENANCE_FAILURE"}`
+    );
+  }).catch(error => {
+    addStatus("Local API connection", "DATA_UNAVAILABLE", error.message);
+    addStatus("Research authorization", "DATA_UNAVAILABLE");
+  });
+} else {
 const { useState, useEffect, useRef, useCallback, createElement: h } = React;
 const abs = Math.abs;
 
@@ -157,6 +229,15 @@ const api = {
   async fetchPredictionLatest(live = false) {
     const res = await fetch(`${getApiBaseUrl()}/prediction/latest?live=${live}`);
     if (!res.ok) throw new Error("prediction/latest failed");
+    return res.json();
+  },
+  async fetchResearchSignal() {
+    const res = await fetch(`${getApiBaseUrl()}/api/research/entry-tp-sl`);
+    if (!res.ok) {
+      const error = new Error("research entry/tp/sl failed");
+      error.status = res.status;
+      throw error;
+    }
     return res.json();
   },
   async fetchPredictionHistory(limit = 20) {
@@ -354,15 +435,6 @@ const api = {
   async triggerArenaRetrain() {
     const res = await fetch(`${getApiBaseUrl()}/api/arena/retrain`, { method: "POST" });
     if (!res.ok) throw new Error("arena retrain failed");
-    return res.json();
-  },
-  async executeArenaTrade(action, confidence = 0.82, reasoning = "Manual trade") {
-    const res = await fetch(`${getApiBaseUrl()}/api/arena/trade`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, confidence, reasoning })
-    });
-    if (!res.ok) throw new Error("arena trade execution failed");
     return res.json();
   },
   async fetchMeieAccounts() {
@@ -2735,27 +2807,31 @@ function DecisionAnatomyPanel({ decisionData }) {
 // ===========================================================================
 // PredictionPanel (with TP / SL / Confidence)
 // ===========================================================================
-function PredictionPanel({ predictionData, engineState = "offline" }) {
+function PredictionPanel({ predictionData, researchData, engineState = "offline" }) {
   const [showEvidence, setShowEvidence] = useState(false);
+  const signal = researchData?.hypothetical_signal;
+  const researchState = researchData?.research_status || "DATA_UNAVAILABLE";
+  const failureState = researchData?.state || (researchData?.status === "SUCCESS" ? null : researchData?.status);
+  const valueOrUnavailable = (value, formatter = String) => value === null || value === undefined || value === "" ? "DATA_UNAVAILABLE" : formatter(value);
+  const formatPrice = value => valueOrUnavailable(value, price => `$${Math.round(Number(price)).toLocaleString()}`);
 
-  // Check error states dynamically from backend
-  const statusStr = predictionData?.status || "online";
-  const isDataUnavailable = statusStr === "DATA_UNAVAILABLE" || predictionData?.action === "DATA_UNAVAILABLE";
-  const isProvenanceFailure = statusStr === "PROVENANCE_FAILURE" || predictionData?.action === "PROVENANCE_FAILURE";
-  const isModelFailure = statusStr === "MODEL_FAILURE" || predictionData?.action === "MODEL_FAILURE";
+  // Fail closed for research output: no local numeric or scientific fallback is permitted.
+  const statusStr = failureState || predictionData?.status;
+  const isDataUnavailable = statusStr === "DATA_UNAVAILABLE" || !signal;
+  const isProvenanceFailure = statusStr === "PROVENANCE_FAILURE";
+  const isModelFailure = statusStr === "MODEL_FAILURE";
   const isWarmingUp = engineState === "warming_up" || statusStr === "warming_up";
   const isOffline = engineState === "offline" || engineState === "security_blocked";
 
   // Dynamic values from backend
-  const entryPrice = predictionData?.entry_price || predictionData?.btc_price;
-  const tpPrice = predictionData?.tp;
-  const slPrice = predictionData?.sl;
-  const direction = predictionData?.direction || "SHORT";
-  const horizon = predictionData?.horizon || "4h";
-  const barrierPair = predictionData?.barrier_pair_id || "barrier_pair_01";
-  const modelName = predictionData?.model || "LightGBM Meta-Model (B4)";
-  const setupName = predictionData?.setup_detected || "A1 (Liquidity Sweep / Reclaim)";
-  const probPct = predictionData?.probability_pct !== undefined ? predictionData.probability_pct : 47.1;
+  const entryPrice = signal?.entry_price;
+  const tpPrice = signal?.tp_price;
+  const slPrice = signal?.sl_price;
+  const direction = signal?.direction || "DATA_UNAVAILABLE";
+  const horizon = signal?.horizon || "DATA_UNAVAILABLE";
+  const barrierPair = signal?.barrier_pair_id || "DATA_UNAVAILABLE";
+  const modelName = signal?.model_name || "DATA_UNAVAILABLE";
+  const setupName = signal?.setup_detected || "DATA_UNAVAILABLE";
 
   const dirColor = direction === "LONG" ? "#38BDF8" : (direction === "SHORT" ? "#F87171" : "#94A3B8");
 
@@ -2795,8 +2871,9 @@ function PredictionPanel({ predictionData, engineState = "offline" }) {
     // Header Bar
     h("div", { className: "prediction-header-bar", style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" } },
       h("div", null,
-        h("div", { style: { fontSize: "0.78rem", color: "#38BDF8", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.05em" } }, "🔬 CURRENT RESEARCH INFERENCE · BTC/USD"),
-        h("h3", { style: { fontSize: "1.3rem", fontWeight: "800", color: "#F8FAFC", marginTop: "2px" } }, "Hypothetical Research Scenario")
+        h("div", { style: { fontSize: "0.78rem", color: "#38BDF8", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.05em" } }, "BTCognitive Research Terminal · BTC/USD"),
+        h("h3", { style: { fontSize: "1.3rem", fontWeight: "800", color: "#F8FAFC", marginTop: "2px" } }, "ENTRY / TP / SL RESEARCH MODE"),
+        h("div", { style: { fontSize: "0.75rem", color: "#94A3B8", marginTop: "3px" } }, "Hypothetical signal · No real orders are executed · No capital is deployed")
       ),
       h("div", { style: { display: "flex", alignItems: "center", flexWrap: "wrap", gap: "8px" } },
         h("span", {
@@ -2820,7 +2897,7 @@ function PredictionPanel({ predictionData, engineState = "offline" }) {
             fontWeight: "800",
             fontSize: "0.74rem"
           }
-        }, "RESEARCH STATUS: COST_ERASED")
+        }, `RESEARCH STATUS: ${researchState}`)
       )
     ),
 
@@ -2829,26 +2906,26 @@ function PredictionPanel({ predictionData, engineState = "offline" }) {
       // Card 1: Hypothetical Entry
       h("div", { className: "prediction-card-box", style: { background: "rgba(0,0,0,0.3)", padding: "14px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.08)" } },
         h("div", { className: "prediction-card-lbl", style: { fontSize: "0.76rem", color: "#94A3B8", marginBottom: "4px" } }, "Hypothetical Entry"),
-        h("div", { className: "prediction-card-val", style: { fontSize: "1.25rem", fontWeight: "800", color: "#00F0FF", fontFamily: "var(--font-mono)" } }, entryPrice ? `$${Math.round(entryPrice).toLocaleString()}` : "DATA_UNAVAILABLE"),
-        h("div", { style: { fontSize: "0.72rem", color: "#64748B", marginTop: "6px" } }, "15m Decision Close Reference")
+        h("div", { className: "prediction-card-val", style: { fontSize: "1.25rem", fontWeight: "800", color: "#00F0FF", fontFamily: "var(--font-mono)" } }, formatPrice(entryPrice)),
+        h("div", { style: { fontSize: "0.72rem", color: "#64748B", marginTop: "6px" } }, "Backend research contract")
       ),
       // Card 2: Take Profit (TP)
       h("div", { className: "prediction-card-box", style: { background: "rgba(0, 229, 168, 0.05)", borderLeft: "3px solid #00E5A8", padding: "14px", borderRadius: "10px", border: "1px solid rgba(0, 229, 168, 0.2)" } },
         h("div", { className: "prediction-card-lbl", style: { fontSize: "0.76rem", color: "#00E5A8", marginBottom: "4px" } }, "Take Profit (TP)"),
-        h("div", { className: "prediction-card-val", style: { fontSize: "1.25rem", fontWeight: "800", color: "#00E5A8", fontFamily: "var(--font-mono)" } }, tpPrice ? `$${Math.round(tpPrice).toLocaleString()}` : "DATA_UNAVAILABLE"),
-        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", marginTop: "6px" } }, "k_TP = 1.0 × ATR14")
+        h("div", { className: "prediction-card-val", style: { fontSize: "1.25rem", fontWeight: "800", color: "#00E5A8", fontFamily: "var(--font-mono)" } }, formatPrice(tpPrice)),
+        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", marginTop: "6px" } }, valueOrUnavailable(signal?.k_tp, value => `k_TP = ${value}`))
       ),
       // Card 3: Stop Loss (SL)
       h("div", { className: "prediction-card-box", style: { background: "rgba(248, 113, 113, 0.05)", borderLeft: "3px solid #F87171", padding: "14px", borderRadius: "10px", border: "1px solid rgba(248, 113, 113, 0.2)" } },
         h("div", { className: "prediction-card-lbl", style: { fontSize: "0.76rem", color: "#F87171", marginBottom: "4px" } }, "Stop Loss (SL)"),
-        h("div", { className: "prediction-card-val", style: { fontSize: "1.25rem", fontWeight: "800", color: "#F87171", fontFamily: "var(--font-mono)" } }, slPrice ? `$${Math.round(slPrice).toLocaleString()}` : "DATA_UNAVAILABLE"),
-        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", marginTop: "6px" } }, "k_SL = 1.0 × ATR14")
+        h("div", { className: "prediction-card-val", style: { fontSize: "1.25rem", fontWeight: "800", color: "#F87171", fontFamily: "var(--font-mono)" } }, formatPrice(slPrice)),
+        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", marginTop: "6px" } }, valueOrUnavailable(signal?.k_sl, value => `k_SL = ${value}`))
       ),
       // Card 4: Horizon & Setup
       h("div", { className: "prediction-card-box", style: { background: "rgba(0,0,0,0.3)", padding: "14px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.08)" } },
         h("div", { className: "prediction-card-lbl", style: { fontSize: "0.76rem", color: "#94A3B8", marginBottom: "4px" } }, "Horizon & Grid"),
         h("div", { className: "prediction-card-val", style: { fontSize: "1.1rem", fontWeight: "800", color: "#A78BFA", fontFamily: "var(--font-mono)" } }, `${horizon} (${barrierPair})`),
-        h("div", { style: { fontSize: "0.72rem", color: "#64748B", marginTop: "6px" } }, "16 decision bars (240m)")
+        h("div", { style: { fontSize: "0.72rem", color: "#64748B", marginTop: "6px" } }, valueOrUnavailable(signal?.volatility_estimator))
       )
     ),
 
@@ -2863,11 +2940,11 @@ function PredictionPanel({ predictionData, engineState = "offline" }) {
       }
     },
       h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px", marginBottom: "6px" } },
-        h("span", { style: { fontSize: "0.78rem", fontWeight: "800", color: "#F87171", letterSpacing: "0.03em" } }, "RESEARCH CLASSIFICATION: COST_ERASED (C2)"),
-        h("span", { style: { fontSize: "0.72rem", background: "rgba(255,255,255,0.06)", padding: "2px 8px", borderRadius: "4px", color: "#CBD5E1" } }, "EXECUTION: PAPER / RESEARCH ONLY")
+        h("span", { style: { fontSize: "0.78rem", fontWeight: "800", color: "#F87171", letterSpacing: "0.03em" } }, `RESEARCH CLASSIFICATION: ${researchState} (${researchData?.claim_level || "DATA_UNAVAILABLE"})`),
+        h("span", { style: { fontSize: "0.72rem", background: "rgba(255,255,255,0.06)", padding: "2px 8px", borderRadius: "4px", color: "#CBD5E1" } }, `EXECUTION: ${researchData?.execution_mode || "DISABLED"}`)
       ),
       h("div", { style: { fontSize: "0.80rem", color: "#CBD5E1", lineHeight: "1.5" } },
-        "Interpretation: The tested research configuration produced conditional predictive structure, but a deployable net-of-cost trading edge has not been established after preregistered transaction friction (35 bps BASE / 65 bps CONSERVATIVE). No real orders are executed."
+        `Interpretation: ${signal?.interpretation || "DATA_UNAVAILABLE"} No real orders are executed.`
       )
     ),
 
@@ -2903,35 +2980,35 @@ function PredictionPanel({ predictionData, engineState = "offline" }) {
             ),
             h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
               h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Model Acceptance / Decision"),
-              h("td", { style: { padding: "6px 8px", color: "#F87171", fontWeight: "700" } }, "ABSTAIN (NET EXPECTANCY NEGATIVE)")
+              h("td", { style: { padding: "6px 8px", color: "#F87171", fontWeight: "700" } }, valueOrUnavailable(signal?.model_decision))
             ),
             h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
               h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Barrier Pair Configuration"),
-              h("td", { style: { padding: "6px 8px", color: "#CBD5E1", fontFamily: "var(--font-mono)" } }, `${barrierPair} (k_TP = 1.0, k_SL = 1.0, R:R = 1.0)`)
+              h("td", { style: { padding: "6px 8px", color: "#CBD5E1", fontFamily: "var(--font-mono)" } }, `${barrierPair} · ${valueOrUnavailable(signal?.k_tp, value => `k_TP = ${value}`)} · ${valueOrUnavailable(signal?.k_sl, value => `k_SL = ${value}`)}`)
             ),
             h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
               h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Volatility Estimator"),
-              h("td", { style: { padding: "6px 8px", color: "#CBD5E1" } }, "ATR14 on 15-minute decision bars")
+              h("td", { style: { padding: "6px 8px", color: "#CBD5E1" } }, valueOrUnavailable(signal?.volatility_estimator))
             ),
             h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
               h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Evaluation Horizon"),
-              h("td", { style: { padding: "6px 8px", color: "#CBD5E1" } }, "240 minutes (16 decision bars)")
+              h("td", { style: { padding: "6px 8px", color: "#CBD5E1" } }, valueOrUnavailable(signal?.horizon))
             ),
             h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
               h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Preregistered Cost Scenarios"),
-              h("td", { style: { padding: "6px 8px", color: "#CBD5E1" } }, "BASE: 35 bps round-trip | CONSERVATIVE: 65 bps round-trip")
+              h("td", { style: { padding: "6px 8px", color: "#CBD5E1" } }, researchData?.hypothetical_signal?.cost_scenarios ? Object.entries(researchData.hypothetical_signal.cost_scenarios).map(([name, value]) => `${name}: ${value}`).join(" | ") : "DATA_UNAVAILABLE")
             ),
             h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
               h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Resolver Version"),
-              h("td", { style: { padding: "6px 8px", color: "#CBD5E1", fontFamily: "var(--font-mono)" } }, "ENTRY_TP_SL_RESOLVER_V1")
+              h("td", { style: { padding: "6px 8px", color: "#CBD5E1", fontFamily: "var(--font-mono)" } }, valueOrUnavailable(signal?.resolver_version))
             ),
             h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
               h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Research Status"),
-              h("td", { style: { padding: "6px 8px", color: "#F87171", fontWeight: "700" } }, "COST_ERASED (C2 — Conditional Predictability)")
+              h("td", { style: { padding: "6px 8px", color: "#F87171", fontWeight: "700" } }, `${researchState} (${researchData?.claim_level || "DATA_UNAVAILABLE"})`)
             ),
             h("tr", null,
               h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Provenance & Freeze Status"),
-              h("td", { style: { padding: "6px 8px", color: "#00E5A8", fontWeight: "700", fontFamily: "var(--font-mono)" } }, "VERIFIED_FROZEN (1bf91f2789846af...)")
+              h("td", { style: { padding: "6px 8px", color: "#00E5A8", fontWeight: "700", fontFamily: "var(--font-mono)" } }, valueOrUnavailable(signal?.provenance_status))
             )
           )
         )
@@ -3444,30 +3521,12 @@ function QuickExecutionTicket({ livePrice }) {
   const [orderSide, setOrderSide] = useState("LONG");
   const [amount, setAmount] = useState(1000);
   const [leverage, setLeverage] = useState(5);
-  const [executing, setExecuting] = useState(false);
-  const [lastExecutedMsg, setLastExecutedMsg] = useState(null);
 
   const price = livePrice || 64280.0;
   const marginReq = (amount / leverage).toFixed(2);
   const estLiq = orderSide === "LONG"
     ? (price * (1 - 0.9 / leverage)).toFixed(2)
     : (price * (1 + 0.9 / leverage)).toFixed(2);
-
-  const handleSimulate = async () => {
-    setExecuting(true);
-    try {
-      const action = orderSide === "LONG" ? "BUY" : "SELL";
-      await api.executeArenaTrade(action, 0.85, `Paper Research Simulation Ticket ($${amount} @ ${leverage}x)`);
-      setLastExecutedMsg(`📝 Paper Simulation Tracked: ${orderSide} $${amount} @ $${price.toLocaleString()} (${leverage}x)`);
-      playAudioChirp(1200, "triangle", 0.15);
-    } catch (err) {
-      setLastExecutedMsg(`📝 Paper Simulation Logged: ${orderSide} $${amount} @ $${price.toLocaleString()} (${leverage}x)`);
-      playAudioChirp(1050, "sine", 0.12);
-    } finally {
-      setExecuting(false);
-      setTimeout(() => setLastExecutedMsg(null), 4500);
-    }
-  };
 
   return h("div", { className: "execution-ticket-card" },
     h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" } },
@@ -3560,25 +3619,18 @@ function QuickExecutionTicket({ livePrice }) {
       )
     ),
 
-    // Simulation Button
-    h("button", {
-      className: `ticket-execute-btn ${orderSide.toLowerCase()}`,
-      onClick: handleSimulate,
-      disabled: executing
-    }, executing ? "⏳ Recording Simulation..." : `📝 Log ${orderSide} Paper Simulation ($${amount})`),
-
-    lastExecutedMsg && h("div", {
+    h("div", {
       style: {
         marginTop: "8px",
         fontSize: "0.74rem",
-        color: "#00E5A8",
+        color: "#94A3B8",
         textAlign: "center",
-        background: "rgba(0, 229, 168, 0.1)",
+        background: "rgba(148, 163, 184, 0.08)",
         padding: "6px",
         borderRadius: "6px",
         fontWeight: "700"
       }
-    }, lastExecutedMsg)
+    }, "Display-only guardian: tracks paper scenarios or user-entered external positions. No order pathway is available.")
   );
 }
 
@@ -6941,7 +6993,7 @@ function TerminalView({
 
         // [ RESEARCH ] Tab: Conformal Prediction Matrix & Counterfactual Consensus
         workstationTab === "research" && h("div", { style: { display: "flex", flexDirection: "column", gap: "20px" } },
-          h(PredictionPanel, { predictionData, engineState }),
+          h(PredictionPanel, { predictionData, researchData: researchSignalData, engineState }),
           h(CounterfactualPanel, { counterfactualData })
         ),
 
@@ -8193,6 +8245,7 @@ function App() {
 
   // AI & Intelligence state
   const [predictionData,    setPredictionData]    = useState(null);
+  const [researchSignalData, setResearchSignalData] = useState(null);
   const [predictionHistory, setPredictionHistory] = useState([]);
   const [regimeData,        setRegimeData]        = useState(null);
   const [explanationData,   setExplanationData]   = useState(null);
@@ -8341,8 +8394,9 @@ function App() {
   const loadAIData = useCallback(async () => {
     if (isReplaying) return; // Freeze live polling during Replay mode
     try {
-      const [pred, hist, regime, expl, qual, mem, port, mkt, intel, count, dec] = await Promise.allSettled([
+      const [pred, research, hist, regime, expl, qual, mem, port, mkt, intel, count, dec] = await Promise.allSettled([
         api.fetchPredictionLatest(),
+        api.fetchResearchSignal(),
         api.fetchPredictionHistory(),
         api.fetchRegimeLatest(),
         api.fetchExplanationLatest(),
@@ -8356,6 +8410,12 @@ function App() {
       ]);
 
       if (pred.status === "fulfilled")  setPredictionData(pred.value);
+      if (research.status === "fulfilled") {
+        setResearchSignalData(research.value);
+      } else {
+        const state = research.reason?.status === 503 ? "DATA_UNAVAILABLE" : "MODEL_FAILURE";
+        setResearchSignalData({ status: state, state });
+      }
       if (hist.status === "fulfilled")  setPredictionHistory(hist.value);
       if (regime.status === "fulfilled") setRegimeData(regime.value);
       if (expl.status === "fulfilled")  setExplanationData(expl.value);
@@ -8599,4 +8659,4 @@ if (document.readyState === "loading") {
 } else {
   mountApp();
 }
-
+}

@@ -1,0 +1,13 @@
+{
+  "status": "BLOCKED_AUDIT_FAILURE",
+  "authorized": false,
+  "blocked_findings": [
+    "B1",
+    "B2",
+    "D5"
+  ],
+  "protocol_version": "BTC-ENTRY-TP-SL-V3.1",
+  "protocol_amendment_id": "BTC-ENTRY-TP-SL-V3-AMENDMENT-01",
+  "resolver_version": "ENTRY_TP_SL_RESOLVER_V2",
+  "reason": "Resampling, fill alignment, Amendment 01 resolver semantics, single-count entry costs, and the D5 missing-outcome runner repair have regression coverage. B1 and B2 remain unresolved, and the D5 repair still requires independent verification; do not fit models or regenerate performance tables."
+}

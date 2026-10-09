@@ -7,12 +7,14 @@ market regime classification, model health/lineage, and counterfactual matrices.
 
 import time
 import math
+import json
 import logging
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Dict, List, Optional, Any
 import numpy as np
 import pandas as pd
-from fastapi import APIRouter, Request, Query, Body
+from fastapi import APIRouter, Request, Query, Body, HTTPException
 
 from config import SYMBOL
 from models.symbol_contract import CANONICAL_SYMBOL
@@ -43,6 +45,31 @@ def _sanitize_records(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 clean_r[k] = v
         sanitized.append(clean_r)
     return sanitized
+
+
+def _read_research_authorization() -> Dict[str, Any]:
+    authorization_path = (
+        Path(__file__).resolve().parents[1]
+        / "research"
+        / "entry_tp_sl"
+        / "run_authorization.json"
+    )
+    try:
+        with authorization_path.open("r", encoding="utf-8") as authorization_file:
+            authorization = json.load(authorization_file)
+    except (OSError, json.JSONDecodeError):
+        return {
+            "status": "PROVENANCE_FAILURE",
+            "authorized": False,
+            "reason": "Research authorization could not be verified.",
+        }
+    if not isinstance(authorization, dict):
+        return {
+            "status": "PROVENANCE_FAILURE",
+            "authorized": False,
+            "reason": "Research authorization has an invalid schema.",
+        }
+    return authorization
 
 
 # ---------------------------------------------------------------------------
@@ -76,72 +103,15 @@ def health_check():
 
 @router.get("/prediction/latest")
 async def get_prediction_latest(live: bool = False, horizon: Optional[str] = None):
-    """Returns the live AI prediction output with TP, SL, confidence, multi-horizon matrix, and uncertainty narrative."""
-    async with live_engine._lock:
-        if live_engine.latest_prediction is not None:
-            resp = live_engine.latest_prediction.copy()
-            if horizon and "horizons" in resp and horizon in resp["horizons"]:
-                h_data = resp["horizons"][horizon]
-                resp["horizon"] = horizon
-                resp["direction"] = h_data.get("direction", resp["direction"])
-                resp["action"] = h_data.get("action", resp["action"])
-                resp["probability"] = h_data.get("probability", resp["probability"])
-                resp["probability_pct"] = h_data.get("probability_pct", resp["probability_pct"])
-                resp["expected_return_pct"] = h_data.get("expected_return_pct", resp["expected_return_pct"])
-                resp["expected_return_net_pct"] = h_data.get("expected_return_net_pct", resp["expected_return_net_pct"])
-                resp["tp"] = h_data.get("tp", resp["tp"])
-                resp["sl"] = h_data.get("sl", resp["sl"])
-                resp["tp_atr_mult"] = h_data.get("tp_atr_mult", resp.get("tp_atr_mult", 2.0))
-                resp["sl_atr_mult"] = h_data.get("sl_atr_mult", resp.get("sl_atr_mult", 1.5))
-                resp["reward_risk_ratio"] = h_data.get("reward_risk_ratio", 2.0)
-            resp["status"] = "online"
-            resp["is_live"] = True
-            resp["system_classification"] = "EXPLORATORY STRATEGY ANALYTICS"
-            resp["validation_status"] = "NOT VALIDATED FOR PREDICTIVE OR ECONOMIC SUPERIORITY"
-            resp["governance_disclaimer"] = "Exploratory directional model. Not validated by HAR-RS-DOW/C2 scientific research."
-            resp["research_classification"] = "COST_ERASED"
-            resp["research_claim_level"] = "C2"
-            resp["execution_mode"] = "PAPER_RESEARCH_ONLY"
-            resp["live_capital_authorized"] = False
-            return resp
-
-    # Fallback if engine is warming up
-    row = feature_cache.get_latest_row()
-    entry_p = float(row.get("close", 65000.0)) if row is not None else 65000.0
-    atr_val = float(row.get("atr_14", entry_p * 0.008)) if row is not None else (entry_p * 0.008)
+    """Keep the legacy 24-hour forecast out of the Entry/TP/SL inference contract."""
+    del live, horizon
     return {
-        "symbol": CANONICAL_SYMBOL,
-        "direction": "SHORT",
-        "probability": 0.471,
-        "probability_pct": 47.1,
-        "expected_return": -0.0056,
-        "expected_return_pct": -0.56,
-        "expected_return_gross_pct": 0.12,
-        "expected_return_net_pct": -0.57,
-        "prediction_interval": [-0.007, 0.015],
-        "prediction_interval_str": "-0.70% -> +1.50%",
-        "action": "ABSTAIN / COST_ERASED",
-        "model": "LightGBM Meta-Model (B4)",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "entry_time_ms": int(time.time() * 1000),
-        "btc_price": entry_p,
-        "entry_price": entry_p,
-        "tp": round(entry_p - 1.0 * atr_val, 2),
-        "sl": round(entry_p + 1.0 * atr_val, 2),
-        "tp_atr_mult": 1.0,
-        "sl_atr_mult": 1.0,
-        "barrier_pair_id": "barrier_pair_01",
-        "confidence": 0.471,
-        "horizon": "4h",
-        "status": "online",
-        "is_live": True,
-        "system_classification": "RESEARCH_EXPLORATORY",
-        "validation_status": "COST_ERASED",
-        "research_classification": "COST_ERASED",
-        "research_claim_level": "C2",
+        "status": "DATA_UNAVAILABLE",
+        "model_inference": "DATA_UNAVAILABLE",
+        "legacy_forecast": "ISOLATED",
+        "message": "No verified Entry/TP/SL inference is available; no signal was generated.",
         "execution_mode": "PAPER_RESEARCH_ONLY",
         "live_capital_authorized": False,
-        "governance_disclaimer": "Research inference only. Hypothetical scenario. No real orders are executed."
     }
 
 
@@ -151,197 +121,45 @@ async def get_prediction_latest(live: bool = False, horizon: Optional[str] = Non
 
 @router.get("/api/research/entry-tp-sl")
 async def get_research_entry_tp_sl():
-    """Returns the live dynamic hypothetical Entry/TP/SL research evaluation."""
-    from research.entry_tp_sl.barrier_contract import (
-        FROZEN_BARRIER_GRID,
-        FROZEN_COST_PARAMS,
-        RESOLVER_VERSION,
-        CostScenario
+    """Returns authorization and provenance state without manufacturing a signal."""
+    authorization = _read_research_authorization()
+    gate_status = authorization.get("status")
+    blocked = gate_status == "BLOCKED_AUDIT_FAILURE" and authorization.get("authorized") is not True
+    status = "BLOCKED_AUDIT_FAILURE" if blocked else (
+        "PROVENANCE_FAILURE" if gate_status == "PROVENANCE_FAILURE" else "DATA_UNAVAILABLE"
     )
-
-    row = feature_cache.get_latest_row()
-    entry_p = float(row.get("close", 65000.0)) if row is not None else 65000.0
-    atr_val = float(row.get("atr_14", entry_p * 0.008)) if row is not None else (entry_p * 0.008)
-    if atr_val <= 0 or math.isnan(atr_val):
-        atr_val = entry_p * 0.008
-
-    # Primary frozen barrier pair (barrier_pair_01)
-    primary_pair = FROZEN_BARRIER_GRID.get("barrier_pair_01", {
-        "pair_id": "barrier_pair_01",
-        "tp_multiplier": 1.0,
-        "sl_multiplier": 1.0,
-        "vertical_horizon_minutes": 240
-    })
-
-    k_tp = primary_pair.get("tp_multiplier", 1.0)
-    k_sl = primary_pair.get("sl_multiplier", 1.0)
-    horizon_min = primary_pair.get("vertical_horizon_minutes", 240)
-
-    # Determine hypothetical side based on structural sweep/reclaim detector
-    # (Defaulting to empirical SHORT setup in line with research observation)
-    hypothetical_direction = "SHORT"
-    tp_p = round(entry_p - (k_tp * atr_val), 2)
-    sl_p = round(entry_p + (k_sl * atr_val), 2)
-
-    barrier_grid_list = []
-    for pair_id, p_cfg in FROZEN_BARRIER_GRID.items():
-        tp_mult = p_cfg["tp_multiplier"]
-        sl_mult = p_cfg["sl_multiplier"]
-        barrier_grid_list.append({
-            "pair_id": pair_id,
-            "role": p_cfg["role"],
-            "tp_multiplier": tp_mult,
-            "sl_multiplier": sl_mult,
-            "horizon_minutes": p_cfg["vertical_horizon_minutes"],
-            "hypothetical_tp": round(entry_p - (tp_mult * atr_val), 2),
-            "hypothetical_sl": round(entry_p + (sl_mult * atr_val), 2),
-            "mean_net_r": "-0.5678R" if pair_id == "barrier_pair_01" else ("-0.5683R" if pair_id == "barrier_pair_02" else "-0.5813R"),
-            "win_rate": "47.1%" if pair_id == "barrier_pair_01" else "37.4%"
-        })
-
     return {
-        "status": "SUCCESS",
-        "research_status": "COST_ERASED",
-        "claim_level": "C2",
-        "promotion_decision": "COST_ERASED",
+        "status": status,
+        "research_status": status,
+        "authorization": authorization,
+        "historical_outputs": "HISTORICAL_UNVERIFIED",
+        "current_inference": "DATA_UNAVAILABLE",
+        "hypothetical_signal": None,
+        "metrics": None,
         "execution_mode": "PAPER_RESEARCH_ONLY",
         "live_capital_authorized": False,
-        "canonical_symbol": "BTC/USD",
-        "live_market": {
-            "price": entry_p,
-            "atr_14": round(atr_val, 2),
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        },
-        "hypothetical_signal": {
-            "direction": hypothetical_direction,
-            "entry_price": entry_p,
-            "tp_price": tp_p,
-            "sl_price": sl_p,
-            "horizon": f"{int(horizon_min / 60)}h ({horizon_min}m)",
-            "horizon_minutes": horizon_min,
-            "volatility_estimator": "ATR14 on 15-minute decision bars",
-            "setup_detected": "A1 (Liquidity Sweep / Reclaim)",
-            "side_selected": hypothetical_direction,
-            "model_name": "LightGBM Meta-Model (B4)",
-            "model_decision": "ABSTAIN_NET_COST",
-            "barrier_pair_id": "barrier_pair_01",
-            "k_tp": k_tp,
-            "k_sl": k_sl,
-            "cost_scenarios": {
-                "BASE": f"{FROZEN_COST_PARAMS[CostScenario.BASE]['total_round_trip_cost_bps']} bps round-trip",
-                "CONSERVATIVE": f"{FROZEN_COST_PARAMS[CostScenario.CONSERVATIVE]['total_round_trip_cost_bps']} bps round-trip"
-            },
-            "resolver_version": RESOLVER_VERSION,
-            "provenance_status": "VERIFIED_FROZEN",
-            "interpretation": "The tested research configuration produced conditional predictive structure, but a deployable net-of-cost trading edge has not been established after preregistered transaction friction."
-        },
-        "barrier_grid": barrier_grid_list,
-        "multiple_testing": {
-            "dsr": 0.0000,
-            "pbo": 0.2000,
-            "sample_n": 20244,
-            "effective_trades": 1553,
-            "sealed_holdout_trades": 2662
-        }
     }
 
 
 @router.get("/prediction/range")
 @router.get("/api/prediction/range")
 async def get_prediction_range():
-    """Returns the latest calibrated probabilistic BTCUSD 24h range forecast, excursions, and risk envelope."""
-    async with live_engine._lock:
-        if live_engine.latest_range_forecast is not None:
-            resp = live_engine.latest_range_forecast.copy()
-            resp["status"] = "online"
-            return resp
-
-    # Fallback on-demand generation if engine is warming up
-    row = feature_cache.get_latest_row()
-    entry_p = float(row.get("close", 65000.0)) if row is not None else 65000.0
-    vol = float(row.get("realized_vol_24h", 0.015)) if row is not None else 0.015
-    fc = live_engine.range_service.generate_forecast(
-        current_price=entry_p,
-        vol_24h=vol,
-        features=row if row is not None else {'vol_24h': vol, 'rsi_14': 50.0},
-        market_regime="RANGING"
-    )
-    resp = fc.to_dict()
-    resp["status"] = "online"
-    resp["model_version"] = "v3.0.0-excursion-ridge-conformal"
-    resp["context_version"] = "v1.0.0-volatility-bridge-context"
-    resp["context_status"] = "CONTEXT_HEALTHY"
-    resp["volatility_state"] = "EXPANDING"
-    return resp
+    """Keeps the legacy 24-hour range product outside the Entry/TP/SL inference contract."""
+    return {
+        "status": "HISTORICAL_UNVERIFIED",
+        "message": "Legacy 24-hour range results are not verified current Entry/TP/SL inference.",
+        "forecast": None,
+    }
 
 
 @router.get("/prediction/range/health")
 @router.get("/api/prediction/range/health")
 async def get_prediction_range_health():
-    """Returns operational health, longitudinal calibration stats, and baseline comparisons."""
-    from engine.range_quality import range_quality_service
-    from models.challenger_registry import challenger_registry
-    
-    prod_model = challenger_registry.get_production_model()
-    mem_df = load_market_memory()
-    
-    resolved_count = 0
-    empirical_cov = 91.10
-    mean_err = 0.3980
-    last_res_ts = None
-    
-    if not mem_df.empty and 'outcome_resolved' in mem_df.columns:
-        resolved_mask = (mem_df['outcome_resolved'] == True) | (mem_df['outcome_resolved'] == 1)
-        res_df = mem_df[resolved_mask]
-        resolved_count = len(res_df)
-        if resolved_count > 0:
-            if 'outcome_resolved_at' in res_df.columns:
-                last_res_ts = str(res_df['outcome_resolved_at'].dropna().iloc[-1]) if not res_df['outcome_resolved_at'].dropna().empty else None
-            valid_was_corr = res_df['was_correct'].dropna()
-            if len(valid_was_corr) > 0:
-                empirical_cov = round(float(valid_was_corr.mean() * 100.0), 2)
-            if 'actual_return' in res_df.columns:
-                mean_err = round(float(res_df['actual_return'].abs().mean() * 100.0), 4)
-
-    quality = range_quality_service.evaluate_quality(
-        recent_mfe_coverage=empirical_cov,
-        recent_mae_coverage=min(99.0, empirical_cov + 3.0),
-        recent_path_containment=empirical_cov,
-        mean_forecast_error=mean_err,
-        mean_range_width=5.28,
-        baseline_delta=-0.0140,
-        data_quality="VALID" if feature_cache.is_healthy() else "DEGRADED"
-    )
-
-    now_iso = datetime.now(timezone.utc).isoformat()
+    """Reports the absence of an independently verified range-quality artifact."""
     return {
-        "model_health": "HEALTHY",
-        "context_health": "HEALTHY",
-        "calibration_health": "CALIBRATION_OK",
-        "data_health": "VALID" if feature_cache.is_healthy() else "DEGRADED",
-        "drift_health": "DRIFT_NORMAL",
-        "provenance_health": "PROVENANCE_LOCKED",
-        "model_version": prod_model.version if prod_model else "v3.0.0-excursion-ridge-conformal",
-        "model_name": prod_model.model_name if prod_model else "Production Ridge MFE/MAE Conformal Regressor",
-        "active_context_version": "v1.0.0-volatility-bridge-context",
-        "context_status": "CONTEXT_HEALTHY",
-        "context_coverage": empirical_cov,
-        "context_fallback_count": 0,
-        "combined_model_version": "v3.0.0-ridge-volatility-context",
-        "baseline_delta": -0.0140,
-        "deployment_status": "PRODUCTION",
-        "calibration_status": "CALIBRATION_OK",
-        "reliability_score": quality.reliability_score,
-        "overall_status": quality.overall_status,
-        "observed_blocks": max(1, resolved_count // 24),
-        "N_eff": max(10, resolved_count),
-        "last_resolved_forecast": last_res_ts,
-        "last_calibration_update": now_iso,
-        "evaluation_timestamp": now_iso,
-        "cache_ttl_seconds": 60,
-        "recent_joint_coverage_pct": empirical_cov,
-        "mean_forecast_error_pct": mean_err,
-        "diagnostics": quality.diagnostics
+        "status": "HISTORICAL_UNVERIFIED",
+        "metrics": None,
+        "message": "No independently verified calibration artifact is available.",
     }
 
 
@@ -372,42 +190,29 @@ def get_prediction_range_history(limit: int = Query(20, le=500)):
 @router.get("/api/prediction/range/path")
 async def get_prediction_range_path(horizon: int = Query(24, ge=1, le=72)):
     """Returns 24-hour forward trajectory path points and range envelope for chart overlay."""
-    from engine.forecast_path import forecast_path_generator
-    
-    # Get latest range forecast
-    row = feature_cache.get_latest_row()
-    entry_p = float(row.get("close", 65000.0)) if row is not None else 65000.0
-    vol = float(row.get("realized_vol_24h", 0.015)) if row is not None else 0.015
-    fc = live_engine.range_service.generate_forecast(
-        current_price=entry_p,
-        vol_24h=vol,
-        features=row if row is not None else {'vol_24h': vol, 'rsi_14': 50.0},
-        market_regime="Sideways"
-    )
-    traj = forecast_path_generator.generate_trajectory(range_forecast=fc, horizon_hours=horizon)
-    return traj.to_dict()
+    async with live_engine._lock:
+        forecast = live_engine.latest_range_forecast
+        if forecast is None:
+            return {
+                "status": "DATA_UNAVAILABLE",
+                "message": "No completed range inference is available.",
+                "trajectory": None,
+            }
+        return {
+            "status": "DATA_UNAVAILABLE",
+            "message": "A cached range result is not sufficient to establish a verified trajectory.",
+            "trajectory": None,
+        }
 
 
 @router.get("/prediction/direction/accuracy")
 @router.get("/api/prediction/direction/accuracy")
 async def get_prediction_direction_accuracy():
-    """Returns formal statistical accuracy metrics for the secondary experimental directional model."""
+    """Reports historical metric availability without presenting unverified constants."""
     return {
-        "model_version": "v2.0.0-directional-classifier",
-        "role": "SECONDARY_EXPERIMENTAL_OVERLAY",
-        "horizon": "24h",
-        "sample_count": 744,
-        "independent_blocks": 31,
-        "directional_accuracy_pct": 51.8,
-        "balanced_accuracy_pct": 50.9,
-        "matthews_corr_coef": 0.021,
-        "roc_auc": 0.518,
-        "brier_score": 0.248,
-        "confidence_interval_95": "[46.2%, 57.4%]",
-        "date_range": "2026-07-20 to 2026-08-21",
-        "out_of_sample": True,
-        "status": "EXPERIMENTAL / NO_MEASURABLE_EDGE",
-        "claim_status": "DOES_NOT_CLAIM_VALIDATED_DIRECTIONAL_TRADING_ALPHA"
+        "status": "HISTORICAL_UNVERIFIED",
+        "metrics": None,
+        "message": "No current, independently verified directional-accuracy artifact is available.",
     }
 
 
@@ -426,20 +231,42 @@ def get_prediction_history(limit: int = Query(20, le=500)):
 async def get_prediction_counterfactual(top_k: int = Query(5, ge=1, le=20)):
     """Returns comparative decision matrix across the primary Ensemble and Top-K Alpha Genomes."""
     row = feature_cache.get_latest_row()
-    price = float(row.get("close", 65000.0)) if row is not None else 65000.0
-    atr_14 = float(row.get("atr_14", price * 0.01)) if row is not None else price * 0.01
+    if row is None:
+        return {
+            "status": "DATA_UNAVAILABLE",
+            "message": "A counterfactual requires an available market feature row.",
+            "results": None,
+        }
+    price = row.get("close")
+    atr_14 = row.get("atr_14")
+    if price is None or atr_14 is None or not np.isfinite([price, atr_14]).all() or price <= 0 or atr_14 <= 0:
+        return {
+            "status": "DATA_UNAVAILABLE",
+            "message": "Required price and volatility features are unavailable.",
+            "results": None,
+        }
 
     async with live_engine._lock:
-        if live_engine.latest_prediction is not None:
-            prob = float(live_engine.latest_prediction.get("probability", 0.5))
-            regime = str(live_engine.latest_regime.get("current_regime", "RANGING")) if live_engine.latest_regime else "RANGING"
-        else:
-            prob = 0.5
-            regime = "RANGING"
+        prediction = live_engine.latest_prediction
+        regime_data = live_engine.latest_regime
+        if prediction is None or regime_data is None or prediction.get("probability") is None:
+            return {
+                "status": "DATA_UNAVAILABLE",
+                "message": "A counterfactual requires completed model inference.",
+                "results": None,
+            }
+        prob = float(prediction["probability"])
+        regime = regime_data.get("current_regime")
+        if not np.isfinite(prob) or not isinstance(regime, str):
+            return {
+                "status": "MODEL_FAILURE",
+                "message": "The cached prediction or regime is invalid.",
+                "results": None,
+            }
 
     return generate_counterfactual_matrix(
-        latest_price=price,
-        atr_14=atr_14,
+        latest_price=float(price),
+        atr_14=float(atr_14),
         ensemble_prob=prob,
         current_regime=regime,
         top_k=top_k
@@ -458,12 +285,8 @@ async def get_market_regime(live: bool = False):
         if live_engine.latest_regime is not None:
             return live_engine.latest_regime
     return {
-        "current_regime": "RANGING",
-        "trend_score": 0.0,
-        "trend_label": "Neutral",
-        "volatility_state": "MEDIUM",
-        "macro_cycle": "NEUTRAL",
-        "timestamp": datetime.now(timezone.utc).isoformat()
+        "status": "DATA_UNAVAILABLE",
+        "current_regime": None,
     }
 
 
@@ -488,15 +311,13 @@ async def get_explainability(live: bool = False):
     except Exception as e:
         logger.warning(f"XAI generation fallback: {e}")
         return {
+            "status": "MODEL_FAILURE",
             "top_5_indicators": [],
             "attention_heatmap": [],
             "activated_experts": [],
-            "reasons": ["Awaiting initial candle stream synchronization"],
-            "contributions": [
-                {"feature": "EMA 20 Trend Alignment", "value": 0.012, "impact": "Bullish Slope"},
-                {"feature": "RSI 14 Momentum", "value": -0.008, "impact": "Neutral"}
-            ],
-            "summary": "Model indicators are currently warming up."
+            "reasons": ["No valid explanation was produced."],
+            "contributions": [],
+            "summary": "MODEL_FAILURE",
         }
 
 
@@ -512,13 +333,8 @@ async def get_signal_quality(live: bool = False):
         if live_engine.latest_quality is not None:
             return live_engine.latest_quality
     return {
-        "score": 85,
-        "max_score": 100,
-        "rating": "Good",
-        "calibration_score": 88,
-        "regime_confidence": 82,
-        "drift_score": 90,
-        "model_agreement": 84
+        "status": "DATA_UNAVAILABLE",
+        "quality": None,
     }
 
 
@@ -552,50 +368,29 @@ def get_api_memory_records(limit: int = Query(50, le=500)):
 def get_memory_stats():
     """Returns aggregated performance statistics from Market Memory."""
     df = load_market_memory()
-    if df.empty:
-        return {
-            "win_rate_pct": 78.4,
-            "net_return_pct": 4.82,
-            "realized_sharpe": 1.48,
-            "brier_score": 0.042,
-            "skip_audit": {
-                "skip_count": 8,
-                "avoided_drawdown_usd": 1840.0,
-                "skip_defense_rate_pct": 91.5,
-                "summary": "91.5% of SKIP decisions successfully avoided adverse market chop, protecting capital from drawdown."
-            }
-        }
-
-    resolved = df[df["outcome_resolved"] == True]
+    if df.empty or "outcome_resolved" not in df:
+        return {"status": "DATA_UNAVAILABLE", "metrics": None}
+    resolved = df[df["outcome_resolved"].eq(True)]
     if resolved.empty:
-        return {
-            "win_rate_pct": 78.4,
-            "net_return_pct": 4.82,
-            "realized_sharpe": 1.48,
-            "brier_score": 0.042,
-            "skip_audit": {
-                "skip_count": len(df[df["decision"] == "SKIP"]),
-                "avoided_drawdown_usd": 1840.0,
-                "skip_defense_rate_pct": 91.5,
-                "summary": "Defensive SKIP filters active."
-            }
-        }
-
-    win_rate = round(float(resolved["was_correct"].mean() * 100), 1) if not resolved.empty else 78.4
-    net_ret = round(float(resolved["pnl"].sum() / 100.0), 2)
-    skips = df[df["decision"].str.startswith("SKIP", na=False)]
-
+        return {"status": "DATA_UNAVAILABLE", "metrics": None}
+    valid_outcomes = resolved["was_correct"].dropna() if "was_correct" in resolved else pd.Series(dtype=float)
+    net_return = resolved["pnl"].dropna() if "pnl" in resolved else pd.Series(dtype=float)
     return {
-        "win_rate_pct": win_rate,
-        "net_return_pct": net_ret,
-        "realized_sharpe": 1.48,
-        "brier_score": 0.042,
-        "skip_audit": {
-            "skip_count": len(skips),
-            "avoided_drawdown_usd": round(len(skips) * 230.0, 2),
-            "skip_defense_rate_pct": 91.5,
-            "summary": f"{len(skips)} SKIP decisions executed under high-volatility or chop conditions."
-        }
+        "status": "HISTORICAL_UNVERIFIED",
+        "source": "operational_market_memory",
+        "resolved_count": len(resolved),
+        "metrics": {
+            "win_rate_pct": (
+                round(float(valid_outcomes.mean() * 100.0), 1)
+                if not valid_outcomes.empty
+                else None
+            ),
+            "net_return_pct": (
+                round(float(net_return.sum() / 100.0), 2)
+                if not net_return.empty
+                else None
+            ),
+        },
     }
 
 
@@ -608,7 +403,11 @@ def get_intelligence_latest():
     """Returns 6-engine structured market intelligence signals."""
     df = feature_cache.get_features_df()
     if df.empty:
-        return intelligence_engine._default_fallback()
+        return {
+            "status": "DATA_UNAVAILABLE",
+            "message": "No market feature data is available.",
+            "intelligence": None,
+        }
     return intelligence_engine.compute_all(df)
 
 
@@ -620,26 +419,16 @@ def get_intelligence_latest():
 def get_portfolio_status():
     """Returns the paper trading portfolio summary."""
     df = load_market_memory()
-    initial_cap = 10000.0
     if df.empty:
         return {
-            "initial_capital": initial_cap,
-            "current_balance": initial_cap,
-            "total_pnl": 0.0,
-            "total_trades": 0,
-            "win_rate": 0.0,
-            "positions": []
+            "status": "DATA_UNAVAILABLE",
+            "portfolio": None,
         }
 
-    total_pnl = float(df["pnl"].sum()) if "pnl" in df.columns else 0.0
-    valid_resolved = df["was_correct"].dropna() if "was_correct" in df.columns else pd.Series(dtype=float)
     return {
-        "initial_capital": initial_cap,
-        "current_balance": round(initial_cap + total_pnl, 2),
-        "total_pnl": round(total_pnl, 2),
-        "total_trades": len(df),
-        "win_rate": round(float(valid_resolved.mean() * 100.0), 1) if len(valid_resolved) > 0 else 0.0,
-        "positions": []
+        "status": "HISTORICAL_UNVERIFIED",
+        "portfolio": None,
+        "message": "Operational market-memory rows are not a verified portfolio ledger.",
     }
 
 
@@ -650,16 +439,10 @@ def get_portfolio_status():
 @router.get("/replay")
 def get_replay_snapshot(timestamp: Optional[str] = None):
     """Reconstructs historical market state at a specific historical point in time."""
-    df = feature_cache.get_features_df()
-    if df.empty:
-        return {"status": "NO_DATA"}
-    row = df.iloc[-1]
     return {
-        "timestamp": row.get("timestamp", datetime.now(timezone.utc).isoformat()),
-        "price": float(row.get("close", 65000.0)),
-        "rsi_14": float(row.get("rsi_14", 55.0)),
-        "regime": "TRENDING_BULL",
-        "decision": "TAKE_LONG"
+        "status": "DATA_UNAVAILABLE",
+        "message": "A point-in-time replay source is not configured for this endpoint.",
+        "snapshot": None,
     }
 
 
@@ -669,46 +452,45 @@ def get_replay_snapshot(timestamp: Optional[str] = None):
 
 @router.get("/api/lineage")
 def get_model_lineage():
-    """Returns authentic model lineage and promotion validation audit benchmarks."""
+    """Returns the explicit verification status of historical model-lineage claims."""
     return {
-        "model_version": "v2.1-REGIME-PROD",
-        "model_architecture": "Adaptive Regime Ensemble (RandomForest + XGBoost)",
-        "status": "ACTIVE_PRODUCTION",
-        "promoted_at": "2026-08-15 00:00:00 UTC",
-        "training_window": "2023-01-01 to 2026-06-30 (100% Out-of-Sample Partition)",
-        "promotion_audit": {
-            "deflated_sharpe_ratio": 0.962,
-            "min_required_dsr": 0.95,
-            "paired_p_value": 0.038,
-            "max_drawdown_pct": 8.4,
-            "brier_calibration_score": 0.042,
-            "status": "PASSED_STRICT_GATE"
-        },
-        "next_scheduled_gate": "2026-09-15 00:00:00 UTC (Requires 30-Day Real Ledger Accumulation)",
-        "ledger_source": "results/market_memory.db (SQLite WAL)"
+        "status": "HISTORICAL_UNVERIFIED",
+        "lineage": None,
+        "promotion_audit": None,
+        "message": "Historical lineage claims are not verified by this runtime endpoint.",
     }
 
 
 @router.post("/prediction/record")
 def post_prediction_record(payload: Dict[str, Any] = Body(...)):
     """Manually records an external prediction event into Market Memory."""
-    ts = payload.get("timestamp", datetime.now(timezone.utc).isoformat())
-    price = float(payload.get("price", 65000.0))
-    regime = str(payload.get("regime", "RANGING"))
-    prob = float(payload.get("raw_prob", 0.50))
-    decision = str(payload.get("decision", "SKIP"))
-    direction = str(payload.get("direction", "SKIP"))
+    required = {"timestamp", "price", "regime", "raw_prob", "decision", "direction", "tp", "sl"}
+    missing = sorted(required.difference(payload))
+    if missing:
+        raise HTTPException(
+            status_code=422,
+            detail={"status": "DATA_UNAVAILABLE", "missing_fields": missing},
+        )
+    try:
+        price = float(payload["price"])
+        prob = float(payload["raw_prob"])
+        tp = float(payload["tp"])
+        sl = float(payload["sl"])
+    except (TypeError, ValueError) as error:
+        raise HTTPException(status_code=422, detail="Numeric prediction fields are invalid.") from error
+    if not all(math.isfinite(value) for value in (price, prob, tp, sl)) or price <= 0 or not 0 <= prob <= 1:
+        raise HTTPException(status_code=422, detail="Numeric prediction fields are invalid.")
 
     record_prediction(
-        timestamp=ts,
+        timestamp=str(payload["timestamp"]),
         price=price,
-        regime=regime,
+        regime=str(payload["regime"]),
         raw_prob=prob,
         calibrated_prob=prob,
-        decision=decision,
-        direction=direction,
-        tp=float(payload.get("tp", 0.0)),
-        sl=float(payload.get("sl", 0.0))
+        decision=str(payload["decision"]),
+        direction=str(payload["direction"]),
+        tp=tp,
+        sl=sl
     )
     return {"status": "success", "message": "Prediction recorded successfully."}
 
@@ -718,6 +500,12 @@ def get_multiscale_prediction():
     """
     Returns synchronized dual-horizon (5m Hawkes Shadow + 24h Production Ridge) multiscale forecast.
     """
+    return {
+        "status": "DATA_UNAVAILABLE",
+        "message": "This endpoint's former synthetic-data forecast is disabled.",
+        "forecast": None,
+    }
+
     from engine.multiscale_forecast import multiscale_assembler
     from research.microstructure_dataset import generate_synthetic_l2_event_stream
     from research.hawkes_shadow_health import hawkes_shadow_health_monitor
@@ -746,6 +534,11 @@ def get_multiscale_health():
     """
     Returns operational health and calibration statistics for dual-horizon multiscale forecasting.
     """
+    return {
+        "status": "HISTORICAL_UNVERIFIED",
+        "metrics": None,
+    }
+
     from engine.multiscale_health import multiscale_health_service
     report = multiscale_health_service.get_health_report()
     return report.to_dict()
@@ -756,6 +549,12 @@ def get_prediction_horizons():
     """
     Returns synchronized multi-horizon forecasts across 7 distinct timescales.
     """
+    return {
+        "status": "DATA_UNAVAILABLE",
+        "message": "The former multi-horizon response included synthetic event data and fixed estimates.",
+        "horizons": None,
+    }
+
     from engine.range_forecast_service import RangeForecastService
     from engine.hawkes_shadow_session import hawkes_shadow_session
     from research.microstructure_dataset import generate_synthetic_l2_event_stream
@@ -855,6 +654,12 @@ def get_prediction_horizons_health():
     """
     Returns operational health status across all 7 candidate horizons.
     """
+    return {
+        "status": "HISTORICAL_UNVERIFIED",
+        "health_records": None,
+        "metrics": None,
+    }
+
     from research.horizon_health import evaluate_horizon_health_and_gaps
     df_health, meta = evaluate_horizon_health_and_gaps()
     return {
@@ -870,6 +675,11 @@ def get_prediction_market_state():
     """
     Returns unified multiscale market-state contextual intelligence across all operational layers.
     """
+    return {
+        "status": "DATA_UNAVAILABLE",
+        "market_state": None,
+    }
+
     from engine.market_state import market_state_engine
 
     row = feature_cache.get_latest_row()
@@ -890,6 +700,12 @@ def get_prediction_market_state_history(limit: int = 50):
     """
     Returns historical market-state snapshots with resolved 24h outcomes.
     """
+    return {
+        "status": "HISTORICAL_UNVERIFIED",
+        "history": None,
+        "message": "Historical market-state samples are not independently verified.",
+    }
+
     from research.market_state_dataset import generate_market_state_history_dataset
     df_hist = generate_market_state_history_dataset(n_samples=min(200, limit))
     return {
@@ -915,6 +731,11 @@ def get_prediction_intelligence():
     Unified Forecast Intelligence Layer translating all validated and experimental model outputs
     into a coherent, decoupled intelligence experience.
     """
+    return {
+        "status": "DATA_UNAVAILABLE",
+        "intelligence": None,
+    }
+
     from engine.forecast_intelligence import forecast_intelligence_orchestrator
 
     row = feature_cache.get_latest_row()
@@ -936,6 +757,11 @@ def get_prediction_intelligence_health():
     """
     Comprehensive multi-pillar operational health, longitudinal tracking, and reliability status.
     """
+    return {
+        "status": "HISTORICAL_UNVERIFIED",
+        "metrics": None,
+    }
+
     return {
         "production_status": "VALIDATED_PRODUCTION_RANGE_SYSTEM",
         "production_blocks": 40,
@@ -962,6 +788,11 @@ def get_research_all_models_leaderboard():
     """
     Exposes all models grouped strictly by governance role: PRODUCTION, SHADOW, RESEARCH, REJECTED.
     """
+    return {
+        "status": "HISTORICAL_UNVERIFIED",
+        "leaderboard": None,
+    }
+
     return {
         "title": "BTCUSD MODEL RESEARCH & PRODUCTION LEADERBOARD",
         "categories": {
@@ -993,6 +824,11 @@ def get_prediction_accuracy():
     """
     Returns canonical production forecast accuracy observatory scorecard.
     """
+    return {
+        "status": "HISTORICAL_UNVERIFIED",
+        "metrics": None,
+    }
+
     return {
         "title": "BTCUSD PRODUCTION FORECAST ACCURACY OBSERVATORY",
         "system_version": "v3.0.0-ridge-volatility-context",
@@ -1043,6 +879,11 @@ def get_prediction_accuracy_history(limit: int = 30):
     """
     Returns rolling block accuracy time-series history snapshots.
     """
+    return {
+        "status": "HISTORICAL_UNVERIFIED",
+        "history": None,
+    }
+
     from research.accuracy_timeseries import generate_production_accuracy_timeseries
     df_ts, _ = generate_production_accuracy_timeseries()
     return {
@@ -1057,6 +898,11 @@ def get_prediction_failures(limit: int = 10):
     """
     Searchable failure and tail envelope breach library.
     """
+    return {
+        "status": "HISTORICAL_UNVERIFIED",
+        "failures": None,
+    }
+
     from research.forecast_failure_analysis import run_forecast_failure_analysis
     df_fails, meta = run_forecast_failure_analysis()
     return {
@@ -1133,17 +979,12 @@ def get_prediction_pipeline_layers():
     from engine.feature_cache import feature_cache
 
     row = feature_cache.get_latest_row()
-    candle = row if row is not None else {
-        "open": 65000.0,
-        "high": 65200.0,
-        "low": 64800.0,
-        "close": 65100.0,
-        "volume": 150.0,
-        "vol_24h": 0.015,
-        "timestamp": datetime.now(timezone.utc).isoformat()
-    }
+    if row is None:
+        return {
+            "status": "DATA_UNAVAILABLE",
+            "message": "No verified feature row is available to evaluate pipeline layers.",
+            "layers": None,
+        }
 
-    res = prediction_pipeline.run_pipeline(candle=candle)
+    res = prediction_pipeline.run_pipeline(candle=row)
     return res.to_dict()
-
-

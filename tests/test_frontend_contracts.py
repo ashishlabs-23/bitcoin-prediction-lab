@@ -13,52 +13,38 @@ Automated test suite verifying the BTCognitive Frontend & Research API contracts
 """
 
 import os
-import re
-import pytest
 from fastapi.testclient import TestClient
-from api.server import app
+from api.local_safe_server import app
 
 client = TestClient(app)
 
 
-def test_research_entry_tp_sl_endpoint_contract():
-    """Verifies that /api/research/entry-tp-sl returns full dynamic research values."""
+def test_research_entry_tp_sl_endpoint_reports_blocked_without_signal_values():
+    """Blocked research must not expose a signal or unverified metrics."""
     response = client.get("/api/research/entry-tp-sl")
     assert response.status_code == 200, f"Expected 200, got {response.status_code}"
     data = response.json()
 
-    assert data["research_status"] == "COST_ERASED"
-    assert data["claim_level"] == "C2"
+    assert data["status"] == "BLOCKED_AUDIT_FAILURE"
+    assert data["research_status"] == "BLOCKED_AUDIT_FAILURE"
     assert data["live_capital_authorized"] is False
     assert data["execution_mode"] == "PAPER_RESEARCH_ONLY"
-    assert "hypothetical_signal" in data
-
-    sig = data["hypothetical_signal"]
-    assert "direction" in sig
-    assert "entry_price" in sig and sig["entry_price"] > 0
-    assert "tp_price" in sig and sig["tp_price"] > 0
-    assert "sl_price" in sig and sig["sl_price"] > 0
-    assert sig["barrier_pair_id"] == "barrier_pair_01"
-    assert sig["k_tp"] == 1.0
-    assert sig["k_sl"] == 1.0
-    assert "volatility_estimator" in sig
-    assert "setup_detected" in sig
-    assert "resolver_version" in sig
-    assert "provenance_status" in sig
+    assert data["hypothetical_signal"] is None
+    assert data["metrics"] is None
 
 
-def test_prediction_latest_includes_hypothetical_research_fields():
-    """Verifies that /prediction/latest provides non-actionable hypothetical research values."""
+def test_prediction_latest_does_not_invent_research_values():
+    """No model inference in local-safe mode means no numeric prediction payload."""
     response = client.get("/prediction/latest")
     assert response.status_code == 200
     data = response.json()
 
-    assert "tp" in data
-    assert "sl" in data
-    assert "entry_price" in data or "btc_price" in data
-    assert data.get("live_capital_authorized") is False
-    assert data.get("research_classification") == "COST_ERASED"
-    assert "governance_disclaimer" in data
+    assert data["status"] == "DATA_UNAVAILABLE"
+    assert data["model_inference"] == "DATA_UNAVAILABLE"
+    assert "tp" not in data
+    assert "sl" not in data
+    assert "entry_price" not in data
+    assert "probability" not in data
 
 
 def test_no_live_order_execution_routes():
@@ -97,3 +83,30 @@ def test_frontend_js_contains_hypothetical_and_research_labels():
     assert "DATA_UNAVAILABLE" in content
     assert "PROVENANCE_FAILURE" in content
     assert "MODEL_FAILURE" in content
+
+
+def test_frontend_uses_the_authoritative_research_contract_without_numeric_fallbacks():
+    """Research display must be API-driven and never manufacture Entry/TP/SL values."""
+    app_js_path = os.path.join(os.path.dirname(__file__), "..", "web", "app.js")
+    with open(app_js_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    assert "fetchResearchSignal" in content
+    assert "/api/research/entry-tp-sl" in content
+    assert "const entryPrice = signal?.entry_price" in content
+    assert "const tpPrice = signal?.tp_price" in content
+    assert "const slPrice = signal?.sl_price" in content
+    assert "entryP * 0.985" not in content[content.index("function PredictionPanel"):content.index("function PaperPortfolio")]
+    assert "DATA_UNAVAILABLE" in content
+
+
+def test_research_panel_has_no_order_action_path():
+    """A displayed research signal must not call an order or arena-trade endpoint."""
+    app_js_path = os.path.join(os.path.dirname(__file__), "..", "web", "app.js")
+    with open(app_js_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    assert "executeArenaTrade" not in content
+    assert "/api/arena/trade\", {" not in content
+    panel = content[content.index("function PredictionPanel"):content.index("function PaperPortfolio")]
+    assert "No real orders are executed" in panel
