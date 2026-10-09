@@ -12,72 +12,385 @@ if (window.BTCOGNITIVE_LOCAL_SAFE_MODE === true) {
   const root = document.getElementById("root");
   const shell = document.createElement("main");
   shell.className = "terminal-container";
-  shell.style.maxWidth = "960px";
-  shell.style.margin = "8vh auto";
-  shell.style.padding = "24px";
+  shell.style.cssText = "position:relative;z-index:1;max-width:1080px;margin:5vh auto;padding:24px";
   shell.innerHTML = `
-    <section class="glass-card" style="padding:28px">
-      <div style="color:#38BDF8;font-weight:800;letter-spacing:.06em">BTCognitive · LOCAL SAFE MODE</div>
-      <h1 style="color:#F8FAFC;margin:10px 0">Research Terminal</h1>
-      <p style="color:#CBD5E1">Read-only interface inspection. Market data and model inference are not enabled.</p>
-      <div id="local-safe-status" aria-live="polite" style="display:grid;gap:12px;margin:24px 0"></div>
-      <div style="border:1px solid rgba(239,68,68,.5);background:rgba(239,68,68,.12);padding:16px;border-radius:10px;color:#FCA5A5">
-        Research execution is blocked. Historical results are unverified. Real order execution is disabled.
-      </div>
-      <p style="color:#94A3B8;margin-top:18px">No Entry / TP / SL signal or performance estimate is available in this mode.</p>
-    </section>`;
+  <style>
+    .local-safe-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px;margin:20px 0}
+    .local-safe-card{padding:20px;min-width:0}
+    .local-safe-card h2{font-size:1.05rem;margin:0 0 8px;color:var(--text-main,#F1F5F9)}
+    .local-safe-card p,.local-safe-muted{color:var(--text-muted,#94A3B8)}
+    .local-safe-state{font-family:var(--font-mono,monospace);font-size:.88rem;margin:8px 0;color:#FBBF24;overflow-wrap:anywhere}
+    .local-safe-card label{display:block;margin:12px 0 5px;color:var(--text-main,#F1F5F9)}
+    .local-safe-card input,.local-safe-card select{width:100%;padding:10px 12px;border:1px solid var(--card-border,rgba(255,255,255,.14));border-radius:8px;background:#080E1E;color:var(--text-main,#F1F5F9);font:inherit}
+    .local-safe-card button{margin-top:16px;padding:11px 16px;border:0;border-radius:8px;background:#00E5A8;color:#04110D;font:inherit;font-weight:600;cursor:pointer}
+    .local-safe-card button:focus-visible,.local-safe-card input:focus-visible,.local-safe-card select:focus-visible{outline:3px solid #38BDF8;outline-offset:2px}
+    .local-safe-card button:disabled{opacity:.65;cursor:wait}
+    .local-safe-result{margin-top:16px;padding:14px;border:1px solid var(--card-border,rgba(255,255,255,.14));border-radius:10px}
+    .local-safe-result dl{display:grid;grid-template-columns:minmax(120px,auto) 1fr;gap:6px 14px;margin:10px 0 0}
+    .local-safe-result dt{color:var(--text-muted,#94A3B8)}
+    .local-safe-result dd{margin:0;overflow-wrap:anywhere}
+    .local-safe-alert{color:#FCA5A5}
+  </style>
+  <section class="glass-card" style="padding:clamp(20px,4vw,32px)">
+    <p style="color:#38BDF8;font-weight:800;letter-spacing:.06em">BTCognitive · LOCAL SAFE MODE</p>
+    <h1 style="margin:8px 0">Research Terminal</h1>
+    <p class="local-safe-muted">Manual hypothetical calculations only. This interface does not run a model, create a signal, authorize research execution, or place orders.</p>
+
+    <div class="local-safe-grid" aria-label="System status">
+      <section class="glass-card local-safe-card" aria-labelledby="local-safe-health-heading">
+        <h2 id="local-safe-health-heading">Application health</h2>
+        <p id="local-safe-health" class="local-safe-state" role="status">CHECKING</p>
+        <p id="local-safe-health-detail" class="local-safe-muted">Checking the same-origin local API.</p>
+      </section>
+      <section class="glass-card local-safe-card" aria-labelledby="local-safe-market-heading">
+        <h2 id="local-safe-market-heading">Live market</h2>
+        <p id="local-safe-market" class="local-safe-state" role="status">CHECKING</p>
+        <p id="local-safe-market-detail" class="local-safe-muted">No user input is populated from market status.</p>
+      </section>
+      <section class="glass-card local-safe-card" aria-labelledby="local-safe-model-heading">
+        <h2 id="local-safe-model-heading">Model inference</h2>
+        <p id="local-safe-model" class="local-safe-state" role="status">MODEL_UNAVAILABLE</p>
+        <p id="local-safe-model-detail" class="local-safe-muted">No provenance-verified model artifact is available.</p>
+      </section>
+      <section class="glass-card local-safe-card" aria-labelledby="local-safe-history-heading">
+        <h2 id="local-safe-history-heading">Historical outputs</h2>
+        <p id="local-safe-history" class="local-safe-state">HISTORICAL_UNVERIFIED</p>
+        <p id="local-safe-history-detail" class="local-safe-muted">Past research outputs are not verified predictions or performance evidence.</p>
+      </section>
+      <section class="glass-card local-safe-card" aria-labelledby="local-safe-research-heading">
+        <h2 id="local-safe-research-heading">Research authorization</h2>
+        <p id="local-safe-research" class="local-safe-state">BLOCKED — STATUS CHECKING</p>
+        <p id="local-safe-research-detail" class="local-safe-muted">Research execution is blocked. This gate does not disable the independent manual calculator.</p>
+      </section>
+      <section class="glass-card local-safe-card" aria-labelledby="local-safe-orders-heading">
+        <h2 id="local-safe-orders-heading">Real orders</h2>
+        <p class="local-safe-state">DISABLED</p>
+        <p class="local-safe-muted">No order-entry path is available in this interface.</p>
+      </section>
+    </div>
+
+    <section class="glass-card local-safe-card" aria-labelledby="local-safe-calculator-heading">
+      <h2 id="local-safe-calculator-heading">Manual barrier calculator</h2>
+      <p class="local-safe-muted">Uses only reference price and ATR you enter. The returned figures are a deterministic scenario calculation, not model inference, advice, or an order.</p>
+      <form id="local-safe-calculator" novalidate>
+        <div class="local-safe-grid" style="margin-bottom:0">
+          <div>
+            <label for="local-safe-reference-price">Reference price (USD)</label>
+            <input id="local-safe-reference-price" name="reference_price" type="number" inputmode="decimal" min="0.01" step="any" required autocomplete="off" aria-describedby="local-safe-reference-help">
+            <p id="local-safe-reference-help" class="local-safe-muted">Enter a positive price; this field is intentionally blank.</p>
+          </div>
+          <div>
+            <label for="local-safe-atr">Volatility ATR (USD)</label>
+            <input id="local-safe-atr" name="volatility_atr" type="number" inputmode="decimal" min="0.01" step="any" required autocomplete="off" aria-describedby="local-safe-atr-help">
+            <p id="local-safe-atr-help" class="local-safe-muted">Enter a positive ATR value; this field is intentionally blank.</p>
+          </div>
+          <div>
+            <label for="local-safe-side">Side</label>
+            <select id="local-safe-side" name="side">
+              <option value="LONG">LONG</option>
+              <option value="SHORT">SHORT</option>
+            </select>
+          </div>
+          <div>
+            <label for="local-safe-barrier-pair">Registered barrier pair</label>
+            <select id="local-safe-barrier-pair" name="barrier_pair_id">
+              <option value="">Loading registered barrier pairs…</option>
+            </select>
+          </div>
+          <div>
+            <label for="local-safe-horizon">Horizon</label>
+            <select id="local-safe-horizon" name="horizon_minutes" disabled>
+              <option value="">Load registered pair options first</option>
+            </select>
+          </div>
+        </div>
+        <p id="local-safe-calculator-error" class="local-safe-alert" role="alert" aria-live="assertive"></p>
+        <button id="local-safe-calculate" type="submit" disabled>Calculate hypothetical barriers</button>
+      </form>
+      <section id="local-safe-calculation-result" class="local-safe-result" aria-live="polite" aria-labelledby="local-safe-result-heading" hidden>
+        <h3 id="local-safe-result-heading">Scenario calculation</h3>
+        <p id="local-safe-result-label" class="local-safe-state"></p>
+        <dl id="local-safe-result-fields"></dl>
+        <p id="local-safe-result-disclaimer" class="local-safe-muted" style="margin-top:12px"></p>
+      </section>
+    </section>
+  </section>`;
   root?.replaceChildren(shell);
 
-  const statusContainer = shell.querySelector("#local-safe-status");
-  const addStatus = (label, value, detail = "") => {
-    const card = document.createElement("div");
-    card.className = "glass-card";
-    card.style.padding = "14px 16px";
-    const heading = document.createElement("strong");
-    heading.style.color = "#F8FAFC";
-    heading.textContent = label;
-    const state = document.createElement("div");
-    state.style.color = "#FBBF24";
-    state.style.fontFamily = "var(--font-mono)";
-    state.style.marginTop = "6px";
-    state.textContent = value;
-    card.append(heading, state);
-    if (detail) {
-      const description = document.createElement("div");
-      description.style.color = "#94A3B8";
-      description.style.marginTop = "6px";
-      description.textContent = detail;
-      card.append(description);
+  const byId = id => shell.querySelector(`#${id}`);
+  const fetchStatus = async path => {
+    const response = await fetch(path, { headers: { Accept: "application/json" } });
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      throw new Error(`${path}: server returned a non-JSON response (HTTP ${response.status}).`);
     }
-    statusContainer?.append(card);
+    if (!response.ok) {
+      const detail = typeof data?.detail === "string"
+        ? data.detail
+        : JSON.stringify(data?.detail ?? data);
+      throw new Error(`${path}: HTTP ${response.status}${detail ? ` — ${detail}` : ""}`);
+    }
+    return data;
+  };
+  const setStatus = (id, detailId, state, detail) => {
+    byId(id).textContent = state;
+    if (detailId && detail !== undefined) byId(detailId).textContent = detail;
+  };
+  const showStatusError = (id, detailId, message) => {
+    setStatus(id, detailId, "DATA_UNAVAILABLE", message);
+  };
+  const readableTimestamp = value => {
+    if (typeof value !== "string" && typeof value !== "number") return "";
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
   };
 
-  Promise.all([
-    fetch("/health").then(response => {
-      if (!response.ok) throw new Error(`health HTTP ${response.status}`);
-      return response.json();
-    }),
-    fetch("/api/local/status").then(response => {
-      if (!response.ok) throw new Error(`status HTTP ${response.status}`);
-      return response.json();
-    })
-  ]).then(([health, local]) => {
-    addStatus("Application health", health.status || "DATA_UNAVAILABLE");
-    addStatus("Market data", local.market_data || "DATA_UNAVAILABLE");
-    addStatus("Model inference", local.model_inference || "DATA_UNAVAILABLE");
-    addStatus(
-      "Research authorization",
-      local.research?.authorization?.status || "PROVENANCE_FAILURE",
-      local.research?.authorization?.reason || ""
-    );
-    addStatus(
-      "Historical research outputs",
-      local.research?.historical_outputs || "PROVENANCE_FAILURE",
-      `Manifest integrity: ${local.research?.manifest_integrity?.status || "PROVENANCE_FAILURE"}`
-    );
-  }).catch(error => {
-    addStatus("Local API connection", "DATA_UNAVAILABLE", error.message);
-    addStatus("Research authorization", "DATA_UNAVAILABLE");
+  Promise.allSettled([
+    fetchStatus("/health"),
+    fetchStatus("/api/local/status"),
+    fetchStatus("/api/market/status"),
+    fetchStatus("/api/research/status"),
+    fetchStatus("/prediction/latest")
+  ]).then(([healthResult, localResult, marketResult, researchResult, modelResult]) => {
+    if (healthResult.status === "fulfilled") {
+      const health = healthResult.value;
+      const local = localResult.status === "fulfilled" ? localResult.value : {};
+      const localDetail = localResult.status === "fulfilled"
+        ? (local.application || "Local status available.")
+        : `Local status unavailable: ${localResult.reason.message}`;
+      setStatus("local-safe-health", "local-safe-health-detail", health.status || "STATUS_UNAVAILABLE",
+        health.application || localDetail || "Local API responded.");
+    } else {
+      const localDetail = localResult.status === "rejected"
+        ? `; ${localResult.reason.message}`
+        : "";
+      showStatusError("local-safe-health", "local-safe-health-detail",
+        `${healthResult.reason.message}${localDetail}`);
+    }
+
+    if (marketResult.status === "fulfilled") {
+      const market = marketResult.value;
+      const source = market.venue || market.exchange || market.source;
+      const status = market.status || "STATUS_UNAVAILABLE";
+      const unavailable = status === "DATA_UNAVAILABLE" || !source || source === "none";
+      const timestamp = readableTimestamp(
+        market.source_timestamp_utc ?? market.source_timestamp ?? market.timestamp ?? market.as_of ?? market.updated_at ?? market.observed_at
+      );
+      const details = unavailable
+        ? (market.message || "No verified market feed is available.")
+        : `Source: ${source}${timestamp ? ` · Source timestamp: ${timestamp}` : " · Source timestamp unavailable"}${status === "OK" && Number.isFinite(market.price) ? ` · BTC/USD: ${formatUsd(market.price)}` : ""}${market.message ? ` · ${market.message}` : ""}`;
+      setStatus("local-safe-market", "local-safe-market-detail",
+        unavailable ? "DATA_UNAVAILABLE" : status, details);
+    } else {
+      showStatusError("local-safe-market", "local-safe-market-detail", marketResult.reason.message);
+    }
+
+    if (researchResult.status === "fulfilled") {
+      const research = researchResult.value;
+      const authorization = research.authorization || {};
+      const state = authorization.status || research.status || "STATUS_UNAVAILABLE";
+      const displayState = authorization.authorized === true
+        ? "AUTHORIZED (REPORTED) — EXECUTION DISABLED HERE"
+        : state === "BLOCKED_AUDIT_FAILURE" ? state : `BLOCKED — ${state}`;
+      const researchDetail = authorization.authorized === true
+        ? "The API reports authorization, but this local-safe UI offers no research execution. Manual calculation remains available."
+        : authorization.reason || "Research execution remains blocked in this interface; calculation remains available.";
+      setStatus("local-safe-research", "local-safe-research-detail", displayState, researchDetail);
+      if (research.historical_outputs) {
+        byId("local-safe-history").textContent = research.historical_outputs === "HISTORICAL_UNVERIFIED"
+          ? research.historical_outputs
+          : `HISTORICAL_UNVERIFIED · ${research.historical_outputs}`;
+      }
+    } else {
+      setStatus("local-safe-research", "local-safe-research-detail", "BLOCKED — STATUS UNAVAILABLE",
+        `${researchResult.reason.message} Research execution remains blocked; calculation remains available.`);
+    }
+
+    if (modelResult.status === "fulfilled") {
+      const model = modelResult.value;
+      setStatus("local-safe-model", "local-safe-model-detail",
+        model.status || "MODEL_UNAVAILABLE",
+        model.message || "No model prediction is available.");
+    } else {
+      showStatusError("local-safe-model", "local-safe-model-detail", modelResult.reason.message);
+    }
+  });
+
+  const form = byId("local-safe-calculator");
+  const pairSelect = byId("local-safe-barrier-pair");
+  const horizonSelect = byId("local-safe-horizon");
+  const resultPanel = byId("local-safe-calculation-result");
+  const resultFields = byId("local-safe-result-fields");
+  const errorPanel = byId("local-safe-calculator-error");
+  const submitButton = byId("local-safe-calculate");
+  let scenarioOptionsLoaded = false;
+  const matchHorizonToPair = () => {
+    const option = pairSelect.selectedOptions[0];
+    if (option && option.value) horizonSelect.value = option.dataset.horizon;
+  };
+  pairSelect.addEventListener("change", matchHorizonToPair);
+
+  const loadScenarioOptions = async () => {
+    submitButton.disabled = true;
+    pairSelect.disabled = true;
+    horizonSelect.disabled = true;
+    try {
+      const response = await fetchStatus("/api/scenario/options");
+      if (response.status !== "AVAILABLE" ||
+          !Array.isArray(response.barrier_pairs) ||
+          response.barrier_pairs.length === 0) {
+        throw new Error("Scenario options response did not contain registered barrier pairs.");
+      }
+
+      const pairIds = new Set();
+      const pairs = response.barrier_pairs.map(pair => {
+        if (!pair || typeof pair.barrier_pair_id !== "string" ||
+            !/^barrier_pair_\d+$/.test(pair.barrier_pair_id) ||
+            pairIds.has(pair.barrier_pair_id) ||
+            !Number.isFinite(pair.tp_multiplier) || pair.tp_multiplier <= 0 ||
+            !Number.isFinite(pair.sl_multiplier) || pair.sl_multiplier <= 0 ||
+            !Number.isInteger(pair.horizon_minutes) || pair.horizon_minutes <= 0) {
+          throw new Error("Scenario options response contains an invalid registered barrier pair.");
+        }
+        pairIds.add(pair.barrier_pair_id);
+        return pair;
+      });
+      const registeredPair04 = pairs.find(pair => pair.barrier_pair_id === "barrier_pair_04");
+      if (!registeredPair04 || registeredPair04.horizon_minutes !== 120) {
+        throw new Error("Scenario options do not match the frozen barrier_pair_04 120-minute horizon.");
+      }
+
+      pairSelect.replaceChildren(...pairs.map((pair, index) => {
+        const option = document.createElement("option");
+        option.value = pair.barrier_pair_id;
+        option.dataset.horizon = String(pair.horizon_minutes);
+        option.textContent =
+          `${pair.barrier_pair_id} — ${pair.tp_multiplier}× TP / ${pair.sl_multiplier}× SL`;
+        if (index === 0) option.selected = true;
+        return option;
+      }));
+
+      const horizons = [...new Set(pairs.map(pair => pair.horizon_minutes))];
+      horizonSelect.replaceChildren(...horizons.map(horizon => {
+        const option = document.createElement("option");
+        option.value = String(horizon);
+        option.textContent = `${horizon} minutes`;
+        return option;
+      }));
+      pairSelect.disabled = false;
+      scenarioOptionsLoaded = true;
+      matchHorizonToPair();
+      errorPanel.textContent = "";
+      submitButton.disabled = false;
+    } catch (error) {
+      pairSelect.replaceChildren(new Option("Registered barrier pairs unavailable", ""));
+      horizonSelect.replaceChildren(new Option("Horizon unavailable", ""));
+      errorPanel.textContent =
+        `Cannot load registered scenario options; calculation is disabled. ${error.message || "Options are unavailable."}`;
+    }
+  };
+  loadScenarioOptions();
+
+  const resultRows = [
+    ["side", "Side"],
+    ["entry_price", "Entry price (USD)", true],
+    ["tp_price", "Take-profit price (USD)", true],
+    ["sl_price", "Stop-loss price (USD)", true],
+    ["barrier_pair_id", "Barrier pair"],
+    ["tp_multiplier", "TP multiplier"],
+    ["sl_multiplier", "SL multiplier"],
+    ["vertical_horizon_minutes", "Horizon (minutes)"],
+    ["volatility_atr_usd", "User-provided ATR (USD)", true],
+    ["formula_version", "Formula version"],
+    ["calculated_at", "Calculated at"],
+    ["input_source", "Input source"],
+    ["execution_mode", "Execution mode"]
+  ];
+  const clearResult = () => {
+    resultPanel.hidden = true;
+    resultFields.replaceChildren();
+    byId("local-safe-result-label").textContent = "";
+    byId("local-safe-result-disclaimer").textContent = "";
+  };
+  const formatUsd = value => `$${Number(value).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })}`;
+
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    errorPanel.textContent = "";
+    clearResult();
+    if (!scenarioOptionsLoaded) {
+      errorPanel.textContent = "Cannot calculate until registered scenario options load successfully.";
+      submitButton.disabled = true;
+      return;
+    }
+    if (!form.reportValidity()) return;
+
+    const referencePrice = Number(form.elements.reference_price.value);
+    const volatilityAtr = Number(form.elements.volatility_atr.value);
+    if (!Number.isFinite(referencePrice) || referencePrice <= 0 ||
+        !Number.isFinite(volatilityAtr) || volatilityAtr <= 0) {
+      errorPanel.textContent = "Enter positive, finite reference price and ATR values in USD.";
+      return;
+    }
+
+    const payload = {
+      side: form.elements.side.value,
+      reference_price: referencePrice,
+      volatility_atr: volatilityAtr,
+      barrier_pair_id: form.elements.barrier_pair_id.value,
+      horizon_minutes: Number(form.elements.horizon_minutes.value)
+    };
+    submitButton.disabled = true;
+    submitButton.textContent = "Calculating…";
+    try {
+      const response = await fetch("/api/scenario/calculate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(payload)
+      });
+      let calculation;
+      try {
+        calculation = await response.json();
+      } catch {
+        throw new Error(`Calculator returned a non-JSON response (HTTP ${response.status}).`);
+      }
+      if (!response.ok) {
+        const detail = typeof calculation?.detail === "string"
+          ? calculation.detail
+          : JSON.stringify(calculation?.detail ?? calculation);
+        throw new Error(`Calculation failed (HTTP ${response.status})${detail ? `: ${detail}` : "."}`);
+      }
+      if (calculation?.status !== "SCENARIO_CALCULATION" ||
+          !["entry_price", "tp_price", "sl_price"].every(key =>
+            typeof calculation[key] === "number" && Number.isFinite(calculation[key]))) {
+        throw new Error("Calculator response did not contain a valid SCENARIO_CALCULATION result.");
+      }
+
+      byId("local-safe-result-label").textContent =
+        calculation.label || "SCENARIO_CALCULATION — NOT A MODEL PREDICTION";
+      for (const [key, label, isUsd] of resultRows) {
+        const value = calculation[key];
+        if (value === undefined || value === null || value === "") continue;
+        if (typeof value === "number" && !Number.isFinite(value)) continue;
+        const term = document.createElement("dt");
+        term.textContent = label;
+        const description = document.createElement("dd");
+        description.textContent = isUsd ? formatUsd(value) : String(value);
+        resultFields.append(term, description);
+      }
+      byId("local-safe-result-disclaimer").textContent = calculation.disclaimer || "";
+      resultPanel.hidden = false;
+    } catch (error) {
+      errorPanel.textContent = error.message || "Calculation failed; no result is available.";
+    } finally {
+      submitButton.disabled = !scenarioOptionsLoaded;
+      submitButton.textContent = "Calculate hypothetical barriers";
+    }
   });
 } else {
 const { useState, useEffect, useRef, useCallback, createElement: h } = React;
