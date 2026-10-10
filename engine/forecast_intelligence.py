@@ -88,12 +88,10 @@ class ForecastIntelligenceOrchestrator:
 
         # 3. Foundation Research Forecasts
         research_payload = {
-            "status": "FOUNDATION_RESEARCH_ONLY",
-            "models": {
-                "timesfm_2.5": {"mode": "Adapted (240h)", "mfe_error": 0.4080, "p90_cov": 89.40, "latency_ms": 145.0, "status": "NOT_PROMOTED"},
-                "moirai_2.0": {"mode": "Adapted (240h)", "mfe_error": 0.4190, "p90_cov": 88.80, "latency_ms": 195.0, "status": "NOT_PROMOTED"},
-                "chronos_2": {"mode": "Zero-Shot (240h)", "mfe_error": 0.4650, "p90_cov": 86.80, "latency_ms": 220.0, "status": "NOT_PROMOTED"}
-            }
+            "status": "UNAVAILABLE_NOT_EXECUTED",
+            "authoritative": False,
+            "reason": "Foundation-model adapters are synthetic placeholders; no model evaluation is available.",
+            "models": {}
         }
 
         # 4. Market State & Volatility Bridge

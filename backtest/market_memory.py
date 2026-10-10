@@ -306,6 +306,9 @@ def record_prediction(
             "strategy_name": strategy_name
         })
 
+    resolved_flag = bool(outcome_resolved or (was_correct is not None))
+    was_correct_val = ((1 if was_correct else 0) if was_correct is not None else None) if resolved_flag else None
+
     record_dict = {
         'prediction_id': str(prediction_id),
         'timestamp': str(timestamp),
@@ -316,7 +319,7 @@ def record_prediction(
         'calibrated_prob': float(calibrated_prob),
         'decision': str(decision),
         'actual_return': float(actual_return),
-        'was_correct': (1 if was_correct else 0) if was_correct is not None else None,
+        'was_correct': was_correct_val,
         'pnl': float(pnl),
         'direction': str(direction),
         'tp': float(tp),
@@ -335,7 +338,7 @@ def record_prediction(
         'composite_quality_score': float(composite_quality_score),
         'expected_return_gross_pct': float(expected_return_gross_pct),
         'expected_return_net_pct': float(expected_return_net_pct),
-        'outcome_resolved': 1 if outcome_resolved else 0,
+        'outcome_resolved': 1 if resolved_flag else 0,
         'outcome_resolved_at': str(outcome_resolved_at) if outcome_resolved_at else None,
         'data_source': 'live_terminal',
         'strategy_name': str(strategy_name),
@@ -440,39 +443,64 @@ def query_similar_context(current_context: dict, top_k: int = 20) -> pd.DataFram
         conn.close()
 
 
-def update_prediction_outcome(prediction_id: str, actual_return: float, was_correct: bool, pnl: float) -> bool:
-    """Updates an existing prediction record atomically in SQLite & CSV."""
+def update_prediction_outcomes_batch(updates: List[Dict[str, Any]]) -> int:
+    """Updates multiple prediction records in a single batch in SQLite & CSV."""
+    if not updates:
+        return 0
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    sqlite_params = [
+        (float(u['actual_return']), 1 if u['was_correct'] else 0, float(u['pnl']), now_iso, str(u['prediction_id']))
+        for u in updates
+    ]
+
     conn = _get_db()
+    updated_count = 0
     try:
         with conn:
-            cur = conn.execute("""
+            cur = conn.executemany("""
                 UPDATE predictions
                 SET actual_return = ?, was_correct = ?, pnl = ?, outcome_resolved = 1, outcome_resolved_at = ?
                 WHERE prediction_id = ?
-            """, (float(actual_return), 1 if was_correct else 0, float(pnl), datetime.now(timezone.utc).isoformat(), str(prediction_id)))
-            updated = cur.rowcount > 0
+            """, sqlite_params)
+            updated_count = cur.rowcount if cur.rowcount > 0 else len(updates)
     except Exception as e:
-        logger.error(f"Error updating prediction outcome: {e}")
-        updated = False
+        logger.error(f"Error batch updating prediction outcomes in SQLite: {e}")
     finally:
         conn.close()
 
     csv_file = get_memory_file()
-    if os.path.exists(csv_file):
+    if os.path.exists(csv_file) and os.path.getsize(csv_file) > 0:
         try:
             df = pd.read_csv(csv_file)
-            mask = df['prediction_id'] == str(prediction_id)
-            if mask.any():
-                df.loc[mask, 'actual_return'] = float(actual_return)
-                df.loc[mask, 'was_correct'] = bool(was_correct)
-                df.loc[mask, 'pnl'] = float(pnl)
-                df.loc[mask, 'outcome_resolved'] = True
-                df.loc[mask, 'outcome_resolved_at'] = datetime.now(timezone.utc).isoformat()
-                df.to_csv(csv_file, index=False)
-        except Exception:
-            pass
+            if 'prediction_id' in df.columns:
+                update_map = {str(u['prediction_id']): u for u in updates}
+                mask = df['prediction_id'].astype(str).isin(update_map.keys())
+                if mask.any():
+                    for idx in df[mask].index:
+                        pid = str(df.at[idx, 'prediction_id'])
+                        u = update_map.get(pid)
+                        if u:
+                            df.at[idx, 'actual_return'] = float(u['actual_return'])
+                            df.at[idx, 'was_correct'] = bool(u['was_correct'])
+                            df.at[idx, 'pnl'] = float(u['pnl'])
+                            df.at[idx, 'outcome_resolved'] = True
+                            df.at[idx, 'outcome_resolved_at'] = now_iso
+                    df.to_csv(csv_file, index=False)
+        except Exception as e:
+            logger.warning(f"Error syncing batch prediction outcomes to CSV: {e}")
 
-    return updated
+    return updated_count
+
+
+def update_prediction_outcome(prediction_id: str, actual_return: float, was_correct: bool, pnl: float) -> bool:
+    """Updates an existing prediction record atomically in SQLite & CSV."""
+    return update_prediction_outcomes_batch([{
+        'prediction_id': prediction_id,
+        'actual_return': actual_return,
+        'was_correct': was_correct,
+        'pnl': pnl
+    }]) > 0
 
 
 def resolve_pending_outcomes(current_price: float, current_time_str: str, horizon_hours: int = 24) -> int:

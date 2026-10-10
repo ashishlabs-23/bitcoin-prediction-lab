@@ -27,5 +27,9 @@ def get_foundation_model_leaderboard_payload() -> Dict[str, Any]:
         "title": "BTCUSD FORECAST MODEL BENCHMARK",
         "benchmark_type": "OUT_OF_SAMPLE_RANGE_EXCURSION",
         "count": len(leaderboard),
-        "leaderboard": leaderboard
+            "status": "UNAVAILABLE_NOT_EXECUTED",
+            "authoritative": False,
+            "reason": "The checked-in adapters generate synthetic forecasts; no executable foundation-model evaluation is available.",
+            "count": 0,
+            "leaderboard": []
     }

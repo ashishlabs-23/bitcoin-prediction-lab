@@ -187,9 +187,10 @@ class CandleStateManager:
 
         # Update past pending prediction outcomes with new closed candle price
         try:
-            from backtest.market_memory import load_market_memory, update_prediction_outcome
+            from backtest.market_memory import load_market_memory, update_prediction_outcomes_batch
             mem_df = load_market_memory()
             if not mem_df.empty:
+                updates = []
                 for _, row in mem_df.iterrows():
                     entry_p = float(row.get('price', 0.0))
                     p_id = str(row.get('prediction_id', ''))
@@ -199,7 +200,14 @@ class CandleStateManager:
                         act_ret = (price - entry_p) / entry_p
                         correct = (act_ret > 0 and p_dir == "LONG") or (act_ret < 0 and p_dir == "SHORT")
                         pnl = round(10000.0 * (act_ret if p_dir == "LONG" else -act_ret), 2) if "TAKE" in p_dec else 0.0
-                        update_prediction_outcome(p_id, act_ret, correct, pnl)
+                        updates.append({
+                            'prediction_id': p_id,
+                            'actual_return': act_ret,
+                            'was_correct': correct,
+                            'pnl': pnl
+                        })
+                if updates:
+                    update_prediction_outcomes_batch(updates)
         except Exception as ex:
             print(f"Error updating pending prediction outcomes: {ex}")
 

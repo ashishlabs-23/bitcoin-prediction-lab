@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://btcognitive.local/schemas/entry-tp-sl-provenance.schema.json",
+  "title": "BTCognitive Entry/TP/SL Provenance Record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["record_version", "track_id", "record_id", "status", "observed_at_utc", "source", "artifact", "instrument", "time_semantics", "transformations", "exclusions"],
+  "properties": {
+    "record_version": {"const": "1.0.0"},
+    "track_id": {"const": "BTC-ENTRY-TP-SL-V3"},
+    "record_id": {"type": "string", "minLength": 1},
+    "status": {"enum": ["UNVERIFIED", "VERIFIED", "PROVENANCE_FAILURE", "DATA_UNAVAILABLE", "MODEL_FAILURE", "NO_SIGNAL"]},
+    "observed_at_utc": {"type": "string", "format": "date-time"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "dataset_ref", "version", "source_url", "license", "license_status", "upstream_source"],
+      "properties": {
+        "provider": {"type": "string"},
+        "dataset_ref": {"type": "string"},
+        "version": {"type": ["integer", "string"]},
+        "source_url": {"type": "string", "format": "uri"},
+        "license": {"type": ["string", "null"]},
+        "license_status": {"enum": ["UNVERIFIED", "REVIEW_REQUIRED", "APPROVED", "REJECTED"]},
+        "upstream_source": {"type": ["string", "null"]},
+        "source_commit": {"type": ["string", "null"]}
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "sha256", "immutable_object_id", "bytes"],
+      "properties": {
+        "name": {"type": "string"},
+        "sha256": {"type": ["string", "null"], "pattern": "^[a-fA-F0-9]{64}$"},
+        "immutable_object_id": {"type": ["string", "null"]},
+        "bytes": {"type": ["integer", "null"], "minimum": 0}
+      }
+    },
+    "instrument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["venue", "symbol", "product_type", "base_asset", "quote_asset", "settlement_asset"],
+      "properties": {
+        "venue": {"type": ["string", "null"]},
+        "symbol": {"type": ["string", "null"]},
+        "product_type": {"enum": ["spot", "linear_perpetual", "inverse_perpetual", "UNVERIFIED"]},
+        "base_asset": {"type": ["string", "null"]},
+        "quote_asset": {"type": ["string", "null"]},
+        "settlement_asset": {"type": ["string", "null"]}
+      }
+    },
+    "time_semantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["timestamp_unit", "timestamp_role", "timezone", "event_time_rule", "available_time_rule", "status"],
+      "properties": {
+        "timestamp_unit": {"enum": ["unix_seconds", "unix_milliseconds", "iso8601_utc", "UNVERIFIED"]},
+        "timestamp_role": {"enum": ["bar_open", "bar_close", "event_time", "UNVERIFIED"]},
+        "timezone": {"const": "UTC"},
+        "event_time_rule": {"type": ["string", "null"]},
+        "available_time_rule": {"type": ["string", "null"]},
+        "status": {"enum": ["UNVERIFIED", "VERIFIED", "PROVENANCE_FAILURE"]}
+      }
+    },
+    "transformations": {"type": "array", "items": {"type": "object", "required": ["name", "version", "code_sha256"], "properties": {"name": {"type": "string"}, "version": {"type": "string"}, "code_sha256": {"type": ["string", "null"], "pattern": "^[a-fA-F0-9]{64}$"}}}},
+    "exclusions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["har_ohlcv", "har_artifact", "iv7d"],
+      "properties": {"har_ohlcv": {"const": true}, "har_artifact": {"const": true}, "iv7d": {"const": true}}
+    },
+    "parent_record_hash": {"type": ["string", "null"], "pattern": "^[a-fA-F0-9]{64}$"},
+    "record_hash": {"type": ["string", "null"], "pattern": "^[a-fA-F0-9]{64}$"},
+    "notes": {"type": "array", "items": {"type": "string"}}
+  }
+}

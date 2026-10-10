@@ -1,0 +1,10 @@
+{
+  "milestone": "MILESTONE_5_POST_REPAIR_VALID",
+  "milestone_timestamp": "2026-10-07T14:00:56.000040+00:00",
+  "evidence_boundary": "2026-08-21T12:15:00Z",
+  "observed_valid_blocks": 5,
+  "production_model_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "context_hash": "8f48b11c990b7987a04918e6ec29a67a989f71eaf8e544ebdf8edf60c20b0c89",
+  "repair_version": "v1.0.0-production-data-consistency-repair",
+  "status": "LOCKED"
+}

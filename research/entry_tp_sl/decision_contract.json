@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract_id": "BTC_ENTRY_TP_SL_DECISION_CONTRACT_V1",
+  "version": "1.0.0",
+  "created_at_utc": "2026-10-07T16:30:00Z",
+  "status": "FROZEN",
+  "decision_timing": {
+    "cadence_name": "15M_DECISION_CADENCE",
+    "cadence_seconds": 900,
+    "cadence_minutes": 15,
+    "grid_alignment_utc": [0, 15, 30, 45],
+    "timezone": "UTC"
+  },
+  "timestamp_definitions": {
+    "t0": "decision_timestamp",
+    "decision_timestamp": "The exact UTC timestamp representing the close of the completed 15-minute decision bar (e.g. 12:15:00 UTC).",
+    "feature_cutoff_timestamp": "Strictly equal to decision_timestamp. No data with available_timestamp > decision_timestamp may enter any feature computation.",
+    "signal_generation_timestamp": "Instantaneous at decision_timestamp.",
+    "order_submission_timestamp": "Instantaneous at decision_timestamp.",
+    "fill_timestamp": "decision_timestamp + 60 seconds (the open of the immediate subsequent 1-minute execution bar).",
+    "first_path_observation_interval": "(decision_timestamp + 60s, decision_timestamp + 120s]"
+  },
+  "point_in_time_invariants": {
+    "pit_strict_filter": "available_timestamp <= decision_timestamp",
+    "no_same_bar_hindsight": "15-minute decision bar high/low/close are available ONLY after the 15-minute bar is fully closed.",
+    "no_forming_bar_features": true,
+    "no_asynchronous_lag_leakage": true
+  }
+}

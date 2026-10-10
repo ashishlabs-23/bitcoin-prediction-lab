@@ -20,7 +20,7 @@ import logging
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 
 from engine.microstructure_state import MicrostructureStateVector, _get_meie_db
 
@@ -90,6 +90,8 @@ class DetectedEvent:
     state: MicrostructureStateVector
     preregistration_id: str
     notes: str
+    extreme_pierced: str = "NONE"      # "HIGH_PIERCED" | "LOW_PIERCED" | "NONE"
+    sweep_candidate: bool = False      # Observational candidate marker, NOT assertive trading rule
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
@@ -236,6 +238,40 @@ def _persist_event(event: DetectedEvent):
 
 
 # ---------------------------------------------------------------------------
+# Observational extreme-piercing & sweep candidate detector
+# ---------------------------------------------------------------------------
+
+def _observe_extreme_pierced(current_price: float, lookback: int = 20) -> Tuple[str, bool]:
+    """
+    Observational check: Did current price pierce the rolling lookback high/low?
+    Returns (extreme_pierced: str, is_pierced: bool) where extreme_pierced in
+    ("HIGH_PIERCED", "LOW_PIERCED", "NONE").
+    """
+    conn = _get_meie_db()
+    try:
+        cur = conn.execute(
+            "SELECT price FROM microstructure_raw ORDER BY id DESC LIMIT ?;",
+            (lookback + 1,)
+        )
+        rows = [r[0] for r in cur.fetchall()[1:]]
+    except Exception:
+        return "NONE", False
+    finally:
+        conn.close()
+
+    if len(rows) < 5:
+        return "NONE", False
+
+    roll_min = min(rows)
+    roll_max = max(rows)
+    if current_price >= roll_max:
+        return "HIGH_PIERCED", True
+    elif current_price <= roll_min:
+        return "LOW_PIERCED", True
+    return "NONE", False
+
+
+# ---------------------------------------------------------------------------
 # Public interface
 # ---------------------------------------------------------------------------
 
@@ -261,6 +297,9 @@ def detect_event(
     direction  = EventDirection.AMBIGUOUS
     notes      = ""
     preregistration_id = "MEIE-EVENT-01-v1.0"
+
+    extreme_pierced, is_pierced = _observe_extreme_pierced(sv.price, lookback=20)
+    sweep_candidate = is_pierced and abs(sv.z_ofi) >= 1.0 and sv.z_impact <= 0.5
 
     if sv.data_quality == "INSUFFICIENT":
         notes = "Insufficient rolling window — no event classification."
@@ -295,6 +334,10 @@ def detect_event(
             direction  = _resolve_direction(sv, hawkes_snapshot)
             notes = f"Absorption: strong OFI but minimal price response. Side: {direction.value}."
 
+    if sweep_candidate:
+        obs_tag = f"[Observed: sweep_candidate=True, pierced={extreme_pierced}]"
+        notes = f"{notes} {obs_tag}".strip() if notes else obs_tag
+
     event = DetectedEvent(
         timestamp=sv.timestamp,
         price=sv.price,
@@ -303,6 +346,8 @@ def detect_event(
         state=sv,
         preregistration_id=preregistration_id,
         notes=notes,
+        extreme_pierced=extreme_pierced,
+        sweep_candidate=sweep_candidate,
     )
 
     if event_type != MarketEvent.NORMAL:

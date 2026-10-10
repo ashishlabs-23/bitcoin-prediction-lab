@@ -147,3 +147,91 @@ def test_aeer_v2_3_way_resolution_options():
     assert audit["resolution_options"]["can_abstain"] is True
     assert audit["resolution_options"]["can_force_user"] is True
     assert "UNCONFIRMED_USER_OVERRIDE" in audit["resolution_options"]["warning"]
+
+
+def test_prospective_features_provenance_and_active_consumption():
+    """
+    Verifies that changing each of the three prospective features:
+      1. sweep_candidate
+      2. derivatives_quadrant
+      3. session_state
+    actively changes the AEER payload and provenance hash while keeping other inputs constant,
+    without automatically declaring a direction or creating new mechanisms.
+    """
+    router = AdaptiveEvidenceRouterV2()
+
+    base_snapshot = {
+        "spot_price": 64000.0,
+        "ofi": 0.2,
+        "hawkes": 1.2,
+        "vpin": 0.25,
+        "funding": 0.0001,
+        "open_interest": 1.0,
+        "rv_5m": 0.002,
+        "sweep_candidate": False,
+        "derivatives_quadrant": "STABLE",
+        "session_state": "ASIA_RANGE"
+    }
+
+    base_dq = router.decompose_decision_questions(
+        intent="AUTO",
+        horizon="15m",
+        market_snapshot=base_snapshot,
+        active_sparse_indicators=["ofi", "sweep_candidate", "derivatives_quadrant", "session_state"]
+    )
+    base_hash = base_dq["provenance"]["provenance_hash"]
+    assert base_dq["provenance"]["is_directional_trade_signal"] is False
+
+    # 1. Test sweep_candidate perturbation
+    sweep_snapshot = dict(base_snapshot, sweep_candidate=True)
+    sweep_dq = router.decompose_decision_questions(
+        intent="AUTO",
+        horizon="15m",
+        market_snapshot=sweep_snapshot,
+        active_sparse_indicators=["ofi", "sweep_candidate", "derivatives_quadrant", "session_state"]
+    )
+    assert sweep_dq["provenance"]["provenance_hash"] != base_hash
+    assert sweep_dq["provenance"]["is_directional_trade_signal"] is False
+
+    rel_base_sweep = router.compute_routing_relevance("sweep_candidate", [], "15m", market_snapshot=base_snapshot)
+    rel_active_sweep = router.compute_routing_relevance("sweep_candidate", [], "15m", market_snapshot=sweep_snapshot)
+    assert rel_active_sweep["routing_relevance_bps"] > rel_base_sweep["routing_relevance_bps"]
+
+    # 2. Test derivatives_quadrant perturbation
+    dq_snapshot = dict(base_snapshot, derivatives_quadrant="PRICE_UP_OI_UP")
+    dq_result = router.decompose_decision_questions(
+        intent="AUTO",
+        horizon="15m",
+        market_snapshot=dq_snapshot,
+        active_sparse_indicators=["ofi", "sweep_candidate", "derivatives_quadrant", "session_state"]
+    )
+    assert dq_result["provenance"]["provenance_hash"] != base_hash
+    assert dq_result["provenance"]["is_directional_trade_signal"] is False
+
+    rel_base_dq = router.compute_routing_relevance("derivatives_quadrant", [], "15m", market_snapshot=base_snapshot)
+    rel_active_dq = router.compute_routing_relevance("derivatives_quadrant", [], "15m", market_snapshot=dq_snapshot)
+    assert rel_active_dq["routing_relevance_bps"] > rel_base_dq["routing_relevance_bps"]
+
+    # 3. Test session_state perturbation
+    session_snapshot = dict(base_snapshot, session_state="NY_LONDON_OVERLAP")
+    session_result = router.decompose_decision_questions(
+        intent="AUTO",
+        horizon="15m",
+        market_snapshot=session_snapshot,
+        active_sparse_indicators=["ofi", "sweep_candidate", "derivatives_quadrant", "session_state"]
+    )
+    assert session_result["provenance"]["provenance_hash"] != base_hash
+    assert session_result["provenance"]["is_directional_trade_signal"] is False
+
+    rel_base_sess = router.compute_routing_relevance("session_state", [], "15m", market_snapshot=base_snapshot)
+    rel_active_sess = router.compute_routing_relevance("session_state", [], "15m", market_snapshot=session_snapshot)
+    assert rel_active_sess["routing_relevance_bps"] > rel_base_sess["routing_relevance_bps"]
+
+    # Verify prospective manifest contents
+    manifest = session_result["provenance"]["prospective_feature_manifest"]
+    assert len(manifest) == 3
+    features_present = {m["feature"]: m for m in manifest}
+    assert "session_state" in features_present
+    assert features_present["session_state"]["value"] == "NY_LONDON_OVERLAP"
+    assert features_present["session_state"]["validation_status"] == "PROSPECTIVE"
+

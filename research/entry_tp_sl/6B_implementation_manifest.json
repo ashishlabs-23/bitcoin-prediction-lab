@@ -1,0 +1,32 @@
+{
+  "contract_manifest_sha256": "b6b94d69e576be0357ce9249f24ca05fb44430e6e9050a940054833204e0013f",
+  "dataset_sha256": "1bf91f2789846af29d60a9c15e780b565b63a85c286e83080ac28bf4bf7d1287",
+  "environment_fingerprint": "1f327cf5edf52a160282f6f2f08ad8b4536a161851dc5cea4e25cfa770c6ea62",
+  "git_commit": "cd1017aa90637bb81b1edf263f620e89346d84ca",
+  "implementation_manifest_sha256": "a1abc15d247dc05d015e22a58e75d90ac077d767bb516bfa1bc9f12562ebc3b8",
+  "phase": "6B_IMPLEMENTATION_AND_FEASIBILITY",
+  "pilot_metrics": {
+    "COLLISION_count": 3,
+    "DATA_GAP_count": 0,
+    "SL_FIRST_count": 283,
+    "TIMEOUT_count": 21,
+    "TP_FIRST_count": 196,
+    "pilot_sample_size": 500
+  },
+  "resolver_version": "ENTRY_TP_SL_RESOLVER_V1",
+  "source_file_hashes": {
+    "barrier_contract.py": "290311994de7f14c7216c1b92053cbd085f0fd1d4a7749a24520c91d4d4e7fcc",
+    "feasibility_audit.md": "69720d224a762f9e0b3d7e2e69152711066261eb152d667fb3b5b9f50b551eb5",
+    "reference_resolver.py": "2cc311a82a72d46c6206c57b4e7e5aa3ebe4634123341162934f87df0423b690",
+    "resolver_reachability_after_6B.md": "fac95343397fe21bdb8abbe1afb974865c695264c328c43f23e92db8c255fcfc",
+    "triple_barrier.py": "758b07f935a317cc435dc96f5dc0d53c992612f014b7579e2d2b05fc105e84de"
+  },
+  "test_summary": {
+    "cost_accounting_tests": "PASS",
+    "differential_parity_tests": "PASS (100% agreement between Engine and Oracle)",
+    "hypothesis_property_tests": "PASS",
+    "pit_causality_tests": "PASS",
+    "timeout_accounting_tests": "PASS"
+  },
+  "timestamp_utc": "2026-10-07T16:50:00Z"
+}

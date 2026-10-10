@@ -638,7 +638,7 @@ def get_meie_forensic_summary():
                     "slippage_usd": round(sum(t.get("position_size_usd", 100.0) * (t.get("slippage_bps", 2.0) / 10000.0) for t in trades) / n, 4),
                     "net_ev_usd": round(net_ev, 4),
                     "profit_factor": round(pf, 3) if pf != float("inf") else 999.0,
-                    "max_drawdown_pct": round(abs(sv.get("mdd_pct", 0.0)), 2),
+                    "max_drawdown_pct": round(abs(float(sv.get("mdd_pct") or 0.0)), 2),
                     "cvar_95_usd": round(cvar_95, 4),
                     "skip_delta_ev_usd": round(net_ev - 0.0, 4),
                     "opposite_delta_ev_usd": round(net_ev - opp_ev, 4),
@@ -1528,27 +1528,73 @@ def compute_what_if_scenario(
             vol_multiplier = float(body.get("vol_multiplier", vol_multiplier))
             spot_price = body.get("spot_price", spot_price)
 
+        required_values = {
+            "spot_price": spot_price,
+            "tp_price": tp_price,
+            "sl_price": sl_price,
+        }
+        missing_values = [name for name, value in required_values.items() if value is None]
+        if missing_values:
+            return {
+                "status": "DATA_UNAVAILABLE",
+                "missing_inputs": missing_values,
+                "simulation": None,
+            }
+
+        if horizon not in {"5m", "15m", "1h", "4h", "1d", "7d"}:
+            raise HTTPException(status_code=422, detail="Unsupported scenario horizon.")
+
+        if not np.isfinite([spot_price, tp_price, sl_price, vol_multiplier]).all():
+            raise HTTPException(status_code=422, detail="Scenario inputs must be finite numbers.")
+        if (
+            spot_price <= 0
+            or sl_price <= 0
+            or tp_price <= spot_price
+            or sl_price >= spot_price
+            or not 0.1 <= vol_multiplier <= 5.0
+        ):
+            raise HTTPException(status_code=422, detail="Scenario barriers must satisfy 0 < SL < spot < TP.")
+
         snapshot = observatory.get_canonical_snapshot()
         snap_dict = snapshot.to_dict()
-        live_spot = float(spot_price if spot_price and spot_price > 0 else snap_dict.get("live_price", 64250.0))
+        live_spot = float(spot_price)
 
         # Get empirical conformal reference bounds (P90 / P10)
         c2 = snap_dict.get("conformal_interval_24h", {})
-        conformal_p90 = float(c2.get("upper", round(live_spot * 1.008, 2)))
-        conformal_p10 = float(c2.get("lower", round(live_spot * 0.993, 2)))
+        raw_rv_value = snap_dict.get("rv_5m")
+        conformal_upper = c2.get("upper") if isinstance(c2, dict) else None
+        conformal_lower = c2.get("lower") if isinstance(c2, dict) else None
+        if any(value is None for value in (raw_rv_value, conformal_upper, conformal_lower)):
+            return {
+                "status": "DATA_UNAVAILABLE",
+                "missing_inputs": ["verified_volatility_and_conformal_reference"],
+                "simulation": None,
+            }
+        raw_rv, conformal_p90, conformal_p10 = map(
+            float,
+            (raw_rv_value, conformal_upper, conformal_lower),
+        )
+        if (
+            not np.isfinite([raw_rv, conformal_p90, conformal_p10]).all()
+            or raw_rv <= 0.0001
+            or not conformal_p10 < live_spot < conformal_p90
+        ):
+            return {
+                "status": "PROVENANCE_FAILURE",
+                "message": "Market volatility or reference bounds are invalid.",
+                "simulation": None,
+            }
 
-        # Default TP/SL if not passed
-        user_tp = float(tp_price if tp_price and tp_price > live_spot else round(conformal_p90, 2))
-        user_sl = float(sl_price if sl_price and sl_price < live_spot else round(conformal_p10, 2))
+        user_tp = float(tp_price)
+        user_sl = float(sl_price)
 
         # Horizon scaling
         horizon_map = {"5m": 5, "15m": 15, "1h": 60, "4h": 240, "1d": 1440, "7d": 10080}
-        h_clean = horizon if horizon in horizon_map else "15m"
-        t_mins = horizon_map.get(h_clean, 15)
+        h_clean = horizon
+        t_mins = horizon_map[h_clean]
 
-        raw_rv = float(snap_dict.get("rv_5m", 0.0024))
-        rv_base = raw_rv * 0.1 if raw_rv > 0.01 else (raw_rv if raw_rv > 0.0001 else 0.0024)
-        base_sigma = max(0.0005, rv_base * math.sqrt(t_mins / 5.0))
+        rv_base = raw_rv * 0.1 if raw_rv > 0.01 else raw_rv
+        base_sigma = rv_base * math.sqrt(t_mins / 5.0)
         stressed_sigma = base_sigma * vol_multiplier
 
         # 1. Compute Exact Analytical First-Passage for Custom User Scenario
@@ -1569,7 +1615,7 @@ def compute_what_if_scenario(
 
         # Eventual touch probability
         h_total = math.log(user_tp / user_sl)
-        p_eventual_tp = math.log(live_spot / user_sl) / h_total if h_total > 0 else 0.50
+        p_eventual_tp = math.log(live_spot / user_sl) / h_total
         p_eventual_sl = 1.0 - p_eventual_tp
 
         # Geometry metrics
@@ -1577,13 +1623,13 @@ def compute_what_if_scenario(
         sl_dist_usd = round(live_spot - user_sl, 2)
         tp_dist_pct = round((tp_dist_usd / live_spot) * 100.0, 3)
         sl_dist_pct = round((sl_dist_usd / live_spot) * 100.0, 3)
-        geom_rr = round(tp_dist_usd / max(1e-6, sl_dist_usd), 2)
+        geom_rr = round(tp_dist_usd / sl_dist_usd, 2)
 
         # Comparative Analysis vs Empirical Conformal Range
         conf_tp_dist = conformal_p90 - live_spot
         conf_sl_dist = live_spot - conformal_p10
-        tp_vs_conf_ratio = round(tp_dist_usd / max(1e-6, conf_tp_dist), 2)
-        sl_vs_conf_ratio = round(sl_dist_usd / max(1e-6, conf_sl_dist), 2)
+        tp_vs_conf_ratio = round(tp_dist_usd / conf_tp_dist, 2)
+        sl_vs_conf_ratio = round(sl_dist_usd / conf_sl_dist, 2)
 
         is_tp_beyond_conformal = user_tp > conformal_p90
         is_sl_beyond_conformal = user_sl < conformal_p10
@@ -1596,7 +1642,8 @@ def compute_what_if_scenario(
         config_hash = hashlib.sha256(config_hash_str.encode()).hexdigest()[:16]
 
         return {
-            "status": "SUCCESS",
+            "status": "SIMULATION_ONLY",
+            "research_authorization": "BLOCKED_AUDIT_FAILURE",
             "simulator_purpose": "USER_DEFINED_PATH_SIMULATION_NULL",
             "directional_recommendation": "DISABLED",
             "model_tier": "TIER_0_DRIFTLESS_LOGPRICE_NULL",
@@ -1616,7 +1663,6 @@ def compute_what_if_scenario(
                 "target_distance_pct": tp_dist_pct,
                 "stop_distance_pct": sl_dist_pct,
                 "reward_risk_ratio": geom_rr,
-                "estimated_execution_cost_bps": 9.3
             },
             "path_analysis": {
                 "p_tp_first": round(pu, 4) if pu is not None else None,
@@ -1631,9 +1677,9 @@ def compute_what_if_scenario(
                 "conformal_p90_upper": conformal_p90,
                 "conformal_p10_lower": conformal_p10,
                 "conformal_envelope_rr": round(conf_tp_dist / max(1e-6, conf_sl_dist), 2),
-                "conformal_baseline_p_upper": round(pu_conf, 4) if pu_conf is not None else 0.0553,
-                "conformal_baseline_p_lower": round(pl_conf, 4) if pl_conf is not None else 0.0911,
-                "conformal_baseline_p_survival": round(p0_conf, 4) if p0_conf is not None else 0.8537,
+                "conformal_baseline_p_upper": round(pu_conf, 4) if pu_conf is not None else None,
+                "conformal_baseline_p_lower": round(pl_conf, 4) if pl_conf is not None else None,
+                "conformal_baseline_p_survival": round(p0_conf, 4) if p0_conf is not None else None,
                 "tp_to_conformal_ratio": tp_vs_conf_ratio,
                 "sl_to_conformal_ratio": sl_vs_conf_ratio,
                 "is_tp_beyond_conformal_90": is_tp_beyond_conformal,
@@ -1641,7 +1687,11 @@ def compute_what_if_scenario(
                 "comparative_envelope_context": (
                     f"User TP is {tp_vs_conf_ratio:.1f}x empirical P90 boundary; "
                     f"SL is {sl_vs_conf_ratio:.1f}x empirical P10 boundary. "
-                    f"Finite-horizon boundary exit probability within {h_clean} is {((pexit or 0)*100):.1f}%."
+                    (
+                        f"Finite-horizon boundary exit probability within {h_clean} is {pexit * 100:.1f}%."
+                        if pexit is not None
+                        else f"Finite-horizon boundary exit probability within {h_clean} is unavailable."
+                    )
                 )
             },
             "research_provenance": {
@@ -1653,7 +1703,11 @@ def compute_what_if_scenario(
                 "research_registration": "TIER0_EXPLORATORY_PATH_SIMULATION",
                 "drift_mu": 0.0,
                 "is_directional_trade_signal": False,
-                "probability_conservation_sum": round((pu or 0) + (pl or 0) + (p0 or 0), 6),
+                "probability_conservation_sum": (
+                    round(pu + pl + p0, 6)
+                    if pu is not None and pl is not None and p0 is not None
+                    else None
+                ),
                 "formula": "Exact Fourier Eigenfunction Expansion on Killed Brownian Motion"
             },
             "timestamp": datetime.now(timezone.utc).isoformat()

@@ -13,8 +13,13 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from api.candle_manager import CandleStateManager
 
 
-def test_candle_state_manager_forming_vs_closed():
+def test_candle_state_manager_forming_vs_closed(tmp_path, monkeypatch):
     """Verify that ticks update forming candle, and predictions run ONLY on closed candles."""
+    test_csv = str(tmp_path / "test_market_memory.csv")
+    test_db = str(tmp_path / "test_market_memory.db")
+    monkeypatch.setattr("backtest.market_memory.get_memory_file", lambda: test_csv)
+    monkeypatch.setattr("backtest.market_memory.DB_PATH", test_db)
+
     manager = CandleStateManager(interval_seconds=60)
 
     start_ms = 1786636800000  # Even 1-minute boundary

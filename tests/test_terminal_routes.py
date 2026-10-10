@@ -12,32 +12,38 @@ from api.server import app
 client = TestClient(app)
 
 
-def test_terminal_live_endpoint():
+def test_server_startup_rejects_unverifiable_frozen_inputs():
+    with pytest.raises(RuntimeError, match="Full scientific freeze verification failed"):
+        with TestClient(app):
+            pass
+
+
+@pytest.mark.parametrize(
+    ("state", "code"),
+    [
+        ("PROVENANCE_FAILURE", "FROZEN_INPUT_HASH_MISMATCH"),
+        ("DATA_UNAVAILABLE", "FROZEN_INPUT_MISSING"),
+        ("MODEL_FAILURE", "FROZEN_MODEL_OR_RUNTIME_INVALID"),
+    ],
+)
+def test_terminal_live_endpoint_fails_closed_without_verified_forecast(monkeypatch, state, code):
+    import api.routes_terminal as terminal_routes
+
+    monkeypatch.setattr(terminal_routes, "_init_live_terminal", lambda: None)
+    monkeypatch.setattr(terminal_routes, "_pipeline", None)
+    monkeypatch.setattr(terminal_routes, "_initialization_failure", {
+        "state": state,
+        "code": code,
+    })
+
     response = client.get("/api/terminal/live")
-    assert response.status_code == 200
-    data = response.json()
-    assert "four_questions" in data
-    q = data["four_questions"]
-    
-    # Check Question 1
-    assert "1_expected_volatility" in q
-    assert "point_forecast_har_rs_dow" in q["1_expected_volatility"]
-    
-    # Check Question 2
-    assert "2_uncertainty_risk_envelope" in q
-    assert "lower_bound_variance" in q["2_uncertainty_risk_envelope"]
-    assert "upper_bound_variance" in q["2_uncertainty_risk_envelope"]
-    
-    # Check Question 3
-    assert "3_current_regime" in q
-    assert "macro_epoch" in q["3_current_regime"]
-    
-    # Check Question 4
-    assert "4_operational_calibration_trust" in q
-    assert "calibration_health_status" in q["4_operational_calibration_trust"]
-    assert q["4_operational_calibration_trust"]["calibration_health_status"] in [
-        "STABLE", "WATCH", "DEGRADED", "FAIL", "DATA_INVALID"
-    ]
+    assert response.status_code == 503
+    assert response.json()["detail"] == {
+        "status": "UNAVAILABLE",
+        "state": state,
+        "code": code,
+        "forecast": None,
+    }
 
 
 def test_observatory_summary_endpoint():

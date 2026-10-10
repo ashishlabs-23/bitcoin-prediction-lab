@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract_id": "BTC_ENTRY_TP_SL_OUTCOME_ACCOUNTING_CONTRACT_V1",
+  "version": "1.0.0",
+  "created_at_utc": "2026-10-07T16:30:00Z",
+  "status": "FROZEN",
+  "position_lifecycle": {
+    "max_concurrent_positions": 1,
+    "position_capacity_constraint": "ONE_OPEN_POSITION_PER_INSTRUMENT",
+    "concurrent_signal_handling": "ABSTAIN_CONCURRENT_POSITION_EXISTS",
+    "cooldown_seconds": 0,
+    "forbidden_mechanisms": [
+      "trailing_stops",
+      "tiered_exits",
+      "partial_exits",
+      "pyramiding",
+      "averaging_down",
+      "dynamic_tp_sl_adjustment"
+    ]
+  },
+  "volatility_estimator": {
+    "PRIMARY": {
+      "name": "ATR_14_15M",
+      "lookback_periods": 14,
+      "bar_interval_minutes": 15,
+      "formula": "ATR_14(15m) / Close_t0",
+      "scientific_rationale": "Causal local range metric matched to high-low boundary mechanics, robust to jump discontinuities, zero lookahead leakage."
+    },
+    "PRE_REGISTERED_SECONDARY": {
+      "name": "REALIZED_VOLATILITY_24H_15M",
+      "lookback_periods": 96,
+      "bar_interval_minutes": 15,
+      "formula": "std(log_returns_15m, 96) * sqrt(96)"
+    }
+  },
+  "predetermined_barrier_grid": [
+    {
+      "pair_id": "barrier_pair_01",
+      "role": "PRIMARY_REFERENCE",
+      "tp_multiplier": 1.0,
+      "sl_multiplier": 1.0,
+      "vertical_horizon_minutes": 240,
+      "vertical_horizon_bars_1m": 240,
+      "target_rr_ratio": 1.0
+    },
+    {
+      "pair_id": "barrier_pair_02",
+      "role": "CONFIRMATORY_SECONDARY",
+      "tp_multiplier": 1.5,
+      "sl_multiplier": 1.0,
+      "vertical_horizon_minutes": 240,
+      "vertical_horizon_bars_1m": 240,
+      "target_rr_ratio": 1.5
+    },
+    {
+      "pair_id": "barrier_pair_03",
+      "role": "CONFIRMATORY_SECONDARY",
+      "tp_multiplier": 2.0,
+      "sl_multiplier": 1.0,
+      "vertical_horizon_minutes": 240,
+      "vertical_horizon_bars_1m": 240,
+      "target_rr_ratio": 2.0
+    },
+    {
+      "pair_id": "barrier_pair_04",
+      "role": "CONFIRMATORY_SECONDARY_TIGHT",
+      "tp_multiplier": 0.75,
+      "sl_multiplier": 0.75,
+      "vertical_horizon_minutes": 120,
+      "vertical_horizon_bars_1m": 120,
+      "target_rr_ratio": 1.0
+    },
+    {
+      "pair_id": "barrier_pair_05",
+      "role": "CONFIRMATORY_SECONDARY_WIDE",
+      "tp_multiplier": 2.0,
+      "sl_multiplier": 1.5,
+      "vertical_horizon_minutes": 240,
+      "vertical_horizon_bars_1m": 240,
+      "target_rr_ratio": 1.3333
+    }
+  ],
+  "time_horizon": {
+    "PRIMARY_HORIZON_MINUTES": 240,
+    "PRIMARY_HORIZON_1M_BARS": 240,
+    "SECONDARY_HORIZON_MINUTES": 120,
+    "FUTURE_RESEARCH_HORIZONS": [60, 480]
+  },
+  "r_multiple_accounting": {
+    "one_r_definition_usd": "P_entry * sl_multiplier * sigma_t0",
+    "gross_r_tp_exit": "+(tp_multiplier / sl_multiplier)",
+    "gross_r_sl_exit": -1.0,
+    "gross_r_timeout_exit_formula": "(side_sign * (P_timeout - P_entry)) / (P_entry * sl_multiplier * sigma_t0)",
+    "timeout_is_never_hardcoded_minus_one_r": true,
+    "net_r_formula": "gross_r - (round_trip_cost_fraction / (sl_multiplier * sigma_t0))"
+  },
+  "intrabar_ambiguity_policy": {
+    "unresolved_dual_touch_policy": "CONSERVATIVE_SL_FIRST",
+    "record_same_timestamp_collision": true,
+    "record_unresolved_intrabar_order": true,
+    "null_vs_zero_semantics": "UNOBSERVABLE = null, OBSERVED_ZERO = 0.0",
+    "secondary_tp_first_sensitivity_analysis_mandated": true
+  },
+  "multiplicity_accounting_rule": "Each evaluated barrier pair counts as a separate model/experimental configuration for multiple-testing accounting."
+}
