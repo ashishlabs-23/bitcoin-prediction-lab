@@ -7,9 +7,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+from fastapi import Body, FastAPI
+from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
+import httpx
+
+from api.bitstamp_readonly import fetch_bitstamp_btcusd_ohlcv
+from api.scenario_calculator import calculate_scenario, get_scenario_options
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -81,6 +85,9 @@ def _research_status() -> dict[str, Any]:
         )
         manifest_integrity = {
             "status": "VERIFIED" if hashes_agree else "PROVENANCE_FAILURE",
+            "check": "raw file SHA-256 compared with embedded and registered SHA-256",
+            "scope": "manifest hash fields only; listed artifacts and dataset hash not recomputed",
+            "discrepancy_does_not_establish_tampering": not hashes_agree,
             "actual_file_sha256": actual_sha256,
             "embedded_manifest_sha256": embedded_sha256,
             "registered_sha256": registered_sha256,
@@ -110,7 +117,7 @@ def _research_status() -> dict[str, Any]:
         },
         "historical_outputs": historical_outputs,
         "manifest_integrity": manifest_integrity,
-        "current_inference": "DATA_UNAVAILABLE",
+        "current_inference": "MODEL_UNAVAILABLE",
     }
 
 
@@ -119,8 +126,8 @@ def health() -> dict[str, Any]:
     return {
         "status": "operational",
         "application": "BTCognitive Local Safe UI",
-        "model_inference": "DATA_UNAVAILABLE",
-        "market_data": "DATA_UNAVAILABLE",
+        "model_inference": "MODEL_UNAVAILABLE",
+        "market_data": "ON_DEMAND",
         "research_validity": "BLOCKED_AUDIT_FAILURE",
         "order_execution": "DISABLED",
     }
@@ -136,20 +143,49 @@ def local_status() -> dict[str, Any]:
     research = _research_status()
     return {
         "application": "OPERATIONAL",
-        "market_data": "DATA_UNAVAILABLE",
-        "model_inference": "DATA_UNAVAILABLE",
+        "market_data": "ON_DEMAND",
+        "model_inference": "MODEL_UNAVAILABLE",
         "research": research,
         "order_execution": "DISABLED",
     }
 
 
 @app.get("/api/market/status")
-def market_status() -> dict[str, str]:
+async def market_status() -> dict[str, Any]:
+    async with httpx.AsyncClient() as client:
+        result = await fetch_bitstamp_btcusd_ohlcv(client)
+    newest_bar = result.bars[-1] if result.bars else None
     return {
-        "status": "DATA_UNAVAILABLE",
-        "source": "none",
-        "message": "No verified read-only market-data source is enabled in local-safe mode.",
+        "status": result.status.value,
+        "venue": result.venue,
+        "symbol": result.symbol,
+        "source": result.source,
+        "price": newest_bar.close if newest_bar is not None and result.status.value == "OK" else None,
+        "source_timestamp": result.source_timestamp,
+        "source_timestamp_utc": (
+            datetime.fromtimestamp(result.source_timestamp, timezone.utc).isoformat()
+            if result.source_timestamp is not None
+            else None
+        ),
+        "retrieved_at": result.retrieved_at,
+        "retrieved_at_utc": datetime.fromtimestamp(result.retrieved_at, timezone.utc).isoformat(),
+        "freshness_limit_seconds": result.freshness_limit_seconds,
+        "message": result.message,
     }
+
+
+@app.get("/api/scenario/options")
+def scenario_options() -> dict[str, Any]:
+    return {
+        "status": "AVAILABLE",
+        "barrier_pairs": get_scenario_options(),
+        "volatility_input": "ATR in USD, explicitly supplied by the user",
+    }
+
+
+@app.post("/api/scenario/calculate")
+def scenario_calculate(payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
+    return calculate_scenario(payload)
 
 
 @app.get("/api/research/status")
@@ -172,7 +208,8 @@ def research_entry_tp_sl() -> dict[str, Any]:
         "historical_outputs": research["historical_outputs"],
         "manifest_integrity": research["manifest_integrity"],
         "market_data": "DATA_UNAVAILABLE",
-        "model_inference": "DATA_UNAVAILABLE",
+        "model_inference": "MODEL_UNAVAILABLE",
+        "current_inference": "MODEL_UNAVAILABLE",
         "hypothetical_signal": None,
         "metrics": None,
         "execution_mode": "PAPER_RESEARCH_ONLY",
@@ -183,9 +220,9 @@ def research_entry_tp_sl() -> dict[str, Any]:
 @app.get("/prediction/latest")
 def prediction_latest() -> dict[str, str]:
     return {
-        "status": "DATA_UNAVAILABLE",
-        "model_inference": "DATA_UNAVAILABLE",
-        "message": "No model inference is performed in local-safe mode.",
+        "status": "MODEL_UNAVAILABLE",
+        "model_inference": "MODEL_UNAVAILABLE",
+        "message": "No provenance-verified model artifact is available; no inference was performed.",
     }
 
 
@@ -201,18 +238,69 @@ def index() -> HTMLResponse:
         )
 
     markup = re.sub(
-        r'<script\b(?=[^>]*\bsrc=["\']https://)[^>]*>\s*</script>',
+        r'<script\b(?=[^>]*\bsrc=["\']https://)[^>]*>.*?</script\s*>',
+        "",
+        markup,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    markup = re.sub(
+        r'<link\b(?=[^>]*\bhref=["\']https://)[^>]*>',
         "",
         markup,
         flags=re.IGNORECASE,
     )
-    app_script = '<script src="/app.js?v=10.4"></script>'
+    app_script_pattern = re.compile(
+        r'<script\b(?=[^>]*\bsrc=["\']/app\.js(?:\?[^"\']*)?["\'])[^>]*>\s*</script>',
+        re.IGNORECASE,
+    )
     safe_mode_script = (
         '<script>window.BTCOGNITIVE_LOCAL_SAFE_MODE = true;</script>'
-        f"{app_script}"
+        '<script src="/app.js?v=10.5"></script>'
     )
-    markup = markup.replace(app_script, safe_mode_script)
-    return HTMLResponse(markup)
+    markup, replacements = app_script_pattern.subn(safe_mode_script, markup, count=1)
+    markup = re.sub(
+        r'(<link\b(?=[^>]*\brel=["\']stylesheet["\'])[^>]*\bhref=["\'])/styles\.css(?:\?[^"\']*)?(["\'])',
+        r"\1/styles.css?local-safe=1\2",
+        markup,
+        flags=re.IGNORECASE,
+    )
+    if replacements != 1 or "window.BTCOGNITIVE_LOCAL_SAFE_MODE = true" not in markup:
+        return HTMLResponse(
+            content="BTCognitive local-safe frontend initialization failed.",
+            status_code=503,
+        )
+    response = HTMLResponse(markup)
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self' data:; script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; font-src 'self' data:; "
+        "img-src 'self' data:; connect-src 'self'"
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.get("/styles.css")
+def styles() -> Response:
+    stylesheet_path = WEB_ROOT / "styles.css"
+    try:
+        stylesheet = stylesheet_path.read_text(encoding="utf-8")
+    except OSError:
+        return Response(
+            content="BTCognitive stylesheet is unavailable.",
+            status_code=503,
+            media_type="text/plain",
+        )
+    stylesheet = re.sub(
+        r"^\s*@import\s+url\(\s*['\"]?https://[^)]*\)\s*;?\s*$",
+        "",
+        stylesheet,
+        flags=re.IGNORECASE | re.MULTILINE,
+    )
+    return Response(
+        content=stylesheet,
+        media_type="text/css",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 app.mount("/", StaticFiles(directory=str(WEB_ROOT)), name="web")

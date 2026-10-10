@@ -39,8 +39,8 @@ def test_prediction_latest_does_not_invent_research_values():
     assert response.status_code == 200
     data = response.json()
 
-    assert data["status"] == "DATA_UNAVAILABLE"
-    assert data["model_inference"] == "DATA_UNAVAILABLE"
+    assert data["status"] == "MODEL_UNAVAILABLE"
+    assert data["model_inference"] == "MODEL_UNAVAILABLE"
     assert "tp" not in data
     assert "sl" not in data
     assert "entry_price" not in data
