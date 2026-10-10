@@ -130,6 +130,9 @@ class LiveInferenceEngine:
             oi_change=oi_change
         )
         df = feature_cache.get_features_df()
+        if self.model is None:
+            logger.warning("Model inference unavailable; skipping prediction and persistence.")
+            return
 
         canonical_feature_cols = [
             'open', 'high', 'low', 'close', 'volume', 'ret_1h', 'ret_4h', 'ret_24h', 'rsi_14',
@@ -151,12 +154,14 @@ class LiveInferenceEngine:
         states_df = compute_market_states(df)
         latest_state = states_df.iloc[-1]
 
-        prob = 0.5
-        if self.model is not None:
-            try:
-                prob = float(self.model.predict_proba_regime(latest_row, current_regime)[0])
-            except Exception as e:
-                logger.warning(f"Prediction inference error: {e}")
+        try:
+            prob = float(self.model.predict_proba_regime(latest_row, current_regime)[0])
+        except Exception as e:
+            logger.warning(f"Prediction inference error; skipping prediction and persistence: {e}")
+            return
+        if not math.isfinite(prob) or not 0.0 <= prob <= 1.0:
+            logger.error("Prediction inference returned an invalid probability; skipping persistence.")
+            return
 
         # Feature Attribution
         mapped_contribs = {

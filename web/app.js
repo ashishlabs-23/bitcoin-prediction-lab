@@ -8,6 +8,391 @@
      • Backend WSS   → engine connection status only
    ========================================================================== */
 
+if (window.BTCOGNITIVE_LOCAL_SAFE_MODE === true) {
+  const root = document.getElementById("root");
+  const shell = document.createElement("main");
+  shell.className = "terminal-container";
+  shell.style.cssText = "position:relative;z-index:1;max-width:1080px;margin:5vh auto;padding:24px";
+  shell.innerHTML = `
+  <style>
+    .local-safe-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px;margin:20px 0}
+    .local-safe-card{padding:20px;min-width:0}
+    .local-safe-card h2{font-size:1.05rem;margin:0 0 8px;color:var(--text-main,#F1F5F9)}
+    .local-safe-card p,.local-safe-muted{color:var(--text-muted,#94A3B8)}
+    .local-safe-state{font-family:var(--font-mono,monospace);font-size:.88rem;margin:8px 0;color:#FBBF24;overflow-wrap:anywhere}
+    .local-safe-card label{display:block;margin:12px 0 5px;color:var(--text-main,#F1F5F9)}
+    .local-safe-card input,.local-safe-card select{width:100%;padding:10px 12px;border:1px solid var(--card-border,rgba(255,255,255,.14));border-radius:8px;background:#080E1E;color:var(--text-main,#F1F5F9);font:inherit}
+    .local-safe-card button{margin-top:16px;padding:11px 16px;border:0;border-radius:8px;background:#00E5A8;color:#04110D;font:inherit;font-weight:600;cursor:pointer}
+    .local-safe-card button:focus-visible,.local-safe-card input:focus-visible,.local-safe-card select:focus-visible{outline:3px solid #38BDF8;outline-offset:2px}
+    .local-safe-card button:disabled{opacity:.65;cursor:wait}
+    .local-safe-result{margin-top:16px;padding:14px;border:1px solid var(--card-border,rgba(255,255,255,.14));border-radius:10px}
+    .local-safe-result dl{display:grid;grid-template-columns:minmax(120px,auto) 1fr;gap:6px 14px;margin:10px 0 0}
+    .local-safe-result dt{color:var(--text-muted,#94A3B8)}
+    .local-safe-result dd{margin:0;overflow-wrap:anywhere}
+    .local-safe-alert{color:#FCA5A5}
+  </style>
+  <section class="glass-card" style="padding:clamp(20px,4vw,32px)">
+    <p style="color:#38BDF8;font-weight:800;letter-spacing:.06em">BTCognitive · LOCAL SAFE MODE</p>
+    <h1 style="margin:8px 0">Research Terminal</h1>
+    <p class="local-safe-muted">Manual hypothetical calculations only. This interface does not run a model, create a signal, authorize research execution, or place orders.</p>
+
+    <div class="local-safe-grid" aria-label="System status">
+      <section class="glass-card local-safe-card" aria-labelledby="local-safe-health-heading">
+        <h2 id="local-safe-health-heading">Application health</h2>
+        <p id="local-safe-health" class="local-safe-state" role="status">CHECKING</p>
+        <p id="local-safe-health-detail" class="local-safe-muted">Checking the same-origin local API.</p>
+      </section>
+      <section class="glass-card local-safe-card" aria-labelledby="local-safe-market-heading">
+        <h2 id="local-safe-market-heading">Live market</h2>
+        <p id="local-safe-market" class="local-safe-state" role="status">CHECKING</p>
+        <p id="local-safe-market-detail" class="local-safe-muted">No user input is populated from market status.</p>
+      </section>
+      <section class="glass-card local-safe-card" aria-labelledby="local-safe-model-heading">
+        <h2 id="local-safe-model-heading">Model inference</h2>
+        <p id="local-safe-model" class="local-safe-state" role="status">MODEL_UNAVAILABLE</p>
+        <p id="local-safe-model-detail" class="local-safe-muted">No provenance-verified model artifact is available.</p>
+      </section>
+      <section class="glass-card local-safe-card" aria-labelledby="local-safe-history-heading">
+        <h2 id="local-safe-history-heading">Historical outputs</h2>
+        <p id="local-safe-history" class="local-safe-state">HISTORICAL_UNVERIFIED</p>
+        <p id="local-safe-history-detail" class="local-safe-muted">Past research outputs are not verified predictions or performance evidence.</p>
+      </section>
+      <section class="glass-card local-safe-card" aria-labelledby="local-safe-research-heading">
+        <h2 id="local-safe-research-heading">Research authorization</h2>
+        <p id="local-safe-research" class="local-safe-state">BLOCKED — STATUS CHECKING</p>
+        <p id="local-safe-research-detail" class="local-safe-muted">Research execution is blocked. This gate does not disable the independent manual calculator.</p>
+      </section>
+      <section class="glass-card local-safe-card" aria-labelledby="local-safe-orders-heading">
+        <h2 id="local-safe-orders-heading">Real orders</h2>
+        <p class="local-safe-state">DISABLED</p>
+        <p class="local-safe-muted">No order-entry path is available in this interface.</p>
+      </section>
+    </div>
+
+    <section class="glass-card local-safe-card" aria-labelledby="local-safe-calculator-heading">
+      <h2 id="local-safe-calculator-heading">Manual barrier calculator</h2>
+      <p class="local-safe-muted">Uses only reference price and ATR you enter. The returned figures are a deterministic scenario calculation, not model inference, advice, or an order.</p>
+      <form id="local-safe-calculator" novalidate>
+        <div class="local-safe-grid" style="margin-bottom:0">
+          <div>
+            <label for="local-safe-reference-price">Reference price (USD)</label>
+            <input id="local-safe-reference-price" name="reference_price" type="number" inputmode="decimal" min="0.01" step="any" required autocomplete="off" aria-describedby="local-safe-reference-help">
+            <p id="local-safe-reference-help" class="local-safe-muted">Enter a positive price; this field is intentionally blank.</p>
+          </div>
+          <div>
+            <label for="local-safe-atr">Volatility ATR (USD)</label>
+            <input id="local-safe-atr" name="volatility_atr" type="number" inputmode="decimal" min="0.01" step="any" required autocomplete="off" aria-describedby="local-safe-atr-help">
+            <p id="local-safe-atr-help" class="local-safe-muted">Enter a positive ATR value; this field is intentionally blank.</p>
+          </div>
+          <div>
+            <label for="local-safe-side">Side</label>
+            <select id="local-safe-side" name="side">
+              <option value="LONG">LONG</option>
+              <option value="SHORT">SHORT</option>
+            </select>
+          </div>
+          <div>
+            <label for="local-safe-barrier-pair">Registered barrier pair</label>
+            <select id="local-safe-barrier-pair" name="barrier_pair_id">
+              <option value="">Loading registered barrier pairs…</option>
+            </select>
+          </div>
+          <div>
+            <label for="local-safe-horizon">Horizon</label>
+            <select id="local-safe-horizon" name="horizon_minutes" disabled>
+              <option value="">Load registered pair options first</option>
+            </select>
+          </div>
+        </div>
+        <p id="local-safe-calculator-error" class="local-safe-alert" role="alert" aria-live="assertive"></p>
+        <button id="local-safe-calculate" type="submit" disabled>Calculate hypothetical barriers</button>
+      </form>
+      <section id="local-safe-calculation-result" class="local-safe-result" aria-live="polite" aria-labelledby="local-safe-result-heading" hidden>
+        <h3 id="local-safe-result-heading">Scenario calculation</h3>
+        <p id="local-safe-result-label" class="local-safe-state"></p>
+        <dl id="local-safe-result-fields"></dl>
+        <p id="local-safe-result-disclaimer" class="local-safe-muted" style="margin-top:12px"></p>
+      </section>
+    </section>
+  </section>`;
+  root?.replaceChildren(shell);
+
+  const byId = id => shell.querySelector(`#${id}`);
+  const fetchStatus = async path => {
+    const response = await fetch(path, { headers: { Accept: "application/json" } });
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      throw new Error(`${path}: server returned a non-JSON response (HTTP ${response.status}).`);
+    }
+    if (!response.ok) {
+      const detail = typeof data?.detail === "string"
+        ? data.detail
+        : JSON.stringify(data?.detail ?? data);
+      throw new Error(`${path}: HTTP ${response.status}${detail ? ` — ${detail}` : ""}`);
+    }
+    return data;
+  };
+  const setStatus = (id, detailId, state, detail) => {
+    byId(id).textContent = state;
+    if (detailId && detail !== undefined) byId(detailId).textContent = detail;
+  };
+  const showStatusError = (id, detailId, message) => {
+    setStatus(id, detailId, "DATA_UNAVAILABLE", message);
+  };
+  const readableTimestamp = value => {
+    if (typeof value !== "string" && typeof value !== "number") return "";
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
+  };
+
+  Promise.allSettled([
+    fetchStatus("/health"),
+    fetchStatus("/api/local/status"),
+    fetchStatus("/api/market/status"),
+    fetchStatus("/api/research/status"),
+    fetchStatus("/prediction/latest")
+  ]).then(([healthResult, localResult, marketResult, researchResult, modelResult]) => {
+    if (healthResult.status === "fulfilled") {
+      const health = healthResult.value;
+      const local = localResult.status === "fulfilled" ? localResult.value : {};
+      const localDetail = localResult.status === "fulfilled"
+        ? (local.application || "Local status available.")
+        : `Local status unavailable: ${localResult.reason.message}`;
+      setStatus("local-safe-health", "local-safe-health-detail", health.status || "STATUS_UNAVAILABLE",
+        health.application || localDetail || "Local API responded.");
+    } else {
+      const localDetail = localResult.status === "rejected"
+        ? `; ${localResult.reason.message}`
+        : "";
+      showStatusError("local-safe-health", "local-safe-health-detail",
+        `${healthResult.reason.message}${localDetail}`);
+    }
+
+    if (marketResult.status === "fulfilled") {
+      const market = marketResult.value;
+      const source = market.venue || market.exchange || market.source;
+      const status = market.status || "STATUS_UNAVAILABLE";
+      const unavailable = status === "DATA_UNAVAILABLE" || !source || source === "none";
+      const timestamp = readableTimestamp(
+        market.source_timestamp_utc ?? market.source_timestamp ?? market.timestamp ?? market.as_of ?? market.updated_at ?? market.observed_at
+      );
+      const details = unavailable
+        ? (market.message || "No verified market feed is available.")
+        : `Source: ${source}${timestamp ? ` · Source timestamp: ${timestamp}` : " · Source timestamp unavailable"}${status === "OK" && Number.isFinite(market.price) ? ` · BTC/USD: ${formatUsd(market.price)}` : ""}${market.message ? ` · ${market.message}` : ""}`;
+      setStatus("local-safe-market", "local-safe-market-detail",
+        unavailable ? "DATA_UNAVAILABLE" : status, details);
+    } else {
+      showStatusError("local-safe-market", "local-safe-market-detail", marketResult.reason.message);
+    }
+
+    if (researchResult.status === "fulfilled") {
+      const research = researchResult.value;
+      const authorization = research.authorization || {};
+      const state = authorization.status || research.status || "STATUS_UNAVAILABLE";
+      const displayState = authorization.authorized === true
+        ? "AUTHORIZED (REPORTED) — EXECUTION DISABLED HERE"
+        : state === "BLOCKED_AUDIT_FAILURE" ? state : `BLOCKED — ${state}`;
+      const researchDetail = authorization.authorized === true
+        ? "The API reports authorization, but this local-safe UI offers no research execution. Manual calculation remains available."
+        : authorization.reason || "Research execution remains blocked in this interface; calculation remains available.";
+      setStatus("local-safe-research", "local-safe-research-detail", displayState, researchDetail);
+      if (research.historical_outputs) {
+        byId("local-safe-history").textContent = research.historical_outputs === "HISTORICAL_UNVERIFIED"
+          ? research.historical_outputs
+          : `HISTORICAL_UNVERIFIED · ${research.historical_outputs}`;
+      }
+    } else {
+      setStatus("local-safe-research", "local-safe-research-detail", "BLOCKED — STATUS UNAVAILABLE",
+        `${researchResult.reason.message} Research execution remains blocked; calculation remains available.`);
+    }
+
+    if (modelResult.status === "fulfilled") {
+      const model = modelResult.value;
+      setStatus("local-safe-model", "local-safe-model-detail",
+        model.status || "MODEL_UNAVAILABLE",
+        model.message || "No model prediction is available.");
+    } else {
+      showStatusError("local-safe-model", "local-safe-model-detail", modelResult.reason.message);
+    }
+  });
+
+  const form = byId("local-safe-calculator");
+  const pairSelect = byId("local-safe-barrier-pair");
+  const horizonSelect = byId("local-safe-horizon");
+  const resultPanel = byId("local-safe-calculation-result");
+  const resultFields = byId("local-safe-result-fields");
+  const errorPanel = byId("local-safe-calculator-error");
+  const submitButton = byId("local-safe-calculate");
+  let scenarioOptionsLoaded = false;
+  const matchHorizonToPair = () => {
+    const option = pairSelect.selectedOptions[0];
+    if (option && option.value) horizonSelect.value = option.dataset.horizon;
+  };
+  pairSelect.addEventListener("change", matchHorizonToPair);
+
+  const loadScenarioOptions = async () => {
+    submitButton.disabled = true;
+    pairSelect.disabled = true;
+    horizonSelect.disabled = true;
+    try {
+      const response = await fetchStatus("/api/scenario/options");
+      if (response.status !== "AVAILABLE" ||
+          !Array.isArray(response.barrier_pairs) ||
+          response.barrier_pairs.length === 0) {
+        throw new Error("Scenario options response did not contain registered barrier pairs.");
+      }
+
+      const pairIds = new Set();
+      const pairs = response.barrier_pairs.map(pair => {
+        if (!pair || typeof pair.barrier_pair_id !== "string" ||
+            !/^barrier_pair_\d+$/.test(pair.barrier_pair_id) ||
+            pairIds.has(pair.barrier_pair_id) ||
+            !Number.isFinite(pair.tp_multiplier) || pair.tp_multiplier <= 0 ||
+            !Number.isFinite(pair.sl_multiplier) || pair.sl_multiplier <= 0 ||
+            !Number.isInteger(pair.horizon_minutes) || pair.horizon_minutes <= 0) {
+          throw new Error("Scenario options response contains an invalid registered barrier pair.");
+        }
+        pairIds.add(pair.barrier_pair_id);
+        return pair;
+      });
+      const registeredPair04 = pairs.find(pair => pair.barrier_pair_id === "barrier_pair_04");
+      if (!registeredPair04 || registeredPair04.horizon_minutes !== 120) {
+        throw new Error("Scenario options do not match the frozen barrier_pair_04 120-minute horizon.");
+      }
+
+      pairSelect.replaceChildren(...pairs.map((pair, index) => {
+        const option = document.createElement("option");
+        option.value = pair.barrier_pair_id;
+        option.dataset.horizon = String(pair.horizon_minutes);
+        option.textContent =
+          `${pair.barrier_pair_id} — ${pair.tp_multiplier}× TP / ${pair.sl_multiplier}× SL`;
+        if (index === 0) option.selected = true;
+        return option;
+      }));
+
+      const horizons = [...new Set(pairs.map(pair => pair.horizon_minutes))];
+      horizonSelect.replaceChildren(...horizons.map(horizon => {
+        const option = document.createElement("option");
+        option.value = String(horizon);
+        option.textContent = `${horizon} minutes`;
+        return option;
+      }));
+      pairSelect.disabled = false;
+      scenarioOptionsLoaded = true;
+      matchHorizonToPair();
+      errorPanel.textContent = "";
+      submitButton.disabled = false;
+    } catch (error) {
+      pairSelect.replaceChildren(new Option("Registered barrier pairs unavailable", ""));
+      horizonSelect.replaceChildren(new Option("Horizon unavailable", ""));
+      errorPanel.textContent =
+        `Cannot load registered scenario options; calculation is disabled. ${error.message || "Options are unavailable."}`;
+    }
+  };
+  loadScenarioOptions();
+
+  const resultRows = [
+    ["side", "Side"],
+    ["entry_price", "Entry price (USD)", true],
+    ["tp_price", "Take-profit price (USD)", true],
+    ["sl_price", "Stop-loss price (USD)", true],
+    ["barrier_pair_id", "Barrier pair"],
+    ["tp_multiplier", "TP multiplier"],
+    ["sl_multiplier", "SL multiplier"],
+    ["vertical_horizon_minutes", "Horizon (minutes)"],
+    ["volatility_atr_usd", "User-provided ATR (USD)", true],
+    ["formula_version", "Formula version"],
+    ["calculated_at", "Calculated at"],
+    ["input_source", "Input source"],
+    ["execution_mode", "Execution mode"]
+  ];
+  const clearResult = () => {
+    resultPanel.hidden = true;
+    resultFields.replaceChildren();
+    byId("local-safe-result-label").textContent = "";
+    byId("local-safe-result-disclaimer").textContent = "";
+  };
+  const formatUsd = value => `$${Number(value).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })}`;
+
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    errorPanel.textContent = "";
+    clearResult();
+    if (!scenarioOptionsLoaded) {
+      errorPanel.textContent = "Cannot calculate until registered scenario options load successfully.";
+      submitButton.disabled = true;
+      return;
+    }
+    if (!form.reportValidity()) return;
+
+    const referencePrice = Number(form.elements.reference_price.value);
+    const volatilityAtr = Number(form.elements.volatility_atr.value);
+    if (!Number.isFinite(referencePrice) || referencePrice <= 0 ||
+        !Number.isFinite(volatilityAtr) || volatilityAtr <= 0) {
+      errorPanel.textContent = "Enter positive, finite reference price and ATR values in USD.";
+      return;
+    }
+
+    const payload = {
+      side: form.elements.side.value,
+      reference_price: referencePrice,
+      volatility_atr: volatilityAtr,
+      barrier_pair_id: form.elements.barrier_pair_id.value,
+      horizon_minutes: Number(form.elements.horizon_minutes.value)
+    };
+    submitButton.disabled = true;
+    submitButton.textContent = "Calculating…";
+    try {
+      const response = await fetch("/api/scenario/calculate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(payload)
+      });
+      let calculation;
+      try {
+        calculation = await response.json();
+      } catch {
+        throw new Error(`Calculator returned a non-JSON response (HTTP ${response.status}).`);
+      }
+      if (!response.ok) {
+        const detail = typeof calculation?.detail === "string"
+          ? calculation.detail
+          : JSON.stringify(calculation?.detail ?? calculation);
+        throw new Error(`Calculation failed (HTTP ${response.status})${detail ? `: ${detail}` : "."}`);
+      }
+      if (calculation?.status !== "SCENARIO_CALCULATION" ||
+          !["entry_price", "tp_price", "sl_price"].every(key =>
+            typeof calculation[key] === "number" && Number.isFinite(calculation[key]))) {
+        throw new Error("Calculator response did not contain a valid SCENARIO_CALCULATION result.");
+      }
+
+      byId("local-safe-result-label").textContent =
+        calculation.label || "SCENARIO_CALCULATION — NOT A MODEL PREDICTION";
+      for (const [key, label, isUsd] of resultRows) {
+        const value = calculation[key];
+        if (value === undefined || value === null || value === "") continue;
+        if (typeof value === "number" && !Number.isFinite(value)) continue;
+        const term = document.createElement("dt");
+        term.textContent = label;
+        const description = document.createElement("dd");
+        description.textContent = isUsd ? formatUsd(value) : String(value);
+        resultFields.append(term, description);
+      }
+      byId("local-safe-result-disclaimer").textContent = calculation.disclaimer || "";
+      resultPanel.hidden = false;
+    } catch (error) {
+      errorPanel.textContent = error.message || "Calculation failed; no result is available.";
+    } finally {
+      submitButton.disabled = !scenarioOptionsLoaded;
+      submitButton.textContent = "Calculate hypothetical barriers";
+    }
+  });
+} else {
 const { useState, useEffect, useRef, useCallback, createElement: h } = React;
 const abs = Math.abs;
 
@@ -157,6 +542,15 @@ const api = {
   async fetchPredictionLatest(live = false) {
     const res = await fetch(`${getApiBaseUrl()}/prediction/latest?live=${live}`);
     if (!res.ok) throw new Error("prediction/latest failed");
+    return res.json();
+  },
+  async fetchResearchSignal() {
+    const res = await fetch(`${getApiBaseUrl()}/api/research/entry-tp-sl`);
+    if (!res.ok) {
+      const error = new Error("research entry/tp/sl failed");
+      error.status = res.status;
+      throw error;
+    }
     return res.json();
   },
   async fetchPredictionHistory(limit = 20) {
@@ -354,15 +748,6 @@ const api = {
   async triggerArenaRetrain() {
     const res = await fetch(`${getApiBaseUrl()}/api/arena/retrain`, { method: "POST" });
     if (!res.ok) throw new Error("arena retrain failed");
-    return res.json();
-  },
-  async executeArenaTrade(action, confidence = 0.82, reasoning = "Manual trade") {
-    const res = await fetch(`${getApiBaseUrl()}/api/arena/trade`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, confidence, reasoning })
-    });
-    if (!res.ok) throw new Error("arena trade execution failed");
     return res.json();
   },
   async fetchMeieAccounts() {
@@ -2735,27 +3120,31 @@ function DecisionAnatomyPanel({ decisionData }) {
 // ===========================================================================
 // PredictionPanel (with TP / SL / Confidence)
 // ===========================================================================
-function PredictionPanel({ predictionData, engineState = "offline" }) {
+function PredictionPanel({ predictionData, researchData, engineState = "offline" }) {
   const [showEvidence, setShowEvidence] = useState(false);
+  const signal = researchData?.hypothetical_signal;
+  const researchState = researchData?.research_status || "DATA_UNAVAILABLE";
+  const failureState = researchData?.state || (researchData?.status === "SUCCESS" ? null : researchData?.status);
+  const valueOrUnavailable = (value, formatter = String) => value === null || value === undefined || value === "" ? "DATA_UNAVAILABLE" : formatter(value);
+  const formatPrice = value => valueOrUnavailable(value, price => `$${Math.round(Number(price)).toLocaleString()}`);
 
-  // Check error states dynamically from backend
-  const statusStr = predictionData?.status || "online";
-  const isDataUnavailable = statusStr === "DATA_UNAVAILABLE" || predictionData?.action === "DATA_UNAVAILABLE";
-  const isProvenanceFailure = statusStr === "PROVENANCE_FAILURE" || predictionData?.action === "PROVENANCE_FAILURE";
-  const isModelFailure = statusStr === "MODEL_FAILURE" || predictionData?.action === "MODEL_FAILURE";
+  // Fail closed for research output: no local numeric or scientific fallback is permitted.
+  const statusStr = failureState || predictionData?.status;
+  const isDataUnavailable = statusStr === "DATA_UNAVAILABLE" || !signal;
+  const isProvenanceFailure = statusStr === "PROVENANCE_FAILURE";
+  const isModelFailure = statusStr === "MODEL_FAILURE";
   const isWarmingUp = engineState === "warming_up" || statusStr === "warming_up";
   const isOffline = engineState === "offline" || engineState === "security_blocked";
 
   // Dynamic values from backend
-  const entryPrice = predictionData?.entry_price || predictionData?.btc_price;
-  const tpPrice = predictionData?.tp;
-  const slPrice = predictionData?.sl;
-  const direction = predictionData?.direction || "SHORT";
-  const horizon = predictionData?.horizon || "4h";
-  const barrierPair = predictionData?.barrier_pair_id || "barrier_pair_01";
-  const modelName = predictionData?.model || "LightGBM Meta-Model (B4)";
-  const setupName = predictionData?.setup_detected || "A1 (Liquidity Sweep / Reclaim)";
-  const probPct = predictionData?.probability_pct !== undefined ? predictionData.probability_pct : 47.1;
+  const entryPrice = signal?.entry_price;
+  const tpPrice = signal?.tp_price;
+  const slPrice = signal?.sl_price;
+  const direction = signal?.direction || "DATA_UNAVAILABLE";
+  const horizon = signal?.horizon || "DATA_UNAVAILABLE";
+  const barrierPair = signal?.barrier_pair_id || "DATA_UNAVAILABLE";
+  const modelName = signal?.model_name || "DATA_UNAVAILABLE";
+  const setupName = signal?.setup_detected || "DATA_UNAVAILABLE";
 
   const dirColor = direction === "LONG" ? "#38BDF8" : (direction === "SHORT" ? "#F87171" : "#94A3B8");
 
@@ -2795,8 +3184,9 @@ function PredictionPanel({ predictionData, engineState = "offline" }) {
     // Header Bar
     h("div", { className: "prediction-header-bar", style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" } },
       h("div", null,
-        h("div", { style: { fontSize: "0.78rem", color: "#38BDF8", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.05em" } }, "🔬 CURRENT RESEARCH INFERENCE · BTC/USD"),
-        h("h3", { style: { fontSize: "1.3rem", fontWeight: "800", color: "#F8FAFC", marginTop: "2px" } }, "Hypothetical Research Scenario")
+        h("div", { style: { fontSize: "0.78rem", color: "#38BDF8", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.05em" } }, "BTCognitive Research Terminal · BTC/USD"),
+        h("h3", { style: { fontSize: "1.3rem", fontWeight: "800", color: "#F8FAFC", marginTop: "2px" } }, "ENTRY / TP / SL RESEARCH MODE"),
+        h("div", { style: { fontSize: "0.75rem", color: "#94A3B8", marginTop: "3px" } }, "Hypothetical signal · No real orders are executed · No capital is deployed")
       ),
       h("div", { style: { display: "flex", alignItems: "center", flexWrap: "wrap", gap: "8px" } },
         h("span", {
@@ -2820,7 +3210,7 @@ function PredictionPanel({ predictionData, engineState = "offline" }) {
             fontWeight: "800",
             fontSize: "0.74rem"
           }
-        }, "RESEARCH STATUS: COST_ERASED")
+        }, `RESEARCH STATUS: ${researchState}`)
       )
     ),
 
@@ -2829,26 +3219,26 @@ function PredictionPanel({ predictionData, engineState = "offline" }) {
       // Card 1: Hypothetical Entry
       h("div", { className: "prediction-card-box", style: { background: "rgba(0,0,0,0.3)", padding: "14px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.08)" } },
         h("div", { className: "prediction-card-lbl", style: { fontSize: "0.76rem", color: "#94A3B8", marginBottom: "4px" } }, "Hypothetical Entry"),
-        h("div", { className: "prediction-card-val", style: { fontSize: "1.25rem", fontWeight: "800", color: "#00F0FF", fontFamily: "var(--font-mono)" } }, entryPrice ? `$${Math.round(entryPrice).toLocaleString()}` : "DATA_UNAVAILABLE"),
-        h("div", { style: { fontSize: "0.72rem", color: "#64748B", marginTop: "6px" } }, "15m Decision Close Reference")
+        h("div", { className: "prediction-card-val", style: { fontSize: "1.25rem", fontWeight: "800", color: "#00F0FF", fontFamily: "var(--font-mono)" } }, formatPrice(entryPrice)),
+        h("div", { style: { fontSize: "0.72rem", color: "#64748B", marginTop: "6px" } }, "Backend research contract")
       ),
       // Card 2: Take Profit (TP)
       h("div", { className: "prediction-card-box", style: { background: "rgba(0, 229, 168, 0.05)", borderLeft: "3px solid #00E5A8", padding: "14px", borderRadius: "10px", border: "1px solid rgba(0, 229, 168, 0.2)" } },
         h("div", { className: "prediction-card-lbl", style: { fontSize: "0.76rem", color: "#00E5A8", marginBottom: "4px" } }, "Take Profit (TP)"),
-        h("div", { className: "prediction-card-val", style: { fontSize: "1.25rem", fontWeight: "800", color: "#00E5A8", fontFamily: "var(--font-mono)" } }, tpPrice ? `$${Math.round(tpPrice).toLocaleString()}` : "DATA_UNAVAILABLE"),
-        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", marginTop: "6px" } }, "k_TP = 1.0 × ATR14")
+        h("div", { className: "prediction-card-val", style: { fontSize: "1.25rem", fontWeight: "800", color: "#00E5A8", fontFamily: "var(--font-mono)" } }, formatPrice(tpPrice)),
+        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", marginTop: "6px" } }, valueOrUnavailable(signal?.k_tp, value => `k_TP = ${value}`))
       ),
       // Card 3: Stop Loss (SL)
       h("div", { className: "prediction-card-box", style: { background: "rgba(248, 113, 113, 0.05)", borderLeft: "3px solid #F87171", padding: "14px", borderRadius: "10px", border: "1px solid rgba(248, 113, 113, 0.2)" } },
         h("div", { className: "prediction-card-lbl", style: { fontSize: "0.76rem", color: "#F87171", marginBottom: "4px" } }, "Stop Loss (SL)"),
-        h("div", { className: "prediction-card-val", style: { fontSize: "1.25rem", fontWeight: "800", color: "#F87171", fontFamily: "var(--font-mono)" } }, slPrice ? `$${Math.round(slPrice).toLocaleString()}` : "DATA_UNAVAILABLE"),
-        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", marginTop: "6px" } }, "k_SL = 1.0 × ATR14")
+        h("div", { className: "prediction-card-val", style: { fontSize: "1.25rem", fontWeight: "800", color: "#F87171", fontFamily: "var(--font-mono)" } }, formatPrice(slPrice)),
+        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", marginTop: "6px" } }, valueOrUnavailable(signal?.k_sl, value => `k_SL = ${value}`))
       ),
       // Card 4: Horizon & Setup
       h("div", { className: "prediction-card-box", style: { background: "rgba(0,0,0,0.3)", padding: "14px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.08)" } },
         h("div", { className: "prediction-card-lbl", style: { fontSize: "0.76rem", color: "#94A3B8", marginBottom: "4px" } }, "Horizon & Grid"),
         h("div", { className: "prediction-card-val", style: { fontSize: "1.1rem", fontWeight: "800", color: "#A78BFA", fontFamily: "var(--font-mono)" } }, `${horizon} (${barrierPair})`),
-        h("div", { style: { fontSize: "0.72rem", color: "#64748B", marginTop: "6px" } }, "16 decision bars (240m)")
+        h("div", { style: { fontSize: "0.72rem", color: "#64748B", marginTop: "6px" } }, valueOrUnavailable(signal?.volatility_estimator))
       )
     ),
 
@@ -2863,11 +3253,11 @@ function PredictionPanel({ predictionData, engineState = "offline" }) {
       }
     },
       h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px", marginBottom: "6px" } },
-        h("span", { style: { fontSize: "0.78rem", fontWeight: "800", color: "#F87171", letterSpacing: "0.03em" } }, "RESEARCH CLASSIFICATION: COST_ERASED (C2)"),
-        h("span", { style: { fontSize: "0.72rem", background: "rgba(255,255,255,0.06)", padding: "2px 8px", borderRadius: "4px", color: "#CBD5E1" } }, "EXECUTION: PAPER / RESEARCH ONLY")
+        h("span", { style: { fontSize: "0.78rem", fontWeight: "800", color: "#F87171", letterSpacing: "0.03em" } }, `RESEARCH CLASSIFICATION: ${researchState} (${researchData?.claim_level || "DATA_UNAVAILABLE"})`),
+        h("span", { style: { fontSize: "0.72rem", background: "rgba(255,255,255,0.06)", padding: "2px 8px", borderRadius: "4px", color: "#CBD5E1" } }, `EXECUTION: ${researchData?.execution_mode || "DISABLED"}`)
       ),
       h("div", { style: { fontSize: "0.80rem", color: "#CBD5E1", lineHeight: "1.5" } },
-        "Interpretation: The tested research configuration produced conditional predictive structure, but a deployable net-of-cost trading edge has not been established after preregistered transaction friction (35 bps BASE / 65 bps CONSERVATIVE). No real orders are executed."
+        `Interpretation: ${signal?.interpretation || "DATA_UNAVAILABLE"} No real orders are executed.`
       )
     ),
 
@@ -2903,35 +3293,35 @@ function PredictionPanel({ predictionData, engineState = "offline" }) {
             ),
             h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
               h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Model Acceptance / Decision"),
-              h("td", { style: { padding: "6px 8px", color: "#F87171", fontWeight: "700" } }, "ABSTAIN (NET EXPECTANCY NEGATIVE)")
+              h("td", { style: { padding: "6px 8px", color: "#F87171", fontWeight: "700" } }, valueOrUnavailable(signal?.model_decision))
             ),
             h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
               h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Barrier Pair Configuration"),
-              h("td", { style: { padding: "6px 8px", color: "#CBD5E1", fontFamily: "var(--font-mono)" } }, `${barrierPair} (k_TP = 1.0, k_SL = 1.0, R:R = 1.0)`)
+              h("td", { style: { padding: "6px 8px", color: "#CBD5E1", fontFamily: "var(--font-mono)" } }, `${barrierPair} · ${valueOrUnavailable(signal?.k_tp, value => `k_TP = ${value}`)} · ${valueOrUnavailable(signal?.k_sl, value => `k_SL = ${value}`)}`)
             ),
             h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
               h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Volatility Estimator"),
-              h("td", { style: { padding: "6px 8px", color: "#CBD5E1" } }, "ATR14 on 15-minute decision bars")
+              h("td", { style: { padding: "6px 8px", color: "#CBD5E1" } }, valueOrUnavailable(signal?.volatility_estimator))
             ),
             h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
               h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Evaluation Horizon"),
-              h("td", { style: { padding: "6px 8px", color: "#CBD5E1" } }, "240 minutes (16 decision bars)")
+              h("td", { style: { padding: "6px 8px", color: "#CBD5E1" } }, valueOrUnavailable(signal?.horizon))
             ),
             h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
               h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Preregistered Cost Scenarios"),
-              h("td", { style: { padding: "6px 8px", color: "#CBD5E1" } }, "BASE: 35 bps round-trip | CONSERVATIVE: 65 bps round-trip")
+              h("td", { style: { padding: "6px 8px", color: "#CBD5E1" } }, researchData?.hypothetical_signal?.cost_scenarios ? Object.entries(researchData.hypothetical_signal.cost_scenarios).map(([name, value]) => `${name}: ${value}`).join(" | ") : "DATA_UNAVAILABLE")
             ),
             h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
               h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Resolver Version"),
-              h("td", { style: { padding: "6px 8px", color: "#CBD5E1", fontFamily: "var(--font-mono)" } }, "ENTRY_TP_SL_RESOLVER_V1")
+              h("td", { style: { padding: "6px 8px", color: "#CBD5E1", fontFamily: "var(--font-mono)" } }, valueOrUnavailable(signal?.resolver_version))
             ),
             h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
               h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Research Status"),
-              h("td", { style: { padding: "6px 8px", color: "#F87171", fontWeight: "700" } }, "COST_ERASED (C2 — Conditional Predictability)")
+              h("td", { style: { padding: "6px 8px", color: "#F87171", fontWeight: "700" } }, `${researchState} (${researchData?.claim_level || "DATA_UNAVAILABLE"})`)
             ),
             h("tr", null,
               h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Provenance & Freeze Status"),
-              h("td", { style: { padding: "6px 8px", color: "#00E5A8", fontWeight: "700", fontFamily: "var(--font-mono)" } }, "VERIFIED_FROZEN (1bf91f2789846af...)")
+              h("td", { style: { padding: "6px 8px", color: "#00E5A8", fontWeight: "700", fontFamily: "var(--font-mono)" } }, valueOrUnavailable(signal?.provenance_status))
             )
           )
         )
@@ -3444,30 +3834,12 @@ function QuickExecutionTicket({ livePrice }) {
   const [orderSide, setOrderSide] = useState("LONG");
   const [amount, setAmount] = useState(1000);
   const [leverage, setLeverage] = useState(5);
-  const [executing, setExecuting] = useState(false);
-  const [lastExecutedMsg, setLastExecutedMsg] = useState(null);
 
   const price = livePrice || 64280.0;
   const marginReq = (amount / leverage).toFixed(2);
   const estLiq = orderSide === "LONG"
     ? (price * (1 - 0.9 / leverage)).toFixed(2)
     : (price * (1 + 0.9 / leverage)).toFixed(2);
-
-  const handleSimulate = async () => {
-    setExecuting(true);
-    try {
-      const action = orderSide === "LONG" ? "BUY" : "SELL";
-      await api.executeArenaTrade(action, 0.85, `Paper Research Simulation Ticket ($${amount} @ ${leverage}x)`);
-      setLastExecutedMsg(`📝 Paper Simulation Tracked: ${orderSide} $${amount} @ $${price.toLocaleString()} (${leverage}x)`);
-      playAudioChirp(1200, "triangle", 0.15);
-    } catch (err) {
-      setLastExecutedMsg(`📝 Paper Simulation Logged: ${orderSide} $${amount} @ $${price.toLocaleString()} (${leverage}x)`);
-      playAudioChirp(1050, "sine", 0.12);
-    } finally {
-      setExecuting(false);
-      setTimeout(() => setLastExecutedMsg(null), 4500);
-    }
-  };
 
   return h("div", { className: "execution-ticket-card" },
     h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" } },
@@ -3560,25 +3932,18 @@ function QuickExecutionTicket({ livePrice }) {
       )
     ),
 
-    // Simulation Button
-    h("button", {
-      className: `ticket-execute-btn ${orderSide.toLowerCase()}`,
-      onClick: handleSimulate,
-      disabled: executing
-    }, executing ? "⏳ Recording Simulation..." : `📝 Log ${orderSide} Paper Simulation ($${amount})`),
-
-    lastExecutedMsg && h("div", {
+    h("div", {
       style: {
         marginTop: "8px",
         fontSize: "0.74rem",
-        color: "#00E5A8",
+        color: "#94A3B8",
         textAlign: "center",
-        background: "rgba(0, 229, 168, 0.1)",
+        background: "rgba(148, 163, 184, 0.08)",
         padding: "6px",
         borderRadius: "6px",
         fontWeight: "700"
       }
-    }, lastExecutedMsg)
+    }, "Display-only guardian: tracks paper scenarios or user-entered external positions. No order pathway is available.")
   );
 }
 
@@ -6941,7 +7306,7 @@ function TerminalView({
 
         // [ RESEARCH ] Tab: Conformal Prediction Matrix & Counterfactual Consensus
         workstationTab === "research" && h("div", { style: { display: "flex", flexDirection: "column", gap: "20px" } },
-          h(PredictionPanel, { predictionData, engineState }),
+          h(PredictionPanel, { predictionData, researchData: researchSignalData, engineState }),
           h(CounterfactualPanel, { counterfactualData })
         ),
 
@@ -8193,6 +8558,7 @@ function App() {
 
   // AI & Intelligence state
   const [predictionData,    setPredictionData]    = useState(null);
+  const [researchSignalData, setResearchSignalData] = useState(null);
   const [predictionHistory, setPredictionHistory] = useState([]);
   const [regimeData,        setRegimeData]        = useState(null);
   const [explanationData,   setExplanationData]   = useState(null);
@@ -8341,8 +8707,9 @@ function App() {
   const loadAIData = useCallback(async () => {
     if (isReplaying) return; // Freeze live polling during Replay mode
     try {
-      const [pred, hist, regime, expl, qual, mem, port, mkt, intel, count, dec] = await Promise.allSettled([
+      const [pred, research, hist, regime, expl, qual, mem, port, mkt, intel, count, dec] = await Promise.allSettled([
         api.fetchPredictionLatest(),
+        api.fetchResearchSignal(),
         api.fetchPredictionHistory(),
         api.fetchRegimeLatest(),
         api.fetchExplanationLatest(),
@@ -8356,6 +8723,12 @@ function App() {
       ]);
 
       if (pred.status === "fulfilled")  setPredictionData(pred.value);
+      if (research.status === "fulfilled") {
+        setResearchSignalData(research.value);
+      } else {
+        const state = research.reason?.status === 503 ? "DATA_UNAVAILABLE" : "MODEL_FAILURE";
+        setResearchSignalData({ status: state, state });
+      }
       if (hist.status === "fulfilled")  setPredictionHistory(hist.value);
       if (regime.status === "fulfilled") setRegimeData(regime.value);
       if (expl.status === "fulfilled")  setExplanationData(expl.value);
@@ -8599,4 +8972,4 @@ if (document.readyState === "loading") {
 } else {
   mountApp();
 }
-
+}

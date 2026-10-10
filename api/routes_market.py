@@ -86,46 +86,67 @@ async def get_market_latest(request: Request, days: int = Query(90, ge=1, le=365
 
     latest_row = feature_cache.get_latest_row()
 
-    if ticker and live_p:
-        price = live_p
-        change_pct = float(ticker.get("priceChangePercent", 0.0))
-        change_24h = float(ticker.get("priceChange", 0.0))
-        high_24h = float(ticker.get("highPrice", price * 1.01))
-        low_24h = float(ticker.get("lowPrice", price * 0.99))
-        volume_24h = float(ticker.get("volume", 28000.0))
-    elif latest_row is not None:
-        price = live_p or float(latest_row["close"])
-        change_pct = float(latest_row.get("ret_24h", 0.02)) * 100
-        change_24h = price * change_pct / 100
-        high_24h = float(latest_row.get("high", price * 1.01))
-        low_24h = float(latest_row.get("low", price * 0.99))
-        volume_24h = float(latest_row.get("volume", 28000.0))
-    else:
-        price = live_p or 65000.0
-        change_pct = 0.0
-        change_24h = 0.0
-        high_24h = price * 1.01
-        low_24h = price * 0.99
-        volume_24h = 28000.0
+    price = live_p if live_p is not None else (
+        float(latest_row["close"]) if latest_row is not None and latest_row.get("close") is not None else None
+    )
+    if price is None:
+        return {
+            "status": "DATA_UNAVAILABLE",
+            "symbol": SYMBOL,
+            "exchange": EXCHANGE,
+            "market_data": None,
+        }
 
-    ret_24h = float(latest_row.get("ret_24h", 0.0)) if latest_row is not None else 0.0
-    realized_vol = float(latest_row.get("realized_vol_24h", 0.015)) if latest_row is not None else 0.015
-    rsi_14 = float(latest_row.get("rsi_14", 55.0)) if latest_row is not None else 55.0
-    oi_change = float(latest_row.get("oi_pct_change_24h", 0.02)) if latest_row is not None else 0.02
+    change_pct = (
+        float(ticker["priceChangePercent"])
+        if ticker is not None and ticker.get("priceChangePercent") is not None
+        else None
+    )
+    change_24h = (
+        float(ticker["priceChange"])
+        if ticker is not None and ticker.get("priceChange") is not None
+        else None
+    )
+    high_24h = (
+        float(ticker["highPrice"])
+        if ticker is not None and ticker.get("highPrice") is not None
+        else None
+    )
+    low_24h = (
+        float(ticker["lowPrice"])
+        if ticker is not None and ticker.get("lowPrice") is not None
+        else None
+    )
+    volume_24h = (
+        float(ticker["volume"])
+        if ticker is not None and ticker.get("volume") is not None
+        else None
+    )
+
+    def cached_value(column: str) -> Optional[float]:
+        if latest_row is None or latest_row.get(column) is None:
+            return None
+        return float(latest_row[column])
+
+    ret_24h = cached_value("ret_24h")
+    realized_vol = cached_value("realized_vol_24h")
+    rsi_14 = cached_value("rsi_14")
+    oi_change = cached_value("oi_pct_change_24h")
 
     return {
+        "status": "OK",
         "symbol": SYMBOL,
         "exchange": EXCHANGE,
         "price": price,
-        "change_24h": round(change_24h, 2),
-        "change_pct_24h": round(change_pct, 2),
-        "high_24h": round(high_24h, 2),
-        "low_24h": round(low_24h, 2),
-        "volume_24h": round(volume_24h, 2),
-        "ret_24h": round(ret_24h, 4),
-        "realized_vol_24h": round(realized_vol, 4),
-        "rsi_14": round(rsi_14, 2),
-        "oi_change_24h": round(oi_change, 4),
+        "change_24h": round(change_24h, 2) if change_24h is not None else None,
+        "change_pct_24h": round(change_pct, 2) if change_pct is not None else None,
+        "high_24h": round(high_24h, 2) if high_24h is not None else None,
+        "low_24h": round(low_24h, 2) if low_24h is not None else None,
+        "volume_24h": round(volume_24h, 2) if volume_24h is not None else None,
+        "ret_24h": round(ret_24h, 4) if ret_24h is not None else None,
+        "realized_vol_24h": round(realized_vol, 4) if realized_vol is not None else None,
+        "rsi_14": round(rsi_14, 2) if rsi_14 is not None else None,
+        "oi_change_24h": round(oi_change, 4) if oi_change is not None else None,
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
@@ -140,15 +161,25 @@ def get_candles(interval: str = Query("1h"), limit: int = Query(150, le=500)):
         tail_df = df.tail(limit)
         candles = []
         for _, row in tail_df.iterrows():
-            ts = int(pd.to_datetime(row["timestamp"]).timestamp()) if "timestamp" in row else int(time.time())
+            if "timestamp" not in row or not all(
+                key in row and pd.notna(row[key])
+                for key in ("open", "high", "low", "close", "volume")
+            ):
+                continue
+            ts = int(pd.to_datetime(row["timestamp"]).timestamp())
             candles.append({
                 "time": ts,
-                "open": round(float(row.get("open", row["close"])), 2),
-                "high": round(float(row.get("high", row["close"] * 1.002)), 2),
-                "low": round(float(row.get("low", row["close"] * 0.998)), 2),
+                "open": round(float(row["open"]), 2),
+                "high": round(float(row["high"]), 2),
+                "low": round(float(row["low"]), 2),
                 "close": round(float(row["close"]), 2),
-                "volume": round(float(row.get("volume", 100.0)), 4)
+                "volume": round(float(row["volume"]), 4)
             })
-        return {"candles": candles, "count": len(candles), "degraded": False}
+        return {
+            "status": "OK" if candles else "DATA_UNAVAILABLE",
+            "candles": candles,
+            "count": len(candles),
+            "degraded": not bool(candles),
+        }
 
     return {"candles": [], "count": 0, "degraded": True}
