@@ -52,6 +52,7 @@ from api.routes_notifications import router as notifications_router
 from api.genome_routes import router as genome_router
 from api.routes_analogs import router as analogs_router
 from api.routes_terminal import router as terminal_router
+from api.market_monitor_routes import router as market_monitor_router
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -118,33 +119,43 @@ from validation.startup_gate import verify_full_freeze_integrity, verify_scienti
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Manages initialization and graceful teardown of shared async resources."""
-    logger.info("Verifying scientific freeze contract before startup...")
-    # Priority 1 Scientific Startup Gate: refuses startup on tampered artifact or invalid contract
-    verify_scientific_contract()
+    """Start read-only market monitoring even when frozen research cannot be authorized."""
+    failures = []
+    try:
+        verify_scientific_contract()
+    except Exception as exc:
+        failures.append("scientific contract: " + type(exc).__name__)
+        logger.warning("Frozen scientific contract is not verified (%s).", type(exc).__name__)
     try:
         verify_full_freeze_integrity()
-    except Exception as e:
-        logger.warning(f"Scientific freeze check note (live engine will serve calibrated abstentions): {e}")
+    except Exception as exc:
+        failures.append("full freeze integrity: " + type(exc).__name__)
+        logger.warning("Frozen input integrity is not verified (%s).", type(exc).__name__)
 
-    logger.info("Initializing BTCognitive Server...")
+    # A hash pass alone does not authorize inference. Until evaluation evidence
+    # and formal authorization are authenticated, this app serves the baseline only.
+    app.state.research_gate = {
+        "status": "BLOCKED_PROVENANCE_UNVERIFIED" if failures else "BLOCKED_AUDIT_FAILURE",
+        "authorized": False,
+        "reason": (
+            "Frozen model verification failed (" + "; ".join(failures) + ")."
+            if failures else
+            "Freeze checks alone do not authorize production inference; evaluation evidence and formal research authorization remain required."
+        ),
+    }
+
+    logger.info("Initializing BTCognitive read-only market monitor...")
     app.state.http = get_shared_client()
     feature_cache.initialize()
-
-    try:
-        sanitize_market_memory()
-    except Exception as e:
-        logger.warning(f"Error sanitizing market memory: {e}")
-
-    live_engine.start()
-    logger.info("BTCognitive Server is online, scientifically verified, and hardened.")
+    # Do not start live_engine in monitor-only mode.
+    live_engine.is_running = False
+    logger.warning("Production model inference and trading remain disabled; market monitor is available.")
     yield
 
-    logger.info("Shutting down BTCognitive Server...")
+    logger.info("Shutting down BTCognitive market monitor...")
     live_engine.is_running = False
     await close_shared_client()
     logger.info("Shutdown complete.")
-
 
 # ---------------------------------------------------------------------------
 # FastAPI App Initialization & Security Hardening
@@ -191,6 +202,8 @@ app.add_middleware(
 )
 
 # Mount Modular APIRouters
+# Unified market monitor is registered first so legacy fake fallbacks cannot shadow it.
+app.include_router(market_monitor_router)
 app.include_router(market_router)
 app.include_router(prediction_router)
 app.include_router(arena_router)
@@ -248,4 +261,4 @@ if os.path.isdir(web_dir):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("api.server:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("api.server:app", host=os.getenv("BTCOGNITIVE_HOST", "127.0.0.1"), port=int(os.getenv("PORT", "8000")), reload=os.getenv("BTC_ENVIRONMENT", "development").lower() != "production")

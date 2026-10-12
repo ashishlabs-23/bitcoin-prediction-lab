@@ -1,391 +1,61 @@
-# 🧠 BTCognitive: Bitcoin Probabilistic Risk Intelligence & Research Platform
+# BTCognitive — BTC/USD Market Monitor
 
-> **BTCognitive is a BTCUSD probabilistic risk intelligence platform that models conformal future price ranges, favorable/adverse excursions, volatility term structure, uncertainty envelopes, and point-process event pressure.**
-> 
-> It does not claim guaranteed direction or profitable automated trading.
+BTCognitive serves one active read-only market-monitor application. It displays source-backed BTC/USD spot observations, closed hourly candles, technical features, optional derivatives context, and an **experimental historical-distribution forecast**. The authenticated production model remains blocked while frozen inputs and evaluation evidence are unverified.
 
----
+## What the application does
 
-## 1. BTCognitive Overview
+- Retrieves BTC/USD quotes and hourly candles through public Coinbase, Bitstamp and Kraken endpoints. It fails over between providers without blending different instruments into a synthetic spot price.
+- Shows quote retrieval time, candle freshness, bid–ask spread, cross-venue quote divergence and source/provider errors.
+- Calculates momentum, recent realized volatility, RSI and relative volume from validated closed BTC/USD candles.
+- Displays Binance BTCUSDT perpetual funding/open interest as a separate USDT-quoted derivatives context; these values are never substituted for BTC/USD spot.
+- Estimates 1h, 4h and 24h P10/P50/P90 prices from non-overlapping historical log returns when enough complete history is available.
+- Calculates a rolling-origin historical check against a zero-return baseline when the sample is large enough.
 
-BTCognitive is a production-grade machine learning system and quantitative forecasting laboratory designed specifically for Bitcoin (BTCUSD). Rather than chasing noisy, uncalibrated point predictions, BTCognitive frames market dynamics through **conformal excursion quantiles, multi-scale volatility term structure, point-process event pressure, and point-in-time empirical validation**.
+## Forecast limits
 
+The active range estimator is an empirical baseline, **not** the frozen HAR-RS-DOW/conformal production model and not an ML model trained to predict direction. P10–P90 represents a nominal **central 80% historical quantile band**, not a calibrated 90% confidence interval. P50 is the historical median; directional probability, TP/SL targets and order execution are intentionally absent.
 
-The platform is strictly divided into **Production**, **Shadow**, **Research**, and **Market State** tiers, ensuring complete mathematical isolation between live inference and experimental exploration.
+Historical walk-forward measurements are descriptive; they do not establish a durable edge or profitability. Production forecasts remain blocked until exact data/artifact lineage, untouched evaluation evidence and formal research authorization are authenticated. Do not add fabricated prices, performance metrics, confidence scores, datasets or fallback trade targets to bypass this gate.
 
----
+Macro series and ETF/exchange-flow inputs are shown as not configured unless a verified provider is actually wired in. Missing data stays missing.
 
-## 2. What BTCognitive Predicts
+## Run locally
 
-BTCognitive predicts:
-1. **24-Hour Probabilistic Price Envelope (P10 / P50 / P90)**: Expected boundary range calibrated under conformal prediction.
-2. **Max Favorable Excursion (MFE) & Max Adverse Excursion (MAE)**: Quantile distributions of upper breakout potential and downward drawdown risk.
-3. **Volatility Term Structure Context**: Multi-horizon realized volatility and regime state conditioning.
-4. **Conformal Forecast Uncertainty**: Residual-derived uncertainty metric representing model dispersion.
-5. **5-Minute Microstructure Pressure**: Event intensity ratios from order-flow imbalance and Hawkes point-processes (**Shadow Layer**).
-
----
-
-## 3. Main BTCUSD Product
-
-The primary BTCUSD product delivers a unified, 5-second decision view:
-
-```text
-=====================================================
-BTCUSD: $65,200.00
------------------------------------------------------
-NEXT 5 MINUTES:        BULLISH PRESSURE (Hawkes Shadow)
-NEXT 24 HOURS:         $62,980.00 — $66,820.00 (Production)
-VOLATILITY STATE:      VOL_EXPANDING
-FORECAST RELIABILITY:  VERY HIGH (87.92 / 100)
-DIRECTIONAL STATUS:    NO MEASURABLE EDGE (Experimental)
-=====================================================
-```
-
----
-
-## 4. 5M Microstructure Shadow Layer
-
-* **Model**: `v1.0.0-challenger-hawkes-microstructure`
-* **Horizon**: 5 Minutes
-* **Role**: `VALIDATED_SHADOW_MODEL` ($N_{\text{eff}} \approx 135$)
-* **Inputs**: Top-of-book order flow imbalance (OFI), trade intensity, mark-out price returns.
-* **Outputs**: Microstructure MFE (9.30 bps), MAE (9.95 bps), P90 Coverage (92.5%), Directional AUC (0.562).
-* **Governance**: **NOT used for production decisions.** Promotion remains blocked until $N_{\text{eff}} \ge 250$ independent blocks are accumulated.
-
----
-
-## 5. 24H Production Range
-
-* **Model**: `v3.0.0-ridge-volatility-context` (Base: `v3.0.0-excursion-ridge-conformal`, Context: `v1.0.0-volatility-bridge-context`)
-* **Horizon**: 24 Hours
-* **Role**: `VALIDATED_PRODUCTION_RANGE_SYSTEM` ($N_{\text{eff}} = 31.0$, $744$ hours)
-* **Metrics**: MFE Error = `0.3980%`, MAE Error = `0.5620%`, P90 Coverage = `91.10%`, Winkler Score = `605.10`, Interval Width = `5.28%`.
-* **Latency**: `0.42 ms` per forecast generation.
-
----
-
-## 6. Max Favorable & Adverse Excursion (MFE / MAE)
-
-Rather than predicting only closing prices, BTCognitive models path extremes:
-$$\text{MFE}_{t, t+H} = \frac{\max_{\tau \in [t, t+H]} P_\tau - P_t}{P_t}, \quad \text{MAE}_{t, t+H} = \frac{P_t - \min_{\tau \in [t, t+H]} P_\tau}{P_t}$$
-
-Excursions allow asymmetric risk evaluation, separating upside potential from maximum intra-horizon drawdown.
-
----
-
-## 7. Volatility Term Structure
-
-The production model conditions on multi-scale volatility ratios:
-* **Short/Medium Ratio ($R_{\text{short}}$)**: $\frac{\sigma_{\text{1h}}}{\sigma_{\text{24h}}}$
-* **Medium/Long Ratio ($R_{\text{term}}$)**: $\frac{\sigma_{\text{24h}}}{\sigma_{\text{168h}}}$
-* **Regime Classifier**: `VOL_COMPRESSION`, `VOL_NORMAL`, `VOL_EXPANDING`, `PEAK_VOLATILITY`.
-
-Volatility conditioning yields a statistically significant paired improvement of **`-14.0 bps`** ($p_{\text{adj}} = 0.0006$) over baseline Ridge.
-
----
-
-## 8. Forecast Uncertainty
-
-Uncertainty is evaluated through conformal quantile spreads:
-$$\text{Uncertainty Score} = \frac{\text{Upper P90} - \text{Lower P90}}{P_t} \times \frac{\text{Current Volatility}}{\text{Median Volatility}}$$
-Higher uncertainty scores directly reflect elevated dispersion in future potential trajectories.
-
----
-
-## 9. Forecast Accuracy Observatory
-
-BTCognitive continuously audits realized vs predicted outcomes across non-overlapping blocks:
-
-| Metric Name | Observed Value | Baseline Reference | Status |
-| :--- | :---: | :---: | :---: |
-| **MFE Error (MAE)** | `0.3980%` | `0.4120%` | Nominal |
-| **MAE Error (MAE)** | `0.5620%` | `0.5812%` | Nominal |
-| **Joint Path Containment** | `91.10%` | `90.00% Target` | Calibrated |
-| **Winkler Score (P90)** | `605.10` | `624.32` | Nominal |
-| **Paired MFE Delta** | `-14.0 bps` | $p = 0.0006$ | Superior |
-
----
-
-## 10. Forecast vs Realized Replay
-
-The platform features an immutable historical replay visualizer:
-* **What AI Knew at $t$**: Predicted envelope, volatility state, Hawkes shadow pressure.
-* **What Actually Happened**: Realized trajectory, actual MFE/MAE, boundary containment.
-* **Failures Are Never Hidden**: All tail breaches are stored in the searchable failure library.
-
----
-
-## 11. AI Experiment Arena
-
-The **Arena** is a strict quantitative research laboratory, **NOT an auto-trading bot**. It:
-1. Records immutable point-in-time predictions.
-2. Resolves outcomes on non-overlapping evaluation boundaries.
-3. Tests challengers against production systems using block-bootstrap hypothesis testing ($10,000$ resamples).
-4. Enforces multiple-testing family-wise error adjustments ($K = 1,228$ trials).
-
----
-
-## 12. Foundation Model Research
-
-Pretrained time-series foundation models (**Google TimesFM 2.5**, **Salesforce Moirai 2.0**, **Amazon Chronos-2**) were thoroughly benchmarked:
-* **Zero-Shot Transfer**: Outperforms naive random walk by ~220 bps, confirming genuine temporal priors.
-* **Specialized Comparison**: Specialized BTCognitive Ridge + Volatility Context outperforms adapted TimesFM by **`+10.0 bps`** ($p_{\text{adj}} = 0.2850$), while operating with **$350\text{x}\text{--}520\text{x}$ lower latency** ($0.42$ ms vs $145\text{--}220$ ms).
-* **Role**: All foundation models remain strictly in **`FOUNDATION_RESEARCH`**.
-
----
-
-## 13. Challenger Governance & Lifecycle
-
-Model transitions follow strict lifecycle gates:
-1. `FOUNDATION_RESEARCH` / `RESEARCH_ONLY`
-2. `VALIDATED_RESEARCH` (Out-of-sample block superiority, $p_{\text{adj}} < 0.01$)
-3. `VALIDATED_SHADOW_MODEL` (Decoupled real-time tracking, $N_{\text{eff}} \ge 100$)
-4. `VALIDATED_PRODUCTION_SYSTEM` (Longitudinal stability, $N_{\text{eff}} \ge 250$, manual promotion)
-
----
-
-## 14. Research Methodology
-
-* **Point-in-Time Features**: Strict zero-leakage guarantee across feature extraction.
-* **Purging & Embargo**: 24-hour purge and embargo windows prevent temporal cross-contamination.
-* **Block Accounting**: Evaluated on non-overlapping 24-hour blocks ($N_{\text{eff}} = 31.0$, $744$ hours).
-* **Multiple Testing Accountability**: Dynamic tracking of all cumulative trials ($K = 1,228$).
-* **Frozen Production Locks**: Deterministic hash manifests lock production model weights and formulas.
-
----
-
-## 15. Validation Results
-
-* **Evaluation Window**: 2026-07-21 to 2026-08-21 ($744$ calendar hours).
-* **Evaluation Units**: 31 independent 24h blocks ($34$ resolved evaluation snapshots).
-* **Tail Envelope Breaches**: Exactly $3$ breaches logged ($\frac{3}{34} = 8.82\% \approx 8.9\%$, matching $90\%$ conformal coverage target).
-* **Effective Sample Size**: $N_{\text{eff}} = 31.0$ (Lag-1 autocorrelation $= 0.024$).
-
----
-
-## 16. Model Roles & Hierarchy
-
-```mermaid
-graph TD
-    Data[BTCUSD Live Market Data] --> Bridge[Volatility Term Structure Context]
-    Bridge --> Prod[Production: Ridge v3.0.0 / 24H]
-    Data --> Hawkes[Shadow: Hawkes Microstructure v1.0.0 / 5M]
-    Data -.-> Found[Research: TimesFM / Moirai / Chronos]
-    Data -.-> Inter[Research: 1H / 4H / 12H / 48H]
-    
-    Prod --> Out[Unified Forecast Intelligence]
-    Hawkes -.-> Out
-    Bridge --> Out
-```
-
-* **PRODUCTION**: `v3.0.0-ridge-volatility-context` (24H)
-* **SHADOW**: `v1.0.0-challenger-hawkes-microstructure` (5M)
-* **RESEARCH**: TimesFM 2.5, Moirai 2.0, Chronos-2, 1h/4h/12h/48h Horizons
-* **ARCHIVED**: Mamba Selective State-Space Model v1
-
----
-
-## 17. API Endpoints
-
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| `GET` | `/ping` | Ultra-fast ($<2\text{ms}$) keep-alive endpoint for free monitoring services |
-| `GET` | `/health` | Health check endpoint indicating model warmup and engine status |
-| `GET` | `/prediction/intelligence` | Real-time unified forecast intelligence payload |
-| `GET` | `/prediction/intelligence/health` | Multi-pillar operational health status |
-| `GET` | `/prediction/accuracy` | Canonical production accuracy observatory scorecard |
-| `GET` | `/prediction/accuracy/history` | Rolling block accuracy time-series history |
-| `GET` | `/prediction/failures` | Searchable tail breach and failure library |
-| `GET` | `/prediction/market-state` | Unified multiscale market-state context |
-| `GET` | `/research/models` | Comprehensive model research leaderboard |
-
----
-
-## 18. Multi-Exchange Ingestion & Geo-Failover Layer
-
-To guarantee high availability on cloud hosts in US/EU regions (where Binance endpoints may face geo-blocking or rate limits), BTCognitive implements an automated 4-tier fallback:
-1. **Binance Coin-M & Spot** (`dapi.binance.com` / `api.binance.com`)
-2. **Coinbase Spot API** (`api.coinbase.com`)
-3. **Kraken Public REST** (`api.kraken.com`)
-4. **Bybit Spot & Linear Perpetuals** (`api.bybit.com`)
-
-No API keys or manual failover switches are needed; the engine cascades automatically without dropping live inference sessions.
-
----
-
-## 19. $0/Month Free-Tier Deployment Stack
-
-BTCognitive is fully optimized to run on **100% free-tier cloud infrastructure** with 24/7 uptime:
-
-* **Frontend UI**: Hosted on [Netlify](https://www.netlify.com) or [Cloudflare Pages](https://pages.cloudflare.com) via `publish = "web"` (100 GB/mo free bandwidth, instant HTTPS).
-* **Backend API & ML Engine**: Hosted on [Koyeb](https://www.koyeb.com) (always-on free micro instance) or [Render](https://render.com) using [`render.yaml`](file:///c:/Projects/BTCognitive/bitcoin-prediction-lab/render.yaml).
-* **Database (Optional Persistence)**: [Turso LibSQL](https://turso.tech) (9 GB free, 1B reads/mo) or local SQLite WAL.
-* **Keep-Alive (Prevent Sleep)**: Free 5-minute HTTP ping on `/ping` via [UptimeRobot](https://uptimerobot.com) or [Cron-job.org](https://cron-job.org).
-
-📖 **Full Deployment Guide**: See [docs/FREE_TIER_DEPLOYMENT.md](file:///c:/Projects/BTCognitive/bitcoin-prediction-lab/docs/FREE_TIER_DEPLOYMENT.md) for step-by-step instructions.
-
----
-
-## 20. Database & Data Provenance
-
-* **SQLite & LibSQL Feature Store**: Stores partitioned 1m, 5m, 1h, and 24h aggregates. Supports local WAL and remote Turso LibSQL.
-* **Deterministic Locks**: JSON manifests in `results/` secure data hashes, model weights, and hyperparameters.
-* **Replay Engine**: Verifies byte-for-byte reproducibility of historical inference paths.
-
----
-
-## 21. Reproducibility
-
-Every experiment and validation milestone is reproducible from frozen seeds:
-```bash
-# Replay longitudinal production validation
-python research/combined_production_replay.py
-
-# Replay foundation model evaluations
-python research/foundation_replay.py
-
-# Replay accuracy observatory audit
-python research/production_accuracy_review.py
-```
-
----
-
-## 22. Configuration
-
-Configured via environment variables and `config/`:
-* `BTC_HORIZON_HOURS=24`
-* `BTC_CONFORMAL_ALPHA=0.10`
-* `BTC_ENVIRONMENT=production`
-* `TURSO_DATABASE_URL=` *(Optional LibSQL connection)*
-* `ALLOWED_ORIGINS=http://localhost:8000,https://*.netlify.app`
-
----
-
-## 23. Quickstart
+Python 3.11+ is recommended.
 
 ```bash
-# 1. Clone repository
-git clone https://github.com/ashishlabs-23/bitcoin-prediction-lab.git
-cd bitcoin-prediction-lab
-
-# 2. Set up virtual environment
-python -m venv venv
-.\venv\Scripts\activate  # Windows
-source venv/bin/activate  # Linux/macOS
-
-# 3. Install dependencies
-pip install -r requirements.txt
-
-# 4. Run resilience & contract test suite
-pytest tests/test_free_tier_resilience.py -v
-
-# 5. Launch FastAPI backend
-uvicorn api.server:app --host 127.0.0.1 --port 8000
+python -m venv .venv
+# Windows PowerShell
+.\.venv\Scripts\Activate.ps1
+# macOS/Linux
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python -m uvicorn api.server:app --host 127.0.0.1 --port 8000
 ```
 
+Open http://127.0.0.1:8000. For a hosted service, set `BTCOGNITIVE_HOST=0.0.0.0` and use the platform-provided `PORT`. The default process binding is loopback for local use.
 
----
+## API
 
-## 24. Safety & Governance Invariants
+- `GET /api/dashboard?horizon=24h` — quote, candles, drivers, optional context and baseline forecast. Horizons: `1h`, `4h`, `24h`.
+- `GET /api/market-drivers` — alias for the unified dashboard payload.
+- `GET /prediction/latest?horizon=24h` and `GET /prediction/range?horizon=24h` — compatibility routes returning the same experimental baseline, never a fabricated directional signal.
+- `GET /api/research/entry-tp-sl` — explicitly blocked response until evidence is authenticated.
+- `GET /health` — monitor health and research authorization state.
 
-1. **Zero Real-Money Trading**: No order execution endpoints or live exchange connectors exist.
-2. **Zero Automatic Retraining**: Models cannot retrain themselves in production.
-3. **Zero Automatic Promotion**: Promotion requires passing OOS statistical gates and manual sign-off.
-4. **Zero Probability Blending**: Mathematical models remain strictly decoupled.
+## Tests
 
----
+Focused deterministic tests do not require live exchange/network access:
 
-## 25. Known Limitations
-
-* **Macro Volatility Cascades**: Black-swan liquidity shocks can cause temporary envelope breaches (accounted for by $10\%$ conformal budget).
-* **24h Directional Edge**: Directional price changes at 24h exhibit no statistically measurable edge ($AUC = 0.504$).
-* **Microstructure Decay**: Hawkes order-flow alpha decays within 10–30 minutes and does not propagate to 24h horizons.
-
----
-
-## 26. Roadmap & Research Stop Rule
-
-* **Current Status**: **`PRODUCT_FROZEN`** in **Longitudinal Monitoring Mode**.
-* **Ongoing Tracking**: Accumulating independent blocks toward $60\text{--}90$ blocks (Production) and $250+$ (Hawkes Shadow).
-* **Research Stop Rule**: **No new ML models will be introduced unless the Forecast Accuracy Observatory detects a specific, named production failure.**
-
----
-
-## 27. Core Architecture & Module Map
-
-The repository is structured into high-performance production services, immutable data contracts, and reproducible research harnesses:
-
-### 🌟 Core Production Files (Main Pipeline)
-* **`api/server.py`**: FastAPI application entry point, middleware, and CORS configuration.
-* **`api/routes_prediction.py`**: Primary prediction routes, longitudinal monitoring, and resolution-health endpoints.
-* **`engine/inference_service.py`**: Live production inference pipeline combining Ridge regression with volatility context.
-* **`engine/feature_cache.py`**: Thread-safe live feature caching with deterministic fallbacks.
-* **`engine/longitudinal_status.py`**: Real-time longitudinal status tracking and block progress reporting.
-* **`models/ridge_model.py`**: Production 24h range & excursion forecasting model (`v3.0.0-ridge-volatility-context`).
-* **`models/volatility_bridge.py`**: Multi-horizon volatility ratio calculator and regime feature extractor.
-* **`models/hawkes_process.py`**: 5-minute microstructure point-process engine (`v1.0.0-challenger-hawkes-microstructure`, shadow mode).
-### 🔒 Production Security Architecture (OWASP ASVS 5.0 Hardened)
-* **`config/security.py`**: Role-based access control (RBAC), rate limit thresholds, strict CORS, and master kill-switches.
-* **`api/security_auth.py`**: Constant-time token verification (`secrets.compare_digest`) and role dependencies (`PUBLIC`, `USER`, `RESEARCH`, `ADMIN`).
-* **`api/security_middleware.py`**: Injects OWASP ASVS headers (HSTS, CSP, X-Frame-Options), enforces body size caps (1MB), and sanitizes unhandled exceptions.
-* **`engine/security_validators.py`**: SSRF prevention (blocks private/loopback/cloud metadata IPs), path traversal jails, and SQL identifier whitelisting.
-* **`engine/security_audit.py`**: Structured JSON security audit logger with automated regex secret masking.
-* **`docs/security_architecture.md`**: Full OWASP ASVS 5.0 and OWASP API Top 10 compliance specification and threat model.
-
----
-
-### 🛡️ Immutable System Contracts (`models/`)
-* **`models/regime_contract.py`**: Canonical 5-state market regime contract (`VOL_COMPRESSION`, `VOL_NORMAL`, `VOL_EXPANDING`, `PEAK_VOLATILITY`, `TRENDING`).
-* **`models/horizon_contract.py`**: Canonical 24h production range & 5m shadow horizons.
-* **`models/symbol_contract.py`**: Canonical `BTCUSD` symbol specification with multi-exchange normalization adapters.
-* **`models/forecast_quality_contract.py`**: Forecast quality stratification (`VALID`, `DEGRADED`, `INVALID`) and validation eligibility governance.
-
----
-
-### 🔬 Post-Repair Longitudinal & Governance Modules (`research/`)
-* **`research/historical_analogs.py`**: Diversity-aware historical analog retrieval engine using 6D expanding-window standardized state vectors, greedy $\ge 7$-day temporal separation, and dimension-normalized RMS distance over 40,400+ historical bars.
-* **`research/macro_evaluation_harness.py`**: Gated macro feature evaluation harness strictly enforcing pre-flight physical data provenance (`verify_data_source_provenance`), SHA-256 cryptographic fingerprinting, and zero synthetic fallback.
-* **`research/run_contract_suite.py`**: Master test runner executing 26 test suites (52/52 tests green).
-* **`research/post_repair_outcome_resolver.py`**: Point-in-time $(t, t+24\text{h}]$ automated 24h outcome resolution engine.
-* **`research/post_repair_block_builder.py`**: Non-overlapping independent 24h block builder and $N_{\text{eff}}$ sample accountant.
-* **`research/degraded_forecast_monitor.py`**: Degraded forecast rate monitor with operational alerting (`1.0%` threshold).
-* **`research/milestone_5_post_repair_gate.py`**: First post-repair milestone evaluator (requires 5 VALID blocks).
-* **`research/post_repair_dataset_audit.py`**: Clean dataset partitioner separating `POST_REPAIR` from `PRE_REPAIR_HISTORY`.
-* **`research/post_repair_longitudinal_monitor.py`**: Metric collector generating live longitudinal tracking tables.
-* **`research/research_stop_rule.py`**: Enforces strict algorithmic freeze (`NO_NEW_RESEARCH_REQUIRED`).
-
----
-
-### 📊 Validation Reports & Audit Documentation (`docs/` & `research/reports/`)
-* **`docs/FREE_TIER_DEPLOYMENT.md`**: Step-by-step $0/month free tier deployment across Netlify, Koyeb/Render, Turso, and UptimeRobot.
-* **`docs/prediction_metrics.md`**: Formal mathematical definitions of MFE, MAE, Winkler Score, and Conformal Uncertainty.
-* **`docs/model_lifecycle.md`**: Model promotion, shadow bakeoff, and decommissioning lifecycle rules.
-* **`docs/production_operator_runbook.md`**: Operational runbook for production deployment, database recovery, and monitoring.
-* **`research/reports/`**: Point-in-time validation summaries, restart reviews, and pre/post-repair comparisons.
-
----
-
-## 28. Repository Structure
-
-```text
-bitcoin-prediction-lab/
-├── api/                # FastAPI REST routes and server entry points
-├── engine/             # Core inference, feature caching, and longitudinal services
-├── models/             # Production Ridge, Volatility Bridge, Hawkes shadow, and Contracts
-├── config/             # Centralized database paths and system configuration
-├── research/           # Outcome resolvers, block builders, monitors, and audit harnesses
-├── training/           # Point-in-time feature extraction and adaptation harnesses
-├── docs/               # System contracts, operator runbooks, free-tier guides, and metric definitions
-├── results/            # Frozen manifests, audit CSVs, and statistical logs
-├── tests/              # Test suites for resilience, contracts, and regression
-└── web/                # Frontend dashboard, chart visualizations, and UI assets
+```bash
+python -m pytest -q tests/test_market_drivers.py tests/test_market_monitor_routes.py
 ```
 
----
+The repository retains a legacy research suite with historical frozen-data expectations requiring separate provenance repair. Those constraints are not bypassed by the market monitor.
 
-## 29. License
+## Security and scope
 
-Licensed under the [Apache 2.0 License](LICENSE).
-
-
+- Read-only market-data access; no broker/order execution.
+- Research authorization and frozen production inference remain disabled.
+- No automatic retraining or promotion.
+- Provider outages, stale observations and insufficient history must result in explicit unavailable states, never synthetic values.

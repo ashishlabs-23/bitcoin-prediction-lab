@@ -12,10 +12,15 @@ from api.server import app
 client = TestClient(app)
 
 
-def test_server_startup_rejects_unverifiable_frozen_inputs():
-    with pytest.raises(RuntimeError, match="Full scientific freeze verification failed"):
-        with TestClient(app):
-            pass
+def test_server_starts_monitor_when_frozen_inputs_are_unverified():
+    with TestClient(app) as started:
+        response = started.get("/health")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["mode"] == "MARKET_MONITOR_ONLY"
+        assert body["research_authorized"] is False
+        assert body["production_forecast_available"] is False
+        assert body["trading_enabled"] is False
 
 
 @pytest.mark.parametrize(

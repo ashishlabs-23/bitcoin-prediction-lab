@@ -22,43 +22,53 @@ client = TestClient(app)
 
 
 def test_research_entry_tp_sl_endpoint_contract():
-    """Verifies that /api/research/entry-tp-sl returns full dynamic research values."""
+    """Frozen research output stays blocked without authenticated evidence."""
     response = client.get("/api/research/entry-tp-sl")
-    assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+    assert response.status_code == 200
     data = response.json()
-
-    assert data["research_status"] == "COST_ERASED"
-    assert data["claim_level"] == "C2"
+    assert data["status"] == "BLOCKED"
+    assert data["research_status"] in {"BLOCKED_PROVENANCE_UNVERIFIED", "BLOCKED_AUDIT_FAILURE"}
+    assert data["claim_level"] == "UNVALIDATED"
     assert data["live_capital_authorized"] is False
-    assert data["execution_mode"] == "PAPER_RESEARCH_ONLY"
-    assert "hypothetical_signal" in data
-
-    sig = data["hypothetical_signal"]
-    assert "direction" in sig
-    assert "entry_price" in sig and sig["entry_price"] > 0
-    assert "tp_price" in sig and sig["tp_price"] > 0
-    assert "sl_price" in sig and sig["sl_price"] > 0
-    assert sig["barrier_pair_id"] == "barrier_pair_01"
-    assert sig["k_tp"] == 1.0
-    assert sig["k_sl"] == 1.0
-    assert "volatility_estimator" in sig
-    assert "setup_detected" in sig
-    assert "resolver_version" in sig
-    assert "provenance_status" in sig
+    assert data["execution_mode"] == "READ_ONLY_RESEARCH"
+    assert data["hypothetical_signal"] is None
+    assert data["entry_price"] is None
+    assert data["tp_price"] is None
+    assert data["sl_price"] is None
 
 
-def test_prediction_latest_includes_hypothetical_research_fields():
-    """Verifies that /prediction/latest provides non-actionable hypothetical research values."""
+def test_prediction_latest_includes_empirical_ranges_without_directional_claims(monkeypatch):
+    """The compatibility route exposes empirical ranges, never a fabricated direction."""
+    import api.market_monitor_routes as monitor_routes
+
+    async def fake_market_data(client=None, horizon="24h"):
+        return {
+            "status": "LIVE",
+            "market": {"symbol": "BTC/USD", "source": "test", "price_usd": 100000.0},
+            "technical": {}, "candles": [], "drivers": [],
+            "forecast": {
+                "status": "EXPERIMENTAL_BASELINE", "availability": "AVAILABLE", "horizon": horizon,
+                "spot_price_usd": 100000.0,
+                "price_quantiles_usd": {"p10": 98000.0, "p50": 100000.0, "p90": 102000.0},
+                "return_quantiles_pct": {"p10": -2.0, "p50": 0.0, "p90": 2.0},
+                "direction": "NOT_ESTIMATED", "probability_pct": None, "tp": None, "sl": None,
+                "live_capital_authorized": False, "research_classification": "EXPERIMENTAL_BASELINE",
+                "governance_disclaimer": "Historical distribution baseline only.",
+            },
+            "research": {"status": "BLOCKED_PROVENANCE_UNVERIFIED", "trading_enabled": False},
+        }
+
+    monkeypatch.setattr(monitor_routes, "get_market_dashboard", fake_market_data)
     response = client.get("/prediction/latest")
     assert response.status_code == 200
     data = response.json()
-
-    assert "tp" in data
-    assert "sl" in data
-    assert "entry_price" in data or "btc_price" in data
-    assert data.get("live_capital_authorized") is False
-    assert data.get("research_classification") == "COST_ERASED"
-    assert "governance_disclaimer" in data
+    assert data["status"] == "EXPERIMENTAL_BASELINE"
+    assert data["price_quantiles_usd"]["p10"] <= data["price_quantiles_usd"]["p50"] <= data["price_quantiles_usd"]["p90"]
+    assert data["direction"] == "NOT_ESTIMATED"
+    assert data["probability_pct"] is None
+    assert data["tp"] is None and data["sl"] is None
+    assert data["live_capital_authorized"] is False
+    assert data["research"]["authorized"] is False
 
 
 def test_no_live_order_execution_routes():
@@ -83,17 +93,17 @@ def test_frontend_js_contains_no_prohibited_trade_claims():
     assert "ultra high profit" not in content.lower()
 
 
-def test_frontend_js_contains_hypothetical_and_research_labels():
-    """Audits web/app.js to ensure research status, hypothetical labels, and evidence viewer are present."""
-    app_js_path = os.path.join(os.path.dirname(__file__), "..", "web", "app.js")
-    with open(app_js_path, "r", encoding="utf-8") as f:
-        content = f.read()
-
-    assert "ENTRY / TP / SL RESEARCH MODE" in content
-    assert "COST_ERASED" in content
-    assert "Hypothetical signal" in content
-    assert "No real orders are executed" in content
-    assert "View Research Evidence" in content
-    assert "DATA_UNAVAILABLE" in content
-    assert "PROVENANCE_FAILURE" in content
-    assert "MODEL_FAILURE" in content
+def test_active_frontend_is_single_market_monitor_and_truthful():
+    root = os.path.join(os.path.dirname(__file__), "..", "web")
+    with open(os.path.join(root, "index.html"), "r", encoding="utf-8") as f:
+        html = f.read()
+    with open(os.path.join(root, "market-monitor.js"), "r", encoding="utf-8") as f:
+        js = f.read()
+    active = html + "\n" + js
+    assert "Production forecast blocked" in html
+    assert "market-monitor.js" in html
+    assert "market-monitor.css" in html
+    assert "EXPERIMENTAL BASELINE" in js
+    assert "trading is disabled" in html
+    assert "guaranteed profit" not in active.lower()
+    assert "place order" not in active.lower()

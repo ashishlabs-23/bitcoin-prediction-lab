@@ -103,6 +103,7 @@ ALLOWED_EXTERNAL_DOMAINS: Set[str] = {
     "api.coinbase.com",
     "api.exchange.coinbase.com",
     "api.kraken.com",
+    "www.bitstamp.net",
     "api.bybit.com",
     "community-api.coinmetrics.io",
     "api.coinmetrics.io"
