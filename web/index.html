@@ -1,68 +1,41 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#070a14">
-  <meta name="description" content="Source-backed BTC/USD observations and experimental historical risk ranges.">
-  <title>BTCognitive — BTC/USD Market Monitor</title>
-  <link rel="stylesheet" href="/market-monitor.css?v=1">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BTCognitive — Probabilistic Risk Intelligence</title>
+  <meta name="description" content="Real-time Bitcoin probabilistic risk intelligence powered by conformal range forecasting, volatility structure modeling, and empirical risk filtering." />
+
+
+  <!-- Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧠</text></svg>" />
+
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="/styles.css?v=10.4" />
+
+
+  <!-- Three.js for 3D interactive background -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+
+  <!-- TradingView Lightweight Charts for real-time candlestick rendering -->
+  <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+
+  <!-- React 18 & ReactDOM 18 -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
 </head>
 <body>
-  <header class="topbar">
-    <a class="brand" href="/" aria-label="BTCognitive home"><span class="brand-mark">₿</span><span>BTCognitive</span></a>
-    <div class="topbar-right"><span id="feed-status" class="status-chip status-wait">Connecting to market feeds…</span><span class="live-dot" aria-hidden="true"></span></div>
-  </header>
-  <main class="page-shell">
-    <section class="governance" aria-labelledby="governance-title">
-      <div class="governance-copy"><span class="eyebrow">RESEARCH MODEL STATUS</span><h2 id="governance-title">Production forecast blocked</h2><p>The frozen model's input provenance and evaluation evidence are not authenticated. This app uses a separate transparent historical baseline; trading is disabled.</p></div>
-      <div class="governance-state"><span class="status-chip status-block">BLOCKED · PROVENANCE UNVERIFIED</span><span class="small-muted">Read-only market research</span></div>
-    </section>
+  <div role="status" style="position:sticky;top:0;z-index:10000;padding:10px 16px;background:#3a2410;color:#ffe2b8;text-align:center;font:600 13px/1.4 sans-serif">
+    PREVIEW ONLY — forecasts are unavailable because frozen research inputs are unverified. Figures elsewhere in this legacy interface may be static or historical; trading is disabled.
+  </div>
+  <!-- React Mount Root -->
+  <div id="root"></div>
 
-    <section class="hero-row">
-      <div><p class="eyebrow">BITCOIN · USD SPOT</p><h1>BTC/USD Market Monitor</h1><p class="subtitle">Live market data, measurable drivers and experimental price ranges. No fabricated prices or confidence scores.</p></div>
-      <button id="refresh" class="button-primary" type="button">Refresh data <span aria-hidden="true">↻</span></button>
-    </section>
-
-    <section class="price-grid" aria-label="Current market quote">
-      <article class="panel price-panel"><div class="panel-top"><span class="eyebrow">LATEST SPOT PRICE</span><span id="quote-source" class="tag">Waiting for source</span></div><div id="spot-price" class="spot-price">—</div><div class="metric-foot"><span id="bid-ask">Bid — · Ask —</span><span id="quote-age">Updated —</span></div><div id="quote-time" class="small-muted"></div></article>
-      <article class="panel metric-panel"><span class="eyebrow">24H MOMENTUM</span><strong id="momentum-24h">—</strong><span class="small-muted">Based on closed hourly candles</span></article>
-      <article class="panel metric-panel"><span class="eyebrow">24H REALIZED VOLATILITY</span><strong id="volatility-24h">—</strong><span class="small-muted">Annualization not applied</span></article>
-      <article class="panel metric-panel"><span class="eyebrow">BID–ASK SPREAD</span><strong id="spread">—</strong><span class="small-muted">Source quote, when available</span></article>
-    </section>
-
-    <section class="section-block">
-      <div class="section-heading"><div><p class="eyebrow">OBSERVED HISTORY</p><h2>Recent BTC/USD price</h2></div><span id="candle-meta" class="small-muted">No candle history yet</span></div>
-      <article class="panel chart-panel"><svg id="price-chart" viewBox="0 0 1000 250" role="img" aria-label="Recent hourly BTC/USD closing prices"><text x="500" y="125" text-anchor="middle" class="chart-empty">Waiting for validated candles…</text></svg><div id="chart-range" class="chart-foot"></div></article>
-    </section>
-
-    <section class="section-block">
-      <div class="section-heading"><div><p class="eyebrow">EXPERIMENTAL FORECAST</p><h2>Historical price ranges</h2></div><label class="horizon-control" for="horizon"><span>Horizon</span><select id="horizon"><option value="1h">1 hour</option><option value="4h">4 hours</option><option value="24h" selected>24 hours</option></select></label></div>
-      <div id="forecast-summary" class="panel forecast-intro"><span class="status-chip status-wait">Waiting for enough closed candles</span><p>The forecast will appear only when live price and the minimum independent historical blocks are available.</p></div>
-      <div class="forecast-grid">
-        <article class="panel forecast-card"><span class="quantile-label">P10 · LOWER RANGE</span><strong id="p10-price">—</strong><span id="p10-return" class="small-muted">—</span></article>
-        <article class="panel forecast-card forecast-median"><span class="quantile-label">P50 · MEDIAN</span><strong id="p50-price">—</strong><span id="p50-return" class="small-muted">—</span></article>
-        <article class="panel forecast-card"><span class="quantile-label">P90 · UPPER RANGE</span><strong id="p90-price">—</strong><span id="p90-return" class="small-muted">—</span></article>
-      </div>
-      <div class="forecast-note"><span>How to read it</span><p>P10–P90 is an empirical central 80% historical return band, <strong>not</strong> a calibrated 90% confidence interval. P50 is the historical median, not a guaranteed target. Backtest results below do not establish profitability.</p></div>
-      <div class="section-heading backtest-heading"><div><p class="eyebrow">ROLLING-ORIGIN CHECK</p><h2>Baseline evaluation</h2></div><span id="backtest-status" class="status-chip status-wait">Not evaluated</span></div>
-      <div class="metric-grid backtest-grid"><article class="panel metric-panel"><span class="eyebrow">OUT-OF-SAMPLE BLOCKS</span><strong id="test-blocks">—</strong><span class="small-muted">Non-overlapping historical periods</span></article><article class="panel metric-panel"><span class="eyebrow">RANGE COVERAGE</span><strong id="coverage">—</strong><span class="small-muted">Observed P10–P90 containment</span></article><article class="panel metric-panel"><span class="eyebrow">MEDIAN ABSOLUTE ERROR</span><strong id="forecast-mae">—</strong><span class="small-muted">Median forecast vs realized return</span></article><article class="panel metric-panel"><span class="eyebrow">ZERO-RETURN BASELINE MAE</span><strong id="baseline-mae">—</strong><span class="small-muted">Naive comparator</span></article></div>
-      <p id="backtest-note" class="small-muted backtest-note">No evaluation result available yet.</p>
-    </section>
-
-    <section class="section-block">
-      <div class="section-heading"><div><p class="eyebrow">WHAT IS MOVING</p><h2>Market drivers</h2><p class="section-desc">Indicators are calculated from the displayed provider's closed BTC/USD hourly candles. Derivatives use a separate USDT perpetual instrument.</p></div></div>
-      <div id="driver-grid" class="driver-grid"><article class="panel driver-card"><span class="small-muted">Waiting for source-backed observations…</span></article></div>
-    </section>
-
-    <section class="section-block source-grid">
-      <article class="panel source-panel"><div class="section-heading"><div><p class="eyebrow">DERIVATIVES CONTEXT</p><h2>BTCUSDT perpetual</h2></div><span id="derivatives-status" class="status-chip status-wait">Loading</span></div><p class="small-muted">USDT-quoted derivatives are context only, not substituted for BTC/USD spot.</p><div class="source-values"><div><span>Funding rate</span><strong id="funding-rate">—</strong></div><div><span>Open interest</span><strong id="open-interest">—</strong></div><div><span>Mark price</span><strong id="mark-price">—</strong></div></div></article>
-      <article class="panel source-panel"><div class="section-heading"><div><p class="eyebrow">EXTERNAL CONTEXT</p><h2>Flows & macro</h2></div><span class="status-chip status-muted">Partial coverage</span></div><div class="availability-row"><div><strong>ETF / exchange flows</strong><span id="flows-state">Not configured</span></div><div><strong>Macroeconomic series</strong><span id="macro-state">Not configured</span></div></div><p class="small-muted">No ETF-flow or FRED-derived values are estimated when a verified provider is not configured.</p></article>
-    </section>
-
-    <section class="panel footer-panel"><div><p class="eyebrow">MODEL HONESTY</p><h2>One interface, explicit evidence states</h2><p>Current predictions are transparent historical-distribution baselines. The authenticated production model, directional probabilities, take-profit/stop-loss levels and real-money trading remain disabled.</p></div><div id="provider-errors" class="small-muted">Provider diagnostics will appear here when needed.</div></section>
-    <footer><span>BTCognitive · Read-only research</span><span id="last-refresh">No successful refresh yet</span></footer>
-  </main>
-  <script src="/market-monitor.js?v=1" defer></script>
+  <!-- Native React Application Script -->
+  <script src="/app.js?v=10.4"></script>
 </body>
 </html>

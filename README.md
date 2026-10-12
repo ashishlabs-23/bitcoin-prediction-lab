@@ -1,19 +1,16 @@
-# BTCognitive — BTC/USD Market Monitor
+# BTCognitive — Research Terminal
 
-BTCognitive serves one active read-only market-monitor application. It displays source-backed BTC/USD spot observations, closed hourly candles, technical features, optional derivatives context, and an **experimental historical-distribution forecast**. The authenticated production model remains blocked while frozen inputs and evaluation evidence are unverified.
+BTCognitive serves one web frontend: the full Research Terminal in `web/index.html`, powered by `web/app.js` and `web/styles.css`. The separate market-monitor page has been removed; its read-only market APIs remain available to the terminal and API clients. A visible preview notice warns that some legacy figures may be static or historical. Frozen model inputs remain unverified, so production forecasts and trading are disabled.
 
-## What the application does
+## Market data and API
 
-- Retrieves BTC/USD quotes and hourly candles through public Coinbase, Bitstamp and Kraken endpoints. It fails over between providers without blending different instruments into a synthetic spot price.
-- Shows quote retrieval time, candle freshness, bid–ask spread, cross-venue quote divergence and source/provider errors.
-- Calculates momentum, recent realized volatility, RSI and relative volume from validated closed BTC/USD candles.
-- Displays Binance BTCUSDT perpetual funding/open interest as a separate USDT-quoted derivatives context; these values are never substituted for BTC/USD spot.
-- Estimates 1h, 4h and 24h P10/P50/P90 prices from non-overlapping historical log returns when enough complete history is available.
-- Calculates a rolling-origin historical check against a zero-return baseline when the sample is large enough.
+The backend provides BTC/USD quotes and hourly candles through public Coinbase, Bitstamp and Kraken endpoints, with explicit provider/source states and no synthetic cross-instrument spot price. It calculates momentum, recent realized volatility, RSI and relative volume from validated closed candles. Binance BTCUSDT perpetual data remains a separate derivatives context.
+
+The API can expose experimental 1h, 4h and 24h historical-distribution ranges when live data and sufficient history are available. Those ranges are not forecasts from the frozen production model and do not establish predictive or economic superiority.
 
 ## Forecast limits
 
-The active range estimator is an empirical baseline, **not** the frozen HAR-RS-DOW/conformal production model and not an ML model trained to predict direction. P10–P90 represents a nominal **central 80% historical quantile band**, not a calibrated 90% confidence interval. P50 is the historical median; directional probability, TP/SL targets and order execution are intentionally absent.
+Any range estimator exposed by the API is an empirical baseline, **not** the frozen HAR-RS-DOW/conformal production model and not an ML model trained to predict direction. P10–P90 represents a nominal **central 80% historical quantile band**, not a calibrated 90% confidence interval. P50 is the historical median; directional probability, TP/SL targets and order execution are intentionally absent.
 
 Historical walk-forward measurements are descriptive; they do not establish a durable edge or profitability. Production forecasts remain blocked until exact data/artifact lineage, untouched evaluation evidence and formal research authorization are authenticated. Do not add fabricated prices, performance metrics, confidence scores, datasets or fallback trade targets to bypass this gate.
 

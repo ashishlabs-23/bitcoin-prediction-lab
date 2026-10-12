@@ -93,17 +93,25 @@ def test_frontend_js_contains_no_prohibited_trade_claims():
     assert "ultra high profit" not in content.lower()
 
 
-def test_active_frontend_is_single_market_monitor_and_truthful():
+def test_active_frontend_is_the_research_terminal_and_discloses_forecast_gate():
     root = os.path.join(os.path.dirname(__file__), "..", "web")
     with open(os.path.join(root, "index.html"), "r", encoding="utf-8") as f:
         html = f.read()
-    with open(os.path.join(root, "market-monitor.js"), "r", encoding="utf-8") as f:
-        js = f.read()
-    active = html + "\n" + js
-    assert "Production forecast blocked" in html
-    assert "market-monitor.js" in html
-    assert "market-monitor.css" in html
-    assert "EXPERIMENTAL BASELINE" in js
+    with open(os.path.join(root, "app.js"), "r", encoding="utf-8") as f:
+        app_js = f.read()
+    served = client.get("/")
+    assert served.status_code == 200
+    assert "BTCognitive — Probabilistic Risk Intelligence" in served.text
+    assert "/app.js?v=10.4" in served.text
+    assert '<title>BTCognitive — Probabilistic Risk Intelligence</title>' in html
+    assert '/styles.css?v=10.4' in html
+    assert '/app.js?v=10.4' in html
+    assert "BTCognitive Research Terminal" in app_js
+    assert "PREVIEW ONLY" in html
+    assert "frozen research inputs are unverified" in html
     assert "trading is disabled" in html
-    assert "guaranteed profit" not in active.lower()
-    assert "place order" not in active.lower()
+    assert "market-monitor" not in html
+    assert not os.path.exists(os.path.join(root, "market-monitor.js"))
+    assert not os.path.exists(os.path.join(root, "market-monitor.css"))
+    assert "guaranteed profit" not in (html + "\n" + app_js).lower()
+    assert "place order" not in (html + "\n" + app_js).lower()
