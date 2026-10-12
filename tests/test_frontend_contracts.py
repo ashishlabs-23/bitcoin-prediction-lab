@@ -111,7 +111,6 @@ def test_active_frontend_is_the_research_terminal_and_discloses_forecast_gate():
     assert "frozen research inputs are unverified" in html
     assert "trading is disabled" in html
     assert "market-monitor" not in html
-    assert not os.path.exists(os.path.join(root, "market-monitor.js"))
-    assert not os.path.exists(os.path.join(root, "market-monitor.css"))
+    assert sorted(os.listdir(root)) == ["app.js", "index.html", "styles.css"]
     assert "guaranteed profit" not in (html + "\n" + app_js).lower()
     assert "place order" not in (html + "\n" + app_js).lower()
