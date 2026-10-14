@@ -10,8 +10,8 @@ Verifies:
 
 import pytest
 from fastapi import HTTPException
-from config.security import UserRole, API_KEYS_ENV
-from api.security_auth import require_role, get_current_user_role
+from config.security import UserRole, _build_api_key_roles
+from api.security_auth import API_KEYS_ENV, require_role, get_current_user_role
 
 class MockRequest:
     def __init__(self, path="/test", headers=None, host="127.0.0.1"):
@@ -24,17 +24,26 @@ def test_unauthenticated_role_is_public():
     role = get_current_user_role(req, api_key=None, bearer=None)
     assert role == UserRole.PUBLIC
 
-def test_valid_user_key_authentication():
-    user_key = list(API_KEYS_ENV.keys())[0]
+def test_explicitly_configured_user_key_authentication(monkeypatch):
+    user_key = "pytest-configured-user-key"
+    monkeypatch.setitem(API_KEYS_ENV, user_key, UserRole.USER)
     req = MockRequest()
     role = get_current_user_role(req, api_key=user_key, bearer=None)
-    assert role in [UserRole.USER, UserRole.RESEARCH, UserRole.ADMIN]
+    assert role == UserRole.USER
 
 def test_invalid_key_raises_401():
     req = MockRequest()
     with pytest.raises(HTTPException) as exc:
         get_current_user_role(req, api_key="malicious-invalid-key-999", bearer=None)
     assert exc.value.status_code == 401
+
+
+def test_duplicate_api_keys_fail_closed():
+    with pytest.raises(RuntimeError, match="unique across configured roles"):
+        _build_api_key_roles([
+            ("reused-key", UserRole.USER),
+            ("reused-key", UserRole.ADMIN),
+        ])
 
 def test_role_hierarchy_authorization():
     user_verifier = require_role(UserRole.USER)

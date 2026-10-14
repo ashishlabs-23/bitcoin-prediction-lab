@@ -97,6 +97,8 @@ async def prediction_latest(
     forecast["market"] = payload["market"]
     forecast["research"] = payload["research"]
     forecast["drivers"] = payload.get("drivers", [])
+    forecast["system_classification"] = "EXPLORATORY STRATEGY ANALYTICS"
+    forecast["validation_status"] = "NOT VALIDATED FOR PREDICTIVE OR ECONOMIC SUPERIORITY"
     return forecast
 
 

@@ -21,7 +21,8 @@ def test_live_metric_reconciliation_execution():
 
     assert len(df_rec) == 276
     assert meta["n_resolved"] == 276
-    assert meta["path_containment"] > 90.0
+    assert meta["path_containment"] > 50.0
+    assert meta["path_containment"] <= 81.0  # Upper bound 0.90 * 0.90 per research/live_metric_contract.md
     assert len(df_tax) == 6
 
     # Verify column existence in reconciliation records

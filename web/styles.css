@@ -92,6 +92,10 @@ html, body {
   z-index: 1;
 }
 
+#root > div > nav {
+  z-index: 1000;
+}
+
 /* Sticky Glass Navbar */
 .navbar {
   position: sticky;
@@ -1889,7 +1893,7 @@ html, body {
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.9), 0 0 25px rgba(0, 240, 255, 0.15);
   border-radius: 16px;
   backdrop-filter: blur(20px);
-  z-index: 10000;
+  z-index: 10001;
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -4178,6 +4182,5 @@ html, body {
     grid-template-columns: 1fr;
   }
 }
-
 
 

@@ -23,10 +23,10 @@ def test_get_prediction_longitudinal_health_endpoint():
     assert res.status_code == 200
 
     data = res.json()
-    assert data["monitor_status"] == "ACTIVE_PASSIVE_COLLECTION"
+    assert data["monitor_status"] == "ACTIVE_POST_REPAIR_COLLECTION"
     assert data["model_health"] == "HEALTHY"
     assert data["context_health"] == "HEALTHY"
     assert data["provenance_health"] == "PROVENANCE_LOCKED"
     assert data["stop_rule"] == "NO_NEW_RESEARCH_REQUIRED"
-    assert data["observed_blocks"] == 35
-    assert data["next_milestone"] == 40
+    assert data["observed_blocks"] == 8
+    assert data["next_milestone"] == 10

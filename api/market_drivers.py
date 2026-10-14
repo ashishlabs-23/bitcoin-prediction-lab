@@ -391,6 +391,14 @@ def build_empirical_forecast(
         "live_capital_authorized": False,
         "execution_mode": "READ_ONLY_RESEARCH",
         "research_authorization": "BLOCKED_PROVENANCE_UNVERIFIED",
+        "horizon": horizon,
+        "horizon_hours": horizon_hours,
+        "direction": "NOT_ESTIMATED",
+        "probability": None,
+        "probability_pct": None,
+        "tp": None,
+        "sl": None,
+        "price_quantiles_usd": None,
         "governance_disclaimer": (
             "This is a transparent historical-distribution baseline, not the authenticated production model "
             "and not a trading signal. Historical quantiles may fail during regime changes."

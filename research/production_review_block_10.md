@@ -4,6 +4,6 @@
 
 - **Evaluated Blocks**: `11` non-overlapping 24h intervals
 - **Challenger Bake-Off Verdict**: `RETAIN_PRODUCTION_RIDGE`
-- **Paired Permutation p-value**: `0.0680`
+- **Paired Permutation p-value**: `0.9550`
 - **Provenance Status**: `VERIFIED`
 - **Final Governance Action**: `MAINTAIN_PRODUCTION_RIDGE_WITHOUT_RETRAINING`

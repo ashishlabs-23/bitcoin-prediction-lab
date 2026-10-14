@@ -19,19 +19,20 @@ import json
 import argparse
 from datetime import datetime, timezone, timedelta
 from collections import Counter
+import pandas as pd
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from backtest.market_memory import load_market_memory
+
 
 def load_prediction_db():
-    """Load prediction records from the SQLite market memory database."""
-    try:
-        from models.market_memory import load_recent_predictions
-        records = load_recent_predictions(limit=500)
-        return records
-    except Exception as e:
-        print(f"⚠️  Could not load prediction DB: {e}")
-        return []
+    """Load prediction records from the supported market-memory store."""
+    frame = load_market_memory()
+    if frame.empty:
+        raise RuntimeError("No prediction records are available; report was not generated.")
+    records = frame.tail(500).astype(object).where(pd.notna(frame.tail(500)), None)
+    return records.to_dict(orient="records")
 
 
 def analyze_signals(records, days=7):
@@ -130,5 +131,7 @@ if __name__ == "__main__":
 
     records = load_prediction_db()
     metrics = analyze_signals(records, days=args.days)
+    if "error" in metrics:
+        raise SystemExit(f"{metrics['error']}; report was not generated.")
     print_report(metrics)
     save_report(metrics)

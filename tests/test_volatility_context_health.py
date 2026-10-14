@@ -1,10 +1,4 @@
-"""
-tests/test_volatility_context_health.py — Unit Tests for Range Health API with Context Metrics
-==============================================================================================
-Verifies:
-1. Exposure of active_context_version and context_status in GET /prediction/range/health
-2. Tracking of live context drift and fallback counters
-"""
+"""Range-health API must not expose unverified context metrics."""
 
 import os
 import sys
@@ -23,9 +17,10 @@ def test_get_prediction_range_health_context_metrics():
     assert response.status_code == 200
 
     data = response.json()
-    assert data["active_context_version"] == "v1.0.0-volatility-bridge-context"
-    assert data["context_status"] == "CONTEXT_HEALTHY"
-    assert data["context_coverage"] == 91.10
-    assert data["context_fallback_count"] == 0
-    assert data["combined_model_version"] == "v3.0.0-ridge-volatility-context"
-    assert data["baseline_delta"] == -0.0140
+    assert data["status"] == "BLOCKED_PROVENANCE_UNVERIFIED"
+    assert data["production_model_status"] == "BLOCKED"
+    assert data["production_forecast_available"] is False
+    assert data["trading_enabled"] is False
+    assert data["observed_coverage_pct"] is None
+    assert data["sample_size"] is None
+    assert data["reason"]

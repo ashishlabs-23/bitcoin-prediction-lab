@@ -54,7 +54,11 @@ class DirectionOverlayService:
         """
         asym = exp_mfe / (exp_mae + 1e-6)
 
-        if directional_prob >= 0.65 and asym >= self.min_asymmetry_upside:
+        if uncertainty_level == "HIGH_DISPERSION":
+            state = "HIGH_UNCERTAINTY_ABSTAIN"
+            conf = "LOW"
+            expl = "Model dispersion precludes reliable risk boundaries."
+        elif directional_prob >= 0.65 and asym >= self.min_asymmetry_upside:
             state = "BULLISH"
             conf = "HIGH" if uncertainty_level == "NORMAL" else "MODERATE"
             expl = f"Bullish excursion asymmetry ({asym:.2f}x) with elevated directional probability ({directional_prob*100:.1f}%). Secondary exploratory signal only."
@@ -62,6 +66,18 @@ class DirectionOverlayService:
             state = "BEARISH"
             conf = "HIGH" if uncertainty_level == "NORMAL" else "MODERATE"
             expl = f"Bearish adverse excursion ({asym:.2f}x) with downside directional probability ({directional_prob*100:.1f}%). Secondary exploratory signal only."
+        elif asym >= self.min_asymmetry_upside:
+            state = "UPWARD_VOLATILITY_SKEW"
+            conf = "MODERATE"
+            expl = f"Upward excursion asymmetry ({asym:.2f}x) observed. Volatility skew only, not a trade signal."
+        elif asym <= self.max_asymmetry_downside:
+            state = "DOWNWARD_VOLATILITY_SKEW"
+            conf = "MODERATE"
+            expl = f"Downward excursion asymmetry ({asym:.2f}x) observed. Volatility skew only, not a trade signal."
+        elif uncertainty_level == "NORMAL" and 0.90 <= asym <= 1.10:
+            state = "SYMMETRIC_VOLATILITY"
+            conf = "HIGH"
+            expl = "Upper and lower excursions are balanced. Symmetric volatility structure."
         else:
             state = "NO_DIRECTIONAL_EDGE"
             conf = "HIGH"

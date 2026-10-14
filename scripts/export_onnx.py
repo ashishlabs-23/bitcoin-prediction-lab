@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""
-ONNX Model Exporter Utility
-===========================
-Exports trained Scikit-Learn and XGBoost baseline estimators into
-portable ONNX runtime artifacts for microsecond edge execution.
+"""Check whether optional ONNX conversion and runtime packages are installed.
+
+This utility only checks toolchain readiness; it does not export a model.
 """
 
 import os

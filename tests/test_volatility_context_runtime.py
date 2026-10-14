@@ -1,10 +1,4 @@
-"""
-tests/test_volatility_context_runtime.py — Unit Tests for Production Runtime Path
-================================================================================
-Verifies:
-1. End-to-end execution of the combined Ridge + Volatility Context pipeline
-2. Inclusion of context fields in GET /prediction/range
-"""
+"""Production forecasts remain blocked while safe empirical baselines are non-authorizing."""
 
 import os
 import sys
@@ -32,7 +26,12 @@ def test_get_prediction_range_context_fields():
     assert response.status_code == 200
 
     data = response.json()
-    assert data["model_version"] == "v3.0.0-excursion-ridge-conformal"
-    assert data["context_version"] == "v1.0.0-volatility-bridge-context"
-    assert data["context_status"] == "CONTEXT_HEALTHY"
-    assert "volatility_state" in data
+    assert data["forecast_mode"] == "EXPERIMENTAL_BASELINE"
+    assert data["research_authorization"] == "BLOCKED_PROVENANCE_UNVERIFIED"
+    assert data["validation_status"] == "NOT_VALIDATED_FOR_TRADING"
+    assert data["live_capital_authorized"] is False
+    assert data["direction"] == "NOT_ESTIMATED"
+    assert data["probability"] is None
+    assert "model_version" not in data
+    assert "context_version" not in data
+    assert data["availability"] in {"AVAILABLE", "UNAVAILABLE"}

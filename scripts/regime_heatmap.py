@@ -20,16 +20,23 @@ from collections import defaultdict
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from data.loader import get_features_df
+from models.train_baselines import make_dataset
 
 REGIMES = ["TRENDING_BULL", "TRENDING_BEAR", "RANGING", "HIGH_VOLATILITY", "BREAKOUT"]
 
 
 def classify_regime(row) -> str:
-    """Simple regime classifier based on feature thresholds."""
-    trend   = float(row.get("trend_score", 0.0))
-    vol     = float(row.get("realized_vol_24h", 0.02))
-    rsi     = float(row.get("rsi_14", 50.0))
+    """Classify rows only when the feature dataset contains the calibrated trend score."""
+    required = ("trend_score", "realized_vol_24h", "rsi_14")
+    missing = [name for name in required if name not in row]
+    if missing:
+        raise ValueError(
+            "Regime classification requires processed features "
+            f"{', '.join(missing)}; rebuild the supported feature dataset first."
+        )
+    trend = float(row["trend_score"])
+    vol = float(row["realized_vol_24h"])
+    rsi = float(row["rsi_14"])
 
     if vol > 0.04:
         return "HIGH_VOLATILITY"
@@ -102,9 +109,16 @@ def save_csv(probs, path="heatmap_regime_transitions.csv"):
 
 
 if __name__ == "__main__":
-    print("Loading historical features...")
-    df = get_features_df()
-    print(f"  Loaded {len(df):,} candles.")
+    print("Loading processed feature history...")
+    df, _, _ = make_dataset()
+    print(f"  Loaded {len(df):,} feature rows.")
+    required_features = {"trend_score", "realized_vol_24h", "rsi_14"}
+    missing_features = required_features.difference(df.columns)
+    if missing_features:
+        raise SystemExit(
+            "Processed feature dataset is incompatible; missing required features: "
+            + ", ".join(sorted(missing_features))
+        )
 
     counts, probs = compute_transition_matrix(df)
     print_heatmap(probs)

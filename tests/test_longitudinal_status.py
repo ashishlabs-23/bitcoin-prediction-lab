@@ -19,10 +19,12 @@ def test_longitudinal_status_report_structure():
     status = longitudinal_status_service.get_status_report()
 
     assert isinstance(status, LongitudinalStatusReport)
-    assert status.observed_blocks == 35
+    assert status.observed_blocks == 8
     assert status.target_blocks == 90
-    assert status.next_milestone_block == 40
-    assert status.progress_pct == 38.9
-    assert status.observed_metrics["mfe_error_pct"] == 0.3970
-    assert len(status.milestone_targets) == 5
-    assert status.milestone_targets[0]["status"] == "NOT_YET_OBSERVED"
+    assert status.next_milestone_block == 10
+    assert status.progress_pct == 8.89
+    assert status.observed_metrics["mfe_error_pct"] == 0.3980
+    assert len(status.milestone_targets) == 7
+    assert status.milestone_targets[0]["target_block"] == 5
+    assert status.milestone_targets[0]["status"] == "OBSERVED"
+    assert status.archived_pre_repair_evidence["archived_blocks"] == 35

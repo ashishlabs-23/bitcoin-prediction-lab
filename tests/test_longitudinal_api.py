@@ -25,11 +25,12 @@ def test_get_prediction_longitudinal_endpoint():
 
     data = res.json()
     assert data["governance_mode"] == "LONGITUDINAL_MONITORING_ACTIVE"
-    assert data["observed_blocks"] == 35
+    assert data["observed_blocks"] == 8
+    assert data["archived_pre_repair_evidence"]["archived_blocks"] == 35
     assert data["target_blocks"] == 90
-    assert data["next_milestone_block"] == 40
-    assert data["observed_metrics"]["model_status"] == "MODEL_STABLE"
-    assert data["hawkes_shadow_progress"]["role"] == "VALIDATED_SHADOW_MODEL"
+    assert data["next_milestone_block"] == 10
+    assert data["observed_metrics"]["model_status"] == "MODEL_FROZEN"
+    assert data["hawkes_shadow_progress"]["role"] == "VALIDATED_SHADOW_ONLY"
 
 
 def test_get_research_next_trigger_endpoint():
@@ -46,8 +47,8 @@ def test_get_prediction_intelligence_health_longitudinal_fields():
     assert res.status_code == 200
 
     data = res.json()
-    assert data["production_blocks"] == 35
-    assert data["production_N_eff"] == 33.4
-    assert data["production_baseline_delta_bps"] == -14.1
+    assert data["production_blocks"] == 8
+    assert data["production_N_eff"] == 141.08
+    assert data["production_baseline_delta_bps"] == -14.0
     assert data["context_status"] == "CONTEXT_STABLE"
     assert data["shadow_hawkes_N_eff"] == 135.0

@@ -12,7 +12,7 @@ import numpy as np
 
 # Add parent directory to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from data.ingest import make_dataset
+from models.train_baselines import make_dataset
 
 
 def run_health_audit():

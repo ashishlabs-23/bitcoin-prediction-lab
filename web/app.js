@@ -1,8 +1,8 @@
 /* ==========================================================================
-   BTCognitive — Live Binance Chart + AI Prediction Overlay
+   BTCognitive — Live Coinbase BTC-USD Chart + Research Terminal
    Architecture:
-     • Binance REST  → seed 200 candles instantly on load / interval change
-     • Binance WSS   → wss://stream.binance.com:9443/ws/btcusdt@kline_<interval>
+     • Coinbase REST → seed candles on load / interval change
+     • Coinbase WSS  → BTC-USD ticker; update the active interval candle
      • lightweight-charts → candleSeries.update(bar) — O(1), no full redraws
      • Backend REST  → AI prediction/history every 30 s
      • Backend WSS   → engine connection status only
@@ -23,6 +23,13 @@ function getApiBaseUrl() {
     return window.location.origin;
   }
   return "http://localhost:8000";
+}
+
+function hasVerifiedResearchAuthorization(payload) {
+  const gate = payload?.research || payload?.research_gate;
+  return gate?.authorized === true
+    && gate?.provenance_status === "VERIFIED"
+    && gate?.production_forecast_available === true;
 }
 
 function setApiBaseUrl(url) {
@@ -62,14 +69,14 @@ async function validateBackendUrl(candidateUrl) {
     }
   }
 
+  let timeoutId = null;
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    timeoutId = setTimeout(() => controller.abort(), 6000);
     const res = await fetch(`${cleanUrl}/health`, {
       signal: controller.signal,
       headers: { "Accept": "application/json" }
     });
-    clearTimeout(timeoutId);
 
     if (!res.ok) {
       return {
@@ -105,6 +112,8 @@ async function validateBackendUrl(candidateUrl) {
       valid: false,
       error: `Connection failed: ${err.message || "Network/CORS error"}. Ensure backend is running with CORS enabled.`
     };
+  } finally {
+    if (timeoutId !== null) clearTimeout(timeoutId);
   }
 }
 
@@ -113,23 +122,59 @@ const INTERVAL_MAP = {
   "1H": "1h", "4H": "4h", "1D": "1d"
 };
 
-// Step size in seconds for each Binance interval (used for future-candle projection)
+// Candle widths are UTC-aligned, matching the exchange candle timestamps.
 const INTERVAL_STEP = {
   "1m": 60, "5m": 300, "15m": 900,
   "1h": 3600, "4h": 14400, "1d": 86400
 };
 
-// Coinbase Exchange public endpoints — native BTC-USD spot with ultra-fast 50Hz ticker feed
+const COINBASE_GRANULARITY = {
+  "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "4h": 3600, "1d": 86400
+};
+
+function candleBucketStart(epochSeconds, intervalSeconds) {
+  return Math.floor(epochSeconds / intervalSeconds) * intervalSeconds;
+}
+
+function formatCandleCountdown(remainingSeconds) {
+  const seconds = Math.max(0, Math.floor(remainingSeconds));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainder = seconds % 60;
+  return hours > 0
+    ? `${hours}h ${String(minutes).padStart(2, "0")}m ${String(remainder).padStart(2, "0")}s`
+    : `${minutes}m ${String(remainder).padStart(2, "0")}s`;
+}
+
+function aggregateCandles(candles, intervalSeconds, sourceIntervalSeconds) {
+  const grouped = new Map();
+  for (const candle of candles) {
+    const bucket = candleBucketStart(candle.time, intervalSeconds);
+    const group = grouped.get(bucket) || [];
+    group.push(candle);
+    grouped.set(bucket, group);
+  }
+
+  const currentBucket = candleBucketStart(Date.now() / 1000, intervalSeconds);
+  const expectedCandles = intervalSeconds / sourceIntervalSeconds;
+  return [...grouped.entries()]
+    .filter(([time, group]) => group.length === expectedCandles || time === currentBucket)
+    .map(([time, group]) => ({
+      time,
+      open: group[0].open,
+      high: Math.max(...group.map(candle => candle.high)),
+      low: Math.min(...group.map(candle => candle.low)),
+      close: group[group.length - 1].close,
+      volume: group.reduce((total, candle) => total + candle.volume, 0)
+    }));
+}
+
+// Coinbase Exchange public BTC-USD market-data endpoints.
 const COINBASE_REST = (interval) => {
-  const granMap = { "1h": 3600, "4h": 14400, "1d": 86400 };
-  const gran = granMap[interval] || 3600;
+  const gran = COINBASE_GRANULARITY[interval];
   return `https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=${gran}`;
 };
 const COINBASE_WSS = "wss://ws-feed.exchange.coinbase.com";
-
-// Fallback Binance public endpoint
-const BINANCE_REST = (interval, limit) =>
-  `https://dapi.binance.com/dapi/v1/klines?symbol=BTCUSD_PERP&interval=${interval}&limit=${limit}`;
 
 // ---------------------------------------------------------------------------
 // EMA helpers — O(1) incremental, never recalculate the whole array
@@ -193,7 +238,17 @@ const api = {
   async fetchMarketLatest() {
     const res = await fetch(`${getApiBaseUrl()}/market/latest`);
     if (!res.ok) throw new Error("market/latest failed");
-    return res.json();
+    const data = await res.json();
+    const technical = data?.technical || {};
+    return {
+      ...data,
+      change_pct_24h: typeof technical.momentum_24h_pct === "number" ? technical.momentum_24h_pct : null,
+      high_24h: typeof technical.high_24h_usd === "number" ? technical.high_24h_usd : null,
+      low_24h: typeof technical.low_24h_usd === "number" ? technical.low_24h_usd : null,
+      realized_volatility_24h_pct: typeof technical.realized_volatility_24h_pct === "number"
+        ? technical.realized_volatility_24h_pct
+        : null
+    };
   },
   async fetchCounterfactual(topK = 5) {
     const res = await fetch(`${getApiBaseUrl()}/prediction/counterfactual?top_k=${topK}`);
@@ -225,8 +280,8 @@ const api = {
     if (!res.ok) throw new Error("prediction/range failed");
     return res.json();
   },
-  async fetchRangePath(horizon = 24) {
-    const res = await fetch(`${getApiBaseUrl()}/prediction/range/path?horizon=${horizon}`);
+  async fetchRangePath(horizon = "24h") {
+    const res = await fetch(`${getApiBaseUrl()}/prediction/range/path?horizon=${encodeURIComponent(horizon)}`);
     if (!res.ok) throw new Error("prediction/range/path failed");
     return res.json();
   },
@@ -277,20 +332,25 @@ const api = {
     if (!res.ok) throw new Error("notifications/settings failed");
     return res.json();
   },
-  async updateNotificationSettings(settings) {
+  async updateNotificationSettings(settings, adminKey) {
+    const key = adminKey?.trim();
+    if (!key) throw new Error("Admin API key is required to save notification settings.");
     const res = await fetch(`${getApiBaseUrl()}/api/notifications/settings`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-API-Key": key },
       body: JSON.stringify(settings)
     });
-    if (!res.ok) throw new Error("update settings failed");
+    if (!res.ok) throw new Error(`Saving notification settings failed (HTTP ${res.status}). Check the admin API key.`);
     return res.json();
   },
-  async triggerTestAlert() {
+  async triggerTestAlert(adminKey) {
+    const key = adminKey?.trim();
+    if (!key) throw new Error("Admin API key is required to send a notification test.");
     const res = await fetch(`${getApiBaseUrl()}/api/notifications/test`, {
-      method: "POST"
+      method: "POST",
+      headers: { "X-API-Key": key }
     });
-    if (!res.ok) throw new Error("test alert failed");
+    if (!res.ok) throw new Error(`Notification test failed (HTTP ${res.status}). Check the admin API key.`);
     return res.json();
   },
   async fetchActivePaperPosition(strategyName = null, indicators = null, userDirection = "AUTO", horizon = "15m", evidenceMode = "AI_RECOMMEND", signalMode = "live_ai") {
@@ -470,9 +530,14 @@ function requestNotificationPermission() {
 function showBrowserNotification(alert) {
   if (!("Notification" in window) || Notification.permission !== "granted") return;
   try {
-    const title = `🚨 ${alert.tier_title || "HIGH PROFIT ALERT"} (${alert.direction})`;
+    const isTest = alert.is_test === true;
+    const title = isTest
+      ? "BTCognitive notification test"
+      : `🚨 ${alert.tier_title || "Market observation"} (${alert.direction})`;
     const options = {
-      body: `🎯 Entry: $${alert.entry_price?.toLocaleString()} | TP: $${alert.target_profit_price?.toLocaleString()} (+${alert.target_profit_pct}%) | Score: ${alert.opportunity_score}/100\n${alert.rationale || ""}`,
+      body: isTest
+        ? (alert.rationale || "Test notification only; this is not a market signal.")
+        : `🎯 Entry: $${alert.entry_price?.toLocaleString()} | TP: $${alert.target_profit_price?.toLocaleString()} (+${alert.target_profit_pct}%) | Score: ${alert.opportunity_score}/100\n${alert.rationale || ""}`,
       icon: "https://cryptologos.cc/logos/bitcoin-btc-logo.png",
       tag: alert.id || "btc_opp_alert",
       renotify: true
@@ -548,107 +613,77 @@ class BackendWSManager {
 const backendWS = new BackendWSManager();
 
 // ===========================================================================
-// useBinanceFeed — the core live data hook
-//
-// Responsibilities:
-//   1. fetchHistory(interval) → Coinbase REST → seed candles
-//   2. connectBinanceWS(interval) → wss://ws-feed.exchange.coinbase.com → ticker
-//   3. Updates live price and tick handlers
-//   4. Returns { wsStatus, seedCandles, onTickRef, livePrice }
+// useCoinbaseFeed — quote, candles, and timestamps all use Coinbase BTC-USD.
 // ===========================================================================
-function useBinanceFeed(interval) {
+function useCoinbaseFeed(interval) {
   const [wsStatus,    setWsStatus]    = useState("disconnected");
   const [seedCandles, setSeedCandles] = useState([]);
   const [livePrice,   setLivePrice]   = useState(0);
+  const [exchangeClock, setExchangeClock] = useState(null);
+  const [historyStatus, setHistoryStatus] = useState("loading");
 
   const wsRef          = useRef(null);
   const reconnTimeout  = useRef(null);
   const attemptsRef    = useRef(0);
   const intervalRef    = useRef(interval);
   const aliveRef       = useRef(true);
+  const historyRequestRef = useRef(0);
+  const historyControllerRef = useRef(null);
 
   // Chart component plugs its update handler here
   const onTickRef = useRef(null);
 
   // ------------------------------------------------------------------
-  // Step 1 — REST seed: multi-tier candle fetch (Coinbase -> Binance Futures -> Binance Spot -> Local)
+  // Step 1 — REST seed. Coinbase's 4h view is built from four aligned hourly candles.
   // ------------------------------------------------------------------
   const fetchHistory = useCallback(async (iv) => {
-    // 1. Try Coinbase REST
+    const requestId = ++historyRequestRef.current;
+    const controller = new AbortController();
+    historyControllerRef.current?.abort();
+    historyControllerRef.current = controller;
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    setSeedCandles([]);
+    setLivePrice(0);
+    setHistoryStatus("loading");
     try {
-      const res = await fetch(COINBASE_REST(iv));
+      const sourceInterval = iv === "4h" ? "1h" : iv;
+      const res = await fetch(COINBASE_REST(sourceInterval), { signal: controller.signal });
       if (!res.ok) throw new Error(`Coinbase REST ${res.status}`);
       const raw = await res.json();
-      if (Array.isArray(raw) && raw.length > 0 && aliveRef.current) {
-        const candles = raw.slice().reverse().map(c => ({
+      if (requestId !== historyRequestRef.current || !aliveRef.current) return;
+      if (Array.isArray(raw) && raw.length > 0) {
+        const sourceCandles = raw.slice().reverse().map(c => ({
           time:   c[0],
           open:   parseFloat(c[3]),
           high:   parseFloat(c[2]),
           low:    parseFloat(c[1]),
           close:  parseFloat(c[4]),
           volume: parseFloat(c[5])
-        }));
+        })).filter(c => Number.isFinite(c.time) && [c.open, c.high, c.low, c.close, c.volume].every(Number.isFinite));
+        const candles = iv === "4h"
+          ? aggregateCandles(sourceCandles, INTERVAL_STEP["4h"], INTERVAL_STEP["1h"])
+          : sourceCandles;
+        if (!candles.length) throw new Error("Coinbase returned no complete candles for this interval.");
         setSeedCandles(candles);
-        if (candles.length) setLivePrice(candles[candles.length - 1].close);
+        setLivePrice(candles[candles.length - 1].close);
+        setHistoryStatus("ready");
         return;
       }
-    } catch {}
-
-    // 2. Try Binance USD-M Futures
-    try {
-      const bRes = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=${encodeURIComponent(iv)}&limit=150`);
-      const bRaw = await bRes.json();
-      if (Array.isArray(bRaw) && bRaw.length > 0 && aliveRef.current) {
-        const bCandles = bRaw.map(k => ({
-          time:   Math.floor(k[0] / 1000),
-          open:   parseFloat(k[1]),
-          high:   parseFloat(k[2]),
-          low:    parseFloat(k[3]),
-          close:  parseFloat(k[4]),
-          volume: parseFloat(k[5])
-        }));
-        setSeedCandles(bCandles);
-        if (bCandles.length) setLivePrice(bCandles[bCandles.length - 1].close);
-        return;
-      }
-    } catch {}
-
-    // 3. Try Binance Spot
-    try {
-      const sRes = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${encodeURIComponent(iv)}&limit=150`);
-      const sRaw = await sRes.json();
-      if (Array.isArray(sRaw) && sRaw.length > 0 && aliveRef.current) {
-        const sCandles = sRaw.map(k => ({
-          time:   Math.floor(k[0] / 1000),
-          open:   parseFloat(k[1]),
-          high:   parseFloat(k[2]),
-          low:    parseFloat(k[3]),
-          close:  parseFloat(k[4]),
-          volume: parseFloat(k[5])
-        }));
-        setSeedCandles(sCandles);
-        if (sCandles.length) setLivePrice(sCandles[sCandles.length - 1].close);
-        return;
-      }
-    } catch {}
-
-    // 4. Try Local Backend Proxy
-    try {
-      const localRes = await fetch(`${getApiBaseUrl()}/candles?interval=${encodeURIComponent(iv)}&limit=150`);
-      const localData = await localRes.json();
-      if (localData?.candles?.length && aliveRef.current) {
-        setSeedCandles(localData.candles);
-        setLivePrice(localData.candles[localData.candles.length - 1].close);
-      }
-    } catch (fErr) {
-      console.warn("[BTCognitive] All candle fetch streams failed:", fErr);
+      throw new Error("Coinbase returned no usable BTC-USD candles.");
+    } catch (error) {
+      if (requestId !== historyRequestRef.current || !aliveRef.current) return;
+      setHistoryStatus("error");
+      console.error("[BTCognitive] Coinbase candle history unavailable:", error.name === "AbortError" ? "request timed out" : error);
+    } finally {
+      clearTimeout(timeoutId);
     }
+
   }, []);
 
   // ------------------------------------------------------------------
-  // Step 2 — WebSocket: multi-tier realtime stream with automatic polling fallback
+  // Step 2 — Coinbase ticker WebSocket.
   // ------------------------------------------------------------------
-  const connectBinanceWS = useCallback((iv) => {
+  const connectCoinbaseWS = useCallback((iv) => {
     if (wsRef.current) {
       wsRef.current.onclose = null;
       wsRef.current.close();
@@ -659,34 +694,35 @@ function useBinanceFeed(interval) {
     if (!aliveRef.current) return;
     setWsStatus("reconnecting");
 
-    const useBinanceFallback = attemptsRef.current % 2 === 1;
-    const wsUrl = useBinanceFallback ? "wss://fstream.binance.com/ws/btcusdt@ticker" : COINBASE_WSS;
-    const ws = new WebSocket(wsUrl);
+    const ws = new WebSocket(COINBASE_WSS);
     wsRef.current = ws;
 
     ws.onopen = () => {
       if (!aliveRef.current) { ws.close(); return; }
       attemptsRef.current = 0;
       setWsStatus("connected");
-      if (!useBinanceFallback) {
-        ws.send(JSON.stringify({
-          type: "subscribe",
-          product_ids: ["BTC-USD"],
-          channels: ["ticker"]
-        }));
-      }
+      ws.send(JSON.stringify({
+        type: "subscribe",
+        product_ids: ["BTC-USD"],
+        channels: ["ticker"]
+      }));
     };
 
     ws.onmessage = (evt) => {
       if (!aliveRef.current) return;
       try {
         const msg = JSON.parse(evt.data);
-        const price = msg.price ? parseFloat(msg.price) : (msg.c ? parseFloat(msg.c) : null);
-        if (price && !isNaN(price)) {
+        const price = Number(msg.price);
+        const time = Math.floor(Date.parse(msg.time) / 1000);
+        const volume = Number(msg.last_size || 0);
+        if (msg.product_id === "BTC-USD" && Number.isFinite(price) && price > 0 && Number.isFinite(time)) {
           setLivePrice(price);
-          if (onTickRef.current) onTickRef.current({ isTicker: true, price });
+          setExchangeClock({ timestampMs: time * 1000, receivedAt: performance.now() });
+          if (onTickRef.current) onTickRef.current({ isTicker: true, price, time, volume });
         }
-      } catch {}
+      } catch (error) {
+        console.warn("[BTCognitive] Ignored invalid Coinbase ticker message:", error);
+      }
     };
 
     ws.onclose = () => {
@@ -694,31 +730,11 @@ function useBinanceFeed(interval) {
       setWsStatus("reconnecting");
       const delay = Math.min(1000 * Math.pow(2, attemptsRef.current), 20000);
       attemptsRef.current++;
-      reconnTimeout.current = setTimeout(() => connectBinanceWS(intervalRef.current), delay);
+      reconnTimeout.current = setTimeout(() => connectCoinbaseWS(intervalRef.current), delay);
     };
 
     ws.onerror = () => setWsStatus("disconnected");
   }, []);
-
-  // ------------------------------------------------------------------
-  // Step 3 — Polling Fallback: keeps ticker active if WS is ever disrupted
-  // ------------------------------------------------------------------
-  useEffect(() => {
-    const pollInterval = setInterval(async () => {
-      if (wsStatus !== "connected" && aliveRef.current) {
-        try {
-          const res = await fetch("https://fapi.binance.com/fapi/v1/ticker/price?symbol=BTCUSDT");
-          const data = await res.json();
-          if (data?.price) {
-            const p = parseFloat(data.price);
-            setLivePrice(p);
-            if (onTickRef.current) onTickRef.current({ isTicker: true, price: p });
-          }
-        } catch {}
-      }
-    }, 2000);
-    return () => clearInterval(pollInterval);
-  }, [wsStatus]);
 
   // ------------------------------------------------------------------
   // Effect: re-run on interval change
@@ -729,16 +745,19 @@ function useBinanceFeed(interval) {
     attemptsRef.current = 0;
 
     fetchHistory(interval);
-    connectBinanceWS(interval);
+    connectCoinbaseWS(interval);
 
     return () => {
       aliveRef.current = false;
+      historyRequestRef.current++;
+      historyControllerRef.current?.abort();
+      historyControllerRef.current = null;
       if (wsRef.current) { wsRef.current.onclose = null; wsRef.current.close(); wsRef.current = null; }
       if (reconnTimeout.current) clearTimeout(reconnTimeout.current);
     };
-  }, [interval, fetchHistory, connectBinanceWS]);
+  }, [interval, fetchHistory, connectCoinbaseWS]);
 
-  return { wsStatus, seedCandles, onTickRef, livePrice };
+  return { wsStatus, seedCandles, onTickRef, livePrice, exchangeClock, historyStatus };
 }
 
 // ===========================================================================
@@ -748,18 +767,7 @@ function useBinanceFeed(interval) {
 //   1. Candlestick series  — BTC OHLCV
 //   2. EMA-20 line         — incremental update each tick
 //   3. EMA-50 line         — incremental update each tick
-//   4. Forecast line       — dashed, EMA-slope extrapolation (updates on candle close)
-//   5. LONG/SHORT markers  — arrowUp/arrowDown at candle time
-// ===========================================================================
-// LightweightCandleChart component
-//
-// Rendering layers:
-//   1. Candlestick series  — BTC OHLCV
-//   2. EMA-20 line         — incremental update each tick
-//   3. EMA-50 line         — incremental update each tick
-//   4. 24h Excursion Band  — Upper P90 & Lower P90 conformal risk bounds (Amber)
-//   5. Median Excursion    — De-emphasized thin neutral P50 path (Dotted)
-//   6. Consolidated badges — Compact, non-redundant decision markers
+//   4. Forecast overlays remain absent until their evidence is authenticated.
 // ===========================================================================
 function LightweightCandleChart({
   interval,
@@ -772,7 +780,8 @@ function LightweightCandleChart({
   onWsStatusChange,
   onPriceChange,
   onHoverBarChange,
-  onCandleTimeChange
+  onCandleTimeChange,
+  onExchangeTimeChange
 }) {
   const containerRef = useRef(null);
 
@@ -781,9 +790,6 @@ function LightweightCandleChart({
   const candleRef      = useRef(null);
   const ema20Ref       = useRef(null);
   const ema50Ref       = useRef(null);
-  const upperP90Ref    = useRef(null);
-  const lowerP90Ref    = useRef(null);
-  const p50Ref         = useRef(null);
   const entryLineRef   = useRef(null);
   const tpLineRef      = useRef(null);
   const slLineRef      = useRef(null);
@@ -796,6 +802,7 @@ function LightweightCandleChart({
   const selectedStrategy = propsStrat !== undefined ? propsStrat : localStrategy;
   const setSelectedStrategy = propsSetStrat !== undefined ? propsSetStrat : setLocalStrategy;
   const activePaperPos = propsPos !== undefined ? propsPos : localPos;
+  const usesExternalPosition = propsPos !== undefined;
 
   // Running EMA values (O(1) incremental — refs, not state)
   const ema20ValRef    = useRef(null);
@@ -807,14 +814,14 @@ function LightweightCandleChart({
   // Last candle time — detect new-candle vs in-place update
   const lastTimeRef    = useRef(0);
 
-  const { wsStatus, seedCandles, onTickRef, livePrice } = useBinanceFeed(interval);
+  const { wsStatus, seedCandles, onTickRef, livePrice, exchangeClock, historyStatus } = useCoinbaseFeed(interval);
 
   // Periodic poll of canonical active position & markers
   useEffect(() => {
     let isMounted = true;
     const pollActivePosition = () => {
       const queryStrat = selectedStrategy === "AUTO" ? null : selectedStrategy;
-      if (propsPos === undefined) {
+      if (!usesExternalPosition) {
         api.fetchActivePaperPosition(queryStrat)
           .then(data => { if (isMounted) setLocalPos(data); })
           .catch(() => {});
@@ -827,11 +834,12 @@ function LightweightCandleChart({
     pollActivePosition();
     const intervalId = setInterval(pollActivePosition, 4000);
     return () => { isMounted = false; clearInterval(intervalId); };
-  }, [selectedStrategy, livePrice]);
+  }, [selectedStrategy, usesExternalPosition]);
 
   // Propagate WS status up
   useEffect(() => { onWsStatusChange?.(wsStatus); }, [wsStatus]);
   useEffect(() => { onPriceChange?.(livePrice); },   [livePrice]);
+  useEffect(() => { onExchangeTimeChange?.(exchangeClock); }, [exchangeClock]);
 
   // -----------------------------------------------------------------------
   // Create chart once on mount — empty deps so it only runs once
@@ -915,36 +923,6 @@ function LightweightCandleChart({
       lastValueVisible: true
     });
 
-    // Layer 4 — 24h Conformal Excursion Upper (P90) — Neutral Amber
-    const upperP90Series = chart.addLineSeries({
-      color:            "#F59E0B",
-      lineWidth:        1.5,
-      lineStyle:        LC.LineStyle.Solid,
-      title:            "24h Excursion Upper (P90)",
-      priceLineVisible: false,
-      lastValueVisible: false
-    });
-
-    // Layer 5 — 24h Conformal Excursion Lower (P90) — Neutral Amber
-    const lowerP90Series = chart.addLineSeries({
-      color:            "#F59E0B",
-      lineWidth:        1.5,
-      lineStyle:        LC.LineStyle.Solid,
-      title:            "24h Excursion Lower (P90)",
-      priceLineVisible: false,
-      lastValueVisible: false
-    });
-
-    // Layer 6 — De-emphasized Median Path (P50) — Muted Neutral
-    const p50Series = chart.addLineSeries({
-      color:            "rgba(148, 163, 184, 0.45)",
-      lineWidth:        1,
-      lineStyle:        LC.LineStyle.Dotted,
-      title:            "24h Median (P50)",
-      priceLineVisible: false,
-      lastValueVisible: false
-    });
-
     // Crosshair hover time subscription for accurate scrub inspection
     chart.subscribeCrosshairMove((param) => {
       if (!param.time || !param.seriesData) {
@@ -969,9 +947,6 @@ function LightweightCandleChart({
     candleRef.current   = candleSeries;
     ema20Ref.current    = ema20Series;
     ema50Ref.current    = ema50Series;
-    upperP90Ref.current = upperP90Series;
-    lowerP90Ref.current = lowerP90Series;
-    p50Ref.current      = p50Series;
 
     // Responsive resize observer — no manual width tracking needed
     const ro = new ResizeObserver(() => {
@@ -984,8 +959,7 @@ function LightweightCandleChart({
     return () => {
       ro.disconnect();
       chart.remove();
-      chartRef.current = candleRef.current = ema20Ref.current =
-      ema50Ref.current = upperP90Ref.current = lowerP90Ref.current = p50Ref.current = null;
+      chartRef.current = candleRef.current = ema20Ref.current = ema50Ref.current = null;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1016,9 +990,6 @@ function LightweightCandleChart({
     ema20Ref.current.setData(seedCandles.map((c, i) => ({ time: c.time, value: ema20Vals[i] })));
     ema50Ref.current.setData(seedCandles.map((c, i) => ({ time: c.time, value: ema50Vals[i] })));
 
-    // Build initial excursion envelope
-    updateExcursionEnvelope(seedCandles, interval);
-
     // Show optimal visible range (last 80 candles) and scroll to live edge
     if (seedCandles.length > 0) {
       const fromIdx = Math.max(0, seedCandles.length - 80);
@@ -1029,39 +1000,50 @@ function LightweightCandleChart({
   }, [seedCandles]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // -----------------------------------------------------------------------
-  // Register the O(1) tick handler — runs on every Binance WS message
+  // Update the active candle from each Coinbase ticker message.
   // -----------------------------------------------------------------------
   useEffect(() => {
     onTickRef.current = (bar) => {
       if (!candleRef.current) return;
 
       if (bar.isTicker) {
-        // High-frequency sub-second ticker tick update
+        const step = INTERVAL_STEP[intervalRef.current] || INTERVAL_STEP["1h"];
+        const bucketTime = candleBucketStart(bar.time, step);
         const seed = seedRef.current;
-        if (seed && seed.length > 0) {
-          const last = seed[seed.length - 1];
-          const newHigh = Math.max(last.high, bar.price);
-          const newLow = Math.min(last.low, bar.price);
-          last.close = bar.price;
-          last.high = newHigh;
-          last.low = newLow;
+        if (!seed || seed.length === 0) return;
+        const last = seed[seed.length - 1];
+        if (bucketTime < last.time) return;
 
-          candleRef.current.update({
-            time:  last.time,
-            open:  last.open,
-            high:  newHigh,
-            low:   newLow,
-            close: bar.price
-          });
+        const isNewBar = bucketTime > last.time;
+        const candle = isNewBar
+          ? { time: bucketTime, open: bar.price, high: bar.price, low: bar.price, close: bar.price, volume: 0 }
+          : last;
+        candle.high = Math.max(candle.high, bar.price);
+        candle.low = Math.min(candle.low, bar.price);
+        candle.close = bar.price;
+        candle.volume += Number.isFinite(bar.volume) ? Math.max(0, bar.volume) : 0;
 
-          onCandleTimeChange?.(last.time);
+        if (isNewBar) {
+          seedRef.current = [...seed.slice(-199), candle];
+        }
+        candleRef.current.update({
+          time: candle.time,
+          open: candle.open,
+          high: candle.high,
+          low: candle.low,
+          close: candle.close
+        });
+        onCandleTimeChange?.(candle.time);
 
-          if (ema20ValRef.current !== null) {
-            const e20 = emaStep(ema20ValRef.current, bar.price, EMA20_A);
-            const e50 = emaStep(ema50ValRef.current, bar.price, EMA50_A);
-            ema20Ref.current?.update({ time: last.time, value: e20 });
-            ema50Ref.current?.update({ time: last.time, value: e50 });
+        if (ema20ValRef.current !== null) {
+          const e20 = emaStep(ema20ValRef.current, bar.price, EMA20_A);
+          const e50 = emaStep(ema50ValRef.current, bar.price, EMA50_A);
+          if (isNewBar) {
+            ema20ValRef.current = e20;
+            ema50ValRef.current = e50;
           }
+          ema20Ref.current?.update({ time: candle.time, value: e20 });
+          ema50Ref.current?.update({ time: candle.time, value: e50 });
         }
         return;
       }
@@ -1085,70 +1067,17 @@ function LightweightCandleChart({
         ema50Ref.current?.update({ time: bar.time, value: ema50ValRef.current });
       }
 
-      // 3. On candle close — append to seed buffer and refresh envelope
+      // 3. On candle close — append to the normalized history buffer.
       if (bar.isClosed && bar.time !== lastTimeRef.current) {
         lastTimeRef.current = bar.time;
         const newCandle = { time: bar.time, open: bar.open, high: bar.high, low: bar.low, close: bar.close, volume: bar.volume };
         seedRef.current = [...seedRef.current.slice(-199), newCandle];
-        updateExcursionEnvelope(seedRef.current, intervalRef.current);
       }
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // -----------------------------------------------------------------------
-  // 24h Excursion Uncertainty Envelope — Conformal Risk Quantiles (P10/P50/P90)
-  // Replaces the single directional path projection with an honest uncertainty fan
-  // -----------------------------------------------------------------------
   const intervalRef = useRef(interval);
   useEffect(() => { intervalRef.current = interval; }, [interval]);
-
-  function updateExcursionEnvelope(candles, iv) {
-    if (!upperP90Ref.current || !lowerP90Ref.current || candles.length < 10) return;
-
-    const step   = INTERVAL_STEP[iv] || 3600;   // seconds per bar
-    const anchor = candles[candles.length - 1];
-
-    // Compute empirical short-term realized volatility from trailing candles
-    const tail = candles.slice(-24);
-    let sumSq = 0;
-    for (let i = 1; i < tail.length; i++) {
-      const lr = Math.log(tail[i].close / tail[i - 1].close);
-      sumSq += lr * lr;
-    }
-    const vol = Math.max(0.008, Math.sqrt(sumSq / Math.max(1, tail.length - 1)));
-
-    // Calibrated Conformal Multipliers:
-    // P90 MFE (Upside) expansion: +vol * 1.75 * sqrt(t/24)
-    // P90 MAE (Downside) expansion: -vol * 2.20 * sqrt(t/24)
-    // P50 Central path: subtle balanced baseline
-    const upperPts = [];
-    const lowerPts = [];
-    const p50Pts   = [];
-
-    // Anchor at current bar
-    upperPts.push({ time: anchor.time, value: anchor.close });
-    lowerPts.push({ time: anchor.time, value: anchor.close });
-    p50Pts.push({ time: anchor.time, value: anchor.close });
-
-    const numBars = 20;
-    for (let i = 1; i <= numBars; i++) {
-      const t = anchor.time + i * step;
-      const scale = Math.sqrt(i / numBars);
-      const uVal = Math.round(anchor.close * (1.0 + vol * 1.75 * scale) * 100) / 100;
-      const lVal = Math.round(anchor.close * (1.0 - vol * 2.20 * scale) * 100) / 100;
-      const mVal = Math.round(anchor.close * (1.0 + (vol * 0.40 - vol * 0.55) * scale) * 100) / 100;
-
-      upperPts.push({ time: t, value: uVal });
-      lowerPts.push({ time: t, value: lVal });
-      p50Pts.push({ time: t, value: mVal });
-    }
-
-    try {
-      upperP90Ref.current.setData(upperPts);
-      lowerP90Ref.current.setData(lowerPts);
-      p50Ref.current?.setData(p50Pts);
-    } catch { /* chart may be transitioning */ }
-  }
 
   // -----------------------------------------------------------------------
   // Canonical D_t Strategy Price Lines (Entry, TP, SL)
@@ -1352,18 +1281,19 @@ function LightweightCandleChart({
     try { candleRef.current.setMarkers(markers); } catch {}
   }, [predictionData, memoryData, arenaMarkers, interval]);
 
-  const p = activePaperPos;
+  const researchAuthorized = hasVerifiedResearchAuthorization(predictionData);
+  const p = researchAuthorized ? activePaperPos : null;
   const isPosOpen = p && p.has_active_position;
   const pnlUsd = p?.unrealized_pnl_usd || 0.0;
   const pnlPct = p?.unrealized_pnl_pct || 0.0;
   const pnlColor = pnlUsd >= 0 ? "#00E5A8" : "#FF5C7C";
   const currentStrat = p?.strategy_id || (selectedStrategy === "AUTO" ? "MEIE-COMBINED" : selectedStrategy) || "MEIE-COMBINED";
   const anatomy = p?.decision_anatomy || {
-    event: "SCANNING_MICROSTRUCTURE",
-    evidence: "Awaiting market context",
-    estimated_execution_cost_bps: 9.3,
-    c2_health: "CALIBRATED",
-    risk_check: "IDLE / GATED",
+    event: "RESEARCH_BLOCKED",
+    evidence: "Frozen provenance is unverified",
+    estimated_execution_cost_bps: null,
+    c2_health: "UNVERIFIED",
+    risk_check: "DISABLED",
     action: "ABSTAIN",
     economic_aggregation: "DISABLED_AT_TIER_0"
   };
@@ -1375,36 +1305,40 @@ function LightweightCandleChart({
       id:  "btc-lwc-chart",
       style: { width: "100%", height: "520px", borderRadius: "0 0 12px 12px", position: "relative" }
     },
-      // 1. Persistent Self-Auditing Realized Coverage Badge (Top-Right)
-      (() => {
-        const liveCov = predictionData?.coverage_confidence ? Number(predictionData.coverage_confidence).toFixed(1) : "91.1";
-        return h("div", {
-          style: {
-            position: "absolute",
-            top: "12px",
-            right: "16px",
-            zIndex: 10,
-            background: "rgba(11, 18, 32, 0.85)",
-            backdropFilter: "blur(8px)",
-            border: "1px solid rgba(245, 158, 11, 0.25)",
-            borderRadius: "6px",
-            padding: "4px 10px",
-            fontSize: "0.72rem",
-            fontFamily: "JetBrains Mono, monospace",
-            color: "#94A3B8",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.4)"
-          }
-        },
-          h("span", { style: { width: "6px", height: "6px", borderRadius: "50%", background: "#F59E0B", boxShadow: "0 0 6px #F59E0B" } }),
-          h("span", { style: { color: "#F8FAFC", fontWeight: "600" } }, "24h Excursion Range"),
-          h("span", { style: { color: "#64748B" } }, "|"),
-          h("span", { style: { color: "#38BDF8", fontWeight: "600" } }, `Coverage: ${liveCov}%`),
-          h("span", { style: { color: "#64748B" } }, "(Target: 90%)")
-        );
-      })()
+      h("div", {
+        role: "status",
+        style: {
+          position: "absolute",
+          top: "12px",
+          right: "16px",
+          zIndex: 10,
+          background: "rgba(11, 18, 32, 0.9)",
+          border: "1px solid rgba(245, 158, 11, 0.35)",
+          borderRadius: "6px",
+          padding: "6px 10px",
+          fontSize: "0.72rem",
+          fontFamily: "JetBrains Mono, monospace",
+          color: "#FBBF24"
+        }
+      }, "Forecast unavailable · frozen inputs unverified"),
+      historyStatus !== "ready" && h("div", {
+        role: historyStatus === "error" ? "alert" : "status",
+        style: {
+          position: "absolute",
+          inset: "0",
+          zIndex: 5,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "rgba(11, 18, 32, 0.82)",
+          color: historyStatus === "error" ? "#FCA5A5" : "#CBD5E1",
+          fontSize: "0.9rem",
+          fontWeight: "700",
+          pointerEvents: "none"
+        }
+      }, historyStatus === "error"
+        ? "Coinbase candle history unavailable · retry by changing interval"
+        : "Loading Coinbase BTC/USD candle history…")
     ),
 
     // 3. Compact Forensic Decision Anatomy Strip (Event → Path → Economics → Risk → Action)
@@ -1430,7 +1364,7 @@ function LightweightCandleChart({
         h("span", { style: { color: "#CBD5E1" } }, `Evidence: ${anatomy.evidence}`)
       ),
       h("div", { style: { display: "flex", alignItems: "center", gap: "12px", fontFamily: "var(--font-mono)" } },
-        h("span", null, h("span", { style: { color: "#7E95B5" } }, "Est. Cost: "), h("strong", { style: { color: "#CBD5E1" } }, `-${(anatomy.estimated_execution_cost_bps || anatomy.drag_bps || 9.3).toFixed(1)} bps`)),
+        h("span", null, h("span", { style: { color: "#7E95B5" } }, "Est. Cost: "), h("strong", { style: { color: "#CBD5E1" } }, typeof anatomy.estimated_execution_cost_bps === "number" ? `-${anatomy.estimated_execution_cost_bps.toFixed(1)} bps` : "Unavailable")),
         h("span", null, h("span", { style: { color: "#7E95B5" } }, "EV Aggregation: "), h("strong", { style: { color: "#94A3B8" } }, "DISABLED (TIER 0)")),
         h("span", {
           style: {
@@ -1451,7 +1385,7 @@ function LightweightCandleChart({
 
 
 // ===========================================================================
-// LiveBadge — reflects Binance WSS connection state
+// LiveBadge — reflects Coinbase WSS connection state
 // ===========================================================================
 function LiveBadge({ wsStatus }) {
   const cfg = {
@@ -1477,7 +1411,8 @@ function ChartTopBar({
   setActiveInterval,
   livePrice,
   hoveredBar,
-  latestCandleTime
+  latestCandleTime,
+  exchangeClock
 }) {
   const [now, setNow] = useState(Date.now());
 
@@ -1486,20 +1421,22 @@ function ChartTopBar({
     return () => clearInterval(id);
   }, []);
 
+  const clockNow = exchangeClock
+    ? exchangeClock.timestampMs + Math.max(0, performance.now() - exchangeClock.receivedAt)
+    : now;
+  const quoteAgeSeconds = exchangeClock
+    ? Math.max(0, Math.floor((performance.now() - exchangeClock.receivedAt) / 1000))
+    : null;
   const stepSec = INTERVAL_STEP[activeInterval] || 3600;
-  const nowSec = Math.floor(now / 1000);
+  const nowSec = Math.floor(clockNow / 1000);
   const currentBarStartSec = Math.floor(nowSec / stepSec) * stepSec;
   const remainingSec = Math.max(0, (currentBarStartSec + stepSec) - nowSec);
 
-  const remHours = Math.floor(remainingSec / 3600);
-  const remMinutes = Math.floor((remainingSec % 3600) / 60);
-  const remSeconds = remainingSec % 60;
+  const countdownStr = formatCandleCountdown(remainingSec);
+  const closeTime = new Date((currentBarStartSec + stepSec) * 1000);
+  const closeTimeStr = `${String(closeTime.getUTCHours()).padStart(2, "0")}:${String(closeTime.getUTCMinutes()).padStart(2, "0")} UTC`;
 
-  const countdownStr = remHours > 0
-    ? `${String(remHours).padStart(2, '0')}:${String(remMinutes).padStart(2, '0')}:${String(remSeconds).padStart(2, '0')}`
-    : `${String(remMinutes).padStart(2, '0')}:${String(remSeconds).padStart(2, '0')}`;
-
-  const utcNow = new Date(now);
+  const utcNow = new Date(clockNow);
   const utcHours = String(utcNow.getUTCHours()).padStart(2, '0');
   const utcMins = String(utcNow.getUTCMinutes()).padStart(2, '0');
   const utcSecs = String(utcNow.getUTCSeconds()).padStart(2, '0');
@@ -1525,7 +1462,7 @@ function ChartTopBar({
   return h("div", { className: "chart-topbar-wrapper" },
     h("div", { className: "chart-topbar" },
       h("div", { className: "chart-info" },
-        h("span", { className: "chart-symbol" }, "BTC / USD · Binance"),
+        h("span", { className: "chart-symbol" }, "BTC / USD · Coinbase Exchange"),
         livePrice > 0 && h("span", {
           style: { fontFamily: "var(--font-mono)", fontWeight: "700", fontSize: "1.1rem", color: "#F8FAFC", marginLeft: "14px" }
         }, `$${livePrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}`),
@@ -1559,7 +1496,18 @@ function ChartTopBar({
         h("div", { className: `time-pill countdown-pill ${remainingSec <= 30 ? "urgent" : ""}` },
           h("span", { className: "pill-icon" }, "⏳"),
           h("span", { className: "pill-label" }, "Bar Closes in:"),
-          h("strong", { className: "pill-value font-mono" }, countdownStr)
+          h("strong", { className: "pill-value font-mono" }, `${countdownStr} · ${closeTimeStr}`)
+        ),
+        h("div", { className: `time-pill quote-freshness-pill${quoteAgeSeconds === null || quoteAgeSeconds > 60 ? " urgent" : ""}` },
+          h("span", { className: "pill-icon" }, "◉"),
+          h("span", { className: "pill-label" }, "Coinbase quote:"),
+          h("strong", { className: "pill-value font-mono" },
+            quoteAgeSeconds === null
+              ? "Waiting for first quote"
+              : quoteAgeSeconds > 60
+                ? `STALE · ${quoteAgeSeconds}s ago`
+                : `Updated ${quoteAgeSeconds}s ago`
+          )
         )
       ),
 
@@ -1797,9 +1745,37 @@ function OpportunityToastContainer({ alerts = [], onDismiss, onSelectAlert }) {
 
   return h("div", { className: "high-profit-toast-container" },
     alerts.map((alert) => {
+      if (alert.is_test) {
+        return h("div", {
+          key: alert.id,
+          className: "high-profit-toast",
+          role: "status"
+        },
+          h("div", { className: "toast-header" },
+            h("strong", null, "🧪 NOTIFICATION TEST · NOT A MARKET SIGNAL"),
+            h("button", {
+              className: "toast-close-btn",
+              onClick: () => onDismiss(alert.id),
+              title: "Dismiss"
+            }, "✕")
+          ),
+          h("div", { className: "toast-body" },
+            h("div", { style: { fontSize: "0.82rem", color: "#CBD5E1", lineHeight: "1.4" } },
+              alert.rationale
+            )
+          ),
+          h("div", { className: "toast-actions" },
+            h("button", {
+              className: "notif-btn-secondary",
+              onClick: () => onDismiss(alert.id)
+            }, "Dismiss")
+          ),
+          h("div", { className: "toast-progress-bar" })
+        );
+      }
+
       const isUltra = alert.tier === "ULTRA_HIGH_PROFIT";
       const isLong = alert.direction === "LONG";
-      const isSimulatedTest = alert.id?.startsWith("alert_test_") || alert.is_test || alert.tier === "SIMULATED_TEST";
 
       return h("div", {
         key: alert.id,
@@ -1807,18 +1783,6 @@ function OpportunityToastContainer({ alerts = [], onDismiss, onSelectAlert }) {
       },
         h("div", { className: "toast-header" },
           h("div", { style: { display: "flex", alignItems: "center", gap: "6px" } },
-            isSimulatedTest && h("span", {
-              style: {
-                background: "rgba(245, 158, 11, 0.2)",
-                color: "#F59E0B",
-                border: "1px solid rgba(245, 158, 11, 0.5)",
-                padding: "2px 6px",
-                borderRadius: "4px",
-                fontSize: "0.68rem",
-                fontWeight: "800",
-                letterSpacing: "0.04em"
-              }
-            }, "🔬 RESEARCH OBSERVATION"),
             h("span", { className: `toast-badge ${isUltra ? "ultra" : ""}` },
               "🔬 STRUCTURAL SETUP OBSERVED"
             )
@@ -1889,6 +1853,8 @@ function OpportunityToastContainer({ alerts = [], onDismiss, onSelectAlert }) {
 
 function NotificationBell({ alerts = [], onTestAlert, onOpenSettings, onSelectAlert }) {
   const [open, setOpen] = useState(false);
+  const [testStatus, setTestStatus] = useState(null);
+  const [sendingTest, setSendingTest] = useState(false);
   const dropdownRef = useRef(null);
 
   const unreadCount = alerts.length;
@@ -1903,11 +1869,28 @@ function NotificationBell({ alerts = [], onTestAlert, onOpenSettings, onSelectAl
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const sendTestAlert = async () => {
+    if (!onTestAlert || sendingTest) return;
+    setSendingTest(true);
+    setTestStatus({ type: "loading", text: "Sending notification test..." });
+    try {
+      const result = await onTestAlert();
+      setTestStatus({
+        type: result?.status === "delivered" ? "success" : result?.status === "failed" || result?.ok === false ? "error" : "warning",
+        text: result?.message || "Test request completed; check the configured delivery status."
+      });
+    } catch (error) {
+      setTestStatus({ type: "error", text: error.message || "Notification test failed." });
+    } finally {
+      setSendingTest(false);
+    }
+  };
+
   return h("div", { className: "notification-bell-wrapper", ref: dropdownRef },
     h("button", {
       className: "notification-bell-btn",
       onClick: () => setOpen(!open),
-      title: "Structural Setup Observations"
+      title: "Market observations and notification history"
     },
       h("span", { style: { fontSize: "1.05rem" } }, "🔔"),
       h("span", null, "Observations"),
@@ -1917,8 +1900,8 @@ function NotificationBell({ alerts = [], onTestAlert, onOpenSettings, onSelectAl
     open && h("div", { className: "notification-dropdown" },
       h("div", { className: "notification-dropdown-header" },
         h("div", { className: "notification-dropdown-title" },
-          h("span", null, "🔬"),
-          h("span", null, "Structural Setup Radar (Research)")
+          h("span", null, "🔔"),
+          h("span", null, "Observations & Notifications")
         ),
         h("button", {
           onClick: () => requestNotificationPermission().then(perm => {
@@ -1932,7 +1915,7 @@ function NotificationBell({ alerts = [], onTestAlert, onOpenSettings, onSelectAl
         alerts.length === 0 ? (
           h("div", { style: { padding: "20px 10px", textAlign: "center", color: "#94A3B8", fontSize: "0.82rem" } },
             h("div", { style: { fontSize: "1.8rem", marginBottom: "8px" } }, "📡"),
-            "Scanning live market for A1/A2 structural setups (Non-Actionable Research)..."
+              "No validated market observations or notification tests have been recorded."
           )
         ) : (
           alerts.map((a, i) => (
@@ -1945,29 +1928,41 @@ function NotificationBell({ alerts = [], onTestAlert, onOpenSettings, onSelectAl
               }
             },
               h("div", { className: "notification-item-top" },
-                h("span", { className: `notification-item-dir ${a.direction?.toLowerCase()}` },
-                  `${a.direction === "LONG" ? "▲ LONG SETUP" : "▼ SHORT SETUP"} · ${a.id?.startsWith("alert_test_") || a.is_test ? "[SIM]" : "[OBSERVED]"}`
+                h("span", { className: `notification-item-dir ${a.direction?.toLowerCase() || ""}` },
+                  a.is_test
+                    ? "TEST NOTIFICATION · NOT A MARKET SIGNAL"
+                    : `${a.direction === "LONG" ? "▲ LONG SETUP" : "▼ SHORT SETUP"} · [OBSERVED]`
                 ),
                 h("span", { className: "notification-item-time" },
                   a.timestamp ? new Date(a.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Just now"
                 )
               ),
               h("div", { className: "notification-item-desc" }, a.rationale),
-              h("div", { className: "notification-item-meta" },
-                h("span", { style: { color: "#38BDF8" } }, `Upper: $${a.target_profit_price?.toLocaleString()} (+${a.target_profit_pct}%)`),
-                h("span", { style: { color: "#FFD700" } }, `Score: ${a.opportunity_score}/100`)
+              !a.is_test && h("div", { className: "notification-item-meta" },
+                Number.isFinite(a.target_profit_price) && h("span", { style: { color: "#38BDF8" } }, `Upper: $${a.target_profit_price.toLocaleString()} (+${a.target_profit_pct}%)`),
+                Number.isFinite(a.opportunity_score) && h("span", { style: { color: "#FFD700" } }, `Score: ${a.opportunity_score}/100`)
               )
             )
           ))
         )
       ),
 
+      testStatus && h("div", {
+        role: "status",
+        "aria-live": "polite",
+        style: {
+          fontSize: "0.75rem",
+          color: testStatus.type === "error" ? "#FF5C7C" : testStatus.type === "warning" ? "#F59E0B" : "#00E5A8"
+        }
+      }, testStatus.text),
+
       h("div", { className: "notification-dropdown-footer" },
         h("button", {
           className: "notif-btn-secondary",
-          onClick: onTestAlert,
-          title: "Simulate a live research setup observation"
-        }, "🔬 Test Setup"),
+          onClick: sendTestAlert,
+          disabled: sendingTest,
+          title: "Send a test notification; no market signal is generated"
+        }, sendingTest ? "Sending..." : "🧪 Test Notification"),
         h("button", {
           className: "notif-btn-primary",
           onClick: () => { setOpen(false); onOpenSettings(); }
@@ -1977,10 +1972,8 @@ function NotificationBell({ alerts = [], onTestAlert, onOpenSettings, onSelectAl
   );
 }
 
-function NotificationSettingsModal({ isOpen, onClose, settings, onSaveSettings, onTestAlert }) {
-  if (!isOpen) return null;
-
-  const [formData, setFormData] = useState(settings || {
+function NotificationSettingsModal({ isOpen, onClose, settings, adminApiKey, setAdminApiKey, onSaveSettings, onTestAlert }) {
+  const [formData, setFormData] = useState(() => ({
     backend_url: getApiBaseUrl(),
     browser_alerts_enabled: true,
     sound_alerts_enabled: true,
@@ -1989,20 +1982,31 @@ function NotificationSettingsModal({ isOpen, onClose, settings, onSaveSettings, 
     webhook_url: "",
     webhook_type: "discord",
     telegram_bot_token: "",
-    telegram_chat_id: ""
-  });
+    telegram_chat_id: "",
+    ...settings
+  }));
 
-  const [backendTestStatus, setBackendTestStatus] = useState(null); // { type: 'loading' | 'success' | 'warning' | 'error', text: '' }
+  const [backendTestStatus, setBackendTestStatus] = useState(null);
   const [isValidating, setIsValidating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSendingTest, setIsSendingTest] = useState(false);
+  const [testFeedback, setTestFeedback] = useState(null);
+
+  useEffect(() => {
+    if (isOpen && settings) setFormData(prev => ({ ...prev, ...settings }));
+  }, [isOpen, settings]);
 
   // Close on Escape key press
   useEffect(() => {
+    if (!isOpen) return undefined;
     const handleKeyDown = (e) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
 
   const handleChange = (k, v) => setFormData(prev => ({ ...prev, [k]: v }));
 
@@ -2033,6 +2037,10 @@ function NotificationSettingsModal({ isOpen, onClose, settings, onSaveSettings, 
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!adminApiKey?.trim()) {
+      setBackendTestStatus({ type: "error", text: "Admin API key is required to save notification settings." });
+      return;
+    }
     const targetUrl = formData.backend_url?.trim() || "http://localhost:8000";
     
     // Only validate if not localhost (or if user typed a custom URL)
@@ -2051,18 +2059,49 @@ function NotificationSettingsModal({ isOpen, onClose, settings, onSaveSettings, 
       }
     }
 
-    setApiBaseUrl(targetUrl);
-    backendWS.reconnectWithNewEndpoint();
-    onSaveSettings(formData);
-    onClose();
+    setIsSaving(true);
+    try {
+      setApiBaseUrl(targetUrl);
+      backendWS.reconnectWithNewEndpoint();
+      const result = await onSaveSettings(formData, adminApiKey.trim());
+      if (result?.ok === false) throw new Error(result.message || "Settings could not be saved.");
+      setBackendTestStatus({ type: "success", text: "Notification settings saved." });
+      onClose();
+    } catch (error) {
+      setBackendTestStatus({ type: "error", text: `Cannot save settings: ${error.message}` });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const [testFeedback, setTestFeedback] = useState(null);
-
-  const handleSendTest = () => {
-    if (onTestAlert) onTestAlert();
-    setTestFeedback("⚡ Test alert dispatched! Sound chime and floating banner triggered.");
-    setTimeout(() => setTestFeedback(null), 4000);
+  const handleSendTest = async () => {
+    if (!onTestAlert || isSendingTest) return;
+    if (!adminApiKey?.trim()) {
+      setTestFeedback({ type: "error", text: "Admin API key is required to send a notification test." });
+      return;
+    }
+    setIsSendingTest(true);
+    setTestFeedback({ type: "loading", text: "Saving current settings and sending a test notification..." });
+    try {
+      const targetUrl = formData.backend_url?.trim() || getApiBaseUrl();
+      if (targetUrl && targetUrl !== getApiBaseUrl()) {
+        setIsValidating(true);
+        const validation = await validateBackendUrl(targetUrl);
+        setIsValidating(false);
+        if (!validation.valid) throw new Error(`Backend validation failed: ${validation.error}`);
+        setApiBaseUrl(targetUrl);
+        backendWS.reconnectWithNewEndpoint();
+      }
+      const result = await onTestAlert(formData, adminApiKey.trim());
+      setTestFeedback({
+        type: result?.status === "delivered" ? "success" : result?.ok ? "warning" : "error",
+        text: result?.message || "Notification test did not return a delivery result."
+      });
+    } catch (error) {
+      setTestFeedback({ type: "error", text: error.message || "Notification test failed." });
+    } finally {
+      setIsSendingTest(false);
+    }
   };
 
   return h("div", {
@@ -2107,6 +2146,25 @@ function NotificationSettingsModal({ isOpen, onClose, settings, onSaveSettings, 
               disabled: isValidating,
               style: { whiteSpace: "nowrap", padding: "6px 12px" }
             }, isValidating ? "⏳ Testing..." : "⚡ Test Ping")
+          ),
+          h("div", { className: "notif-form-group", style: { marginTop: "10px" } },
+            h("label", { className: "notif-form-label", htmlFor: "notification-admin-api-key" }, "Admin API Key"),
+            h("input", {
+              id: "notification-admin-api-key",
+              type: "password",
+              autoComplete: "off",
+              spellCheck: false,
+              className: "notif-form-input",
+              value: adminApiKey || "",
+              onChange: (e) => setAdminApiKey(e.target.value),
+              "aria-describedby": "notification-admin-key-help",
+              placeholder: "Enter X-API-Key for admin actions"
+            }),
+            h("div", { id: "notification-admin-key-help", role: "status", style: { fontSize: "0.72rem", color: adminApiKey?.trim() ? "#94A3B8" : "#F59E0B", marginTop: "5px" } },
+              adminApiKey?.trim()
+                ? "Kept in React memory only; cleared when this page reloads. Never included in saved settings."
+                : "Required to save settings or send a notification test. The key is not stored or sent until you submit."
+            )
           ),
 
           // Real-time Test / Validation Feedback Banner
@@ -2205,23 +2263,27 @@ function NotificationSettingsModal({ isOpen, onClose, settings, onSaveSettings, 
                 h("label", { className: "notif-form-label" }, "Discord / Custom Webhook URL"),
                 h("input", {
                   type: "url",
-                  placeholder: "https://discord.com/api/webhooks/...",
+                  placeholder: formData.webhook_url_configured ? "Saved URL retained; enter a replacement to rotate" : "https://discord.com/api/webhooks/...",
                   className: "notif-form-input",
                   value: formData.webhook_url,
                   onChange: (e) => handleChange("webhook_url", e.target.value)
-                })
+                }),
+                formData.webhook_url_configured && !formData.webhook_url &&
+                  h("div", { style: { fontSize: "0.7rem", color: "#94A3B8" } }, "A webhook URL is already saved securely. Leave this blank to keep it.")
               )
             ) : (
               h("div", { style: { display: "flex", flexDirection: "column", gap: "8px" } },
                 h("div", { className: "notif-form-group" },
                   h("label", { className: "notif-form-label" }, "Telegram Bot Token"),
                   h("input", {
-                    type: "text",
-                    placeholder: "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11",
+                    type: "password",
+                    placeholder: formData.telegram_bot_token_configured ? "Saved token retained; enter a replacement to rotate" : "Enter Telegram bot token",
                     className: "notif-form-input",
                     value: formData.telegram_bot_token,
                     onChange: (e) => handleChange("telegram_bot_token", e.target.value)
-                  })
+                  }),
+                  formData.telegram_bot_token_configured && !formData.telegram_bot_token &&
+                    h("div", { style: { fontSize: "0.7rem", color: "#94A3B8" } }, "A token is already saved securely. Leave this blank to keep it.")
                 ),
                 h("div", { className: "notif-form-group" },
                   h("label", { className: "notif-form-label" }, "Telegram Chat ID"),
@@ -2239,28 +2301,32 @@ function NotificationSettingsModal({ isOpen, onClose, settings, onSaveSettings, 
         ),
 
         testFeedback && h("div", {
+          role: "status",
+          "aria-live": "polite",
           style: {
             fontSize: "0.78rem",
             padding: "8px 12px",
             borderRadius: "8px",
-            background: "rgba(0, 240, 255, 0.12)",
-            border: "1px solid rgba(0, 240, 255, 0.35)",
-            color: "#00F0FF",
+            background: testFeedback.type === "error" ? "rgba(255,92,124,0.12)" : testFeedback.type === "warning" ? "rgba(245,158,11,0.12)" : "rgba(0,229,168,0.12)",
+            border: testFeedback.type === "error" ? "1px solid rgba(255,92,124,0.35)" : testFeedback.type === "warning" ? "1px solid rgba(245,158,11,0.35)" : "1px solid rgba(0,229,168,0.35)",
+            color: testFeedback.type === "error" ? "#FF5C7C" : testFeedback.type === "warning" ? "#F59E0B" : "#00E5A8",
             textAlign: "center",
             fontWeight: "600"
           }
-        }, testFeedback),
+        }, testFeedback.text),
 
         h("div", { style: { display: "flex", gap: "10px", marginTop: "10px" } },
           h("button", {
             type: "button",
             className: "notif-btn-secondary",
-            onClick: handleSendTest
-          }, "⚡ Send Test Alert"),
+            onClick: handleSendTest,
+            disabled: isSendingTest || isSaving
+          }, isSendingTest ? "Sending Test..." : "⚡ Send Test Notification"),
           h("button", {
             type: "submit",
-            className: "notif-btn-primary"
-          }, "Save & Activate")
+            className: "notif-btn-primary",
+            disabled: isSaving || isSendingTest
+          }, isSaving ? "Saving..." : "Save & Activate")
         )
       )
     )
@@ -2281,6 +2347,7 @@ function Navbar({
     connecting:       { label: "Connecting...",                class: "connecting" },
     warming_up:       { label: "Warming Up",                   class: "warming-up" },
     live:             { label: "Engine Live",                  class: "live" },
+    monitor_only:     { label: "Market Monitor Only",          class: "offline" },
     security_blocked: { label: "CORS / HTTPS Blocked",        class: "security-blocked" }
   };
   const current = stateMap[engineState] || stateMap.offline;
@@ -2433,37 +2500,35 @@ function Navbar({
 // ===========================================================================
 // InstitutionalTickerBar — Top High-Frequency Telemetry Ribbon
 // ===========================================================================
-function InstitutionalTickerBar({ livePrice, changePct, intelData }) {
-  const price = livePrice > 0 ? livePrice : 64280.50;
-  const change = typeof changePct === "number" ? changePct : 3.42;
-  const isUp = change >= 0;
+function InstitutionalTickerBar({ livePrice, changePct, marketSummary }) {
+  const price = livePrice > 0 ? livePrice : null;
+  const change = typeof changePct === "number" && price !== null ? changePct : null;
+  const isUp = change !== null && change >= 0;
 
-  const volText = intelData?.volatility?.daily_vol_pct !== undefined
-    ? `${Number(intelData.volatility.daily_vol_pct).toFixed(2)}% (${intelData.volatility.regime || "Calm"})`
-    : "1.82% (Calm)";
-
-  const fundingText = intelData?.structure?.funding_rate_pct !== undefined
-    ? `${intelData.structure.funding_rate_pct >= 0 ? "+" : ""}${Number(intelData.structure.funding_rate_pct).toFixed(4)}% / 8h`
-    : "+0.0100% / 8h";
-
-  const telemetryText = intelData?.latency?.market_latency_ms
-    ? `⚡ ${intelData.latency.market_latency_ms}ms Feed · 5ms WS`
-    : "⚡ 12ms Feed · 5ms WS";
+  const volText = typeof marketSummary?.realized_volatility_24h_pct === "number"
+    ? `${marketSummary.realized_volatility_24h_pct.toFixed(2)}% · Coinbase BTC/USD`
+    : "Unavailable · insufficient verified history";
+  const fundingText = "Unavailable · no verified feed";
+  const telemetryText = "Unavailable";
 
   return h("div", { className: "institutional-ticker-bar" },
     h("div", { className: "ticker-item" },
-      h("span", { style: { color: "#F8FAFC", fontWeight: "800" } }, "BTC/USDT"),
-      h("span", { className: `val ${isUp ? "up" : "down"}` }, `$${price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`),
+      h("span", { style: { color: "#F8FAFC", fontWeight: "800" } }, "BTC/USD · Coinbase"),
+      h("span", { className: `val ${isUp ? "up" : "down"}` }, price === null ? "Unavailable" : `$${price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`),
       h("span", { style: { fontSize: "0.72rem", padding: "1px 6px", borderRadius: "4px", background: isUp ? "rgba(0,229,168,0.15)" : "rgba(255,92,124,0.15)", color: isUp ? "#00E5A8" : "#FF5C7C", fontWeight: "700" } },
-        `${isUp ? "+" : ""}${change.toFixed(2)}%`
+        change === null ? "—" : `${isUp ? "+" : ""}${change.toFixed(2)}%`
       )
     ),
     h("div", { className: "ticker-item" },
       h("span", null, "24h Range:"),
-      h("span", { className: "val" }, `$${Math.round(price * 0.982).toLocaleString()} – $${Math.round(price * 1.018).toLocaleString()}`)
+      h("span", { className: "val" },
+        typeof marketSummary?.low_24h === "number" && typeof marketSummary?.high_24h === "number"
+          ? `$${marketSummary.low_24h.toLocaleString()} – $${marketSummary.high_24h.toLocaleString()}`
+          : "Unavailable · insufficient history"
+      )
     ),
     h("div", { className: "ticker-item" },
-      h("span", null, "24h Vol:"),
+      h("span", null, "24h Realized Volatility:"),
       h("span", { className: "val cyan" }, volText)
     ),
     h("div", { className: "ticker-item" },
@@ -2476,7 +2541,7 @@ function InstitutionalTickerBar({ livePrice, changePct, intelData }) {
     ),
     h("div", { className: "ticker-item", style: { marginLeft: "auto" } },
       h("span", { style: { background: "rgba(0, 240, 255, 0.12)", border: "1px solid rgba(0, 240, 255, 0.3)", color: "#00F0FF", padding: "2px 8px", borderRadius: "12px", fontSize: "0.72rem", fontWeight: "800" } },
-        "🟢 PAPER MODE (ZERO RISK)"
+        "READ-ONLY MONITOR · TRADING DISABLED"
       )
     )
   );
@@ -2486,15 +2551,12 @@ function InstitutionalTickerBar({ livePrice, changePct, intelData }) {
 // HeroSection — Scientific Research Overview & Market Intelligence
 // ===========================================================================
 function HeroSection({ setPath, livePrice, changePct, predictionData, regimeData, qualityData, decisionData }) {
-  const direction = predictionData?.direction || "LONG";
-  const probPct   = predictionData?.probability_pct || 78.4;
-
   return h("section", { className: "hero-creative-container" },
     // Header Headline & Sub-headline
     h("div", { className: "hero-text-center" },
-      h("div", { className: "hero-pill-badge", style: { background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.4)", color: "#F87171" } }, "🔬 Research Status: COST_ERASED (Claim Level C2)"),
-      h("h1", { className: "hero-headline-main" }, "Empirical Bitcoin Risk Intelligence"),
-      h("p", { className: "hero-sub-main" }, "Rigorous chronological walk-forward research across 7.76M 1-minute bars. Conditional predictive pattern observed, but net economic edge is cost-erased under execution friction. Live capital deployment strictly prohibited.")
+      h("div", { className: "hero-pill-badge", style: { background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.4)", color: "#F87171" } }, "🔬 Research Status: BLOCKED · PROVENANCE UNVERIFIED"),
+      h("h1", { className: "hero-headline-main" }, "Bitcoin Market Monitor"),
+      h("p", { className: "hero-sub-main" }, "Live BTC/USD market observations are separate from model research. Frozen research inputs and evaluation provenance are not authenticated; forecast generation and trading remain disabled.")
     ),
 
     // 3D Organic Fluid Wave Sculpture Container with Floating Action & Glass Cards
@@ -2506,7 +2568,7 @@ function HeroSection({ setPath, livePrice, changePct, predictionData, regimeData
         style: { background: "linear-gradient(135deg, #3B82F6, #6366F1)", boxShadow: "0 8px 32px rgba(59, 130, 246, 0.4)" }
       }, "Explore Research Terminal 🔬"),
 
-      // Cards Row — Market Overview left, Walk-Forward Result right
+      // Cards Row — source-backed market state and research authorization
       h("div", { className: "hero-cards-row" },
         h("div", { className: "glass-pill-card floating-left-card", onClick: () => setPath("/terminal") },
           h("div", { className: "card-top-row" },
@@ -2515,17 +2577,17 @@ function HeroSection({ setPath, livePrice, changePct, predictionData, regimeData
           ),
           h("div", { className: "card-main-title" }, "Coinbase BTC/USD Feed"),
           h("div", { className: "card-bottom-val" },
-            h("span", { className: "card-price-highlight" }, livePrice > 0 ? `$${livePrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "BTC/USD"),
-            h("span", { className: "card-pct" }, `${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%`)
+            h("span", { className: "card-price-highlight" }, livePrice > 0 ? `$${livePrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "Unavailable"),
+            h("span", { className: "card-pct" }, livePrice > 0 && typeof changePct === "number" ? `${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%` : "—")
           )
         ),
         h("div", { className: "glass-pill-card floating-right-card", onClick: () => setPath("/arena") },
           h("div", { className: "card-top-row" },
-            h("span", { className: "card-label", style: { color: "#F87171" } }, "Track V3 Mean Net R"),
+            h("span", { className: "card-label", style: { color: "#F87171" } }, "Production Forecast"),
             h("div", { className: "arrow-circle-btn" }, "↗")
           ),
-          h("div", { className: "card-stat-big", style: { color: "#F87171", fontSize: "1.8rem" } }, "-0.5678R"),
-          h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", marginTop: "4px" } }, "BASE 35 bps friction (Cost-Erased)")
+          h("div", { className: "card-stat-big", style: { color: "#F87171", fontSize: "1.8rem" } }, "BLOCKED"),
+          h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", marginTop: "4px" } }, "Frozen research inputs are not verified")
         )
       )
     ),
@@ -2533,20 +2595,20 @@ function HeroSection({ setPath, livePrice, changePct, predictionData, regimeData
     // Bottom Stats Bar Highlights
     h("div", { className: "creative-stats-row" },
       h("div", { className: "c-stat-box" },
-        h("div", { className: "c-stat-num" }, livePrice > 0 ? `$${livePrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "$63,420"),
-        h("div", { className: "c-stat-lbl" }, "Real-Time Coinbase BTC/USD")
+        h("div", { className: "c-stat-num" }, livePrice > 0 ? `$${livePrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "Unavailable"),
+        h("div", { className: "c-stat-lbl" }, "Coinbase BTC/USD · opens on Terminal")
       ),
       h("div", { className: "c-stat-box" },
-        h("div", { className: "c-stat-num", style: { color: "#F87171" } }, "-0.57R / -1.10R"),
-        h("div", { className: "c-stat-lbl" }, "Mean Net R (Base / Conservative)")
+        h("div", { className: "c-stat-num", style: { color: "#F87171" } }, "UNVERIFIED"),
+        h("div", { className: "c-stat-lbl" }, "Historical performance evidence")
       ),
       h("div", { className: "c-stat-box" },
-        h("div", { className: "c-stat-num", style: { color: "#EF4444" } }, "COST_ERASED"),
-        h("div", { className: "c-stat-lbl" }, "Promotion Decision (Capital Prohibited)")
+        h("div", { className: "c-stat-num", style: { color: "#EF4444" } }, "DISABLED"),
+        h("div", { className: "c-stat-lbl" }, "Forecasts and trading")
       ),
       h("div", { className: "c-stat-box" },
-        h("div", { className: "c-stat-num", style: { color: "#38BDF8" } }, "20,244"),
-        h("div", { className: "c-stat-lbl" }, "Out-of-Sample Evaluation N")
+        h("div", { className: "c-stat-num", style: { color: "#38BDF8" } }, "BLOCKED"),
+        h("div", { className: "c-stat-lbl" }, "Research authorization")
       )
     ),
 
@@ -2557,10 +2619,10 @@ function HeroSection({ setPath, livePrice, changePct, predictionData, regimeData
 
     // About Feature Highlight — Explaining 5-Min Intelligence Radar Auto Refresh
     h("div", { style: { marginTop: "24px", background: "rgba(18, 26, 42, 0.6)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "20px", padding: "28px" } },
-      h("div", { style: { fontSize: "0.78rem", color: "#A78BFA", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "8px" } }, "🛰️ AUTOMATED MARKET INTELLIGENCE"),
-      h("h3", { style: { fontSize: "1.3rem", fontWeight: "800", color: "#F8FAFC", marginBottom: "12px" } }, "Adaptive 5-Minute Intelligence Radar Refresh Engine"),
+      h("div", { style: { fontSize: "0.78rem", color: "#A78BFA", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "8px" } }, "🛰️ SOURCE-BACKED MARKET MONITOR"),
+      h("h3", { style: { fontSize: "1.3rem", fontWeight: "800", color: "#F8FAFC", marginBottom: "12px" } }, "Market data and research authorization are reported separately"),
       h("p", { style: { fontSize: "0.92rem", color: "#CBD5E1", lineHeight: "1.6", maxWidth: "900px" } },
-        "The BTCognitive Intelligence Radar automatically refreshes in real-time. It analyzes live BTC market dynamics, realized volatility structure, order book pressure, and macro catalysts to synthesize research market structure insights, hypothetical Take Profit & Stop Loss ATR barrier scenarios, and conformal uncertainty envelopes."
+        "The Terminal displays exchange-sourced BTC/USD prices and candles when the public Coinbase feed is available. Unverified derivatives, capital-flow and macro data are not substituted with estimates. Forecasts and execution remain unavailable until frozen research inputs and evaluation provenance are authenticated."
       )
     )
   );
@@ -2573,19 +2635,29 @@ function HeroSection({ setPath, livePrice, changePct, predictionData, regimeData
 // DecisionAnatomyPanel — 4-Layer Causal Decision Anatomy
 // ===========================================================================
 function DecisionAnatomyPanel({ decisionData }) {
+  if (!hasVerifiedResearchAuthorization(decisionData)) {
+    const researchGate = decisionData?.research || decisionData?.research_gate;
+    return h("div", { className: "glass-card decision-anatomy-card", role: "status", style: { padding: "24px", marginBottom: "24px" } },
+      h("strong", { style: { color: "#FBBF24" } }, "Decision anatomy unavailable · research authorization is blocked."),
+      h("p", { style: { color: "#CBD5E1", marginBottom: 0 } },
+        researchGate?.reason || "No provenance-verified decision payload is available. No simulated event, cost, or risk status is shown."
+      )
+    );
+  }
+
   const data = decisionData || {
-    header: { decision_id: "DEC-LIVE-PENDING", provenance_hash: "none", chain_hash: "none", strategy_id: "MEIE-ARENA-v1.0" },
+    header: { decision_id: "NOT_AVAILABLE", provenance_hash: null, chain_hash: null, strategy_id: "NOT_AUTHORIZED" },
     opportunity_status: "NONE",
     evidence_status: "NOT_APPLICABLE",
     economics_status: "NOT_APPLICABLE",
     risk_status: "NOT_APPLICABLE",
-    layer1_market_event: { event_type: "NONE", event_strength: null, elapsed_seconds: null, state_dynamics: { volatility: "NORMAL", liquidity: "NORMAL", flow: "BALANCED", positioning: "NEUTRAL", novelty: "LOW" } },
+    layer1_market_event: { event_type: "UNAVAILABLE", event_strength: null, elapsed_seconds: null, state_dynamics: { volatility: "UNKNOWN", liquidity: "UNKNOWN", flow: "UNKNOWN", positioning: "UNKNOWN", novelty: "UNKNOWN" } },
     layer2_conditional_path: { empirical_tp_first_pct: null, sample_n: 0, temporal_interval_95: null, evidence_quality: "NOT_APPLICABLE", expected_mfe_bps: null, expected_mae_bps: null },
     layer3_execution_economics: { mode: "NOT_APPLICABLE", gross_expected_ev_bps: null, friction_breakdown_bps: { fee: null, spread: null, slippage: null, impact: null, adverse_selection: null }, total_execution_drag_bps: null, net_executable_ev_bps: null },
-    layer4_risk_authorization: { c2_model_health: "CALIBRATED", trade_risk_check: "NOT_APPLICABLE", risk_block_reason: "NO_OPPORTUNITY", daily_risk_budget_allocated_pct: 0.18, daily_risk_budget_limit_pct: 0.50, latency_health: "PASS", capacity_threshold: "PASS", authorized: false },
+    layer4_risk_authorization: { c2_model_health: "UNVERIFIED", trade_risk_check: "DISABLED", risk_block_reason: "BLOCKED_PROVENANCE_UNVERIFIED", daily_risk_budget_allocated_pct: null, daily_risk_budget_limit_pct: null, latency_health: "UNAVAILABLE", capacity_threshold: "UNAVAILABLE", authorized: false },
     final_action: "ABSTAIN",
-    primary_reason_code: "NO_EVENT",
-    mechanism_diagnostics: { support_count: 0, block_count: 0, diagnostics: { IGNITION: "NEUTRAL", ABSORPTION: "NEUTRAL", VACUUM: "NEUTRAL", TOXICITY: "PASS" } }
+    primary_reason_code: "BLOCKED_PROVENANCE_UNVERIFIED",
+    mechanism_diagnostics: { support_count: 0, block_count: 0, diagnostics: { IGNITION: "UNAVAILABLE", ABSORPTION: "UNAVAILABLE", VACUUM: "UNAVAILABLE", TOXICITY: "UNAVAILABLE" } }
   };
 
   const isTrade = data.final_action === "TRADE";
@@ -2612,16 +2684,16 @@ function DecisionAnatomyPanel({ decisionData }) {
     // Top Bar with Cryptographic Hash Chain and Strategy ID
     h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "14px", marginBottom: "18px", flexWrap: "wrap", gap: "10px" } },
       h("div", { style: { display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" } },
-        h("span", { style: { fontSize: "1.15rem", fontWeight: "800", color: "#F8FAFC", letterSpacing: "0.02em" } }, "⚡ CANONICAL DECISION ANATOMY"),
+        h("span", { style: { fontSize: "1.15rem", fontWeight: "800", color: "#F8FAFC", letterSpacing: "0.02em" } }, "⚡ RESEARCH AUTHORIZATION STATUS"),
         h("span", { style: { background: "rgba(124,92,255,0.15)", border: "1px solid rgba(124,92,255,0.4)", color: "#A78BFA", padding: "2px 8px", borderRadius: "6px", fontSize: "0.72rem", fontWeight: "700", fontFamily: "var(--font-mono)" } }, data.header?.strategy_id || "MEIE-ARENA-v1.0"),
         h("span", { style: { background: hasEvent ? "rgba(0,229,168,0.12)" : "rgba(255,255,255,0.05)", border: `1px solid ${hasEvent ? "#00E5A8" : "rgba(255,255,255,0.1)"}`, color: hasEvent ? "#00E5A8" : "#94A3B8", padding: "2px 8px", borderRadius: "6px", fontSize: "0.70rem", fontWeight: "700", fontFamily: "var(--font-mono)" } },
           `STAGE: ${data.opportunity_status || (hasEvent ? "IDENTIFIED" : "NONE")}`
         )
       ),
       h("div", { style: { display: "flex", gap: "12px", fontSize: "0.74rem", fontFamily: "var(--font-mono)", color: "#94A3B8", flexWrap: "wrap" } },
-        h("span", null, "ID: ", h("strong", { style: { color: "#38BDF8" } }, data.header?.decision_id || "DEC-LIVE")),
+        h("span", null, "ID: ", h("strong", { style: { color: "#38BDF8" } }, data.header?.decision_id || "NOT_AVAILABLE")),
         h("span", null, "·"),
-        h("span", null, "Hash Chain: ", h("strong", { style: { color: "#A78BFA" } }, (data.header?.chain_hash || "").substring(0, 10) + "..."))
+        h("span", null, "Provenance: ", h("strong", { style: { color: "#A78BFA" } }, data.header?.chain_hash ? `${data.header.chain_hash.substring(0, 10)}...` : "UNVERIFIED"))
       )
     ),
 
@@ -2737,6 +2809,18 @@ function DecisionAnatomyPanel({ decisionData }) {
 // ===========================================================================
 function PredictionPanel({ predictionData, engineState = "offline" }) {
   const [showEvidence, setShowEvidence] = useState(false);
+  const researchGate = predictionData?.research || predictionData?.research_gate;
+  const researchAuthorized = engineState === "live" && hasVerifiedResearchAuthorization(predictionData);
+
+  if (!researchAuthorized) {
+    return h("div", { className: "glass-card", role: "status", style: { padding: "24px", marginBottom: "24px" } },
+      h("div", { style: { fontSize: "0.78rem", color: "#38BDF8", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.05em" } }, "Production forecast unavailable"),
+      h("h3", { style: { fontSize: "1.2rem", fontWeight: "800", color: "#F8FAFC", margin: "8px 0" } }, "Frozen research inputs and evaluation provenance are not authenticated."),
+      h("p", { style: { color: "#CBD5E1", margin: 0, lineHeight: 1.5 } },
+        researchGate?.reason || "Model forecasts and trading remain disabled. Live spot-market data is shown separately."
+      )
+    );
+  }
 
   // Check error states dynamically from backend
   const statusStr = predictionData?.status || "online";
@@ -3248,23 +3332,25 @@ function PredictionHistoryTimeline({ memoryData }) {
   const [stats, setStats] = useState(null);
 
   useEffect(() => {
+    let active = true;
     api.fetchMemoryStats()
-      .then(setStats)
-      .catch(err => console.warn("Error fetching memory stats:", err));
+      .then(data => { if (active) setStats(data); })
+      .catch(err => {
+        if (active) setStats(null);
+        console.warn("Error fetching memory stats:", err);
+      });
+    return () => { active = false; };
   }, [memoryData]);
 
-  const s = stats || {
-    win_rate_pct: 78.4,
-    net_return_pct: 4.82,
-    realized_sharpe: 1.48,
-    brier_score: 0.042,
-    skip_audit: {
-      skip_count: 8,
-      avoided_drawdown_usd: 1840.0,
-      skip_defense_rate_pct: 91.5,
-      summary: "91.5% of SKIP decisions successfully avoided adverse market chop, protecting capital from drawdown."
-    }
-  };
+  const researchGate = stats?.research || stats?.research_gate;
+  if (!(researchGate?.authorized === true && researchGate?.provenance_status === "VERIFIED")) {
+    return h("div", { className: "glass-card", role: "status", style: { padding: "24px", marginBottom: "32px" } },
+      h("strong", { style: { color: "#FBBF24" } }, "Historical performance unavailable · provenance is unverified."),
+      h("p", { style: { color: "#CBD5E1", marginBottom: 0 } }, "Legacy ledger values are not presented as verified research results.")
+    );
+  }
+
+  const s = stats;
 
   return h("div", { className: "glass-card", style: { padding: "24px", marginBottom: "32px" } },
     h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px", flexWrap: "wrap", gap: "10px" } },
@@ -3585,14 +3671,18 @@ function QuickExecutionTicket({ livePrice }) {
 // ===========================================================================
 // CompactWorkstationHeader — High-Density Bloomberg/TradingView Workstation Header
 // ===========================================================================
-function CompactWorkstationHeader({ livePrice, changePct, regimeData, activePaperPos, engineState, workstationMode = "focus", onToggleMode }) {
-  const isUp = (changePct || 0) >= 0;
+function CompactWorkstationHeader({ livePrice, changePct, regimeData, activePaperPos, engineState, researchData, workstationMode = "focus", onToggleMode }) {
+  const researchAuthorized = hasVerifiedResearchAuthorization(researchData);
+  const hasChange = typeof changePct === "number";
+  const isUp = hasChange && changePct >= 0;
   const p = activePaperPos;
-  const strat = p?.strategy_id || "MEIE-IGNITION";
-  const action = p?.hypothesis_comparison?.final_action || (p?.has_active_position ? `TRADE · ${p.direction}` : "SCANNING (ABSTAIN)");
-  const c2Health = p?.decision_anatomy?.c2_health || "CALIBRATED";
-  const reg = regimeData?.regime || "VOL_EXPANDING";
-  const vol = regimeData?.volatility_state || "NORMAL";
+  const strat = researchAuthorized ? (p?.strategy_id || "Unavailable") : "Unavailable";
+  const action = researchAuthorized
+    ? (p?.hypothesis_comparison?.final_action || (p?.has_active_position ? `TRADE · ${p.direction}` : "ABSTAIN"))
+    : "Research blocked";
+  const c2Health = researchAuthorized ? (p?.decision_anatomy?.c2_health || "UNVERIFIED") : "UNVERIFIED";
+  const reg = researchAuthorized ? (regimeData?.regime || "Unavailable") : "Unavailable";
+  const vol = researchAuthorized ? (regimeData?.volatility_state || "Unavailable") : "Unavailable";
 
   return h("div", { className: "workstation-header" },
     h("div", { className: "workstation-brand" },
@@ -3600,14 +3690,14 @@ function CompactWorkstationHeader({ livePrice, changePct, regimeData, activePape
       h("div", null,
         h("div", { className: "workstation-title" },
           "BTCognitive",
-          h("span", { style: { fontSize: "0.72rem", fontWeight: "700", color: "#A78BFA", background: "rgba(167, 139, 250, 0.12)", border: "1px solid rgba(167, 139, 250, 0.3)", padding: "2px 8px", borderRadius: "4px" } }, "LIVE PAPER TERMINAL")
+          h("span", { style: { fontSize: "0.72rem", fontWeight: "700", color: "#A78BFA", background: "rgba(167, 139, 250, 0.12)", border: "1px solid rgba(167, 139, 250, 0.3)", padding: "2px 8px", borderRadius: "4px" } }, "BTC/USD MARKET MONITOR")
         )
       )
     ),
     h("div", { style: { display: "flex", alignItems: "center", gap: "12px", fontSize: "0.72rem", fontWeight: "700" } },
-      h("span", { style: { color: "#00E5A8", display: "flex", alignItems: "center", gap: "4px" } }, h("span", { style: { animation: "pulseDot 1.5s infinite" } }, "●"), "DATA LIVE"),
-      h("span", { style: { color: "#38BDF8", display: "flex", alignItems: "center", gap: "4px" } }, "● ARENA ACTIVE"),
-      h("span", { style: { color: "#F59E0B", display: "flex", alignItems: "center", gap: "4px" } }, "● PAPER MODE"),
+      h("span", { style: { color: livePrice > 0 ? "#00E5A8" : "#F59E0B", display: "flex", alignItems: "center", gap: "4px" } }, livePrice > 0 ? "● QUOTE RECEIVED" : "● WAITING FOR QUOTE"),
+      h("span", { style: { color: "#F59E0B", display: "flex", alignItems: "center", gap: "4px" } }, "● RESEARCH BLOCKED"),
+      h("span", { style: { color: "#F59E0B", display: "flex", alignItems: "center", gap: "4px" } }, "● TRADING DISABLED"),
       onToggleMode && h("button", {
         onClick: onToggleMode,
         title: workstationMode === "focus" ? "Switch to Pro Quant Workstation (all labs)" : "Switch to Clean Focus View",
@@ -3626,8 +3716,8 @@ function CompactWorkstationHeader({ livePrice, changePct, regimeData, activePape
     h("div", { className: "workstation-status-strip" },
       h("div", { className: "status-strip-chip" },
         h("span", { style: { color: "#7E95B5" } }, "BTC:"),
-        h("strong", { style: { color: "#F8FAFC" } }, `$${Math.round(livePrice || 64250).toLocaleString()}`),
-        h("span", { style: { color: isUp ? "#00E5A8" : "#FF5C7C", fontSize: "0.70rem" } }, `${isUp ? "+" : ""}${(changePct || 0).toFixed(2)}%`)
+        h("strong", { style: { color: "#F8FAFC" } }, livePrice > 0 ? `$${Math.round(livePrice).toLocaleString()}` : "Unavailable"),
+        h("span", { style: { color: isUp ? "#00E5A8" : "#FF5C7C", fontSize: "0.70rem" } }, hasChange ? `${isUp ? "+" : ""}${changePct.toFixed(2)}%` : "—")
       ),
       h("div", { className: "status-strip-chip" },
         h("span", { style: { color: "#7E95B5" } }, "REGIME:"),
@@ -3667,8 +3757,15 @@ function WorkstationIntentCommandBar({
   totalVoi,
   activePaperPos,
   signalMode = "live_ai",
-  setSignalMode
+  setSignalMode,
+  researchData
 }) {
+  if (!hasVerifiedResearchAuthorization(researchData)) {
+    return h("div", { className: "workstation-intent-command-bar", role: "status" },
+      "Signal steering is unavailable until research provenance and evaluation are verified."
+    );
+  }
+
   const horizons = ["5m", "15m", "1h", "4h", "1d", "7d", "CYCLE"];
   const modes = [
     { id: "AI_RECOMMEND", label: "⚡ AI RECOMMEND" },
@@ -3677,8 +3774,8 @@ function WorkstationIntentCommandBar({
   ];
 
   const p = activePaperPos;
-  const voi = totalVoi !== undefined ? totalVoi : (p?.evidence_routing?.total_voi_bps || 14.8);
-  const activeHash = configHash || p?.provenance?.indicator_config_hash || p?.contract_hash || "0x8f3c2a1e";
+  const voi = totalVoi ?? p?.evidence_routing?.total_voi_bps;
+  const activeHash = configHash || p?.provenance?.indicator_config_hash || p?.contract_hash;
 
   return h("div", { className: "workstation-intent-command-bar" },
     // Group 0: Signal Mode (Live AI Alpha vs Tier 0 Surveillance)
@@ -3766,13 +3863,13 @@ function WorkstationIntentCommandBar({
     // Group 4: Provenance Hash & Routing Relevance Telemetry
     h("div", { className: "command-bar-group", style: { marginLeft: "auto" } },
       h("span", { style: { fontSize: "0.72rem", color: "#A78BFA", background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.3)", padding: "2px 8px", borderRadius: "4px", fontFamily: "var(--font-mono)" } },
-        `Config: ${activeHash}`
+        `Config: ${activeHash || "Unavailable"}`
       ),
       h("span", {
         title: "A priori Routing Relevance; empirical OOS VOI estimation requires live paper trade resolution.",
         style: { fontSize: "0.72rem", color: "#00E5A8", background: "rgba(0,229,168,0.12)", border: "1px solid rgba(0,229,168,0.3)", padding: "2px 8px", borderRadius: "4px", fontFamily: "var(--font-mono)" }
       },
-        `Routing Relevance: +${voi} bps`
+        voi !== undefined ? `Routing Relevance: +${voi} bps` : "Routing Relevance: unavailable"
       ),
       h("span", { style: { fontSize: "0.70rem", color: "#38BDF8", background: "rgba(56,189,248,0.12)", border: "1px solid rgba(56,189,248,0.3)", padding: "2px 8px", borderRadius: "4px", fontWeight: "800" } },
         `MODE: ${p?.guidance_mode || ((userDirectionPreference || "AUTO") === "AUTO" ? "AUTO" : "GUIDED")}`
@@ -4245,6 +4342,19 @@ function AiDualHypothesisPanel({ activePaperPos, livePrice, userDirectionPrefere
 // ===========================================================================
 function WorkstationDecisionSidebar({ activePaperPos, selectedStrategy, setSelectedStrategy, livePrice }) {
   const p = activePaperPos;
+  if (!(p?.has_active_position === true
+    && hasVerifiedResearchAuthorization(p))) {
+    const researchGate = p?.research || p?.research_gate;
+    return h("aside", { className: "workstation-sidebar", role: "status" },
+      h("div", { className: "active-strategy-card" },
+        h("strong", { style: { color: "#FBBF24" } }, "Strategy evaluation unavailable"),
+        h("p", { style: { color: "#CBD5E1" } },
+          researchGate?.reason || "No verified active paper position or research authorization is available."
+        ),
+        h("div", { style: { color: "#94A3B8", fontSize: "0.75rem" } }, "Trading is disabled.")
+      )
+    );
+  }
   const isPosOpen = p && p.has_active_position;
   const pnlUsd = p?.unrealized_pnl_usd || 0.0;
   const pnlPct = p?.unrealized_pnl_pct || 0.0;
@@ -4762,16 +4872,22 @@ function HistoricalAnalogsPanel() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const requestIdRef = useRef(0);
 
   const loadAnalogs = useCallback(() => {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     setError(null);
+    setData(null);
     api.fetchAnalogs(20)
       .then(res => {
-        setData(res);
-        setLoading(false);
+        if (requestId === requestIdRef.current) {
+          setData(res);
+          setLoading(false);
+        }
       })
       .catch(err => {
+        if (requestId !== requestIdRef.current) return;
         console.warn("Failed to load historical analogs:", err);
         setError("Could not retrieve historical analogs from backend.");
         setLoading(false);
@@ -4781,13 +4897,16 @@ function HistoricalAnalogsPanel() {
   useEffect(() => {
     loadAnalogs();
     const interval = setInterval(loadAnalogs, 60000);
-    return () => clearInterval(interval);
+    return () => {
+      requestIdRef.current++;
+      clearInterval(interval);
+    };
   }, [loadAnalogs]);
 
   if (loading && !data) {
     return h("div", { className: "glass-card", style: { padding: "30px", textAlign: "center", color: "#94A3B8" } },
       h("div", { className: "spinner", style: { margin: "0 auto 12px auto" } }),
-      "Searching 40,000+ historical hourly market regimes..."
+      "Loading historical analog observations…"
     );
   }
 
@@ -4801,6 +4920,11 @@ function HistoricalAnalogsPanel() {
   const s = data?.aggregate_stats || {};
   const div = data?.diversity_metrics || s?.diversity || {};
   const analogs = data?.analogs || [];
+  if (!hasVerifiedResearchAuthorization(data)) {
+    return h("div", { className: "glass-card", role: "status", style: { padding: "24px" } },
+      h("strong", { style: { color: "#FBBF24" } }, "Historical analog results unavailable · provenance is unverified.")
+    );
+  }
 
   return h("div", { className: "glass-card", style: { padding: "24px" } },
     // Header
@@ -5014,6 +5138,15 @@ function HistoricalAnalogsPanel() {
 // EntryTpSlResearchPanel — Authoritative Track V3 Walk-Forward Results (Phases 6C–6K)
 // ===========================================================================
 function EntryTpSlResearchPanel() {
+  return h("div", { className: "glass-card", style: { padding: "24px" }, role: "status" },
+    h("div", { style: { color: "#FBBF24", fontWeight: "800", marginBottom: "8px" } },
+      "RESEARCH RESULTS UNAVAILABLE"
+    ),
+    h("p", { style: { color: "#CBD5E1", lineHeight: "1.5" } },
+      "Frozen input provenance and evaluation evidence are not authenticated. Legacy performance figures are not being presented as verified results; forecasts and trading remain disabled."
+    )
+  );
+
   const [subTab, setSubTab] = useState("table");
 
   const wfModels = [
@@ -5223,7 +5356,7 @@ function EntryTpSlResearchPanel() {
 // ===========================================================================
 // BottomTabs Component
 // ===========================================================================
-function BottomTabs({ activeTab, setActiveTab, memoryData, portfolioData, qualityData, explanationData }) {
+function BottomTabs({ activeTab, setActiveTab, memoryData, portfolioData, qualityData, explanationData, researchData }) {
   const tabs = [
     { id: "research_wf", label: "🔬 Entry + TP/SL Research (Track V3)" },
     { id: "memory", label: "📜 Market Memory" },
@@ -5232,6 +5365,15 @@ function BottomTabs({ activeTab, setActiveTab, memoryData, portfolioData, qualit
     { id: "quality", label: "🎯 Signal Quality" },
     { id: "shap", label: "🔍 Explainable AI" }
   ];
+
+  if (!hasVerifiedResearchAuthorization(researchData)) {
+    return h("div", { className: "glass-card", role: "status", style: { marginTop: "32px", padding: "20px" } },
+      h("strong", { style: { color: "#FBBF24" } }, "Research ledger, model diagnostics, and paper-position views are unavailable."),
+      h("p", { style: { color: "#CBD5E1", marginBottom: 0 } },
+        "Frozen model provenance and evaluation are not authenticated. Live market observations remain available above."
+      )
+    );
+  }
 
   return h("div", { style: { marginTop: "32px" } },
     h("div", { className: "bottom-tabs-header" },
@@ -5361,71 +5503,11 @@ const CounterfactualPanel = ReplayCounterfactualLab;
 // ===========================================================================
 // OrderBookPressureWidget — Real-Time Microstructure Depth & Imbalance
 // ===========================================================================
-function OrderBookPressureWidget({ livePrice }) {
-  const p = livePrice || 64250.0;
-  // Synthetic / Point-in-time microstructure depth snapshot
-  const bidRatio = 54.2;
-  const askRatio = 45.8;
-  const ofiVal = "+0.65";
-  const spreadBps = "2.0";
-  const vpinVal = "0.22";
-
-  return h("div", { className: "glass-card", style: { padding: "20px" } },
-    h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" } },
-      h("div", null,
-        h("h3", { style: { margin: 0, fontSize: "1.05rem", fontWeight: "800", color: "#F8FAFC" } },
-          "🌊 Order Book Pressure & Microstructure Depth"
-        ),
-        h("div", { style: { fontSize: "0.72rem", color: "#7E95B5", marginTop: "2px" } },
-          `Point-in-Time Depth Telemetry @ $${p.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
-        )
-      ),
-      h("span", { style: { background: "rgba(148, 163, 184, 0.12)", color: "#94A3B8", border: "1px solid rgba(148, 163, 184, 0.3)", padding: "2px 8px", borderRadius: "4px", fontSize: "0.68rem", fontWeight: "700" } },
-        "DESCRIPTIVE TELEMETRY"
-      )
-    ),
-
-    // Bid/Ask Depth Ratio Bar
-    h("div", { style: { marginBottom: "14px" } },
-      h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "0.74rem", fontWeight: "700", marginBottom: "6px" } },
-        h("span", { style: { color: "#00E5A8" } }, `BIDS: ${bidRatio}%`),
-        h("span", { style: { color: "#7E95B5", fontSize: "0.68rem" } }, "DEPTH IMBALANCE"),
-        h("span", { style: { color: "#FF5C7C" } }, `ASKS: ${askRatio}%`)
-      ),
-      h("div", { style: { width: "100%", height: "8px", background: "#FF5C7C", borderRadius: "4px", overflow: "hidden", display: "flex" } },
-        h("div", { style: { width: `${bidRatio}%`, height: "100%", background: "#00E5A8", transition: "width 0.4s ease" } })
-      )
-    ),
-
-    // Grid of Microstructure Signals with Unvalidated Visual Suppression
-    h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", fontSize: "0.75rem" } },
-      // OFI (Unvalidated Q1 Evidence)
-      h("div", { className: "indicator-checkbox-label unvalidated-evidence", style: { padding: "8px 10px", borderRadius: "6px" } },
-        h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
-          h("span", { style: { color: "#7E95B5", fontSize: "0.65rem", fontWeight: "700" } }, "OFI IMBALANCE"),
-          h("span", { className: "validation-status-tag unvalidated" }, "UNVALIDATED")
-        ),
-        h("strong", { style: { color: "#94A3B8", fontFamily: "var(--font-mono)", fontSize: "0.90rem" } }, ofiVal),
-        h("div", { style: { color: "#64748B", fontSize: "0.60rem", marginTop: "2px" } }, "State contribution: descriptive")
-      ),
-      // VPIN
-      h("div", { style: { background: "rgba(0,0,0,0.3)", padding: "8px 10px", borderRadius: "6px" } },
-        h("div", { style: { color: "#7E95B5", fontSize: "0.65rem", fontWeight: "700" } }, "VPIN TOXICITY CHECK"),
-        h("strong", { style: { color: "#38BDF8", fontFamily: "var(--font-mono)", fontSize: "0.90rem" } }, `${vpinVal} (NORMAL)`),
-        h("div", { style: { color: "#94A3B8", fontSize: "0.60rem", marginTop: "2px" } }, "Adverse selection gated")
-      ),
-      // Half Spread
-      h("div", { style: { background: "rgba(0,0,0,0.3)", padding: "8px 10px", borderRadius: "6px" } },
-        h("div", { style: { color: "#7E95B5", fontSize: "0.65rem", fontWeight: "700" } }, "HALF-SPREAD ESTIMATE"),
-        h("strong", { style: { color: "#F8FAFC", fontFamily: "var(--font-mono)", fontSize: "0.90rem" } }, `${spreadBps} bps`),
-        h("div", { style: { color: "#94A3B8", fontSize: "0.60rem", marginTop: "2px" } }, "Liquidity friction baseline")
-      ),
-      // Hawkes Acceleration
-      h("div", { style: { background: "rgba(0,0,0,0.3)", padding: "8px 10px", borderRadius: "6px" } },
-        h("div", { style: { color: "#7E95B5", fontSize: "0.65rem", fontWeight: "700" } }, "HAWKES EVENT CLUSTERING"),
-        h("strong", { style: { color: "#A78BFA", fontFamily: "var(--font-mono)", fontSize: "0.90rem" } }, "2.2σ (ELEVATED)"),
-        h("div", { style: { color: "#94A3B8", fontSize: "0.60rem", marginTop: "2px" } }, "Trade arrival acceleration")
-      )
+function OrderBookPressureWidget() {
+  return h("div", { className: "glass-card", role: "status", style: { padding: "20px" } },
+    h("h3", null, "Order Book Pressure & Microstructure Depth"),
+    h("p", { style: { color: "#CBD5E1", marginBottom: 0 } },
+      "Order-book depth, OFI, spread, and VPIN are unavailable: this view has no verified live source."
     )
   );
 }
@@ -5443,16 +5525,22 @@ function WhatIfSimulator({ livePrice, predictionData, activePaperPos, startColla
   const [scenarioData, setScenarioData] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const spot = livePrice || activePaperPos?.live_price || 64250.0;
-  const c2 = predictionData?.conformal_interval_24h || activePaperPos?.tier_0_geometric_touch?.conformal_interval_24h || {};
-  const confP90 = Number(c2.upper || (spot * 1.008));
-  const confP10 = Number(c2.lower || (spot * 0.993));
+  const researchGate = predictionData?.research || predictionData?.research_gate;
+  const researchAuthorized = hasVerifiedResearchAuthorization(predictionData);
+  const spot = livePrice > 0 ? livePrice : null;
+  const confP90 = null;
+  const confP10 = null;
 
-  const tpPrice = Number((spot * (1 + tpPct / 100)).toFixed(2));
-  const slPrice = Number((spot * (1 - slPct / 100)).toFixed(2));
+  const tpPrice = spot === null ? null : Number((spot * (1 + tpPct / 100)).toFixed(2));
+  const slPrice = spot === null ? null : Number((spot * (1 - slPct / 100)).toFixed(2));
 
   // Fetch Path Simulation calculation from backend
   useEffect(() => {
+    if (!researchAuthorized || spot === null) {
+      setScenarioData(null);
+      setLoading(false);
+      return;
+    }
     let active = true;
     setLoading(true);
     api.fetchWhatIfScenario(tpPrice, slPrice, horizon, volMult, spot)
@@ -5466,17 +5554,29 @@ function WhatIfSimulator({ livePrice, predictionData, activePaperPos, startColla
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [tpPrice, slPrice, horizon, volMult, spot]);
+  }, [researchAuthorized, tpPrice, slPrice, horizon, volMult, spot]);
 
   const paths = scenarioData?.path_analysis || {};
   const confRef = scenarioData?.empirical_conformal_reference || {};
   const userScen = scenarioData?.user_scenario || {};
   const provenance = scenarioData?.research_provenance || {};
 
-  const pTp = paths.p_tp_first ?? 0.055;
-  const pSl = paths.p_sl_first ?? 0.091;
-  const pSurvive = paths.p_no_boundary_hit_survival ?? 0.854;
-  const pEventualTp = paths.p_eventual_tp ?? 0.50;
+  const pTp = paths.p_tp_first ?? null;
+  const pSl = paths.p_sl_first ?? null;
+  const pSurvive = paths.p_no_boundary_hit_survival ?? null;
+  const pEventualTp = paths.p_eventual_tp ?? null;
+  const formatPctOrUnavailable = value => typeof value === "number" && Number.isFinite(value)
+    ? `${(value * 100).toFixed(1)}%`
+    : "Unavailable";
+
+  if (!researchAuthorized) {
+    return h("div", { className: "glass-card", role: "status", style: { padding: "20px", marginBottom: "16px" } },
+      h("strong", { style: { color: "#FBBF24" } }, "Scenario analysis unavailable · research authorization is blocked."),
+      h("p", { style: { color: "#CBD5E1", marginBottom: 0 } },
+        researchGate?.reason || "No probability, conformal range, or execution-cost estimate is shown without authenticated provenance."
+      )
+    );
+  }
 
   const horizons = ["5m", "15m", "1h", "4h", "1d", "7d"];
   const tpPresets = [0.3, 0.5, 0.8, 1.2, 2.0, 3.5];
@@ -5709,14 +5809,14 @@ function WhatIfSimulator({ livePrice, predictionData, activePaperPos, startColla
     // 3. Pure Path Analysis Output Strip
     h("div", { style: { marginBottom: "14px" } },
       h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "0.74rem", fontWeight: "800", marginBottom: "6px" } },
-        h("span", { style: { color: "#00E5A8" } }, `TP boundary first: ${(pTp * 100).toFixed(1)}%`),
-        h("span", { style: { color: "#38BDF8" } }, `No boundary hit: ${(pSurvive * 100).toFixed(1)}%`),
-        h("span", { style: { color: "#FF5C7C" } }, `SL boundary first: ${(pSl * 100).toFixed(1)}%`)
+        h("span", { style: { color: "#00E5A8" } }, `TP boundary first: ${formatPctOrUnavailable(pTp)}`),
+        h("span", { style: { color: "#38BDF8" } }, `No boundary hit: ${formatPctOrUnavailable(pSurvive)}`),
+        h("span", { style: { color: "#FF5C7C" } }, `SL boundary first: ${formatPctOrUnavailable(pSl)}`)
       ),
       h("div", { style: { width: "100%", height: "12px", background: "rgba(0,0,0,0.4)", borderRadius: "6px", overflow: "hidden", display: "flex", border: "1px solid rgba(255,255,255,0.1)" } },
-        h("div", { style: { width: `${pTp * 100}%`, height: "100%", background: "#00E5A8", transition: "width 0.3s ease" }, title: `TP First: ${(pTp * 100).toFixed(1)}%` }),
-        h("div", { style: { width: `${pSurvive * 100}%`, height: "100%", background: "#38BDF8", transition: "width 0.3s ease" }, title: `No Exit: ${(pSurvive * 100).toFixed(1)}%` }),
-        h("div", { style: { width: `${pSl * 100}%`, height: "100%", background: "#FF5C7C", transition: "width 0.3s ease" }, title: `SL First: ${(pSl * 100).toFixed(1)}%` })
+        h("div", { style: { width: `${typeof pTp === "number" ? pTp * 100 : 0}%`, height: "100%", background: "#00E5A8", transition: "width 0.3s ease" }, title: `TP First: ${formatPctOrUnavailable(pTp)}` }),
+        h("div", { style: { width: `${typeof pSurvive === "number" ? pSurvive * 100 : 0}%`, height: "100%", background: "#38BDF8", transition: "width 0.3s ease" }, title: `No Exit: ${formatPctOrUnavailable(pSurvive)}` }),
+        h("div", { style: { width: `${typeof pSl === "number" ? pSl * 100 : 0}%`, height: "100%", background: "#FF5C7C", transition: "width 0.3s ease" }, title: `SL First: ${formatPctOrUnavailable(pSl)}` })
       )
     ),
 
@@ -5732,20 +5832,24 @@ function WhatIfSimulator({ livePrice, predictionData, activePaperPos, startColla
       h("div", { style: { background: "rgba(0,0,0,0.3)", padding: "8px 10px", borderRadius: "6px" } },
         h("div", { style: { color: "#7E95B5", fontSize: "0.64rem" } }, "EVENTUAL MARTINGALE P_inf"),
         h("strong", { style: { color: "#F8FAFC", fontFamily: "var(--font-mono)", fontSize: "0.90rem" } },
-          `${(pEventualTp * 100).toFixed(1)}% TP / ${( (1 - pEventualTp) * 100).toFixed(1)}% SL`
+          typeof pEventualTp === "number"
+            ? `${formatPctOrUnavailable(pEventualTp)} TP / ${formatPctOrUnavailable(1 - pEventualTp)} SL`
+            : "Unavailable"
         ),
         h("div", { style: { color: "#94A3B8", fontSize: "0.60rem" } }, "ln(S0/SL) / ln(TP/SL)")
       ),
       h("div", { style: { background: "rgba(0,0,0,0.3)", padding: "8px 10px", borderRadius: "6px" } },
         h("div", { style: { color: "#7E95B5", fontSize: "0.64rem" } }, "EMPIRICAL CONFORMAL BOUNDS"),
         h("strong", { style: { color: "#CBD5E1", fontFamily: "var(--font-mono)", fontSize: "0.85rem" } },
-          `P90: $${Math.round(confP90)} | P10: $${Math.round(confP10)}`
+          Number.isFinite(confP90) && Number.isFinite(confP10)
+            ? `P90: $${Math.round(confP90)} | P10: $${Math.round(confP10)}`
+            : "Unavailable"
         ),
         h("div", { style: { color: "#94A3B8", fontSize: "0.60rem" } }, "Calibrated empirical reference")
       ),
       h("div", { style: { background: "rgba(0,0,0,0.3)", padding: "8px 10px", borderRadius: "6px" } },
         h("div", { style: { color: "#7E95B5", fontSize: "0.64rem" } }, "EXECUTION COST CONTEXT"),
-        h("strong", { style: { color: "#CBD5E1", fontFamily: "var(--font-mono)", fontSize: "0.90rem" } }, "-9.3 bps"),
+        h("strong", { style: { color: "#CBD5E1", fontFamily: "var(--font-mono)", fontSize: "0.90rem" } }, "Unavailable"),
         h("div", { style: { color: "#94A3B8", fontSize: "0.60rem" } }, "Independent friction context")
       )
     ),
@@ -5753,8 +5857,8 @@ function WhatIfSimulator({ livePrice, predictionData, activePaperPos, startColla
     // 5. Research Stress-Test Provenance Strip
     h("div", { style: { background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255, 255, 255, 0.05)", borderRadius: "6px", padding: "8px 12px", fontSize: "0.68rem", color: "#7E95B5", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" } },
       h("div", { style: { display: "flex", gap: "12px", fontFamily: "var(--font-mono)" } },
-        h("span", null, `Scenario Hash: `, h("span", { style: { color: "#94A3B8" } }, provenance.scenario_hash || "0x7a3e9b1c")),
-        h("span", null, `Config Hash: `, h("span", { style: { color: "#94A3B8" } }, provenance.configuration_hash || "0x4f12d8a0")),
+        h("span", null, `Scenario Hash: `, h("span", { style: { color: "#94A3B8" } }, provenance.scenario_hash || "UNVERIFIED")),
+        h("span", null, `Config Hash: `, h("span", { style: { color: "#94A3B8" } }, provenance.configuration_hash || "UNVERIFIED")),
         h("span", null, `Census: `, h("span", { style: { color: "#38BDF8" } }, "TIER0_EXPLORATORY_PATH_SIMULATION"))
       ),
       h("span", { style: { color: "#38BDF8", fontWeight: "700", fontFamily: "var(--font-mono)", fontSize: "0.65rem" } }, "NON-DIRECTIONAL NULL")
@@ -5775,6 +5879,12 @@ function CrossHorizonPatiencePanel({
   const [activeSubTab, setActiveSubTab] = useState("QUESTION_A");
 
   if (!crossHorizonData) return null;
+  if (!hasVerifiedResearchAuthorization(crossHorizonData)) {
+    const researchGate = crossHorizonData.research || crossHorizonData.research_gate;
+    return h("div", { className: "glass-card", role: "status", style: { padding: "18px", marginBottom: "14px" } },
+      h("strong", { style: { color: "#FBBF24" } }, "Cross-horizon research unavailable · provenance is unverified.")
+    );
+  }
 
   const qA = crossHorizonData.question_a_fixed_contract_sensitivity || [];
   const qB = crossHorizonData.question_b_horizon_specific_calibrations || [];
@@ -6044,6 +6154,17 @@ function AiPredictionEnginePanel({
   const [showAllEvidence, setShowAllEvidence] = useState(false);
   const [showAdvancedDiag, setShowAdvancedDiag] = useState(false);
   const [showDecisionAnatomy, setShowDecisionAnatomy] = useState(false);
+
+  const researchGate = predictionData?.research || predictionData?.research_gate;
+  const researchAuthorized = hasVerifiedResearchAuthorization(predictionData);
+  if (!researchAuthorized) {
+    return h("div", { className: "glass-card ai-prediction-engine-panel", role: "status", style: { padding: "18px", marginBottom: "16px" } },
+      h("strong", { style: { color: "#FBBF24" } }, "Model intelligence unavailable · research authorization is blocked."),
+      h("p", { style: { color: "#CBD5E1", marginBottom: 0 } },
+        researchGate?.reason || "No provenance-verified research signal or active paper position is available."
+      )
+    );
+  }
 
   const engine = activePaperPos?.ai_prediction_engine || {};
   const dual = engine.dual_hypotheses || {};
@@ -6543,7 +6664,7 @@ function SideBySideWorkstationContainer({
 // TerminalView — 70/30 Split Widescreen Trading Terminal
 // ===========================================================================
 function TerminalView({
-  activeInterval, setActiveInterval, binanceWsStatus, livePrice, changePct,
+  activeInterval, setActiveInterval, coinbaseWsStatus, livePrice, changePct,
   predictionData, predictionHistory, counterfactualData, decisionData,
   regimeData, explanationData, qualityData, memoryData, portfolioData, intelData,
   isReplaying, setIsReplaying, selectedRecord, onSelectRecord,
@@ -6554,6 +6675,7 @@ function TerminalView({
 }) {
   const [hoveredBar, setHoveredBar] = useState(null);
   const [latestCandleTime, setLatestCandleTime] = useState(null);
+  const [exchangeClock, setExchangeClock] = useState(null);
   const [lineageData, setLineageData] = useState(null);
   const [selectedStrategy, setSelectedStrategy] = useState("AUTO");
   const [activePaperPos, setActivePaperPos]     = useState(null);
@@ -6622,7 +6744,7 @@ function TerminalView({
     pollActivePosition();
     const intervalId = setInterval(pollActivePosition, 3000);
     return () => { isMounted = false; clearInterval(intervalId); };
-  }, [selectedStrategy, livePrice, enabledIndicators, userDirectionPreference, targetHorizon, evidenceMode, signalMode]);
+  }, [selectedStrategy, enabledIndicators, userDirectionPreference, targetHorizon, evidenceMode, signalMode]);
 
   const tabs = [
     { id: "live", label: "🔴 LIVE" },
@@ -6642,6 +6764,7 @@ function TerminalView({
       regimeData,
       activePaperPos,
       engineState,
+      researchData: predictionData,
       workstationMode,
       onToggleMode
     }),
@@ -6693,10 +6816,11 @@ function TerminalView({
       evidenceMode,
       setEvidenceMode,
       configHash,
-      totalVoi: activePaperPos?.evidence_routing?.total_voi_bps || 14.8,
+      totalVoi: activePaperPos?.evidence_routing?.total_voi_bps,
       activePaperPos,
       signalMode,
-      setSignalMode
+      setSignalMode,
+      researchData: predictionData
     }),
 
     // 4. Primary 70/30 Workstation Workspace
@@ -6705,12 +6829,13 @@ function TerminalView({
       h("div", { className: "workstation-chart-wrapper" },
         h("div", { className: "glass-card chart-card", style: { margin: 0 } },
           h(ChartTopBar, {
-            wsStatus: binanceWsStatus,
+            wsStatus: coinbaseWsStatus,
             activeInterval,
             setActiveInterval,
             livePrice,
             hoveredBar,
-            latestCandleTime
+            latestCandleTime,
+            exchangeClock
           }),
           h(LightweightCandleChart, {
             interval: activeInterval,
@@ -6723,14 +6848,17 @@ function TerminalView({
             onWsStatusChange,
             onPriceChange,
             onHoverBarChange: setHoveredBar,
-            onCandleTimeChange: setLatestCandleTime
+            onCandleTimeChange: setLatestCandleTime,
+            onExchangeTimeChange: setExchangeClock
           }),
           h("div", { className: "chart-contract-badge" },
             h("span", { style: { color: "#7E95B5" } },
-              "CANONICAL CONTRACT LEVELS · BOUNDED BY D_t | 24H CONFORMAL RISK ENVELOPE [P10/P50/P90]"
+              "LIVE BTC/USD CANDLES · FORECASTS BLOCKED UNTIL RESEARCH INPUTS ARE VERIFIED"
             ),
             h("span", { style: { color: "#00E5A8" } },
-              `Active Target: ${activePaperPos?.strategy_id || "MEIE-IGNITION"} (${activePaperPos?.direction || "LONG"})`
+                hasVerifiedResearchAuthorization(predictionData) && activePaperPos?.has_active_position
+                ? `Paper position: ${activePaperPos.strategy_id || "Unspecified"} (${activePaperPos.direction || "Unspecified"})`
+                  : "Paper-position data unavailable; paper trading disabled"
             )
           )
         ),
@@ -6781,7 +6909,7 @@ function TerminalView({
     ),
 
     // 4. Persistent User-Selectable AI Evidence Inputs Bar (AEER)
-    h(AiEvidenceInputsBar, {
+    hasVerifiedResearchAuthorization(predictionData) ? h(AiEvidenceInputsBar, {
       enabledIndicators,
       onToggleIndicator: handleToggleIndicator,
       onApplyPreset: handleApplyPreset,
@@ -6791,7 +6919,9 @@ function TerminalView({
       evidenceMode,
       setEvidenceMode,
       evidenceRouting: activePaperPos?.evidence_routing
-    }),
+    }) : h("div", { className: "workstation-intent-command-bar", role: "status" },
+      "Research evidence controls are unavailable until input provenance and evaluation are verified."
+    ),
 
     // 5. Secondary Analytics Workstation Tabs (Pro Mode Only)
     workstationMode === "pro" && h("div", { className: "workstation-tabs-container", style: { marginTop: "10px" } },
@@ -7292,6 +7422,7 @@ function ObservatoryContextPanel({ contextData }) {
 // ArenaExperimentView — Professional Experimental Trading Laboratory (MEIE-EPOCH-01)
 // ===========================================================================
 function ArenaExperimentView({ livePrice, predictionData, regimeData, decisionData }) {
+  const researchAuthorized = hasVerifiedResearchAuthorization(predictionData);
   const [activeTab, setActiveTab] = useState("accounts");
   const [arenaStatus, setArenaStatus] = useState(null);
   const [arenaContext, setArenaContext] = useState(null);
@@ -7311,6 +7442,7 @@ function ArenaExperimentView({ livePrice, predictionData, regimeData, decisionDa
 
   // Load all telemetry
   const loadLaboratoryData = useCallback(async () => {
+    if (!researchAuthorized) return;
     setIsRefreshing(true);
     try {
       const [ctxRes, statRes, accRes, ldrRes, trdRes, forRes, failRes, absRes] = await Promise.allSettled([
@@ -7351,13 +7483,14 @@ function ArenaExperimentView({ livePrice, predictionData, regimeData, decisionDa
     } finally {
       setIsRefreshing(false);
     }
-  }, [selectedStrategy]);
+  }, [researchAuthorized, selectedStrategy]);
 
   useEffect(() => {
+    if (!researchAuthorized) return undefined;
     loadLaboratoryData();
     const id = setInterval(loadLaboratoryData, 15000);
     return () => clearInterval(id);
-  }, [loadLaboratoryData]);
+  }, [loadLaboratoryData, researchAuthorized]);
 
   // Close inspector on Escape key
   useEffect(() => {
@@ -7367,6 +7500,15 @@ function ArenaExperimentView({ livePrice, predictionData, regimeData, decisionDa
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [inspectedTrade]);
+
+  if (!researchAuthorized) {
+    return h("div", { className: "glass-card", role: "status", style: { padding: "24px" } },
+      h("h2", null, "Research laboratory unavailable"),
+      h("p", { style: { color: "#CBD5E1", marginBottom: 0 } },
+        "Model experiments, paper trades, and performance telemetry are hidden until research provenance and evaluation are verified."
+      )
+    );
+  }
 
   // Strategy Contract Metadata
   const STRATEGY_CONTRACTS = {
@@ -8147,10 +8289,11 @@ Failure Mode Class:  ${t.failure_class || "NO_CLASS"}
 function App() {
   const [path,            setPath]            = useState(window.location.hash ? window.location.hash.replace("#", "") : "/landing");
   const [engineConnected, setEngineConnected] = useState(false);
-  const [binanceWsStatus, setBinanceWsStatus] = useState("disconnected");
+  const [coinbaseWsStatus, setCoinbaseWsStatus] = useState("disconnected");
   const [activeInterval,  setActiveInterval]  = useState("1h");
   const [livePrice,       setLivePrice]       = useState(0);
-  const [changePct,       setChangePct]       = useState(0);
+  const [changePct,       setChangePct]       = useState(null);
+  const [marketSummary, setMarketSummary] = useState(null);
   const [healthData,      setHealthData]      = useState(null);
   const [securityBlocked, setSecurityBlocked] = useState(false);
 
@@ -8202,6 +8345,8 @@ function App() {
   const [intelData,         setIntelData]         = useState(null);
   const [counterfactualData, setCounterfactualData] = useState(null);
   const [decisionData,      setDecisionData]      = useState(null);
+  const healthRequestRef = useRef(0);
+  const aiRequestRef = useRef(0);
 
   // High-Profit Opportunity Notifications State
   const [opportunityAlerts, setOpportunityAlerts] = useState([]);
@@ -8218,6 +8363,7 @@ function App() {
     telegram_bot_token: "",
     telegram_chat_id: ""
   });
+  const [adminApiKey, setAdminApiKey] = useState("");
 
   // Hash routing
   useEffect(() => {
@@ -8234,7 +8380,9 @@ function App() {
         api.fetchNotificationSettings()
       ]);
       if (recentRes.status === "fulfilled" && recentRes.value.alerts) {
-        setOpportunityAlerts(recentRes.value.alerts);
+        setOpportunityAlerts(recentRes.value.alerts.filter(alert =>
+          alert?.is_test === true || hasVerifiedResearchAuthorization(alert)
+        ));
       }
       if (settingsRes.status === "fulfilled") {
         setNotificationSettings(prev => ({ ...prev, ...settingsRes.value }));
@@ -8249,6 +8397,7 @@ function App() {
   // Handle incoming High-Profit Opportunity Alert
   const handleIncomingAlert = useCallback((alertPayload) => {
     if (!alertPayload) return;
+    if (alertPayload.is_test !== true && !hasVerifiedResearchAuthorization(alertPayload)) return;
     
     // 1. Play fanfare chime
     if (notificationSettings?.sound_alerts_enabled !== false) {
@@ -8256,7 +8405,9 @@ function App() {
     }
 
     // 2. Show native OS desktop notification
-    showBrowserNotification(alertPayload);
+    if (notificationSettings?.browser_alerts_enabled !== false) {
+      showBrowserNotification(alertPayload);
+    }
 
     // 3. Add to recent alerts history
     setOpportunityAlerts(prev => [alertPayload, ...prev.filter(a => a.id !== alertPayload.id)].slice(0, 30));
@@ -8280,46 +8431,50 @@ function App() {
     return unsub;
   }, [handleIncomingAlert]);
 
-  // Trigger test alert handler
-  const handleTriggerTestAlert = useCallback(async () => {
+  // Trigger an explicitly labeled notification test; never substitute a fake market setup.
+  const handleTriggerTestAlert = useCallback(async (settingsToSave = null, apiKey = adminApiKey) => {
     try {
-      const res = await api.triggerTestAlert();
-      if (res && res.alert) {
-        handleIncomingAlert(res.alert);
-        return;
+      const adminKey = apiKey?.trim();
+      if (!adminKey) return { ok: false, status: "failed", message: "Admin API key is required to send a notification test. Enter it in Webhooks settings." };
+      if (settingsToSave) {
+        const targetUrl = settingsToSave.backend_url?.trim();
+        if (targetUrl && targetUrl !== getApiBaseUrl()) {
+          const validation = await validateBackendUrl(targetUrl);
+          if (!validation.valid) {
+            return { ok: false, status: "failed", message: `Backend validation failed: ${validation.error}` };
+          }
+          setApiBaseUrl(targetUrl);
+          backendWS.reconnectWithNewEndpoint();
+        }
+        const saved = await api.updateNotificationSettings(settingsToSave, adminKey);
+        if (!saved?.settings) throw new Error("Notification settings were not saved.");
+        setNotificationSettings(prev => ({ ...prev, ...saved.settings }));
       }
+
+      const res = await api.triggerTestAlert(adminKey);
+      if (!res?.alert) throw new Error(res?.message || "The server did not return a test notification.");
+      handleIncomingAlert(res.alert);
+      return {
+        ok: res.status !== "failed",
+        status: res.status || "not_configured",
+        message: res.message || "Test notification was displayed locally."
+      };
     } catch (err) {
-      console.warn("API trigger test alert failed, generating simulated live alert:", err);
+      return { ok: false, status: "failed", message: `Notification test failed: ${err.message}` };
     }
-    const currentPrice = livePrice || 64654.60;
-    const isLong = Math.random() > 0.3;
-    const simulatedAlert = {
-      id: "alert_test_" + Date.now(),
-      tier: "STRUCTURAL_RESEARCH_SETUP",
-      tier_title: "STRUCTURAL RESEARCH SETUP",
-      direction: isLong ? "LONG" : "SHORT",
-      entry_price: currentPrice,
-      target_profit_price: isLong ? Math.round(currentPrice * 1.026 * 100) / 100 : Math.round(currentPrice * 0.974 * 100) / 100,
-      target_profit_pct: 2.6,
-      stop_loss_price: isLong ? Math.round(currentPrice * 0.988 * 100) / 100 : Math.round(currentPrice * 1.012 * 100) / 100,
-      risk_pct: 1.2,
-      risk_reward_ratio: "2.17:1",
-      opportunity_score: 92,
-      badge: "🔬 RESEARCH SETUP (A1/A2)",
-      rationale: `Hypothetical research setup scenario: ${isLong ? "+2.6% Upper Barrier" : "-2.6% Lower Barrier"} with 2.17:1 R:R reference. COST_ERASED paper evaluation.`,
-      timestamp: Date.now()
-    };
-    handleIncomingAlert(simulatedAlert);
-  }, [handleIncomingAlert, livePrice]);
+  }, [adminApiKey, handleIncomingAlert]);
 
   // Poll backend health heartbeat every 15 s
   const pollHealth = useCallback(async () => {
+    const requestId = ++healthRequestRef.current;
     const currentUrl = getApiBaseUrl();
     try {
       const data = await api.fetchHealth();
+      if (requestId !== healthRequestRef.current) return;
       setHealthData(data);
       setSecurityBlocked(false);
     } catch (err) {
+      if (requestId !== healthRequestRef.current) return;
       const isHttps = window.location.protocol === "https:";
       const isHttpTarget = currentUrl.startsWith("http://") && !currentUrl.includes("localhost") && !currentUrl.includes("127.0.0.1");
       if (isHttps && isHttpTarget) {
@@ -8339,7 +8494,11 @@ function App() {
 
   // Backend AI data poll
   const loadAIData = useCallback(async () => {
-    if (isReplaying) return; // Freeze live polling during Replay mode
+    if (isReplaying) {
+      aiRequestRef.current++;
+      return;
+    }
+    const requestId = ++aiRequestRef.current;
     try {
       const [pred, hist, regime, expl, qual, mem, port, mkt, intel, count, dec] = await Promise.allSettled([
         api.fetchPredictionLatest(),
@@ -8355,17 +8514,23 @@ function App() {
         api.fetchDecisionAnatomy()
       ]);
 
-      if (pred.status === "fulfilled")  setPredictionData(pred.value);
-      if (hist.status === "fulfilled")  setPredictionHistory(hist.value);
-      if (regime.status === "fulfilled") setRegimeData(regime.value);
-      if (expl.status === "fulfilled")  setExplanationData(expl.value);
-      if (qual.status === "fulfilled")  setQualityData(qual.value);
-      if (mem.status === "fulfilled")   setMemoryData(mem.value);
-      if (port.status === "fulfilled")  setPortfolioData(port.value);
-      if (mkt.status === "fulfilled")   setChangePct(mkt.value.change_pct_24h || 0);
-      if (intel.status === "fulfilled") setIntelData(intel.value);
-      if (count.status === "fulfilled") setCounterfactualData(count.value);
-      if (dec.status === "fulfilled")   setDecisionData(dec.value);
+      if (requestId !== aiRequestRef.current) return;
+      setPredictionData(pred.status === "fulfilled" ? pred.value : null);
+      setPredictionHistory(hist.status === "fulfilled" ? hist.value : []);
+      setRegimeData(regime.status === "fulfilled" ? regime.value : null);
+      setExplanationData(expl.status === "fulfilled" ? expl.value : null);
+      setQualityData(qual.status === "fulfilled" ? qual.value : null);
+      setMemoryData(mem.status === "fulfilled" ? mem.value : []);
+      setPortfolioData(port.status === "fulfilled" ? port.value : null);
+      setChangePct(
+        mkt.status === "fulfilled" && typeof mkt.value.change_pct_24h === "number"
+          ? mkt.value.change_pct_24h
+          : null
+      );
+      setMarketSummary(mkt.status === "fulfilled" ? mkt.value : null);
+      setIntelData(intel.status === "fulfilled" ? intel.value : null);
+      setCounterfactualData(count.status === "fulfilled" ? count.value : null);
+      setDecisionData(dec.status === "fulfilled" ? dec.value : null);
     } catch { /* non-critical */ }
   }, [isReplaying]);
 
@@ -8376,18 +8541,16 @@ function App() {
   }, [loadAIData]);
 
   // Save settings handler
-  const handleSaveSettings = useCallback(async (newSettings) => {
-    try {
-      const res = await api.updateNotificationSettings(newSettings);
-      if (res && res.settings) {
-        setNotificationSettings(prev => ({ ...prev, ...res.settings }));
-      }
-    } catch (err) {
-      console.warn("Non-critical notification setting sync:", err.message);
-    }
+  const handleSaveSettings = useCallback(async (newSettings, apiKey = adminApiKey) => {
+    const adminKey = apiKey?.trim();
+    if (!adminKey) throw new Error("Admin API key is required to save notification settings.");
+    const res = await api.updateNotificationSettings(newSettings, adminKey);
+    if (!res?.settings) throw new Error("Notification settings were not saved.");
+    setNotificationSettings(prev => ({ ...prev, ...res.settings }));
     pollHealth();
     loadAIData();
-  }, [pollHealth, loadAIData]);
+    return { ok: true };
+  }, [adminApiKey, pollHealth, loadAIData]);
 
   // Handle Replay record selection
   const handleSelectReplayRecord = useCallback(async (record) => {
@@ -8412,21 +8575,24 @@ function App() {
     }
   }, []);
 
-  const isLiveEngine = ((healthData?.status === "live" || healthData?.status === "online" || healthData?.is_live) && healthData?.models_loaded) || (engineConnected && healthData?.status !== "warming_up");
-  const isWarmingEngine = healthData?.status === "warming_up" || (!healthData?.models_loaded && Boolean(healthData));
+  const isMarketMonitor = healthData?.mode === "MARKET_MONITOR_ONLY";
+  const backendReportsLive = healthData?.status === "live" || healthData?.status === "online" || healthData?.is_live === true;
+  const isLiveEngine = backendReportsLive && healthData?.models_loaded === true && engineConnected;
+  const isWarmingEngine = !isMarketMonitor && healthData?.status !== "offline"
+    && (healthData?.status === "warming_up" || (!healthData?.models_loaded && Boolean(healthData)));
 
   const engineState = securityBlocked
     ? "security_blocked"
-    : (isLiveEngine
+    : (isMarketMonitor
+      ? "monitor_only"
+      : (isLiveEngine
         ? "live"
-        : (isWarmingEngine
-            ? "warming_up"
-            : (engineConnected ? "live" : "offline")));
+        : (isWarmingEngine ? "warming_up" : "offline")));
 
   // Shared props for both home preview and full terminal
   const terminalProps = {
     activeInterval, setActiveInterval,
-    binanceWsStatus,
+    coinbaseWsStatus,
     livePrice, changePct,
     predictionData, predictionHistory, counterfactualData, decisionData,
     regimeData, explanationData, qualityData,
@@ -8435,7 +8601,7 @@ function App() {
     onSelectRecord: handleSelectReplayRecord,
     activeTab, setActiveTab,
     onPriceChange:   setLivePrice,
-    onWsStatusChange: setBinanceWsStatus,
+    onWsStatusChange: setCoinbaseWsStatus,
     engineState,
     workstationMode,
     onToggleMode: toggleWorkstationMode
@@ -8450,9 +8616,13 @@ function App() {
     }
   }, []);
 
+  const formatLatency = value => typeof value === "number" && Number.isFinite(value)
+    ? `${value}ms`
+    : "n/a";
+
   return h("div", null,
     h(ThreeBackground, { enabled: is3dEnabled }),
-    h(InstitutionalTickerBar, { livePrice, changePct, intelData }),
+    h(InstitutionalTickerBar, { livePrice, changePct, marketSummary }),
     h(Navbar, {
       currentPath: path,
       setPath: navigate,
@@ -8502,9 +8672,9 @@ function App() {
             fontWeight: "800",
             letterSpacing: "0.5px"
           }
-        }, "ENTRY / TP / SL RESEARCH MODE"),
+        }, "MARKET MONITOR · RESEARCH BLOCKED"),
         h("span", { style: { color: "#94A3B8", fontSize: "0.74rem" } },
-          "Hypothetical signal · No real orders are executed · No capital is deployed"
+          "No verified market signal · Forecasts and trading are disabled"
         )
       ),
       h("div", { style: { display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" } },
@@ -8521,10 +8691,10 @@ function App() {
               fontFamily: "var(--font-mono)",
               fontSize: "0.72rem"
             }
-          }, "COST_ERASED")
+          }, "BLOCKED · PROVENANCE UNVERIFIED")
         ),
         h("span", { style: { color: "#94A3B8", fontSize: "0.72rem", maxWidth: "340px", lineHeight: "1.2" } },
-          "Current research evidence does NOT establish a deployable net-of-cost trading edge."
+          "Frozen model inputs and evaluation provenance are not authenticated."
         ),
         h("button", {
           onClick: () => navigate("/arena"),
@@ -8547,6 +8717,8 @@ function App() {
       isOpen: isSettingsModalOpen,
       onClose: () => setIsSettingsModalOpen(false),
       settings: notificationSettings,
+      adminApiKey,
+      setAdminApiKey,
       onSaveSettings: handleSaveSettings,
       onTestAlert: handleTriggerTestAlert
     }),
@@ -8576,11 +8748,11 @@ function App() {
     h("footer", { style: { padding: "20px 40px", borderTop: "1px solid var(--card-border)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(5,8,22,0.85)", marginTop: "40px" } },
       h("div", { style: { fontSize: "0.85rem", color: "var(--text-muted)" } }, "© 2026 BTCognitive AI Market Intelligence Engine · Powered by Adaptive Regimes"),
       h("div", { className: "footer-latency" },
-        h("span", { className: "latency-item" }, "Market: ", h("span", { className: "latency-val" }, `${healthData?.latency?.market_latency_ms || 12}ms`)),
+        h("span", { className: "latency-item" }, "Market: ", h("span", { className: "latency-val" }, formatLatency(healthData?.latency?.market_latency_ms))),
         h("span", null, "·"),
-        h("span", { className: "latency-item" }, "Model: ", h("span", { className: "latency-val" }, `${healthData?.latency?.prediction_latency_ms || 83}ms`)),
+        h("span", { className: "latency-item" }, "Model: ", h("span", { className: "latency-val" }, formatLatency(healthData?.latency?.prediction_latency_ms))),
         h("span", null, "·"),
-        h("span", { className: "latency-item" }, "WS: ", h("span", { className: "latency-val" }, `${healthData?.latency?.ws_latency_ms || 5}ms`))
+        h("span", { className: "latency-item" }, "WS: ", h("span", { className: "latency-val" }, formatLatency(healthData?.latency?.ws_latency_ms)))
       )
     )
   );
@@ -8599,4 +8771,3 @@ if (document.readyState === "loading") {
 } else {
   mountApp();
 }
-

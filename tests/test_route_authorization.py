@@ -8,6 +8,7 @@ Tests:
 """
 
 from fastapi.testclient import TestClient
+from config.security import API_KEYS_ENV, UserRole
 from api.server import app
 
 client = TestClient(app, raise_server_exceptions=False)
@@ -26,3 +27,24 @@ def test_user_cannot_access_unauthorized_admin_features():
     )
     # Ensure standard user cannot perform administrative writes
     assert resp.status_code in [200, 404, 405]
+
+
+def test_notification_mutations_require_admin_and_validate_webhook(monkeypatch):
+    admin_key = "pytest-notification-admin-key"
+    monkeypatch.setitem(API_KEYS_ENV, admin_key, UserRole.ADMIN)
+
+    settings_response = client.post(
+        "/api/notifications/settings",
+        json={"sound_alerts_enabled": False},
+    )
+    test_response = client.post("/api/notifications/test")
+    assert settings_response.status_code == 403
+    assert test_response.status_code == 403
+
+    invalid_webhook = client.post(
+        "/api/notifications/settings",
+        headers={"X-API-Key": admin_key},
+        json={"webhook_url": "http://127.0.0.1/internal"},
+    )
+    assert invalid_webhook.status_code == 422
+    assert "HTTPS URL" in invalid_webhook.json()["detail"]

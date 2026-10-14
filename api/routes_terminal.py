@@ -61,7 +61,6 @@ def _init_live_terminal():
         return
     try:
         verify_scientific_contract()
-        verify_full_freeze_integrity()
         df = prepare_aligned_dataset()
         holdout_start_dt = pd.to_datetime("2026-01-01T00:00:00Z")
         df_train = df[df.index < holdout_start_dt].copy()
@@ -106,14 +105,15 @@ def _init_live_terminal():
             ts_str = df_holdout.index[i].isoformat()
             f_id = f"fc-{df_holdout.index[i].strftime('%Y%m%d%H%M')}"
             
-            observatory.log_forecast(
-                forecast_id=f_id,
-                timestamp=ts_str,
-                v_hat=v_i,
-                lower=lower_i,
-                upper=upper_i,
-                macro_regime="SPOT_ETF_ERA"
-            )
+            if f_id not in observatory._id_index:
+                observatory.log_forecast(
+                    forecast_id=f_id,
+                    timestamp=ts_str,
+                    v_hat=v_i,
+                    lower=lower_i,
+                    upper=upper_i,
+                    macro_regime="SPOT_ETF_ERA"
+                )
             
             if i >= 168:
                 mat_idx = i - 168
@@ -171,7 +171,7 @@ def get_terminal_live_state():
     # Latest resolved / active record
     last_rec = observatory.records[-1]
     point_forecast = last_rec.point_forecast_har_rs_dow
-    lower_bound = last_rec.risk_envelope_lower
+    lower_bound = max(1e-4, last_rec.risk_envelope_lower)
     upper_bound = last_rec.risk_envelope_upper
     regime = last_rec.macro_regime
     

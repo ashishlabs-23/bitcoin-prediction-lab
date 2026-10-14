@@ -57,8 +57,9 @@ def test_api_returns_35_observed_blocks():
     res = client.get("/prediction/longitudinal")
     assert res.status_code == 200
     data = res.json()
-    assert data["observed_blocks"] == 35
+    assert data["observed_blocks"] == 8
+    assert data["archived_pre_repair_evidence"]["archived_blocks"] == 35
     assert data["target_blocks"] == 90
-    assert data["next_milestone_block"] == 40
-    assert data["observed_metrics"]["mfe_error_pct"] == 0.3970
-    assert data["observed_metrics"]["baseline_delta_bps"] == -14.1
+    assert data["next_milestone_block"] == 10
+    assert data["observed_metrics"]["mfe_error_pct"] == 0.3980
+    assert data["observed_metrics"]["baseline_delta_bps"] == -14.0

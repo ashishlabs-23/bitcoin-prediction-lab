@@ -84,21 +84,20 @@ def prepare_aligned_dataset() -> pd.DataFrame:
     Loads raw OHLCV and Deribit IV, builds point-in-time HAR regressors,
     excursion envelope compression signal, and 7-day realized variance target.
     """
-    print("1. Loading raw OHLCV and Deribit IV datasets...")
     df_ohlcv = pd.read_parquet(RAW_OHLCV_PATH)
-    df_iv = pd.read_parquet(RAW_IV_PATH)
-    
     df_ohlcv['timestamp'] = pd.to_datetime(df_ohlcv['timestamp'], utc=True)
-    df_iv['timestamp'] = pd.to_datetime(df_iv['timestamp'], utc=True)
-    
     df_ohlcv.sort_values('timestamp', inplace=True)
-    df_iv.sort_values('timestamp', inplace=True)
-    
     df_ohlcv.set_index('timestamp', inplace=True)
-    df_iv.set_index('timestamp', inplace=True)
     
-    # Merge strictly on timestamp
-    df = df_ohlcv.join(df_iv[['iv7d_atm', 'iv7d_var_ann']], how='inner').sort_index()
+    if os.path.exists(RAW_IV_PATH):
+        df_iv = pd.read_parquet(RAW_IV_PATH)
+        df_iv['timestamp'] = pd.to_datetime(df_iv['timestamp'], utc=True)
+        df_iv.sort_values('timestamp', inplace=True)
+        df_iv.set_index('timestamp', inplace=True)
+        # Merge strictly on timestamp
+        df = df_ohlcv.join(df_iv[['iv7d_atm', 'iv7d_var_ann']], how='inner').sort_index()
+    else:
+        df = df_ohlcv.copy()
     print(f"   Aligned Dataset Span: {df.index.min()} to {df.index.max()} ({len(df):,} hourly rows)")
     
     # Compute hourly log returns
@@ -161,10 +160,13 @@ def prepare_aligned_dataset() -> pd.DataFrame:
     df['macro_regime'] = assign_macro_regime(df.index)
     
     # Drop rows with NaN targets or initial warm-up
-    clean_df = df.dropna(subset=[
+    req_cols = [
         'rv7d_var_ann', 'rv1d_var_ann', 'rv7d_var_ann_lag', 'rv30d_var_ann', 
-        'iv7d_var_ann', 'compression_trigger', 'rv_down_1d', 'rv_up_1d'
-    ]).copy()
+        'compression_trigger', 'rv_down_1d', 'rv_up_1d'
+    ]
+    if 'iv7d_var_ann' in df.columns:
+        req_cols.append('iv7d_var_ann')
+    clean_df = df.dropna(subset=req_cols).copy()
     
     return clean_df
 

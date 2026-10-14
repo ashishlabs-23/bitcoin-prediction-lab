@@ -222,9 +222,9 @@ def test_l6_survival_stress_matrix():
     assert attr_res["valid_mechanism_attribution"] is True
 
 
-def test_l7_l8_research_census():
+def test_l7_l8_research_census(tmp_path):
     """Verifies trial registration, DSR multiple-testing adjustment, and null controls."""
-    census = ResearchCensus(ledger_file="experiments/results/test_census.json")
+    census = ResearchCensus(ledger_file=str(tmp_path / "test_census.json"))
     
     # 1. Register trial
     t_rec = census.register_trial(

@@ -22,7 +22,7 @@ def test_health_publicly_accessible():
 
 def test_oversized_payload_rejected():
     large_payload = {"data": "A" * 1100000}  # ~1.1 MB > 1MB limit
-    resp = client.post("/prediction/range", json=large_payload, headers={"X-API-Key": "btc-user-key-live-2026"})
+    resp = client.post("/prediction/range", json=large_payload)
     assert resp.status_code in [413, 404, 405]
 
 def test_host_header_poisoning_blocked():
@@ -33,7 +33,7 @@ def test_malformed_json_handling():
     resp = client.post(
         "/prediction/range",
         content="{\"invalid_json: true",
-        headers={"Content-Type": "application/json", "X-API-Key": "btc-user-key-live-2026"}
+        headers={"Content-Type": "application/json"}
     )
     assert resp.status_code in [400, 422, 404, 405]
 

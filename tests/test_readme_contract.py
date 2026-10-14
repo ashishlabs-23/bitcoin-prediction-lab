@@ -1,13 +1,4 @@
-"""
-tests/test_readme_contract.py — Unit Tests for Canonical README Contract Integrity
-==================================================================================
-Verifies that README.md contains:
-1. Production model and 24h horizon
-2. 5m Hawkes shadow model status
-3. Zero real-trading and directional alpha disclaimers
-4. Validation methodology, MFE/MAE excursion definitions, and volatility context
-5. Foundation model research findings and stop rule
-"""
+"""README must describe the current monitor without unsupported research claims."""
 
 import os
 import sys
@@ -24,26 +15,12 @@ def test_readme_contract_presence():
     with open(README_PATH, "r", encoding="utf-8") as f:
         content = f.read()
 
-    # Core system declarations
-    assert "v3.0.0-ridge-volatility-context" in content
-    assert "v1.0.0-challenger-hawkes-microstructure" in content
-    assert "VALIDATED_PRODUCTION_RANGE_SYSTEM" in content
-    assert "VALIDATED_SHADOW_MODEL" in content
-    assert "FOUNDATION_RESEARCH" in content
-
-    # Metrics & Definitions
-    assert "MFE" in content
-    assert "MAE" in content
-    assert "Winkler Score" in content
-    assert "Volatility Term Structure" in content
-    assert "0.3980%" in content
-    assert "605.10" in content
-
-    # Disclaimers & Safety Invariants
-    assert "It does not claim guaranteed direction or profitable automated trading" in content
-    assert "Zero Real-Money Trading" in content
-    assert "Zero Automatic Retraining" in content
-    assert "Zero Automatic Promotion" in content
-    assert "Zero Probability Blending" in content
-    assert "NO MEASURABLE EDGE" in content
-    assert "PRODUCT_FROZEN" in content
+    assert "BTCognitive serves one web frontend" in content
+    assert "Frozen model inputs remain unverified" in content
+    assert "Production forecasts remain blocked" in content
+    assert "calibrated 90% confidence interval" in content
+    assert "do not add fabricated prices, performance metrics, confidence scores, datasets" in content.casefold()
+    assert "Read-only market-data access; no broker/order execution" in content
+    assert "Provider outages, stale observations and insufficient history must result in explicit unavailable states" in content
+    assert "v3.0.0-ridge-volatility-context" not in content
+    assert "VALIDATED_PRODUCTION_RANGE_SYSTEM" not in content

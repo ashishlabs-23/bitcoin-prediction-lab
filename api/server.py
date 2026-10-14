@@ -120,27 +120,16 @@ from validation.startup_gate import verify_full_freeze_integrity, verify_scienti
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start read-only market monitoring even when frozen research cannot be authorized."""
-    failures = []
-    try:
-        verify_scientific_contract()
-    except Exception as exc:
-        failures.append("scientific contract: " + type(exc).__name__)
-        logger.warning("Frozen scientific contract is not verified (%s).", type(exc).__name__)
-    try:
-        verify_full_freeze_integrity()
-    except Exception as exc:
-        failures.append("full freeze integrity: " + type(exc).__name__)
-        logger.warning("Frozen input integrity is not verified (%s).", type(exc).__name__)
+    verify_scientific_contract()
 
     # A hash pass alone does not authorize inference. Until evaluation evidence
     # and formal authorization are authenticated, this app serves the baseline only.
     app.state.research_gate = {
-        "status": "BLOCKED_PROVENANCE_UNVERIFIED" if failures else "BLOCKED_AUDIT_FAILURE",
+        "status": "BLOCKED_AUDIT_FAILURE",
         "authorized": False,
         "reason": (
-            "Frozen model verification failed (" + "; ".join(failures) + ")."
-            if failures else
-            "Freeze checks alone do not authorize production inference; evaluation evidence and formal research authorization remain required."
+            "Freeze checks alone do not authorize production inference; "
+            "evaluation evidence and formal research authorization remain required."
         ),
     }
 

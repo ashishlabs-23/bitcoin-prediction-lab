@@ -1,46 +1,44 @@
-"""
-Quickstart Inference Example
-===========================
-Demonstrates how to initialize the Adaptive Regime Ensemble,
-build feature matrices from market data, and generate quantile predictions.
-"""
+"""Exploratory ensemble example; its output is not a calibrated production forecast."""
 
 import sys
 import os
+
+import pandas as pd
 
 # Add parent directory to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from models.ensemble import AdaptiveRegimeEnsemble
-from data.ingest import make_dataset
-from models.uncertainty import calculate_composite_uncertainty
+from models.train_baselines import make_dataset
 
 
 def run_demo():
-    print("1. Loading historical Bitcoin market data and feature matrix...")
+    print("Loading exploratory historical features; this is not production inference.")
     X, y, t1 = make_dataset(horizon_bars=24)
-    print(f"   -> Dataset shape: {X.shape}, Features: {list(X.columns[:5])}...")
 
-    print("2. Training Adaptive Regime Ensemble (RandomForest + XGBoost)...")
-    ensemble = AdaptiveRegimeEnsemble()
-    ensemble.fit(X, y)
-    print("   -> Ensemble fitting complete.")
+    if X.empty:
+        raise RuntimeError("No feature rows are available for this example.")
 
-    print("3. Generating prediction for the latest market bar...")
     latest_bar = X.iloc[-1:]
-    pred_prob = ensemble.predict_proba(latest_bar)[0][1]
+    latest_time = latest_bar.index[0]
+    label_end_times = pd.to_datetime(t1, utc=True, errors="coerce")
+    train_mask = label_end_times < latest_time
+    train_X = X.loc[train_mask]
+    train_y = y.loc[train_mask]
+    if len(train_X) < 50 or train_y.nunique() < 2:
+        raise RuntimeError("Insufficient time-purged training history for the exploratory example.")
+
+    regime = "RANGING"
+    ensemble = AdaptiveRegimeEnsemble(dynamic_weighting=False)
+    ensemble.fit(train_X, train_y)
+    pred_prob = float(ensemble.predict_proba_regime(latest_bar, regime)[0])
     direction = "LONG" if pred_prob > 0.55 else ("SHORT" if pred_prob < 0.45 else "NEUTRAL")
 
-    print(f"   -> Forecast Direction: {direction}")
-    print(f"   -> Long Probability:   {pred_prob*100:.2f}%")
-
-    print("4. Calculating 4-Factor Uncertainty Decomposition...")
-    uncertainty = calculate_composite_uncertainty(ensemble, latest_bar, X)
-    print(f"   -> Composite Quality:  {uncertainty.get('composite_quality_score', 0)*100:.1f}/100")
-    print(f"   -> Regime Certainty:   {uncertainty.get('regime_certainty', 0)*100:.1f}%")
-    print(f"   -> Model Consensus:    {uncertainty.get('model_agreement', 0)*100:.1f}%")
-
-    print("\n✅ Quickstart inference demonstration finished successfully.")
+    print(f"Sample time: {latest_time}")
+    print(f"Conditional-weight scenario: {regime} (not an observed regime classification)")
+    print(f"Exploratory direction: {direction}")
+    print(f"Uncalibrated conditional model score: {pred_prob:.3f}")
+    print("No composite confidence or production forecast is available from this example.")
 
 
 if __name__ == "__main__":

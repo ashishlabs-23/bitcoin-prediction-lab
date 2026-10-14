@@ -1,6 +1,6 @@
 # BTCognitive — Research Terminal
 
-BTCognitive serves one web frontend: the full Research Terminal in `web/index.html`, powered by `web/app.js` and `web/styles.css`. The separate market-monitor page has been removed; its read-only market APIs remain available to the terminal and API clients. A visible preview notice warns that some legacy figures may be static or historical. Frozen model inputs remain unverified, so production forecasts and trading are disabled.
+BTCognitive serves one web frontend: the full Research Terminal in `web/index.html`, powered by `web/app.js` and `web/styles.css`. Its live chart uses Coinbase Exchange BTC-USD candles and ticker data only, with UTC-aligned 1m, 5m, 15m, 1h and 1d candles; 4h candles are aggregated from aligned 1h candles. The candle-close countdown follows the latest Coinbase event timestamp when available. A visible preview notice warns that some legacy figures may be static or historical. Frozen model inputs remain unverified, so production forecasts and trading are disabled.
 
 ## Market data and API
 
@@ -16,9 +16,12 @@ Historical walk-forward measurements are descriptive; they do not establish a du
 
 Macro series and ETF/exchange-flow inputs are shown as not configured unless a verified provider is actually wired in. Missing data stays missing.
 
+Notification settings are saved by the backend; webhook URLs, SMTP identities and Telegram credentials are not returned to the browser. Notification changes and test sends require an administrator API key configured as `BTCOGNITIVE_ADMIN_KEY`. Discord destinations are restricted to HTTPS `discord.com/api/webhooks/` URLs. Generic webhook destinations require an exact hostname in `BTCOGNITIVE_WEBHOOK_ALLOWED_HOSTS`; configure only hosts you trust. Email and webhook channels remain unconfigured unless their credentials/settings are provided. “Send Test Notification” sends a neutral delivery-test message (not a market signal) and reports whether each configured external channel delivered, failed or is not configured.
+
 ## Run locally
 
 Python 3.11+ is recommended.
+Copy `.env.example` to `.env` and provide only the credentials and allowlisted hosts you intend to use. `.env` is read at startup, and environment variables take precedence.
 
 ```bash
 python -m venv .venv

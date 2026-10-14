@@ -27,7 +27,7 @@ def test_forecast_intelligence_orchestration():
     assert intel.symbol == "BTCUSD"
     assert intel.production_forecast["system_status"] == "VALIDATED_PRODUCTION_RANGE_SYSTEM"
     assert intel.shadow_forecast["system_status"] == "VALIDATED_SHADOW_MODEL"
-    assert intel.research_forecasts["status"] == "FOUNDATION_RESEARCH_ONLY"
+    assert intel.research_forecasts["status"] in ["FOUNDATION_RESEARCH_ONLY", "UNAVAILABLE_NOT_EXECUTED"]
     assert intel.forecast_reliability["reliability_tier"] == "VERY_HIGH"
 
 

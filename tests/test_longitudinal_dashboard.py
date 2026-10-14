@@ -23,11 +23,12 @@ def test_get_prediction_longitudinal_dashboard_payload():
     assert res.status_code == 200
 
     data = res.json()
-    assert data["observed_blocks"] == 35
+    assert data["observed_blocks"] == 8
+    assert data["archived_pre_repair_evidence"]["archived_blocks"] == 35
     assert data["target_blocks"] == 90
-    assert data["next_milestone_block"] == 40
-    assert data["observed_metrics"]["mfe_error_pct"] == 0.3970
-    assert data["observed_metrics"]["p90_coverage_pct"] == 91.20
-    assert len(data["milestone_targets"]) == 5
-    assert data["milestone_targets"][0]["target_block"] == 40
-    assert data["milestone_targets"][0]["status"] == "NOT_YET_OBSERVED"
+    assert data["next_milestone_block"] == 10
+    assert data["observed_metrics"]["mfe_error_pct"] == 0.3980
+    assert data["observed_metrics"]["p90_coverage_pct"] == 91.10
+    assert len(data["milestone_targets"]) == 7
+    assert data["milestone_targets"][0]["target_block"] == 5
+    assert data["milestone_targets"][0]["status"] == "OBSERVED"

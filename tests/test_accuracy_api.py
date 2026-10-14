@@ -1,10 +1,4 @@
-"""
-tests/test_accuracy_api.py — Unit Tests for Forecast Accuracy Observatory API Routes
-=====================================================================================
-Verifies:
-1. GET /prediction/accuracy response schema, sample accounting, and baseline metrics
-2. GET /prediction/accuracy/history and GET /prediction/failures endpoints
-"""
+"""Accuracy endpoints must withhold metrics until verified forecasts can be evaluated."""
 
 import os
 import sys
@@ -23,11 +17,14 @@ def test_get_prediction_accuracy_endpoint():
     assert res.status_code == 200
 
     data = res.json()
-    assert data["system_version"] == "v3.0.0-ridge-volatility-context"
-    assert data["sample_accounting"]["independent_blocks_24h"] == 31
-    assert data["range_accuracy"]["calibration_status"] == "CALIBRATION_OK"
-    assert data["directional_accuracy"]["status"] == "NO_MEASURABLE_EDGE"
-    assert data["baseline_comparison"]["edge_status"] == "STATISTICALLY_SUPERIOR"
+    assert data["status"] == "UNAVAILABLE_UNVERIFIED"
+    assert data["system_version"] is None
+    assert data["governance_status"] == "BLOCKED_PROVENANCE_UNVERIFIED"
+    assert data["sample_accounting"]["independent_blocks_24h"] is None
+    assert data["range_accuracy"]["calibration_status"] == "UNVERIFIED"
+    assert data["directional_accuracy"]["direction_accuracy_pct"] is None
+    assert data["baseline_comparison"]["edge_status"] == "UNVERIFIED"
+    assert data["reason"]
 
 
 def test_get_prediction_accuracy_history_endpoint():
@@ -35,8 +32,10 @@ def test_get_prediction_accuracy_history_endpoint():
     assert res.status_code == 200
 
     data = res.json()
-    assert data["count"] >= 4
-    assert len(data["history"]) >= 4
+    assert data["status"] == "UNAVAILABLE_UNVERIFIED"
+    assert data["count"] == 0
+    assert data["history"] == []
+    assert data["reason"]
 
 
 def test_get_prediction_failures_endpoint():
@@ -44,5 +43,7 @@ def test_get_prediction_failures_endpoint():
     assert res.status_code == 200
 
     data = res.json()
-    assert data["conformal_alignment"] == "COMPLIANT"
-    assert len(data["failures"]) >= 3
+    assert data["status"] == "UNAVAILABLE_UNVERIFIED"
+    assert data["conformal_alignment"] is None
+    assert data["failures"] == []
+    assert data["reason"]

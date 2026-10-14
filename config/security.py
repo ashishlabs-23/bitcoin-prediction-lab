@@ -10,6 +10,26 @@ import os
 from enum import Enum
 from typing import List, Dict, Set
 
+
+def _load_local_env_file() -> None:
+    env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+    if not os.path.isfile(env_path):
+        return
+
+    with open(env_path, "r", encoding="utf-8") as env_file:
+        for line in env_file:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key:
+                os.environ.setdefault(key, value)
+
+
+_load_local_env_file()
+
 # ==============================================================================
 # 1. MASTER SECURITY INVARIANTS & KILL-SWITCHES (Application Layer)
 # ==============================================================================
@@ -39,12 +59,23 @@ ROLE_HIERARCHY: Dict[UserRole, int] = {
     UserRole.ADMIN: 3,
 }
 
-# Default API keys for development/testing (Override via environment variables in production)
-API_KEYS_ENV = {
-    os.getenv("BTCOGNITIVE_USER_KEY", "btc-user-key-live-2026"): UserRole.USER,
-    os.getenv("BTCOGNITIVE_RESEARCH_KEY", "btc-research-key-live-2026"): UserRole.RESEARCH,
-    os.getenv("BTCOGNITIVE_ADMIN_KEY", "btc-admin-key-live-2026"): UserRole.ADMIN,
-}
+# API credentials are opt-in. Never ship reusable default keys.
+def _build_api_key_roles(configured_keys):
+    key_roles = {}
+    for key, role in configured_keys:
+        if not key:
+            continue
+        if key in key_roles:
+            raise RuntimeError("API keys must be unique across configured roles.")
+        key_roles[key] = role
+    return key_roles
+
+
+API_KEYS_ENV = _build_api_key_roles((
+    (os.getenv("BTCOGNITIVE_USER_KEY", "").strip(), UserRole.USER),
+    (os.getenv("BTCOGNITIVE_RESEARCH_KEY", "").strip(), UserRole.RESEARCH),
+    (os.getenv("BTCOGNITIVE_ADMIN_KEY", "").strip(), UserRole.ADMIN),
+))
 
 # ==============================================================================
 # 3. RATE LIMITS (Requests per minute per IP / Token)
@@ -65,13 +96,21 @@ MAX_WEBSOCKET_MESSAGE_BYTES: int = int(os.getenv("MAX_WS_MSG_BYTES", "65536"))  
 # ==============================================================================
 ALLOWED_ORIGINS: List[str] = os.getenv(
     "BTCOGNITIVE_ALLOWED_ORIGINS",
-    "http://localhost:8000,http://127.0.0.1:8000,http://0.0.0.0:8000,https://btcognitive.netlify.app,https://ashishlabs.com,https://*.web.app,https://*.firebaseapp.com,*"
+    "http://localhost:8000,http://127.0.0.1:8000"
 ).split(",")
+ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS if origin.strip()]
 
 ALLOWED_HOSTS: List[str] = os.getenv(
     "BTCOGNITIVE_ALLOWED_HOSTS",
-    "localhost,127.0.0.1,0.0.0.0,*,testserver,btcognitive.netlify.app,*.netlify.app,*.web.app,*.firebaseapp.com"
+    "localhost,127.0.0.1,testserver"
 ).split(",")
+ALLOWED_HOSTS = [host.strip() for host in ALLOWED_HOSTS if host.strip()]
+
+ALLOWED_WEBHOOK_HOSTS: Set[str] = {
+    host.strip().lower().rstrip(".")
+    for host in os.getenv("BTCOGNITIVE_WEBHOOK_ALLOWED_HOSTS", "discord.com").split(",")
+    if host.strip()
+}
 
 # ==============================================================================
 # 5. SECURITY HEADERS (OWASP ASVS & API Security Compliant)

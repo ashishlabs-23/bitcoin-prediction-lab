@@ -158,15 +158,25 @@ def generate_opportunity_id(
     t_0: str,
     asset: str,
     event_type: str,
-    contract_hash: str,
-    state_hash: str
+    contract_hash: Optional[str] = None,
+    state_hash: Optional[str] = None,
+    event_features: Optional[Dict[str, Any]] = None,
+    **kwargs
 ) -> str:
     """
     Deterministic opportunity identity:
-    OPP-{t_0[:10]}-{asset}-{event_type}-{SHA256(t_0 || asset || event || contract || state)[:8]}
+    OPP-{t_0[:10]}-{asset}-{event_type}-{SHA256(...)[:8]}
     """
-    payload = f"{t_0}_{asset}_{event_type}_{contract_hash}_{state_hash}"
-    opp_hash = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:8]
+    raw = f"{t_0}_{asset}_{event_type}"
+    if contract_hash:
+        raw += f"_{contract_hash}"
+    if state_hash:
+        raw += f"_{state_hash}"
+    if event_features:
+        raw += f"_{json.dumps(event_features, sort_keys=True)}"
+    for k, v in sorted(kwargs.items()):
+        raw += f"_{k}:{v}"
+    opp_hash = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:8]
     date_prefix = pd.to_datetime(t_0, utc=True).strftime('%Y%m%d') if t_0 else "NODATE"
     return f"OPP-{date_prefix}-{asset.upper()}-{event_type.upper()}-{opp_hash}"
 
@@ -510,30 +520,6 @@ class OpportunityPopulationLedger:
                 "total_architectural_value_d_minus_a": round(ev_d - ev_a, 2)
             }
         }
-
-
-def generate_opportunity_id(
-    t_0: str,
-    asset: str,
-    event_type: str,
-    contract_hash: Optional[str] = None,
-    state_hash: Optional[str] = None,
-    event_features: Optional[Dict[str, Any]] = None,
-    **kwargs
-) -> str:
-    """
-    Generates a deterministic opportunity identifier based on t_0, asset, event type, and pre-treatment features.
-    """
-    raw = f"{t_0}_{asset}_{event_type}"
-    if contract_hash:
-        raw += f"_{contract_hash}"
-    if state_hash:
-        raw += f"_{state_hash}"
-    if event_features:
-        raw += f"_{json.dumps(event_features, sort_keys=True)}"
-    h = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
-    clean_date = t_0[:10].replace("-", "") if len(t_0) >= 10 else "DATE"
-    return f"OPP-{clean_date}-{h}"
 
 
 # Global Singletons

@@ -2,13 +2,65 @@ import os
 import json
 import time
 import asyncio
+import ipaddress
+import socket
+import ssl
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timezone
+from urllib.parse import urlsplit
+
+import httpcore
+import httpx
+from httpcore._backends.auto import AutoBackend
 
 from api.http_client import get_shared_client
+from config.security import ALLOWED_WEBHOOK_HOSTS
+
+
+class _PinnedWebhookNetworkBackend:
+    def __init__(self, hostname: str, addresses: List[str]):
+        self.hostname = hostname.lower().rstrip(".")
+        self.addresses = addresses
+        self._backend = AutoBackend()
+
+    async def connect_tcp(self, host, port, timeout=None, local_address=None, socket_options=None):
+        if host.lower().rstrip(".") != self.hostname or port != 443:
+            raise OSError("Webhook transport attempted to connect to an unexpected destination.")
+
+        last_error = None
+        for address in self.addresses:
+            try:
+                return await self._backend.connect_tcp(
+                    address,
+                    port,
+                    timeout=timeout,
+                    local_address=local_address,
+                    socket_options=socket_options,
+                )
+            except OSError as exc:
+                last_error = exc
+        if last_error is not None:
+            raise last_error
+        raise OSError("Webhook hostname has no validated IP addresses.")
+
+    async def connect_unix_socket(self, path, timeout=None, socket_options=None):
+        return await self._backend.connect_unix_socket(path, timeout, socket_options)
+
+    async def sleep(self, seconds):
+        await self._backend.sleep(seconds)
+
+
+class _PinnedWebhookTransport(httpx.AsyncHTTPTransport):
+    def __init__(self, hostname: str, addresses: List[str]):
+        self._pool = httpcore.AsyncConnectionPool(
+            ssl_context=ssl.create_default_context(),
+            max_connections=1,
+            max_keepalive_connections=0,
+            network_backend=_PinnedWebhookNetworkBackend(hostname, addresses),
+        )
 
 
 class NotificationManager:
@@ -18,57 +70,127 @@ class NotificationManager:
     """
 
     def __init__(self):
-        self._load_env_file()
-        
-        smtp_user = os.getenv("SMTP_USER", "manuashi2018@gmail.com")
+        smtp_user = os.getenv("SMTP_USER", "").strip()
         smtp_pw = os.getenv("SMTP_PASSWORD", "").replace(" ", "").strip()
-        smtp_from = os.getenv("SMTP_FROM", smtp_user or "manuashi2018@gmail.com")
+        smtp_from = os.getenv("SMTP_FROM", smtp_user).strip()
 
         self.settings = {
             "browser_alerts_enabled": True,
             "sound_alerts_enabled": True,
             "min_profit_threshold_pct": 1.5,
             "min_opportunity_score": 75,
-            "email_enabled": True,
-            "email_recipient": os.getenv("EMAIL_RECIPIENT", "manuashi2018@gmail.com"),
+            "email_enabled": bool(smtp_user and smtp_pw),
+            "email_recipient": os.getenv("EMAIL_RECIPIENT", "").strip(),
             "smtp_host": os.getenv("SMTP_HOST", "smtp.gmail.com"),
             "smtp_port": int(os.getenv("SMTP_PORT", 587)),
             "smtp_user": smtp_user,
             "smtp_password": smtp_pw,
             "smtp_from": smtp_from,
-            "webhook_enabled": False,
-            "webhook_url": "",
-            "webhook_type": "discord",  # "discord", "telegram", "generic"
-            "telegram_bot_token": "",
-            "telegram_chat_id": ""
+            "webhook_enabled": os.getenv("WEBHOOK_ENABLED", "false").strip().lower() == "true",
+            "webhook_url": os.getenv("WEBHOOK_URL", "").strip(),
+            "webhook_type": os.getenv("WEBHOOK_TYPE", "discord").strip().lower(),
+            "telegram_bot_token": os.getenv("TELEGRAM_BOT_TOKEN", "").strip(),
+            "telegram_chat_id": os.getenv("TELEGRAM_CHAT_ID", "").strip()
         }
         self.recent_alerts: List[Dict[str, Any]] = []
 
-    def _load_env_file(self):
-        """Loads .env file into os.environ if present."""
-        env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env"))
-        if os.path.exists(env_path):
-            try:
-                with open(env_path, "r", encoding="utf-8") as f:
-                    for line in f:
-                        line = line.strip()
-                        if line and not line.startswith("#") and "=" in line:
-                            k, v = line.split("=", 1)
-                            k = k.strip()
-                            v = v.strip().strip('"').strip("'")
-                            if k not in os.environ:
-                                os.environ[k] = v
-            except Exception as e:
-                print(f"Error loading .env file: {e}")
-
     def get_settings(self) -> Dict[str, Any]:
-        return self.settings.copy()
+        settings = self.settings.copy()
+        for key in (
+            "smtp_password",
+            "smtp_user",
+            "smtp_from",
+            "email_recipient",
+            "telegram_bot_token",
+            "webhook_url",
+        ):
+            settings.pop(key, None)
+        settings["smtp_password_configured"] = bool(self.settings.get("smtp_password"))
+        settings["email_configured"] = bool(
+            self.settings.get("smtp_user") and self.settings.get("smtp_password")
+        )
+        settings["telegram_bot_token_configured"] = bool(self.settings.get("telegram_bot_token"))
+        settings["webhook_url_configured"] = bool(self.settings.get("webhook_url"))
+        return settings
+
+    @staticmethod
+    def _validate_webhook_url(url: str, webhook_type: str) -> None:
+        try:
+            parsed = urlsplit(url)
+            hostname = (parsed.hostname or "").lower().rstrip(".")
+            port = parsed.port
+        except ValueError as exc:
+            raise ValueError("Webhook URL is invalid.") from exc
+
+        if (
+            parsed.scheme != "https"
+            or not hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or port not in (None, 443)
+            or parsed.fragment
+        ):
+            raise ValueError("Webhook URL must be an HTTPS URL on port 443 without user information or a fragment.")
+
+        if webhook_type == "discord":
+            if hostname != "discord.com" or not parsed.path.startswith("/api/webhooks/"):
+                raise ValueError("Discord webhooks must use https://discord.com/api/webhooks/ URLs.")
+        elif webhook_type == "generic":
+            if hostname not in ALLOWED_WEBHOOK_HOSTS:
+                raise ValueError("Generic webhook host is not in BTCOGNITIVE_WEBHOOK_ALLOWED_HOSTS.")
+        else:
+            raise ValueError("Webhook type must be 'discord' or 'generic'.")
+
+    @staticmethod
+    async def _validate_public_webhook_destination(url: str) -> List[str]:
+        parsed = urlsplit(url)
+        hostname = parsed.hostname
+        if hostname is None:
+            raise ValueError("Webhook URL is missing a hostname.")
+
+        try:
+            loop = asyncio.get_running_loop()
+            resolved = await loop.getaddrinfo(
+                hostname,
+                parsed.port or 443,
+                type=socket.SOCK_STREAM,
+            )
+        except OSError as exc:
+            raise ValueError("Webhook hostname could not be resolved.") from exc
+
+        addresses = {record[4][0] for record in resolved}
+        if not addresses:
+            raise ValueError("Webhook hostname did not resolve to any IP addresses.")
+        for address in addresses:
+            try:
+                is_global = ipaddress.ip_address(address).is_global
+            except ValueError as exc:
+                raise ValueError("Webhook hostname resolved to an invalid IP address.") from exc
+            if not is_global:
+                raise ValueError("Webhook hostname resolves to a non-public IP address.")
+        return sorted(addresses)
 
     def update_settings(self, new_settings: Dict[str, Any]) -> Dict[str, Any]:
+        webhook_type = new_settings.get("webhook_type", self.settings.get("webhook_type", "discord"))
+        if not isinstance(webhook_type, str) or webhook_type not in {"discord", "generic", "telegram"}:
+            raise ValueError("Unsupported webhook type.")
+
+        for key, value in new_settings.items():
+            if key.endswith("_enabled") and type(value) is not bool:
+                raise ValueError(f"{key} must be a boolean.")
+
+        webhook_url = new_settings.get("webhook_url") or self.settings.get("webhook_url")
+        if webhook_url and webhook_type != "telegram":
+            if not isinstance(webhook_url, str):
+                raise ValueError("Webhook URL must be a string.")
+            self._validate_webhook_url(webhook_url, webhook_type)
+
         for k, v in new_settings.items():
             if k in self.settings:
+                if k in {"smtp_password", "telegram_bot_token", "webhook_url"} and not v:
+                    continue
                 self.settings[k] = v
-        return self.settings.copy()
+        return self.get_settings()
 
     def get_recent_alerts(self, limit: int = 20) -> List[Dict[str, Any]]:
         return list(reversed(self.recent_alerts[-limit:]))
@@ -79,14 +201,19 @@ class NotificationManager:
             self.recent_alerts.pop(0)
 
     async def dispatch_alert(self, alert_payload: Dict[str, Any], ws_manager=None) -> Dict[str, Any]:
-        """
-        Dispatches alert across configured channels:
-        1. In-memory history
-        2. WebSocket broadcast
-        3. Email to user (manuashi2018@gmail.com)
-        4. Webhooks (Discord / Telegram / Custom HTTP)
-        """
+        """Dispatch neutral delivery tests; market signals remain blocked until validated."""
+        if not alert_payload.get("is_test"):
+            return {
+                "status": "blocked",
+                "alert_id": alert_payload.get("id"),
+                "reason": "Production forecasts are unavailable; no market alert was sent.",
+                "research_authorization": "BLOCKED_PROVENANCE_UNVERIFIED",
+                "channels": {"all": {"status": "blocked"}},
+            }
+
         self.record_alert(alert_payload)
+
+        channels: Dict[str, Dict[str, str]] = {}
 
         # 1. WebSocket broadcast if manager provided
         if ws_manager is not None:
@@ -97,35 +224,87 @@ class NotificationManager:
                     "timestamp": datetime.now(timezone.utc).isoformat()
                 }
                 await ws_manager.broadcast(json.dumps(ws_msg))
+                channels["websocket"] = {"status": "delivered"}
             except Exception as e:
-                print(f"Error broadcasting alert over WebSocket: {e}")
+                channels["websocket"] = {"status": "failed", "reason": type(e).__name__}
+        else:
+            channels["websocket"] = {"status": "not_configured"}
 
-        # 2. Email dispatch to user (manuashi2018@gmail.com)
-        if self.settings.get("email_enabled") and self.settings.get("email_recipient"):
-            asyncio.create_task(self._send_email_alert(alert_payload))
+        if self.settings.get("email_enabled"):
+            channels["email"] = await self._send_email_alert(alert_payload)
+        else:
+            channels["email"] = {"status": "disabled"}
 
-        # 3. Webhook / External Notification
-        if self.settings.get("webhook_enabled") and self.settings.get("webhook_url"):
-            asyncio.create_task(self._send_external_webhook(alert_payload))
+        webhook_uses_telegram = (
+            self.settings.get("webhook_enabled")
+            and self.settings.get("webhook_type") == "telegram"
+        )
+        if webhook_uses_telegram:
+            channels["telegram"] = await self._send_telegram_alert(alert_payload)
+        elif self.settings.get("webhook_enabled"):
+            channels["webhook"] = await self._send_external_webhook(alert_payload)
+        else:
+            channels["webhook"] = {"status": "disabled"}
 
-        if self.settings.get("telegram_bot_token") and self.settings.get("telegram_chat_id"):
-            asyncio.create_task(self._send_telegram_alert(alert_payload))
+        if not webhook_uses_telegram:
+            if self.settings.get("telegram_bot_token") and self.settings.get("telegram_chat_id"):
+                channels["telegram"] = await self._send_telegram_alert(alert_payload)
+            else:
+                channels["telegram"] = {"status": "not_configured"}
 
-        return {"status": "dispatched", "alert_id": alert_payload.get("id")}
+        return {"status": "dispatched", "alert_id": alert_payload.get("id"), "channels": channels}
+
+    async def _send_test_email_alert(self, alert: Dict[str, Any]) -> Dict[str, str]:
+        recipients = self.settings.get("email_recipient", "")
+        recipients = [r.strip() for r in recipients.split(",") if r.strip()] if isinstance(recipients, str) else list(recipients)
+        smtp_user = self.settings.get("smtp_user", "")
+        smtp_password = self.settings.get("smtp_password", "").replace(" ", "").strip()
+        if not recipients or not smtp_user or not smtp_password:
+            return {"status": "not_configured", "reason": "SMTP credentials or recipient are not configured."}
+
+        message = MIMEText(
+            alert.get("rationale", "BTCognitive notification delivery test. This is not a market signal."),
+            "plain",
+            "utf-8"
+        )
+        message["Subject"] = "BTCognitive notification delivery test"
+        message["From"] = self.settings.get("smtp_from", smtp_user)
+        message["To"] = ", ".join(recipients)
+
+        try:
+            loop = asyncio.get_running_loop()
+
+            def _send():
+                with smtplib.SMTP(self.settings.get("smtp_host", "smtp.gmail.com"), int(self.settings.get("smtp_port", 587))) as server:
+                    server.starttls()
+                    server.login(smtp_user, smtp_password)
+                    server.sendmail(message["From"], recipients, message.as_string())
+
+            await loop.run_in_executor(None, _send)
+            return {"status": "delivered"}
+        except Exception as e:
+            return {"status": "failed", "reason": f"SMTP delivery failed ({type(e).__name__})."}
 
     async def _send_email_alert(self, alert: Dict[str, Any]):
         """Asynchronously formats and sends rich HTML email alert to user(s)."""
-        raw_recipients = self.settings.get("email_recipient", "manuashi2018@gmail.com, amshithv24cs@rnsit.ac.in")
+        if alert.get("is_test"):
+            return await self._send_test_email_alert(alert)
+        return {
+            "status": "blocked",
+            "reason": "Production forecasts are unavailable; no market alert was sent.",
+        }
+
+        raw_recipients = self.settings.get("email_recipient", "")
         recipients = [r.strip() for r in raw_recipients.split(",") if r.strip()] if isinstance(raw_recipients, str) else list(raw_recipients)
         
         if not recipients:
-            return
+            return {"status": "not_configured", "reason": "No email recipient is configured."}
 
         smtp_host = self.settings.get("smtp_host", "smtp.gmail.com")
         smtp_port = int(self.settings.get("smtp_port", 587))
-        smtp_user = self.settings.get("smtp_user", "manuashi2018@gmail.com")
+        smtp_user = self.settings.get("smtp_user", "")
         smtp_password = self.settings.get("smtp_password", "").replace(" ", "").strip()
-        smtp_from = self.settings.get("smtp_from", smtp_user or "manuashi2018@gmail.com")
+        smtp_from = self.settings.get("smtp_from", smtp_user)
 
         direction = alert.get("direction", "LONG")
         is_long = direction == "LONG"
@@ -298,20 +477,57 @@ class NotificationManager:
                         server.sendmail(smtp_from, recipients, msg.as_string())
                 await loop.run_in_executor(None, _send)
                 print(f"[EMAIL SUCCESS] Delivered email alert to {recipient_str} via {smtp_host}:{smtp_port}")
+                return {"status": "delivered"}
             except Exception as e:
                 print(f"[EMAIL WARNING] SMTP Delivery error via {smtp_host}:{smtp_port}: {e}")
+                return {"status": "failed", "reason": f"SMTP delivery failed ({type(e).__name__})."}
         else:
-            print(f"[EMAIL QUEUED] Email formatted and ready for {recipient_str}. (To send live, set SMTP_PASSWORD in .env or Settings modal).")
+            return {"status": "not_configured", "reason": "SMTP credentials are not configured."}
+
+    async def _post_webhook(self, url: str, payload: Dict[str, Any], addresses: List[str]):
+        hostname = urlsplit(url).hostname
+        if hostname is None:
+            raise ValueError("Webhook URL is missing a hostname.")
+        async with httpx.AsyncClient(
+            transport=_PinnedWebhookTransport(hostname, addresses),
+            timeout=5.0,
+            trust_env=False,
+        ) as client:
+            return await client.post(
+                url,
+                json=payload,
+                headers={"Content-Type": "application/json", "User-Agent": "BTCognitive/2.0"},
+            )
 
     async def _send_external_webhook(self, alert: Dict[str, Any]):
         """Asynchronously sends Discord or generic HTTP webhook using shared httpx client."""
+        if not alert.get("is_test"):
+            return {
+                "status": "blocked",
+                "reason": "Production forecasts are unavailable; no market alert was sent.",
+            }
         url = self.settings.get("webhook_url")
         w_type = self.settings.get("webhook_type", "discord")
+        if w_type == "telegram":
+            return {"status": "failed", "reason": "Telegram must use the configured bot-token channel."}
         if not url:
-            return
+            return {"status": "not_configured", "reason": "Webhook URL is not configured."}
+        try:
+            self._validate_webhook_url(url, w_type)
+            addresses = await self._validate_public_webhook_destination(url)
+        except ValueError as exc:
+            return {"status": "failed", "reason": str(exc)}
 
         try:
-            if w_type == "discord" and "discord.com" in url:
+            if alert.get("is_test") and w_type == "discord" and "discord.com" in url:
+                embed = {
+                    "title": "BTCognitive notification delivery test",
+                    "description": alert.get("rationale", "Test only; not a market signal."),
+                    "color": 0x00F0FF,
+                    "footer": {"text": "Test message · no market signal"}
+                }
+                payload = {"content": "BTCognitive test message; this is not a trading signal.", "embeds": [embed]}
+            elif w_type == "discord" and "discord.com" in url:
                 # Discord rich embed format
                 dir_color = 0x00FF87 if alert.get("direction") == "LONG" else 0xFF3366
                 embed = {
@@ -334,45 +550,52 @@ class NotificationManager:
                 # Generic webhook payload
                 payload = alert
 
-            client = get_shared_client()
-            res = await client.post(url, json=payload, headers={"Content-Type": "application/json", "User-Agent": "BTCognitive/2.0"}, timeout=5.0)
+            res = await self._post_webhook(url, payload, addresses)
             if res.status_code < 300:
-                print(f"Webhook notification delivered to {url}")
+                return {"status": "delivered"}
             else:
-                print(f"Webhook returned status {res.status_code}")
+                return {"status": "failed", "reason": f"Webhook returned HTTP {res.status_code}."}
         except Exception as e:
-            print(f"Error sending webhook notification: {e}")
+            return {"status": "failed", "reason": f"Webhook request failed ({type(e).__name__})."}
 
     async def _send_telegram_alert(self, alert: Dict[str, Any]):
         """Asynchronously sends Telegram Bot message using shared httpx client."""
+        if not alert.get("is_test"):
+            return {
+                "status": "blocked",
+                "reason": "Production forecasts are unavailable; no market alert was sent.",
+            }
         bot_token = self.settings.get("telegram_bot_token")
         chat_id = self.settings.get("telegram_chat_id")
 
         if not bot_token or not chat_id:
-            return
+            return {"status": "not_configured", "reason": "Telegram bot token or chat ID is not configured."}
 
-        text = (
-            f"🚨 *{alert.get('tier_title')}*\n\n"
-            f"⚡ *Direction:* {alert.get('direction')}\n"
-            f"💵 *Entry:* ${alert.get('entry_price'):,}\n"
-            f"🎯 *Target TP:* ${alert.get('target_profit_price'):,} (+{alert.get('target_profit_pct')}%)\n"
-            f"🛑 *Stop Loss:* ${alert.get('stop_loss_price'):,} (-{alert.get('risk_pct')}%)\n"
-            f"⚖️ *Risk/Reward:* {alert.get('risk_reward_ratio')}\n"
-            f"💎 *Opportunity Score:* {alert.get('opportunity_score')}/100\n\n"
-            f"_{alert.get('rationale')}_"
-        )
+        if alert.get("is_test"):
+            text = "*BTCognitive notification delivery test*\n\nThis is a test message, not a market signal."
+        else:
+            text = (
+                f"🚨 *{alert.get('tier_title')}*\n\n"
+                f"⚡ *Direction:* {alert.get('direction')}\n"
+                f"💵 *Entry:* ${alert.get('entry_price'):,}\n"
+                f"🎯 *Target TP:* ${alert.get('target_profit_price'):,} (+{alert.get('target_profit_pct')}%)\n"
+                f"🛑 *Stop Loss:* ${alert.get('stop_loss_price'):,} (-{alert.get('risk_pct')}%)\n"
+                f"⚖️ *Risk/Reward:* {alert.get('risk_reward_ratio')}\n"
+                f"💎 *Opportunity Score:* {alert.get('opportunity_score')}/100\n\n"
+                f"_{alert.get('rationale')}_"
+            )
 
         try:
             url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
             payload = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
             client = get_shared_client()
             res = await client.post(url, json=payload, timeout=5.0)
-            if res.status_code == 200:
-                print("Telegram notification delivered successfully.")
+            if res.status_code == 200 and res.json().get("ok") is True:
+                return {"status": "delivered"}
             else:
-                print(f"Telegram API responded with {res.status_code}: {res.text}")
+                return {"status": "failed", "reason": f"Telegram API returned HTTP {res.status_code} or rejected the message."}
         except Exception as e:
-            print(f"Error sending Telegram notification: {e}")
+            return {"status": "failed", "reason": f"Telegram request failed ({type(e).__name__})."}
 
 
 notification_manager = NotificationManager()

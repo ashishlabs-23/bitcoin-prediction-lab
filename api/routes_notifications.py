@@ -8,10 +8,11 @@ import time
 import logging
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
-from fastapi import APIRouter, Query, Body
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from config.security import UserRole
+from api.security_auth import require_role
 
 from api.notifications import notification_manager
-from engine.feature_cache import feature_cache
 
 logger = logging.getLogger("btcognitive.routes_notifications")
 
@@ -35,43 +36,59 @@ def get_notification_settings():
 
 
 @router.post("/api/notifications/settings")
-async def update_notification_settings(payload: Dict[str, Any] = Body(...)):
+async def update_notification_settings(
+    payload: Dict[str, Any] = Body(...),
+    _current_role: UserRole = Depends(require_role(UserRole.ADMIN)),
+):
     """Updates notification thresholds and webhook endpoints."""
-    updated = notification_manager.update_settings(payload)
+    try:
+        updated = notification_manager.update_settings(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return {"status": "success", "settings": updated}
 
 
 @router.post("/api/notifications/test")
-async def trigger_test_notification():
-    """Triggers an instant simulated high-profit opportunity alert for testing sound & webhook."""
-    row = feature_cache.get_latest_row()
-    live_p = float(row["close"]) if row is not None else 65000.0
-    tp = round(live_p * 1.026, 2)
-    sl = round(live_p * 0.988, 2)
-
+async def trigger_test_notification(
+    _current_role: UserRole = Depends(require_role(UserRole.ADMIN)),
+):
+    """Sends a neutral test message through configured channels; it is not a market signal."""
     test_alert = {
-        "id": f"test_alert_{int(time.time())}",
+        "id": f"notification_test_{time.time_ns()}",
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "tier": "ULTRA_HIGH_PROFIT",
-        "tier_title": "💎 ULTRA HIGH PROFIT OPPORTUNITY (TEST)",
-        "badge": "TEST ALERT",
-        "opportunity_score": 92,
-        "direction": "LONG",
-        "probability": 0.785,
-        "probability_pct": 78.5,
-        "entry_price": live_p,
-        "target_profit_price": tp,
-        "stop_loss_price": sl,
-        "target_profit_pct": 2.6,
-        "risk_pct": 1.2,
-        "risk_reward_ratio": "2.17:1",
-        "expected_gain_usd_per_btc": round(tp - live_p, 2),
-        "regime": "TRENDING_BULL",
-        "quality_score": 90,
-        "rationale": "High-conviction test opportunity: +2.6% Target TP with 2.17:1 Risk/Reward ratio.",
-        "sound_alert": True,
+        "tier": "NOTIFICATION_TEST",
+        "tier_title": "BTCognitive notification delivery test",
+        "badge": "TEST ONLY",
+        "rationale": "This test verifies notification delivery only. It is not a market observation, forecast, or trading signal.",
         "is_test": True
     }
 
-    await notification_manager.dispatch_alert(test_alert)
-    return {"status": "success", "message": "Test notification dispatched!", "alert": test_alert}
+    dispatch_result = await notification_manager.dispatch_alert(test_alert)
+    channels = dispatch_result.get("channels", {})
+    delivered = [name for name, result in channels.items() if result.get("status") == "delivered"]
+    failed = [name for name, result in channels.items() if result.get("status") == "failed"]
+    unconfigured = [name for name, result in channels.items() if result.get("status") == "not_configured"]
+
+    if delivered and failed:
+        status = "partial"
+    elif delivered:
+        status = "delivered"
+    elif failed:
+        status = "failed"
+    else:
+        status = "not_configured"
+
+    details = []
+    if delivered:
+        details.append("delivered via " + ", ".join(delivered))
+    if failed:
+        details.append("failed via " + ", ".join(failed))
+    if unconfigured:
+        details.append("not configured: " + ", ".join(unconfigured))
+    message = "Test message " + ("; ".join(details) if details else "was not delivered by any configured channel.")
+    return {
+        "status": status,
+        "message": message,
+        "delivery": channels,
+        "alert": test_alert
+    }

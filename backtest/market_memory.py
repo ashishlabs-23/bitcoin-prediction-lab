@@ -308,6 +308,8 @@ def record_prediction(
 
     resolved_flag = bool(outcome_resolved or (was_correct is not None))
     was_correct_val = ((1 if was_correct else 0) if was_correct is not None else None) if resolved_flag else None
+    if resolved_flag and not outcome_resolved_at:
+        outcome_resolved_at = str(timestamp)
 
     record_dict = {
         'prediction_id': str(prediction_id),
