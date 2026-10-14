@@ -35,29 +35,64 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
-class RateLimiter:
-    """Sliding-window in-memory rate limiter per client IP / key."""
+import threading
+from collections import OrderedDict, deque
 
-    def __init__(self):
-        # ip -> list of timestamps
-        self.requests: Dict[str, List[float]] = defaultdict(list)
+class RateLimiter:
+    """
+    Sliding-window in-memory rate limiter per client IP / key.
+
+    Hardened with:
+    - Thread-safe concurrency controls via threading.Lock()
+    - Monotonic time tracking (time.monotonic()) to prevent clock-skew attacks
+    - Per-client history bounded to at most `max_history_per_client` timestamps
+    - Total client-key cardinality bounded to `max_cardinality` with LRU eviction
+    - Automatic cleanup of expired timestamps and empty client buckets
+    """
+
+    def __init__(self, max_cardinality: int = 10000, max_history_per_client: int = 3000):
+        self.max_cardinality = max_cardinality
+        self.max_history_per_client = max_history_per_client
+        self._lock = threading.Lock()
+        self.requests: OrderedDict[str, deque[float]] = OrderedDict()
 
     def is_allowed(self, client_id: str, limit_per_minute: int) -> Tuple[bool, int]:
-        now = time.time()
+        now = time.monotonic()
         window_start = now - 60.0
 
-        # Prune old timestamps
-        self.requests[client_id] = [t for t in self.requests[client_id] if t > window_start]
+        with self._lock:
+            if client_id in self.requests:
+                q = self.requests[client_id]
+                while q and q[0] <= window_start:
+                    q.popleft()
+                self.requests.move_to_end(client_id)
+            else:
+                if len(self.requests) >= self.max_cardinality:
+                    keys_to_remove = []
+                    for k, v in self.requests.items():
+                        while v and v[0] <= window_start:
+                            v.popleft()
+                        if not v:
+                            keys_to_remove.append(k)
+                    for k in keys_to_remove:
+                        self.requests.pop(k, None)
 
-        if len(self.requests[client_id]) >= limit_per_minute:
-            return False, 0
+                    while len(self.requests) >= self.max_cardinality:
+                        self.requests.popitem(last=False)
 
-        self.requests[client_id].append(now)
-        remaining = max(0, limit_per_minute - len(self.requests[client_id]))
-        return True, remaining
+                q = deque(maxlen=max(limit_per_minute + 1, self.max_history_per_client))
+                self.requests[client_id] = q
+
+            if len(q) >= limit_per_minute:
+                return False, 0
+
+            q.append(now)
+            remaining = max(0, limit_per_minute - len(q))
+            return True, remaining
 
 
 rate_limiter = RateLimiter()
+
 
 
 class RateLimitingMiddleware(BaseHTTPMiddleware):

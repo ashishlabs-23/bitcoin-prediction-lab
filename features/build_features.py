@@ -38,6 +38,47 @@ def load_raw() -> Dict[str, pd.DataFrame]:
     return raw_data
 
 
+def compute_wilder_rsi(close: pd.Series, window: int = 14) -> pd.Series:
+    """
+    Computes standard Wilder 14-period Relative Strength Index (RSI).
+
+    Formula (J. Welles Wilder Jr., 1978):
+    - Initial average gain/loss: window-period warm-up.
+    - Subsequent periods: Wilder exponential smoothing with alpha = 1 / window.
+    - Explicit edge-case handling:
+        * Flat market (avg_gain == 0 and avg_loss == 0): RSI = 50.0
+        * All gain (avg_gain > 0 and avg_loss == 0): RSI = 100.0
+        * All loss (avg_gain == 0 and avg_loss > 0): RSI = 0.0
+        * Standard: RSI = 100.0 - (100.0 / (1.0 + avg_gain / avg_loss))
+    """
+    delta = close.diff()
+    gain = delta.clip(lower=0.0)
+    loss = -delta.clip(upper=0.0)
+
+    avg_gain = gain.ewm(alpha=1.0 / window, min_periods=window, adjust=False).mean()
+    avg_loss = loss.ewm(alpha=1.0 / window, min_periods=window, adjust=False).mean()
+
+    rsi = pd.Series(np.nan, index=close.index, dtype=float)
+    valid = (~avg_gain.isna()) & (~avg_loss.isna())
+    ag = avg_gain[valid]
+    al = avg_loss[valid]
+
+    flat_mask = (ag == 0.0) & (al == 0.0)
+    all_gain_mask = (ag > 0.0) & (al == 0.0)
+    all_loss_mask = (ag == 0.0) & (al > 0.0)
+    normal_mask = (al > 0.0) & (ag > 0.0)
+
+    res = pd.Series(50.0, index=ag.index, dtype=float)
+    res[all_gain_mask] = 100.0
+    res[all_loss_mask] = 0.0
+
+    rs_vals = ag[normal_mask] / al[normal_mask]
+    res[normal_mask] = 100.0 - (100.0 / (1.0 + rs_vals))
+
+    rsi[valid] = res
+    return rsi
+
+
 def compute_technical_features(ohlcv: pd.DataFrame) -> pd.DataFrame:
     """
     Input: the ohlcv DataFrame from load_raw.
@@ -71,13 +112,9 @@ def compute_technical_features(ohlcv: pd.DataFrame) -> pd.DataFrame:
     df['ret_24h'] = np.log(df['close'] / df['close'].shift(24))
 
     # 14-period RSI
-    delta = df['close'].diff()
-    gain = delta.clip(lower=0)
-    loss = -delta.clip(upper=0)
-    avg_gain = gain.ewm(alpha=1.0 / 14.0, min_periods=14, adjust=False).mean()
-    avg_loss = loss.ewm(alpha=1.0 / 14.0, min_periods=14, adjust=False).mean()
-    rs = avg_gain / avg_loss.replace(0, np.nan)
-    df['rsi_14'] = 100.0 - (100.0 / (1.0 + rs))
+    df['rsi_14'] = compute_wilder_rsi(df['close'], window=14)
+
+
 
     # Standard MACD(12, 26, 9)
     ema12 = df['close'].ewm(span=12, adjust=False).mean()

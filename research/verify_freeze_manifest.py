@@ -65,7 +65,7 @@ import numpy as np
 try:
     import joblib
 except ImportError:
-    from sklearn.externals import joblib
+    joblib = None
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 

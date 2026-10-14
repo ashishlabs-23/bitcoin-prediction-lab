@@ -39,31 +39,58 @@ class CandleStateManager:
         self.model_ensemble = ensemble
 
     def seed_historical_candles(self, klines: List[Dict[str, Any]]):
-        """Seeds state with recent historical OHLCV klines."""
-        if klines:
-            self.closed_candles = klines[-500:].copy()
+        """Seeds state with recent historical OHLCV klines without duplicating seed candles."""
+        if not klines:
+            return
+
+        seen_times = set()
+        deduped = []
+        for k in klines[-500:]:
+            candle_time = k.get("time") or k.get("timestamp")
+            if candle_time is not None:
+                if candle_time in seen_times:
+                    continue
+                seen_times.add(candle_time)
+            deduped.append(dict(k, is_closed=True))
+
+        self.closed_candles = deduped
+        if deduped:
             last_k = klines[-1]
-            self.current_candle = {
-                "time": last_k["time"],
-                "open": last_k["open"],
-                "high": last_k["high"],
-                "low": last_k["low"],
-                "close": last_k["close"],
-                "volume": last_k.get("volume", 0.0),
-                "is_closed": False
-            }
+            if not last_k.get("is_closed", True):
+                self.closed_candles.pop()
+                self.current_candle = {
+                    "time": last_k["time"],
+                    "open": last_k["open"],
+                    "high": last_k["high"],
+                    "low": last_k["low"],
+                    "close": last_k["close"],
+                    "volume": last_k.get("volume", 0.0),
+                    "is_closed": False
+                }
+            else:
+                self.current_candle = None
 
     def process_tick(self, price: float, volume: float = 0.0, timestamp_ms: Optional[int] = None) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]]]:
         """
         Processes an incoming price tick.
         Returns tuple: (tick_update_event, prediction_event_if_candle_closed)
         """
+        interval_ms = self.interval_seconds * 1000
         now_ms = timestamp_ms if timestamp_ms else int(time.time() * 1000)
+
+        # Handle out-of-order ticks: do not alter current candle if tick timestamp precedes current interval
+        if self.current_candle is not None and now_ms < self.current_candle["time"]:
+            return {
+                "type": "tick_ignored",
+                "reason": "OUT_OF_ORDER_TICK",
+                "price": price,
+                "timestamp_ms": now_ms
+            }, None
+
         self.last_tick_time = now_ms / 1000.0
 
         if self.current_candle is None:
-            # Initialize first candle on starting timestamp
-            candle_start_ms = (now_ms // (self.interval_seconds * 1000)) * (self.interval_seconds * 1000)
+            candle_start_ms = (now_ms // interval_ms) * interval_ms
             self.current_candle = {
                 "time": candle_start_ms,
                 "open": price,
@@ -75,17 +102,17 @@ class CandleStateManager:
             }
 
         candle_start = self.current_candle["time"]
-        candle_end = candle_start + (self.interval_seconds * 1000)
-
+        candle_end = candle_start + interval_ms
         candle_closed_event = None
 
         if now_ms >= candle_end:
             # Candle has CLOSED!
+            # The closed candle's OHLCV is strictly derived from ticks within its interval.
             closed_candle = {
                 "time": self.current_candle["time"],
                 "open": self.current_candle["open"],
-                "high": max(self.current_candle["high"], price),
-                "low": min(self.current_candle["low"], price),
+                "high": self.current_candle["high"],
+                "low": self.current_candle["low"],
                 "close": self.current_candle["close"],
                 "volume": self.current_candle["volume"],
                 "is_closed": True
@@ -98,8 +125,8 @@ class CandleStateManager:
             prediction_payload = self._generate_prediction_on_closed_candle(closed_candle)
             candle_closed_event = prediction_payload
 
-            # Initialize new forming candle for new interval
-            next_start = (now_ms // (self.interval_seconds * 1000)) * (self.interval_seconds * 1000)
+            # Initialize new forming candle for new interval starting with the current tick
+            next_start = (now_ms // interval_ms) * interval_ms
             self.current_candle = {
                 "time": next_start,
                 "open": price,
@@ -110,11 +137,12 @@ class CandleStateManager:
                 "is_closed": False
             }
         else:
-            # Update forming candle
+            # Update forming candle within active interval
             self.current_candle["high"] = max(self.current_candle["high"], price)
             self.current_candle["low"] = min(self.current_candle["low"], price)
             self.current_candle["close"] = price
             self.current_candle["volume"] += volume
+
 
         # Construct tick update message payload for /ws/price
         tick_event = {
@@ -259,3 +287,9 @@ class CandleStateManager:
 
         self.last_prediction = prediction_payload
         return prediction_payload
+
+
+# Aliases for backward compatibility
+CandleManager = CandleStateManager
+candle_manager = CandleStateManager()
+

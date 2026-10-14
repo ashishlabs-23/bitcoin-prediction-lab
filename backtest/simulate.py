@@ -143,22 +143,29 @@ def run_backtest(
 
     price_ret = price.pct_change().fillna(0.0)
 
-    # Position is applied with a 1-bar execution lag: position[t-1] is held over bar t (from close[t-1] to close[t]).
+    # Position is applied with a 1-bar execution lag:
+    # A signal generated at close of bar t-1 is executed at close of bar t-1 / open of bar t,
+    # so position[t-1] is held over bar t (from close[t-1] to close[t]).
     pos_lagged = position.shift(1).fillna(0.0)
 
-    # Transaction fees & slippage costs are incurred on position changes: abs(position[t] - position[t-1])
-    pos_diff = (position - position.shift(1).fillna(0.0)).abs()
+    # Execution position changes and fees occur on the ACTUAL execution bar:
+    pos_diff = (pos_lagged - pos_lagged.shift(1).fillna(0.0)).abs()
     total_cost_bps = fee_bps + slippage_bps
     cost_per_bar = (total_cost_bps / 10000.0) * pos_diff
 
-    # Strategy net return per bar
-    strategy_ret = pos_lagged * price_ret - cost_per_bar
+    # Gross return and net return per bar
+    gross_ret = pos_lagged * price_ret
+    strategy_ret = gross_ret - cost_per_bar
     equity_curve = (1.0 + strategy_ret).cumprod()
+    gross_equity = (1.0 + gross_ret).cumprod()
 
     if len(equity_curve) == 0:
         return {
             'equity_curve': pd.Series(dtype=float),
             'total_return': 0.0,
+            'gross_return': 0.0,
+            'net_return': 0.0,
+            'total_cost': 0.0,
             'sharpe': 0.0,
             'max_drawdown': 0.0,
             'turnover': 0.0,
@@ -166,6 +173,8 @@ def run_backtest(
         }
 
     total_return = float(equity_curve.iloc[-1] - 1.0)
+    gross_return = float(gross_equity.iloc[-1] - 1.0)
+    total_cost = float(cost_per_bar.sum())
     ret_list = strategy_ret.tolist()
     sharpe_val = sharpe_ratio(ret_list, periods_per_year=8760)
     sharpe = float(sharpe_val) if sharpe_val is not None else 0.0
@@ -180,6 +189,9 @@ def run_backtest(
     return {
         'equity_curve': equity_curve,
         'total_return': total_return,
+        'gross_return': gross_return,
+        'net_return': total_return,
+        'total_cost': total_cost,
         'sharpe': sharpe,
         'max_drawdown': max_drawdown,
         'turnover': turnover,

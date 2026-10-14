@@ -197,10 +197,12 @@ class PredictionPipeline:
         onchain_data: Optional[Dict[str, Any]] = None,
         orderflow_data: Optional[Dict[str, Any]] = None
     ) -> Layer1TelemetryOutput:
-        close_p = float(candle.get("close", 65000.0))
+        if candle is None or len(candle) == 0 or "close" not in candle:
+            raise ValueError("Candle missing required 'close' price.")
+        close_p = float(candle["close"])
         high_p = float(candle.get("high", close_p))
         low_p = float(candle.get("low", close_p))
-        vol = float(candle.get("volume", 10.0))
+        vol = float(candle.get("volume", 0.0))
         vol_24h = float(candle.get("vol_24h", 0.015))
         ts = str(candle.get("timestamp", datetime.now(timezone.utc).isoformat()))
 

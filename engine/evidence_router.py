@@ -932,14 +932,49 @@ class AdaptiveEvidenceRouterV2:
         graph, and evaluates question-level evidence quality (STRONG/MODERATE/WEAK/CONTRADICTORY).
         """
         h_clean = horizon if horizon in self.horizons else "15m"
-        snap = market_snapshot or {"ofi": 0.65, "hawkes": 2.2, "vpin": 0.22, "funding": -0.0001, "liquidations": 1.8, "rv_5m": 0.024}
+        snap = market_snapshot or {}
         active_set = list(active_sparse_indicators or ["ofi", "hawkes", "vpin", "liquidations", "rv_5m", "jump_intensity"])
         user_set = [x.strip().lower() for x in (user_selected_indicators or [])]
 
         # Tier 0 Driftless Log-Price First-Passage Null Family (mu = 0)
         # Assumes d ln(S_t) = sigma_t dW_t with zero drift and fixed absorbing barriers.
         # Conformal envelope bounds [P10, P90] are calibration objects, NOT physical barriers.
-        s0 = float(snap.get("spot_price", 64000.0))
+        s0_val = snap.get("spot_price")
+        s0 = float(s0_val) if (s0_val is not None and float(s0_val) > 0) else 0.0
+        if s0 <= 0:
+            try:
+                from engine.feature_cache import feature_cache
+                s0 = float(feature_cache.get_latest_price()) if feature_cache else 0.0
+            except Exception:
+                s0 = 0.0
+            if s0 <= 0:
+                try:
+                    from engine.observatory import observatory
+                    snap_obs = observatory.get_canonical_snapshot() if observatory else None
+                    if snap_obs and getattr(snap_obs, "spot_price", 0.0) > 0:
+                        s0 = float(snap_obs.spot_price)
+                except Exception:
+                    pass
+
+        if s0 <= 0:
+            return {
+                "solver_fail_closed": True,
+                "fail_closed_reason": "SPOT_PRICE_UNAVAILABLE",
+                "conservation_status": "FAILED",
+                "horizon": h_clean,
+                "finite_horizon_touch": {
+                    "p_upper_first_within_horizon": 0.0,
+                    "p_lower_first_within_horizon": 0.0,
+                    "p_neither_within_horizon": 1.0,
+                    "conservation_sum": 1.0
+                },
+                "eventual_touch": {
+                    "p_upper_p90": 0.5,
+                    "p_lower_p10": 0.5
+                },
+                "status": "FAIL_CLOSED"
+            }
+
         u_p90 = float(snap.get("conformal_p90", s0 * 1.008))
         l_p10 = float(snap.get("conformal_p10", s0 * 0.993))
 

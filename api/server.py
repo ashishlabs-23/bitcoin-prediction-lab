@@ -14,6 +14,7 @@ Configures FastAPI with:
 import os
 import sys
 import json
+import time
 import logging
 from contextlib import asynccontextmanager
 from typing import List, Dict
@@ -231,8 +232,24 @@ async def websocket_endpoint(websocket: WebSocket):
                 await websocket.close(code=status.WS_1009_MESSAGE_TOO_BIG)
                 break
 
-            if data == "ping":
-                await websocket.send_text(json.dumps({"type": "PONG"}))
+            is_ping = False
+            trimmed = data.strip()
+            if trimmed.lower() == "ping":
+                is_ping = True
+            else:
+                try:
+                    parsed_msg = json.loads(trimmed)
+                    if isinstance(parsed_msg, dict) and str(parsed_msg.get("type", "")).lower() == "ping":
+                        is_ping = True
+                except Exception:
+                    pass
+
+            if is_ping:
+                await websocket.send_text(json.dumps({
+                    "type": "PONG",
+                    "timestamp": int(time.time() * 1000)
+                }))
+
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket, client_ip)
     except Exception as e:

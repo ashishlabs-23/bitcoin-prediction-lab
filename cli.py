@@ -17,22 +17,42 @@ import json
 DEFAULT_API_URL = "http://localhost:8000"
 
 
+import urllib.error
+
 def query_api(endpoint: str, base_url: str = DEFAULT_API_URL):
     url = f"{base_url.rstrip('/')}/{endpoint.lstrip('/')}"
     req = urllib.request.Request(url, headers={"User-Agent": "BTCognitive-CLI/3.0"})
     try:
         with urllib.request.urlopen(req, timeout=10) as response:
             return json.loads(response.read().decode())
+    except urllib.error.HTTPError as e:
+        body = ""
+        try:
+            body = e.read().decode()
+            err_json = json.loads(body)
+            detail = err_json.get("detail", err_json.get("message", body))
+        except Exception:
+            detail = body or str(e.reason)
+
+        if e.code == 503:
+            print(f"\n\033[93m[RESEARCH GATE BLOCKED — HTTP 503 SERVICE UNAVAILABLE]\033[0m")
+            print(f"Endpoint: {url}")
+            print(f"Explanation: {detail}")
+            print("Action: The model or research gate is intentionally failed-closed per epistemic governance.\n")
+        else:
+            print(f"\033[91m[Error {e.code}]\033[0m Failed to query {url}: {detail}")
+        return None
     except Exception as e:
-        print(f"\033[91m[Error]\033[0m Failed to query {url}: {e}")
+        print(f"\033[91m[Connection Error]\033[0m Failed to query {url}: {e}")
         return None
 
 
-def cmd_terminal(args):
+def cmd_terminal(args) -> int:
     print("\n\033[96m======================= BTCOGNITIVE VOLATILITY INTELLIGENCE TERMINAL =======================\033[0m")
     data = query_api("/api/terminal/live", args.url)
     if not data:
-        return
+        return 1
+
         
     q = data.get("four_questions", {})
     
@@ -130,9 +150,10 @@ def cmd_observatory(args):
     print("\n\033[90m--------------------------------------------------------------------------------------------\033[0m")
     print(f"\033[90mRule: Observe != Optimize | Operational health states are control limits, not statistical validation.\033[0m")
     print("\033[96m============================================================================================\033[0m\n")
+    return 0 if summary else 1
 
 
-def cmd_health(args):
+def cmd_health(args) -> int:
     print("\n\033[96m=== BTCognitive Engine Health ===\033[0m")
     data = query_api("/health", args.url)
     if data:
@@ -140,7 +161,10 @@ def cmd_health(args):
         print(f"Status:        {status_color}{data.get('status', 'unknown').upper()}\033[0m")
         print(f"Models Loaded: {data.get('models_loaded')}")
         print(f"Uptime:        {data.get('uptime', 0)} seconds")
+        print()
+        return 0
     print()
+    return 1
 
 
 def main():
@@ -155,15 +179,18 @@ def main():
     args = parser.parse_args()
 
     if args.command == "terminal":
-        cmd_terminal(args)
+        code = cmd_terminal(args)
     elif args.command == "observatory":
-        cmd_observatory(args)
+        code = cmd_observatory(args)
     elif args.command == "health":
-        cmd_health(args)
+        code = cmd_health(args)
     else:
         # Default to terminal if no subcommand
-        cmd_terminal(args)
+        code = cmd_terminal(args)
+
+    sys.exit(code or 0)
 
 
 if __name__ == "__main__":
     main()
+

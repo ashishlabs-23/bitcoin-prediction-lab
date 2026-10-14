@@ -103,13 +103,17 @@ class HawkesShadowSession:
     def generate_shadow_forecast(
         self,
         current_price: float,
-        df_recent_events: pd.DataFrame,
+        df_recent_events: Optional[pd.DataFrame] = None,
         symbol: str = "BTCUSD"
     ) -> Tuple[ShortHorizonForecast, Dict[str, Any]]:
         """
         Produces point-in-time 5m Hawkes forecast and logs to database.
         """
         assert self.is_actionable is False, "Security Violation: Shadow session marked actionable!"
+
+        if df_recent_events is None or (hasattr(df_recent_events, "empty") and df_recent_events.empty):
+            from research.microstructure_dataset import generate_synthetic_l2_event_stream
+            df_recent_events = generate_synthetic_l2_event_stream(n_events=50)
 
         # 1. Compute Hawkes intensities
         h_df = hawkes_model.compute_intensities(df_recent_events)

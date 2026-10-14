@@ -1,0 +1,11 @@
+{
+  "name": "btcognitive-web",
+  "version": "1.0.0",
+  "description": "BTCognitive web interface and real-time intelligence dashboard",
+  "scripts": {
+    "check": "node --check web/app.js && node --check web/src/api_client.js && node --check web/src/websocket.js && node --check web/src/formatters.js",
+    "test": "node tests_frontend.js",
+    "build": "node build_frontend.js"
+  },
+  "private": true
+}

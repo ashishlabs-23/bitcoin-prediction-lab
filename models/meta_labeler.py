@@ -28,6 +28,7 @@ import os
 import sys
 import math
 import logging
+import threading
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any, Union, Tuple
 import numpy as np
@@ -160,28 +161,47 @@ class MetaLabeler:
     Applies Sharpe-optimized meta-labeling to filter false-positive signals.
     """
 
-    def __init__(self, checkpoint_path: Optional[str] = None):
+    def __init__(self, checkpoint_path: Optional[str] = None, lazy: bool = True):
         self.checkpoint_path = checkpoint_path or META_CHECKPOINT_PATH
-        self.model = MetaLabelerNN(input_dim=10, hidden_dim=32)
-        self._load_or_initialize()
+        self.model: Optional[MetaLabelerNN] = None
+        self._is_loaded = False
+        self._lock = threading.Lock()
+        self.status = "WARMING"
+        if not lazy:
+            self._ensure_loaded()
+
+    def _ensure_loaded(self) -> None:
+        """Thread-safe lazy initialization of model weights."""
+        if self._is_loaded:
+            return
+        with self._lock:
+            if self._is_loaded:
+                return
+            self.model = MetaLabelerNN(input_dim=10, hidden_dim=32)
+            if os.path.exists(self.checkpoint_path):
+                try:
+                    state = torch.load(self.checkpoint_path, map_location="cpu", weights_only=True)
+                    if isinstance(state, dict) and "state_dict" in state:
+                        self.model.load_state_dict(state["state_dict"])
+                    else:
+                        self.model.load_state_dict(state)
+                    logger.info(f"Loaded Meta Labeler checkpoint from {self.checkpoint_path}")
+                    self.model.eval()
+                    self.status = "READY"
+                    self._is_loaded = True
+                    return
+                except Exception as e:
+                    logger.warning(f"Failed to load Meta Labeler checkpoint: {e}")
+                    self.status = "FAILED"
+
+            self._seed_calibrated_weights()
+            self.model.eval()
+            self.status = "READY"
+            self._is_loaded = True
 
     def _load_or_initialize(self) -> None:
-        """Loads trained checkpoint or initializes calibrated heuristic weights."""
-        if os.path.exists(self.checkpoint_path):
-            try:
-                state = torch.load(self.checkpoint_path, map_location="cpu", weights_only=True)
-                if isinstance(state, dict) and "state_dict" in state:
-                    self.model.load_state_dict(state["state_dict"])
-                else:
-                    self.model.load_state_dict(state)
-                logger.info(f"Loaded Meta Labeler checkpoint from {self.checkpoint_path}")
-                self.model.eval()
-                return
-            except Exception as e:
-                logger.warning(f"Failed to load Meta Labeler checkpoint: {e}")
-
-        self._seed_calibrated_weights()
-        self.model.eval()
+        """Backwards compatibility helper."""
+        self._ensure_loaded()
 
     def _seed_calibrated_weights(self) -> None:
         """Seeds network with initial institutional trade filtering parameters."""
@@ -255,6 +275,7 @@ class MetaLabeler:
         """
         Trains the Meta Labeler using direct Sharpe Ratio maximization with optional sample-uniqueness weighting.
         """
+        self._ensure_loaded()
         tensor_x = torch.from_numpy(meta_features).float()
         tensor_rets = torch.from_numpy(hypothetical_returns).float()
 
@@ -308,6 +329,7 @@ class MetaLabeler:
             "meta_metrics": { ... }
           }
         """
+        self._ensure_loaded()
         feat_arr = self.extract_meta_features(
             tft_probs=tft_probs,
             expert_agreement=expert_agreement,

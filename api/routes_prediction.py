@@ -518,9 +518,22 @@ def post_prediction_record(
 @router.get("/prediction/multiscale")
 def get_multiscale_prediction():
     from engine.multiscale_forecast import multiscale_assembler
-    from research.microstructure_dataset import generate_synthetic_l2_event_stream
-    df_events = generate_synthetic_l2_event_stream(n_events=50)
-    fc = multiscale_assembler.generate_multiscale(current_price=65000.0, vol_24h=0.015, df_recent_events=df_events)
+    from engine.feature_cache import feature_cache
+
+    live_price = float(feature_cache.get_latest_price()) if feature_cache else 0.0
+    if live_price <= 0:
+        try:
+            from engine.observatory import observatory
+            snap = observatory.get_canonical_snapshot() if observatory else None
+            if snap and getattr(snap, "spot_price", 0.0) > 0:
+                live_price = float(snap.spot_price)
+        except Exception:
+            pass
+
+    if live_price <= 0:
+        raise HTTPException(status_code=503, detail="Market price unavailable for multiscale prediction.")
+
+    fc = multiscale_assembler.generate_multiscale(current_price=live_price, vol_24h=0.015, df_recent_events=None)
     data = fc.to_dict()
     data["symbol"] = "BTCUSD"
     data["production_model_version"] = "v3.0.0-excursion-ridge-conformal"
@@ -538,6 +551,8 @@ def get_multiscale_health():
 @router.get("/prediction/horizons")
 def get_prediction_horizons():
     from research.horizon_model_matrix import generate_horizon_model_matrix
+    from engine.feature_cache import feature_cache
+
     df_m, meta = generate_horizon_model_matrix()
     horizons = df_m["Horizon"].tolist()
     by_h = {}
@@ -547,10 +562,21 @@ def get_prediction_horizons():
             "architecture": r["Architecture Family"],
             "information_family": r["Primary Information Family"]
         }
+
+    live_price = float(feature_cache.get_latest_price()) if feature_cache else 0.0
+    if live_price <= 0:
+        try:
+            from engine.observatory import observatory
+            snap = observatory.get_canonical_snapshot() if observatory else None
+            if snap and getattr(snap, "spot_price", 0.0) > 0:
+                live_price = float(snap.spot_price)
+        except Exception:
+            pass
+
     return {
         "status": meta.get("status", "ALLOCATION_MATRIX_GENERATED"),
         "symbol": "BTCUSD",
-        "current_price": 65000.0,
+        "current_price": live_price if live_price > 0 else None,
         "available_horizons": horizons,
         "forecast_by_horizon": by_h,
     }

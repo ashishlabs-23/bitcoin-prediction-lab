@@ -112,6 +112,13 @@ ALLOWED_WEBHOOK_HOSTS: Set[str] = {
     if host.strip()
 }
 
+ALLOWED_SHEET_SYNC_HOSTS: Set[str] = {
+    host.strip().lower().rstrip(".")
+    for host in os.getenv("BTCOGNITIVE_SHEET_SYNC_ALLOWED_HOSTS", "script.google.com,script.googleusercontent.com").split(",")
+    if host.strip()
+}
+
+
 # ==============================================================================
 # 5. SECURITY HEADERS (OWASP ASVS & API Security Compliant)
 # ==============================================================================

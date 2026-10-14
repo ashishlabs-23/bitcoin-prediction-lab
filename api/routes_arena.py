@@ -10,9 +10,12 @@ import logging
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 import numpy as np
-from fastapi import APIRouter, Query, Body, HTTPException
+from fastapi import APIRouter, Query, Body, HTTPException, Depends
 from fastapi.responses import FileResponse
 
+from config.security import UserRole
+from api.security_auth import require_role
+from engine.security_validators import validate_sheet_sync_url, SecurityValidationError
 from engine.arena_runner import arena_runner
 from engine.feature_cache import feature_cache
 from engine.observatory import observatory
@@ -23,6 +26,7 @@ from engine.evidence_router import adaptive_evidence_router
 logger = logging.getLogger("btcognitive.routes_arena")
 
 router = APIRouter(tags=["AI Experiment Arena"])
+
 
 
 @router.get("/api/arena/context")
@@ -95,14 +99,21 @@ def get_arena_equity(limit: int = Query(100, le=500)):
     return {"equity_curve": equity, "count": len(equity)}
 
 
+import math
+
 @router.post("/api/arena/trade")
-async def execute_arena_paper_trade(payload: Optional[Dict[str, Any]] = Body(default={})):
+async def execute_arena_paper_trade(
+    payload: Optional[Dict[str, Any]] = Body(default={}),
+    _role: UserRole = Depends(require_role(UserRole.ADMIN))
+):
     """Executes a single paper trade adhering to the $10 bankroll formula."""
     if payload is None:
         payload = {}
     action = payload.get("action", "BUY").upper()
     row = feature_cache.get_latest_row()
-    live_p = float(row["close"]) if row is not None else 65000.0
+    if row is None or "close" not in row or row["close"] is None or math.isnan(float(row["close"])):
+        raise HTTPException(status_code=503, detail="Live market price is currently unavailable. Paper trade blocked.")
+    live_p = float(row["close"])
     confidence = float(payload.get("confidence", 0.82))
     reasoning = str(payload.get("reasoning", "Manual / Automated Arena order"))
     result = arena_runner.execute_paper_trade(action=action, price=live_p, confidence=confidence, reasoning=reasoning)
@@ -110,13 +121,13 @@ async def execute_arena_paper_trade(payload: Optional[Dict[str, Any]] = Body(def
 
 
 @router.post("/api/arena/reset")
-def reset_arena_experiment():
+def reset_arena_experiment(_role: UserRole = Depends(require_role(UserRole.ADMIN))):
     """Resets the experiment back to the initial $10.00 virtual starting bankroll."""
     return arena_runner.reset_experiment()
 
 
 @router.post("/api/arena/retrain")
-def trigger_arena_retraining():
+def trigger_arena_retraining(_role: UserRole = Depends(require_role(UserRole.ADMIN))):
     """Triggers offline supervised retraining and Deflated Sharpe Ratio validation."""
     return arena_runner.trigger_retrain()
 
@@ -133,15 +144,26 @@ def export_arena_csv():
 
 
 @router.post("/api/arena/sync_google_sheet")
-async def sync_arena_google_sheet(payload: Optional[Dict[str, Any]] = Body(default={})):
-    """Pushes recent trades and bankroll state to a Google Apps Script Web App webhook."""
+async def sync_arena_google_sheet(
+    payload: Optional[Dict[str, Any]] = Body(default={}),
+    _role: UserRole = Depends(require_role(UserRole.ADMIN))
+):
+    """Pushes recent trades and bankroll state to an authorized Google Apps Script webhook."""
     if payload is None:
         payload = {}
     webhook_url = str(payload.get("webhook_url", "")).strip()
-    if not webhook_url or not webhook_url.startswith("http"):
-        raise HTTPException(status_code=400, detail="Invalid webhook_url. Must be a valid HTTP URL.")
+    if not webhook_url:
+        raise HTTPException(status_code=400, detail="Missing webhook_url parameter.")
+    try:
+        clean_url, _ = validate_sheet_sync_url(webhook_url)
+    except SecurityValidationError as sve:
+        raise HTTPException(status_code=400, detail=str(sve))
+
     limit = int(payload.get("limit", 50))
-    return arena_runner.sync_to_google_script(webhook_url=webhook_url, limit=limit)
+    res = arena_runner.sync_to_google_script(webhook_url=clean_url, limit=limit)
+    if res.get("status") == "error":
+        raise HTTPException(status_code=res.get("code", 502), detail=res.get("reason", "Sync failed"))
+    return res
 
 
 @router.post("/api/arena/experiment")
@@ -316,26 +338,37 @@ def get_meie_state():
         from engine.event_detector import detect_event
         from engine.payoff_engine import estimate_payoff
 
-        # Fetch current live price and candle from feature cache (best-effort)
-        try:
-            cached = feature_cache.get_latest()
-            price = float(cached.get("price", 60000.0))
-            candle = {
-                "close": price,
-                "high": float(cached.get("high", price * 1.001)),
-                "low": float(cached.get("low", price * 0.999)),
-                "open": float(cached.get("open", price)),
-                "volume": float(cached.get("volume", 1000.0)),
-            }
-            hawkes_snapshot = cached.get("hawkes_snapshot")
-            vpin = cached.get("vpin", None)
-            vol_24h = float(cached.get("vol_24h", 0.015))
-        except Exception:
-            price = 60000.0
-            candle = {"close": price, "high": price, "low": price, "open": price, "volume": 1000.0}
-            hawkes_snapshot = None
-            vpin = None
-            vol_24h = 0.015
+        cached_row = feature_cache.get_latest_row() if feature_cache else None
+        cached = cached_row.to_dict() if cached_row is not None and hasattr(cached_row, "to_dict") else None
+        price = None
+        if cached and "price" in cached and float(cached["price"]) > 0:
+            price = float(cached["price"])
+        elif feature_cache:
+            p = float(feature_cache.get_latest_price())
+            if p > 0:
+                price = p
+        if price is None:
+            try:
+                from engine.observatory import observatory
+                snap = observatory.get_canonical_snapshot() if observatory else None
+                if snap and getattr(snap, "spot_price", 0.0) > 0:
+                    price = float(snap.spot_price)
+            except Exception:
+                pass
+
+        if price is None or price <= 0:
+            raise HTTPException(status_code=503, detail="Market price unavailable. Real-time data feed required for MEIE state.")
+
+        candle = {
+            "close": price,
+            "high": float(cached.get("high", price)) if cached else price,
+            "low": float(cached.get("low", price)) if cached else price,
+            "open": float(cached.get("open", price)) if cached else price,
+            "volume": float(cached.get("volume", 0.0)) if cached else 0.0,
+        }
+        hawkes_snapshot = cached.get("hawkes_snapshot") if cached else None
+        vpin = cached.get("vpin", None) if cached else None
+        vol_24h = float(cached.get("vol_24h", 0.015)) if cached else 0.015
 
         ts = datetime.now(timezone.utc).isoformat()
 
@@ -370,6 +403,8 @@ def get_meie_state():
             "timestamp": ts,
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"MEIE state endpoint error: {e}")
         return {
@@ -714,7 +749,24 @@ def get_active_paper_position(
 
         strat_filter = strategy_name if isinstance(strategy_name, str) else None
         open_positions = get_all_open_positions()
-        live_price = float(feature_cache.get_latest_price()) if feature_cache else 64250.0
+        live_price = float(feature_cache.get_latest_price()) if feature_cache else 0.0
+        if live_price <= 0:
+            try:
+                from engine.observatory import observatory
+                snap = observatory.get_canonical_snapshot() if observatory else None
+                if snap and getattr(snap, "spot_price", 0.0) > 0:
+                    live_price = float(snap.spot_price)
+            except Exception:
+                pass
+
+        if live_price <= 0:
+            return {
+                "has_active_position": False,
+                "status": "MARKET_DATA_UNAVAILABLE",
+                "error": "Live market price is currently unavailable.",
+                "live_price": None,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
 
         # Market regime & C2 health from observatory if available
         market_regime = "VOL_EXPANDING"

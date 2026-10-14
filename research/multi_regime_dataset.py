@@ -66,17 +66,14 @@ def compute_parkinson_volatility(high: pd.Series, low: pd.Series, window: int) -
     return np.sqrt(rolling_var) * np.sqrt(24 * 365)
 
 
+from features.build_features import compute_wilder_rsi
+
 def compute_rsi(series: pd.Series, window: int = 14) -> pd.Series:
     """
-    Computes relative strength index (RSI).
+    Computes standard Wilder relative strength index (RSI).
     """
-    delta = series.diff()
-    gain = delta.clip(lower=0)
-    loss = -delta.clip(upper=0)
-    avg_gain = gain.rolling(window=window, min_periods=window).mean()
-    avg_loss = loss.rolling(window=window, min_periods=window).mean()
-    rs = avg_gain / (avg_loss + 1e-9)
-    return 100.0 - (100.0 / (1.0 + rs))
+    return compute_wilder_rsi(series, window=window)
+
 
 
 def build_multi_regime_dataset(start_date: str = "2020-01-01", end_date: str = "2026-08-23") -> pd.DataFrame:

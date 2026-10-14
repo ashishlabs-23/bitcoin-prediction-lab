@@ -62,11 +62,10 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import Ridge
 
-# ── joblib is bundled with scikit-learn; use it directly ──────────────────────
 try:
     import joblib
 except ImportError:
-    from sklearn.externals import joblib  # fallback for very old sklearn
+    joblib = None
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 

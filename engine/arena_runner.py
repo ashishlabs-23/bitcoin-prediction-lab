@@ -1041,11 +1041,20 @@ class ArenaRunner:
     def sync_to_google_script(self, webhook_url: str, limit: int = 50) -> Dict[str, Any]:
         """
         Synchronizes recent trades to a Google Sheet via Google Apps Script Web App.
-        Uses Python standard library (urllib.request) - no external dependencies.
+        Hardened against SSRF: destination allowlist, IP validation, redirects blocked,
+        strict timeouts and response body bounds.
         """
+        from engine.security_validators import validate_sheet_sync_url, SecurityValidationError
+        import httpx
+
+        try:
+            clean_url, _ = validate_sheet_sync_url(webhook_url)
+        except SecurityValidationError as sve:
+            return {"status": "error", "code": 400, "reason": str(sve)}
+
         trades = self.get_recent_trades(limit=limit)
         exp = self.get_active_experiment()
-        
+
         payload = {
             "source": "BTCognitive AI Experiment Arena",
             "active_model": exp.get("active_model", "Genome v4.1"),
@@ -1054,35 +1063,42 @@ class ArenaRunner:
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "trades": trades
         }
-        
-        data_bytes = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(
-            webhook_url,
-            data=data_bytes,
-            headers={
-                "Content-Type": "application/json",
-                "User-Agent": "BTCognitive-Arena-Sync/1.0"
-            },
-            method="POST"
-        )
-        
+
         try:
-            with urllib.request.urlopen(req, timeout=15.0) as response:
-                resp_body = response.read().decode("utf-8")
+            with httpx.Client(
+                timeout=httpx.Timeout(5.0, connect=3.0),
+                follow_redirects=False,
+                trust_env=False,
+                headers={
+                    "Content-Type": "application/json",
+                    "User-Agent": "BTCognitive-Arena-Sync/2.0"
+                }
+            ) as client:
+                resp = client.post(clean_url, json=payload)
+                resp_text = resp.text[:4096] if resp.text else ""
                 try:
-                    resp_json = json.loads(resp_body)
+                    resp_json = json.loads(resp_text) if resp_text else {}
                 except Exception:
-                    resp_json = {"raw": resp_body}
+                    resp_json = {"status": "received"}
+
+                if resp.status_code >= 400:
+                    return {
+                        "status": "error",
+                        "code": resp.status_code,
+                        "reason": f"Upstream service returned HTTP {resp.status_code}"
+                    }
+
                 return {
                     "status": "success",
-                    "code": response.status,
+                    "code": resp.status_code,
                     "synced_trades": len(trades),
                     "response": resp_json
                 }
-        except urllib.error.HTTPError as e:
-            return {"status": "error", "code": e.code, "reason": str(e.reason)}
-        except Exception as e:
-            return {"status": "error", "code": 500, "reason": str(e)}
+        except httpx.TimeoutException:
+            return {"status": "error", "code": 504, "reason": "Webhook destination timed out."}
+        except Exception:
+            return {"status": "error", "code": 502, "reason": "Failed to communicate with webhook destination."}
+
 
 
 # Global singleton instance

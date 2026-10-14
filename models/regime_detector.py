@@ -30,6 +30,7 @@ import os
 import sys
 import json
 import logging
+import threading
 from typing import Dict, List, Optional, Any, Union, Tuple
 import numpy as np
 import pandas as pd
@@ -106,33 +107,53 @@ class MarketRegimeDetector:
     Identifies discrete market conditions with calibrated confidence metrics.
     """
 
-    def __init__(self, checkpoint_path: Optional[str] = None):
+    def __init__(self, checkpoint_path: Optional[str] = None, lazy: bool = True):
         self.checkpoint_path = checkpoint_path or REGIME_CHECKPOINT_PATH
         self.kmeans: Optional[KMeans] = None
-        self.model = RegimeClassifierNN(input_dim=7, hidden_dim=32, num_classes=NUM_REGIMES) if HAS_TORCH else None
-        self._load_or_initialize()
+        self.model: Optional[RegimeClassifierNN] = None
+        self._is_loaded = False
+        self._lock = threading.Lock()
+        self.status = "WARMING"
+        if not lazy:
+            self._ensure_loaded()
+
+    def _ensure_loaded(self) -> None:
+        """Thread-safe lazy initialization of model weights."""
+        if self._is_loaded:
+            return
+        with self._lock:
+            if self._is_loaded:
+                return
+            if not HAS_TORCH:
+                self.model = RegimeClassifierNN()
+                self.status = "UNAVAILABLE"
+                self._is_loaded = True
+                return
+            self.model = RegimeClassifierNN(input_dim=7, hidden_dim=32, num_classes=NUM_REGIMES)
+            if os.path.exists(self.checkpoint_path):
+                try:
+                    state = torch.load(self.checkpoint_path, map_location="cpu", weights_only=True)
+                    if isinstance(state, dict) and "state_dict" in state:
+                        self.model.load_state_dict(state["state_dict"])
+                    else:
+                        self.model.load_state_dict(state)
+                    logger.info(f"Loaded Regime Detector checkpoint from {self.checkpoint_path}")
+                    self.model.eval()
+                    self.status = "READY"
+                    self._is_loaded = True
+                    return
+                except Exception as e:
+                    logger.warning(f"Could not load checkpoint {self.checkpoint_path}: {e}")
+                    self.status = "FAILED"
+            self._seed_baseline_weights()
+            if self.model:
+                self.model.eval()
+            self.status = "READY"
+            self._is_loaded = True
 
     def _load_or_initialize(self) -> None:
-        """Loads trained model weights or initializes calibrated baseline weights."""
-        if not HAS_TORCH:
-            return
-        if os.path.exists(self.checkpoint_path):
-            try:
-                state = torch.load(self.checkpoint_path, map_location="cpu", weights_only=True)
-                if isinstance(state, dict) and "state_dict" in state:
-                    self.model.load_state_dict(state["state_dict"])
-                else:
-                    self.model.load_state_dict(state)
-                logger.info(f"Loaded Regime Detector checkpoint from {self.checkpoint_path}")
-                self.model.eval()
-                return
-            except Exception as e:
-                logger.warning(f"Could not load checkpoint {self.checkpoint_path}: {e}")
-
-        # Initialize baseline heuristics into NN weights if no checkpoint exists
-        self._seed_baseline_weights()
-        if self.model:
-            self.model.eval()
+        """Backwards compatibility helper."""
+        self._ensure_loaded()
 
     def _seed_baseline_weights(self) -> None:
         """Seeds initial network weights with financial domain heuristics."""
@@ -167,8 +188,6 @@ class MarketRegimeDetector:
                 return np.hstack([atr, adx, ema20, ema50, vol, vwap, funding]).astype(np.float32)
             elif data.ndim == 1 and len(data) == 7:
                 return data.astype(np.float32).reshape(1, -1)
-            elif data.ndim == 2 and data.shape[1] >= 7:
-                return data[:, :7].astype(np.float32)
             elif data.ndim == 2 and data.shape[1] == 32:
                 # Map from standard 32-feature tensor
                 atr = data[:, 14:15]    # atr_14_ratio
@@ -179,6 +198,8 @@ class MarketRegimeDetector:
                 vwap = data[:, 8:9]     # vwap_ratio
                 funding = data[:, 25:26]# funding_rate
                 return np.hstack([atr, adx, ema20, ema50, vol, vwap, funding]).astype(np.float32)
+            elif data.ndim == 2 and data.shape[1] >= 7:
+                return data[:, :7].astype(np.float32)
 
         if isinstance(data, pd.DataFrame):
             n = len(data)
@@ -244,6 +265,9 @@ class MarketRegimeDetector:
         if sample_weights is not None:
             weights_t = torch.as_tensor(sample_weights, dtype=torch.float32)
 
+        if self.model is None:
+            self.model = RegimeClassifierNN(input_dim=feats.shape[1], hidden_dim=32, num_classes=NUM_REGIMES)
+
         self.model.train()
         optimizer = torch.optim.AdamW(self.model.parameters(), lr=lr, weight_decay=1e-4)
         criterion = nn.CrossEntropyLoss(reduction='none')
@@ -301,53 +325,61 @@ class MarketRegimeDetector:
 
         return mapping
 
-    def predict(self, data: Union[Dict[str, Any], pd.DataFrame, pd.Series, np.ndarray]) -> Dict[str, Any]:
+    def predict(self, data: Union[Dict[str, Any], pd.DataFrame, pd.Series, np.ndarray]) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
         """
         Classifies input market state into one of the 7 regimes with confidence score.
-        Output:
-          {
-            "regime": "High Volatility",
-            "confidence": 0.92
-          }
+        Supports both single-row inputs (dict, Series) and batch inputs (DataFrame, 2D ndarray).
+        - For single row: returns Dict[str, Any]
+        - For batch of N rows (N > 1): returns List[Dict[str, Any]] of length N
         """
+        self._ensure_loaded()
         feats = self.extract_features(data)
+        N = len(feats)
+        is_batch = (isinstance(data, pd.DataFrame) and len(data) > 1) or (isinstance(data, np.ndarray) and data.ndim == 3 and len(data) > 1)
+
         if HAS_TORCH and self.model is not None:
             self.model.eval()
             with torch.no_grad():
                 tensor_x = torch.from_numpy(feats).float()
                 logits = self.model(tensor_x)
-                probs = F.softmax(logits, dim=-1)[0].cpu().numpy()
+                all_probs = F.softmax(logits, dim=-1).cpu().numpy()
         else:
             # Domain heuristic fallback when PyTorch is not installed
             # Feats: 0: ATR, 1: ADX, 2: EMA20, 3: EMA50, 4: Vol, 5: VWAP, 6: Funding
-            row = feats[0]
-            trend = row[2] + row[3] + row[5]
-            vol = row[0]
-            adx = row[1]
-            
-            raw_scores = np.array([
-                max(0.1, trend * 10 + (1.0 if adx > 0.3 else 0.0)),  # Strong Uptrend
-                max(0.1, trend * 5),                                  # Weak Uptrend
-                max(0.1, 1.0 - abs(trend) * 5),                       # Sideways
-                max(0.1, (1.0 if trend > 0 and vol < 0.02 else 0.2)), # Accumulation
-                max(0.1, (1.0 if trend < 0 and vol < 0.02 else 0.2)), # Distribution
-                max(0.1, vol * 50),                                   # High Volatility
-                max(0.1, -trend * 10 + vol * 30)                      # Capitulation
-            ], dtype=np.float32)
-            exp_scores = np.exp(raw_scores - np.max(raw_scores))
-            probs = exp_scores / np.sum(exp_scores)
+            prob_list = []
+            for row in feats:
+                trend = row[2] + row[3] + row[5]
+                vol = row[0]
+                adx = row[1]
 
-        best_idx = int(np.argmax(probs))
-        regime_name = REGIMES[best_idx]
-        confidence = float(probs[best_idx])
+                raw_scores = np.array([
+                    max(0.1, trend * 10 + (1.0 if adx > 0.3 else 0.0)),  # Strong Uptrend
+                    max(0.1, trend * 5),                                  # Weak Uptrend
+                    max(0.1, 1.0 - abs(trend) * 5),                       # Sideways
+                    max(0.1, (1.0 if trend > 0 and vol < 0.02 else 0.2)), # Accumulation
+                    max(0.1, (1.0 if trend < 0 and vol < 0.02 else 0.2)), # Distribution
+                    max(0.1, vol * 50),                                   # High Volatility
+                    max(0.1, -trend * 10 + vol * 30)                      # Capitulation
+                ], dtype=np.float32)
+                exp_scores = np.exp(raw_scores - np.max(raw_scores))
+                prob_list.append(exp_scores / np.sum(exp_scores))
+            all_probs = np.array(prob_list)
 
-        prob_dict = {REGIMES[i]: round(float(probs[i]), 4) for i in range(NUM_REGIMES)}
+        results = []
+        for i in range(N):
+            row_probs = all_probs[i]
+            best_idx = int(np.argmax(row_probs))
+            regime_name = REGIMES[best_idx]
+            confidence = float(row_probs[best_idx])
+            prob_dict = {REGIMES[j]: round(float(row_probs[j]), 4) for j in range(NUM_REGIMES)}
+            results.append({
+                "regime": regime_name,
+                "confidence": round(confidence, 4),
+                "probabilities": prob_dict
+            })
 
-        return {
-            "regime": regime_name,
-            "confidence": round(confidence, 4),
-            "probabilities": prob_dict
-        }
+        return results if is_batch else results[-1]
+
 
     def save(self, path: Optional[str] = None) -> str:
         """Saves PyTorch model checkpoint to disk."""
@@ -372,6 +404,8 @@ def detect_regime(data: Union[Dict[str, Any], pd.DataFrame, pd.Series, np.ndarra
       }
     """
     res = regime_detector.predict(data)
+    if isinstance(res, list):
+        res = res[-1]
     return {
         "regime": res["regime"],
         "confidence": res["confidence"]

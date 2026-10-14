@@ -12,10 +12,14 @@ import uuid
 import time
 import sqlite3
 import logging
+import threading
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 import numpy as np
 import pandas as pd
+
+# Process-level lock for atomic CSV operations
+_csv_lock = threading.Lock()
 
 # Ensure project root is in sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -366,19 +370,16 @@ def record_prediction(
     finally:
         conn.close()
 
-    # 2. Sync to CSV for testing & external exports
+    # 2. Sync to CSV for testing & external exports using atomic locked append
     csv_file = get_memory_file()
     try:
         rec_for_df = record_dict.copy()
         rec_for_df['was_correct'] = was_correct if was_correct is not None else np.nan
         rec_for_df['outcome_resolved'] = bool(outcome_resolved)
         new_row_df = pd.DataFrame([rec_for_df])
-        if os.path.exists(csv_file) and os.path.getsize(csv_file) > 0:
-            existing = pd.read_csv(csv_file)
-            combined = pd.concat([existing, new_row_df], ignore_index=True)
-        else:
-            combined = new_row_df
-        combined.to_csv(csv_file, index=False)
+        with _csv_lock:
+            file_exists = os.path.exists(csv_file) and os.path.getsize(csv_file) > 0
+            new_row_df.to_csv(csv_file, mode='a', header=not file_exists, index=False)
     except Exception as e:
         logger.warning(f"Error syncing prediction to CSV: {e}")
 
@@ -474,21 +475,22 @@ def update_prediction_outcomes_batch(updates: List[Dict[str, Any]]) -> int:
     csv_file = get_memory_file()
     if os.path.exists(csv_file) and os.path.getsize(csv_file) > 0:
         try:
-            df = pd.read_csv(csv_file)
-            if 'prediction_id' in df.columns:
-                update_map = {str(u['prediction_id']): u for u in updates}
-                mask = df['prediction_id'].astype(str).isin(update_map.keys())
-                if mask.any():
-                    for idx in df[mask].index:
-                        pid = str(df.at[idx, 'prediction_id'])
-                        u = update_map.get(pid)
-                        if u:
-                            df.at[idx, 'actual_return'] = float(u['actual_return'])
-                            df.at[idx, 'was_correct'] = bool(u['was_correct'])
-                            df.at[idx, 'pnl'] = float(u['pnl'])
-                            df.at[idx, 'outcome_resolved'] = True
-                            df.at[idx, 'outcome_resolved_at'] = now_iso
-                    df.to_csv(csv_file, index=False)
+            with _csv_lock:
+                df = pd.read_csv(csv_file)
+                if 'prediction_id' in df.columns:
+                    update_map = {str(u['prediction_id']): u for u in updates}
+                    mask = df['prediction_id'].astype(str).isin(update_map.keys())
+                    if mask.any():
+                        for idx in df[mask].index:
+                            pid = str(df.at[idx, 'prediction_id'])
+                            u = update_map.get(pid)
+                            if u:
+                                df.at[idx, 'actual_return'] = float(u['actual_return'])
+                                df.at[idx, 'was_correct'] = bool(u['was_correct'])
+                                df.at[idx, 'pnl'] = float(u['pnl'])
+                                df.at[idx, 'outcome_resolved'] = True
+                                df.at[idx, 'outcome_resolved_at'] = str(u.get('outcome_resolved_at', now_iso))
+                        df.to_csv(csv_file, index=False)
         except Exception as e:
             logger.warning(f"Error syncing batch prediction outcomes to CSV: {e}")
 
@@ -599,15 +601,12 @@ def record_stress_trial(
         'data_source': str(data_source)
     }
 
-    # 1. Sync to stress_trials.csv
+    # 1. Sync to stress_trials.csv using atomic locked append
     try:
         new_df = pd.DataFrame([new_row])
-        if os.path.exists(stress_file) and os.path.getsize(stress_file) > 0:
-            existing = pd.read_csv(stress_file)
-            combined = pd.concat([existing, new_df], ignore_index=True)
-        else:
-            combined = new_df
-        combined.to_csv(stress_file, index=False)
+        with _csv_lock:
+            file_exists = os.path.exists(stress_file) and os.path.getsize(stress_file) > 0
+            new_df.to_csv(stress_file, mode='a', header=not file_exists, index=False)
     except Exception as e:
         logger.warning(f"Error writing to stress_trials.csv: {e}")
 
@@ -664,16 +663,17 @@ def sanitize_market_memory() -> int:
     purged_count = 0
     if os.path.exists(csv_file) and os.path.getsize(csv_file) > 0:
         try:
-            df = pd.read_csv(csv_file)
-            initial_len = len(df)
-            clean_df = df[~df['regime'].astype(str).str.startswith("SIM_ARENA_")].copy()
-            if 'data_source' in clean_df.columns:
-                clean_df = clean_df[clean_df['data_source'] != 'synthetic_arena'].copy()
-            else:
-                clean_df['data_source'] = 'live_terminal'
-            purged_count = initial_len - len(clean_df)
-            if purged_count > 0 or 'data_source' not in df.columns:
-                clean_df.to_csv(csv_file, index=False)
+            with _csv_lock:
+                df = pd.read_csv(csv_file)
+                initial_len = len(df)
+                clean_df = df[~df['regime'].astype(str).str.startswith("SIM_ARENA_")].copy()
+                if 'data_source' in clean_df.columns:
+                    clean_df = clean_df[clean_df['data_source'] != 'synthetic_arena'].copy()
+                else:
+                    clean_df['data_source'] = 'live_terminal'
+                purged_count = initial_len - len(clean_df)
+                if purged_count > 0 or 'data_source' not in df.columns:
+                    clean_df.to_csv(csv_file, index=False)
         except Exception as e:
             logger.error(f"Error sanitizing CSV market memory: {e}")
 

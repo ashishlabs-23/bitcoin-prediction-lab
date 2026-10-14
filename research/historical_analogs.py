@@ -48,6 +48,34 @@ FUNDING_PATH = os.path.join(ROOT_DIR, "data", "raw", "funding.parquet")
 OI_PATH = os.path.join(ROOT_DIR, "data", "raw", "oi.parquet")
 
 
+def compute_forward_excursions(
+    high: Any,
+    low: Any,
+    close: Any,
+    horizon_bars: int = 24
+) -> Tuple[pd.Series, pd.Series, pd.Series]:
+    """
+    Computes forward realized excursions (MFE, MAE, close return) over exactly
+    bars t+1 through t+horizon_bars, excluding current bar t wick contamination.
+    Rows at the end of the series within the forward horizon return NaN.
+    """
+    high_series = pd.Series(high)
+    low_series = pd.Series(low)
+    close_series = pd.Series(close)
+
+    high_fwd = high_series.shift(-1)
+    low_fwd = low_series.shift(-1)
+    fwd_high = high_fwd.iloc[::-1].rolling(horizon_bars, min_periods=horizon_bars).max().iloc[::-1]
+    fwd_low = low_fwd.iloc[::-1].rolling(horizon_bars, min_periods=horizon_bars).min().iloc[::-1]
+    fwd_close = close_series.shift(-horizon_bars)
+
+    mfe = (fwd_high - close_series) / (close_series + 1e-12)
+    mae = (close_series - fwd_low) / (close_series + 1e-12)
+    ret = (fwd_close - close_series) / (close_series + 1e-12)
+
+    return mfe, mae, ret
+
+
 class HistoricalAnalogEngine:
     """
     In-memory indexed engine for point-in-time historical analog retrieval.
@@ -155,15 +183,12 @@ class HistoricalAnalogEngine:
         term_structure = vol_1h / (vol_24h + 1e-8)
 
         # 5. Forward 24h Realized Excursions (MFE & MAE)
-        high_series = pd.Series(high)
-        low_series = pd.Series(low)
-        fwd_high = high_series.iloc[::-1].rolling(24, min_periods=24).max().iloc[::-1].values
-        fwd_low = low_series.iloc[::-1].rolling(24, min_periods=24).min().iloc[::-1].values
-        fwd_close = pd.Series(close).shift(-24).values
+        # Evaluates strictly bars t+1 through t+24, excluding the current bar's high/low
+        mfe_s, mae_s, ret_s = compute_forward_excursions(high, low, close, horizon_bars=24)
+        mfe_24h = mfe_s.values
+        mae_24h = mae_s.values
+        ret_24h = ret_s.values
 
-        mfe_24h = (fwd_high - close) / (close + 1e-12)
-        mae_24h = (close - fwd_low) / (close + 1e-12)
-        ret_24h = (fwd_close - close) / (close + 1e-12)
 
         raw_df['vol_1h'] = vol_1h
         raw_df['vol_4h'] = vol_4h

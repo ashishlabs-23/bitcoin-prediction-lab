@@ -16,6 +16,8 @@ shap
 
 # testing
 pytest
+pytest-asyncio
+pytest-timeout
 
 # api & server
 fastapi
@@ -23,3 +25,4 @@ uvicorn[standard]
 websockets
 python-multipart
 httpx
+

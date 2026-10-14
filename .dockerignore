@@ -24,9 +24,7 @@ WORKING_CONTEXT.md
 data/raw/
 data/processed/
 
-# Web frontend (served by Netlify, not needed in backend container)
-web/
-web_dist/
+# Web deployment metadata
 .netlify/
 
 # Test files (not needed in production)

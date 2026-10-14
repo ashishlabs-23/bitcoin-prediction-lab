@@ -162,7 +162,12 @@ async def _fetch_bitstamp_history(client: Any) -> list[dict[str, float]]:
 
 
 async def _fetch_kraken_history(client: Any) -> list[dict[str, float]]:
-    since = int(time.time()) - HISTORY_DAYS * 24 * HOUR
+    # Kraken OHLC returns at most 720 candles forward starting from `since`.
+    # To obtain current history, request the most recent 720 hours (30 days of coverage).
+    # Then verify candle freshness independently from latest spot quote.
+    now = time.time()
+    closed_before = int(now // HOUR) * HOUR
+    since = closed_before - 720 * HOUR
     raw = await _get_json(
         client, "https://api.kraken.com/0/public/OHLC",
         {"pair": "XBTUSD", "interval": 60, "since": since},
@@ -180,7 +185,18 @@ async def _fetch_kraken_history(client: Any) -> list[dict[str, float]]:
             "time": row[0], "open": row[1], "high": row[2], "low": row[3],
             "close": row[4], "volume": row[6],
         })
-    return _normalise_candles(rows)
+    candles = _normalise_candles(rows, now=now)
+    if not candles:
+        raise RuntimeError("Kraken returned no valid candles")
+    # Freshness check: latest candle must not lag more than 2 hours behind closed_before
+    latest_candle_time = candles[-1]["time"]
+    if latest_candle_time < closed_before - 2 * HOUR:
+        raise RuntimeError(
+            f"Kraken candles are stale: latest candle is at {_utc_iso(latest_candle_time)}, "
+            f"expected >= {_utc_iso(closed_before - 2 * HOUR)}"
+        )
+    return candles
+
 
 
 async def _fetch_history(provider: str, client: Any) -> list[dict[str, float]]:

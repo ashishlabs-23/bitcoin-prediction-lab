@@ -59,6 +59,31 @@ def cusum_filter(close: pd.Series, threshold: float = 0.01) -> pd.Series:
     return pd.Series(t_events)
 
 
+def expanding_percentile_rank(vol: pd.Series, min_periods: int = 50) -> pd.Series:
+    """
+    Computes strictly point-in-time expanding percentile rank using bisection over historical rows [0, t].
+    Future rows cannot alter earlier ranks.
+    """
+    import bisect
+    n = len(vol)
+    vol_arr = vol.values
+    vol_pct = np.full(n, 0.5, dtype=float)
+    sorted_history: list[float] = []
+    for i in range(n):
+        v = vol_arr[i]
+        if np.isnan(v):
+            vol_pct[i] = 0.5
+            continue
+        idx = bisect.bisect_right(sorted_history, float(v))
+        sorted_history.insert(idx, float(v))
+        k = len(sorted_history)
+        if k >= min_periods:
+            vol_pct[i] = idx / k
+        else:
+            vol_pct[i] = 0.5
+    return pd.Series(vol_pct, index=vol.index)
+
+
 def triple_barrier_label(
     close: pd.Series,
     vol: pd.Series,
@@ -84,11 +109,12 @@ def triple_barrier_label(
     low_vals = low.values if low is not None else None
 
     if adaptive_width and len(vol.dropna()) > 50:
-        vol_pct = vol.rank(pct=True).fillna(0.5).values
-        # Dynamic scaling factor: ranges between 0.7x and 1.3x based on vol percentile
+        vol_pct = expanding_percentile_rank(vol, min_periods=50).values
+        # Dynamic scaling factor: ranges between 0.7x and 1.3x based on point-in-time vol percentile
         adapt_scale = 0.7 + 0.6 * vol_pct
     else:
         adapt_scale = np.ones(n)
+
 
     if isinstance(close.index, pd.DatetimeIndex):
         ts_vals = close.index.values

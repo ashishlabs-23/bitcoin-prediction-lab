@@ -196,44 +196,86 @@ function emaStep(prev, close, alpha) {
 }
 
 // ---------------------------------------------------------------------------
+// Resilient HTTP Client: In-Flight Deduplication, Response Cache, 429 Backoff
+// ---------------------------------------------------------------------------
+const _inflightRequests = new Map();
+const _responseCache = new Map();
+let _rateLimitBackoffUntil = 0;
+let _rateLimitBackoffDelay = 1000;
+
+async function resilientFetch(url, options = {}, ttlMs = 1500) {
+  const isGet = !options.method || options.method.toUpperCase() === "GET";
+  const now = Date.now();
+
+  if (now < _rateLimitBackoffUntil && isGet) {
+    const cached = _responseCache.get(url);
+    if (cached) return Promise.resolve(JSON.parse(JSON.stringify(cached.data)));
+    throw new Error(`Rate limit backoff active for ${Math.ceil((_rateLimitBackoffUntil - now) / 1000)}s`);
+  }
+
+  if (isGet && ttlMs > 0) {
+    const entry = _responseCache.get(url);
+    if (entry && (now - entry.timestamp) < ttlMs) {
+      return Promise.resolve(JSON.parse(JSON.stringify(entry.data)));
+    }
+  }
+
+  if (isGet && _inflightRequests.has(url)) {
+    return _inflightRequests.get(url);
+  }
+
+  const promise = (async () => {
+    try {
+      const res = await fetch(url, options);
+      if (res.status === 429) {
+        const jitter = Math.random() * 500;
+        _rateLimitBackoffUntil = Date.now() + _rateLimitBackoffDelay + jitter;
+        _rateLimitBackoffDelay = Math.min(_rateLimitBackoffDelay * 2, 16000);
+        throw new Error("HTTP 429 Rate Limit Exceeded");
+      }
+      _rateLimitBackoffDelay = 1000;
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+      const data = await res.json();
+      if (isGet && ttlMs > 0) {
+        _responseCache.set(url, { timestamp: Date.now(), data });
+      }
+      return data;
+    } finally {
+      if (isGet) _inflightRequests.delete(url);
+    }
+  })();
+
+  if (isGet) _inflightRequests.set(url, promise);
+  return promise;
+}
+
+// ---------------------------------------------------------------------------
 // Backend API client (prediction, regime, quality — dynamic API endpoint)
 // ---------------------------------------------------------------------------
 const api = {
   async fetchPredictionLatest(live = false) {
-    const res = await fetch(`${getApiBaseUrl()}/prediction/latest?live=${live}`);
-    if (!res.ok) throw new Error("prediction/latest failed");
-    return res.json();
+    return resilientFetch(`${getApiBaseUrl()}/prediction/latest?live=${live}`);
   },
   async fetchPredictionHistory(limit = 20) {
-    const res = await fetch(`${getApiBaseUrl()}/prediction/history?limit=${limit}`);
-    if (!res.ok) throw new Error("prediction/history failed");
-    return res.json();
+    return resilientFetch(`${getApiBaseUrl()}/prediction/history?limit=${limit}`);
   },
   async fetchRegimeLatest(live = false) {
-    const res = await fetch(`${getApiBaseUrl()}/regime/latest?live=${live}`);
-    if (!res.ok) throw new Error("regime/latest failed");
-    return res.json();
+    return resilientFetch(`${getApiBaseUrl()}/regime/latest?live=${live}`);
   },
   async fetchExplanationLatest(live = false) {
-    const res = await fetch(`${getApiBaseUrl()}/explanation/latest?live=${live}`);
-    if (!res.ok) throw new Error("explanation/latest failed");
-    return res.json();
+    return resilientFetch(`${getApiBaseUrl()}/explanation/latest?live=${live}`);
   },
   async fetchQualityLatest(live = false) {
-    const res = await fetch(`${getApiBaseUrl()}/quality/latest?live=${live}`);
-    if (!res.ok) throw new Error("quality/latest failed");
-    return res.json();
+    return resilientFetch(`${getApiBaseUrl()}/quality/latest?live=${live}`);
   },
   async fetchMemory() {
-    const res = await fetch(`${getApiBaseUrl()}/memory`);
-    if (!res.ok) throw new Error("memory failed");
-    const d = await res.json();
+    const d = await resilientFetch(`${getApiBaseUrl()}/memory`);
     return Array.isArray(d) ? d : (d?.memory || []);
   },
   async fetchPortfolio() {
-    const res = await fetch(`${getApiBaseUrl()}/portfolio`);
-    if (!res.ok) throw new Error("portfolio failed");
-    return res.json();
+    return resilientFetch(`${getApiBaseUrl()}/portfolio`);
   },
   async fetchMarketLatest() {
     const res = await fetch(`${getApiBaseUrl()}/market/latest`);
@@ -820,6 +862,7 @@ function LightweightCandleChart({
   useEffect(() => {
     let isMounted = true;
     const pollActivePosition = () => {
+      if (typeof document !== "undefined" && document.hidden) return;
       const queryStrat = selectedStrategy === "AUTO" ? null : selectedStrategy;
       if (!usesExternalPosition) {
         api.fetchActivePaperPosition(queryStrat)
@@ -832,7 +875,7 @@ function LightweightCandleChart({
         .catch(() => {});
     };
     pollActivePosition();
-    const intervalId = setInterval(pollActivePosition, 4000);
+    const intervalId = setInterval(pollActivePosition, 8000);
     return () => { isMounted = false; clearInterval(intervalId); };
   }, [selectedStrategy, usesExternalPosition]);
 
@@ -6729,6 +6772,7 @@ function TerminalView({
   useEffect(() => {
     let isMounted = true;
     const pollActivePosition = () => {
+      if (typeof document !== "undefined" && document.hidden) return;
       const queryStrat = selectedStrategy === "AUTO" ? null : selectedStrategy;
       api.fetchActivePaperPosition(queryStrat, enabledIndicators, userDirectionPreference, targetHorizon, evidenceMode, signalMode)
         .then(data => {
@@ -6742,7 +6786,7 @@ function TerminalView({
         .catch(() => {});
     };
     pollActivePosition();
-    const intervalId = setInterval(pollActivePosition, 3000);
+    const intervalId = setInterval(pollActivePosition, 5000);
     return () => { isMounted = false; clearInterval(intervalId); };
   }, [selectedStrategy, enabledIndicators, userDirectionPreference, targetHorizon, evidenceMode, signalMode]);
 
@@ -7488,7 +7532,10 @@ function ArenaExperimentView({ livePrice, predictionData, regimeData, decisionDa
   useEffect(() => {
     if (!researchAuthorized) return undefined;
     loadLaboratoryData();
-    const id = setInterval(loadLaboratoryData, 15000);
+    const id = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      loadLaboratoryData();
+    }, 15000);
     return () => clearInterval(id);
   }, [loadLaboratoryData, researchAuthorized]);
 
@@ -8488,7 +8535,10 @@ function App() {
 
   useEffect(() => {
     pollHealth();
-    const id = setInterval(pollHealth, 15000);
+    const id = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      pollHealth();
+    }, 15000);
     return () => clearInterval(id);
   }, [pollHealth]);
 
@@ -8536,7 +8586,10 @@ function App() {
 
   useEffect(() => {
     loadAIData();
-    const id = setInterval(loadAIData, 30000);
+    const id = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      loadAIData();
+    }, 30000);
     return () => clearInterval(id);
   }, [loadAIData]);
 
