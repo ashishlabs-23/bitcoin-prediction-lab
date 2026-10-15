@@ -51,6 +51,7 @@ htmlcov/
 .nox/
 experiments/logs/
 experiments/results/*.jsonl
+junit_report.xml
 
 # Temporary & Scratch Files
 scratch/

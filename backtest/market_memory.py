@@ -20,6 +20,8 @@ import pandas as pd
 
 # Process-level lock for atomic CSV operations
 _csv_lock = threading.Lock()
+# Process-level lock for serialized SQLite write/DDL operations across threads
+_db_lock = threading.Lock()
 
 # Ensure project root is in sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -66,10 +68,14 @@ def _get_db(db_file: Optional[str] = None) -> sqlite3.Connection:
     """Returns thread-safe SQLite connection with WAL mode enabled."""
     target_db = db_file or DB_PATH
     os.makedirs(os.path.dirname(os.path.abspath(target_db)), exist_ok=True)
-    conn = sqlite3.connect(target_db, timeout=10.0)
+    conn = sqlite3.connect(target_db, timeout=30.0)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL;")
-    conn.execute("PRAGMA synchronous=NORMAL;")
+    try:
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
+        conn.execute("PRAGMA busy_timeout=30000;")
+    except Exception:
+        pass
     return conn
 
 
@@ -105,6 +111,7 @@ def _init_tables(conn: sqlite3.Connection):
                 volatility_stress REAL,
                 composite_quality_score REAL,
                 expected_return_gross_pct REAL,
+                expected_return_net_pct REAL,
                 outcome_resolved INTEGER DEFAULT 0,
                 outcome_resolved_at TEXT,
                 data_source TEXT DEFAULT 'live_terminal',
@@ -121,7 +128,8 @@ def _init_tables(conn: sqlite3.Connection):
             ('target_rr', 'REAL DEFAULT 2.50'),
             ('realized_pnl_usd', 'REAL DEFAULT 0.0'),
             ('realized_pnl_pct', 'REAL DEFAULT 0.0'),
-            ('exit_reason', 'TEXT DEFAULT "OPEN"')
+            ('exit_reason', 'TEXT DEFAULT "OPEN"'),
+            ('expected_return_net_pct', 'REAL DEFAULT 0.0')
         ]:
             try:
                 conn.execute(f"ALTER TABLE predictions ADD COLUMN {col_name} {col_type};")
@@ -355,20 +363,21 @@ def record_prediction(
     }
 
     # 1. Insert into SQLite
-    conn = _get_db()
-    _init_tables(conn)
-    try:
-        with conn:
-            cols = list(record_dict.keys())
-            placeholders = ", ".join(["?" for _ in cols])
-            query = f"INSERT INTO predictions ({', '.join(cols)}) VALUES ({placeholders})"
-            conn.execute(query, list(record_dict.values()))
-    except sqlite3.IntegrityError as ie:
-        logger.error(f"Duplicate prediction_id rejected: {ie}")
-    except Exception as e:
-        logger.error(f"Error inserting prediction into SQLite: {e}")
-    finally:
-        conn.close()
+    with _db_lock:
+        conn = _get_db()
+        try:
+            _init_tables(conn)
+            with conn:
+                cols = list(record_dict.keys())
+                placeholders = ", ".join(["?" for _ in cols])
+                query = f"INSERT INTO predictions ({', '.join(cols)}) VALUES ({placeholders})"
+                conn.execute(query, list(record_dict.values()))
+        except sqlite3.IntegrityError as ie:
+            logger.error(f"Duplicate prediction_id rejected: {ie}")
+        except Exception as e:
+            logger.error(f"Error inserting prediction into SQLite: {e}")
+        finally:
+            conn.close()
 
     # 2. Sync to CSV for testing & external exports using atomic locked append
     csv_file = get_memory_file()

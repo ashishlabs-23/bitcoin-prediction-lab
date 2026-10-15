@@ -54,6 +54,7 @@ from api.genome_routes import router as genome_router
 from api.routes_analogs import router as analogs_router
 from api.routes_terminal import router as terminal_router
 from api.market_monitor_routes import router as market_monitor_router
+from api.routes_research import router as research_router
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -201,6 +202,7 @@ app.include_router(notifications_router)
 app.include_router(genome_router)
 app.include_router(analogs_router)
 app.include_router(terminal_router)
+app.include_router(research_router)
 
 
 

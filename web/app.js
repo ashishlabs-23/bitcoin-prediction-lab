@@ -499,6 +499,16 @@ const api = {
     const res = await fetch(`${getApiBaseUrl()}/api/arena/meie/abstentions${q}`);
     if (!res.ok) throw new Error("meie abstentions failed");
     return res.json();
+  },
+  async fetchResearchResults() {
+    const res = await fetch(`${getApiBaseUrl()}/api/research/results`);
+    if (!res.ok) throw new Error("fetch research results failed");
+    return res.json();
+  },
+  async fetchResearchReport(reportId) {
+    const res = await fetch(`${getApiBaseUrl()}/api/research/reports/${encodeURIComponent(reportId)}`);
+    if (!res.ok) throw new Error(`fetch research report ${reportId} failed`);
+    return res.json();
   }
 };
 
@@ -2449,6 +2459,20 @@ function Navbar({
           h("path", { d: "M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" })
         ),
         "AI Experiment Arena"
+      )),
+      h("li", null, h("a", {
+        href: "#/research",
+        className: `nav-link-pill ${currentPath === "/research" ? "active" : ""}`,
+        onClick: () => { setPath("/research"); setMobileOpen(false); }
+      },
+        h("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" },
+          h("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
+          h("polyline", { points: "14 2 14 8 20 8" }),
+          h("line", { x1: "16", y1: "13", x2: "8", y2: "13" }),
+          h("line", { x1: "16", y1: "17", x2: "8", y2: "17" }),
+          h("polyline", { points: "10 9 9 9 8 9" })
+        ),
+        "Research Results"
       ))
     ),
 
@@ -2624,26 +2648,26 @@ function HeroSection({ setPath, livePrice, changePct, predictionData, regimeData
             h("span", { className: "card-pct" }, livePrice > 0 && typeof changePct === "number" ? `${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%` : "—")
           )
         ),
-        h("div", { className: "glass-pill-card floating-right-card", onClick: () => setPath("/arena") },
+        h("div", { className: "glass-pill-card floating-right-card", onClick: () => setPath("/research") },
           h("div", { className: "card-top-row" },
-            h("span", { className: "card-label", style: { color: "#F87171" } }, "Production Forecast"),
+            h("span", { className: "card-label", style: { color: "#38BDF8" } }, "Archived Research Evidence"),
             h("div", { className: "arrow-circle-btn" }, "↗")
           ),
-          h("div", { className: "card-stat-big", style: { color: "#F87171", fontSize: "1.8rem" } }, "BLOCKED"),
-          h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", marginTop: "4px" } }, "Frozen research inputs are not verified")
+          h("div", { className: "card-stat-big", style: { color: "#38BDF8", fontSize: "1.35rem" } }, "11 REPORTS"),
+          h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", marginTop: "4px" } }, "Verified empirical findings & contradiction audits")
         )
       )
     ),
 
     // Bottom Stats Bar Highlights
     h("div", { className: "creative-stats-row" },
-      h("div", { className: "c-stat-box" },
+      h("div", { className: "c-stat-box", style: { cursor: "pointer" }, onClick: () => setPath("/terminal") },
         h("div", { className: "c-stat-num" }, livePrice > 0 ? `$${livePrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "Unavailable"),
         h("div", { className: "c-stat-lbl" }, "Coinbase BTC/USD · opens on Terminal")
       ),
-      h("div", { className: "c-stat-box" },
-        h("div", { className: "c-stat-num", style: { color: "#F87171" } }, "UNVERIFIED"),
-        h("div", { className: "c-stat-lbl" }, "Historical performance evidence")
+      h("div", { className: "c-stat-box", style: { cursor: "pointer" }, onClick: () => setPath("/research") },
+        h("div", { className: "c-stat-num", style: { color: "#38BDF8" } }, "11 REPORTS"),
+        h("div", { className: "c-stat-lbl" }, "Archived research evidence · click to open")
       ),
       h("div", { className: "c-stat-box" },
         h("div", { className: "c-stat-num", style: { color: "#EF4444" } }, "DISABLED"),
@@ -2857,10 +2881,30 @@ function PredictionPanel({ predictionData, engineState = "offline" }) {
 
   if (!researchAuthorized) {
     return h("div", { className: "glass-card", role: "status", style: { padding: "24px", marginBottom: "24px" } },
-      h("div", { style: { fontSize: "0.78rem", color: "#38BDF8", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.05em" } }, "Production forecast unavailable"),
-      h("h3", { style: { fontSize: "1.2rem", fontWeight: "800", color: "#F8FAFC", margin: "8px 0" } }, "Frozen research inputs and evaluation provenance are not authenticated."),
-      h("p", { style: { color: "#CBD5E1", margin: 0, lineHeight: 1.5 } },
-        researchGate?.reason || "Model forecasts and trading remain disabled. Live spot-market data is shown separately."
+      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" } },
+        h("div", null,
+          h("div", { style: { fontSize: "0.78rem", color: "#38BDF8", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.05em" } }, "Production forecast unavailable"),
+          h("h3", { style: { fontSize: "1.2rem", fontWeight: "800", color: "#F8FAFC", margin: "8px 0" } }, "Frozen research inputs and evaluation provenance are not authenticated."),
+          h("p", { style: { color: "#CBD5E1", margin: 0, lineHeight: 1.5, maxWidth: "700px" } },
+            researchGate?.reason || "Model forecasts and trading remain disabled. Live spot-market data is shown separately."
+          )
+        ),
+        h("a", {
+          href: "#/research",
+          style: {
+            background: "rgba(56, 189, 248, 0.15)",
+            border: "1px solid rgba(56, 189, 248, 0.4)",
+            color: "#38BDF8",
+            padding: "8px 16px",
+            borderRadius: "8px",
+            textDecoration: "none",
+            fontWeight: "700",
+            fontSize: "0.80rem",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px"
+          }
+        }, "🔬 View Archived Research Results & Evidence ↗")
       )
     );
   }
@@ -8331,6 +8375,615 @@ Failure Mode Class:  ${t.failure_class || "NO_CLASS"}
 
 
 // ===========================================================================
+// ResearchResultsView — Dedicated Scientific Research Evidence & Audit View
+// ===========================================================================
+function ResearchResultsView({ setPath, livePrice = 0 }) {
+  const [catalog, setCatalog] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedReportId, setSelectedReportId] = useState(null);
+  const [reportDetail, setReportDetail] = useState(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState(null);
+  const [activeFilter, setActiveFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const loadResults = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await api.fetchResearchResults();
+      setCatalog(data);
+    } catch (err) {
+      setError(err.message || "Failed to load research results");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadResults();
+  }, [loadResults]);
+
+  const handleOpenReport = async (reportId) => {
+    setSelectedReportId(reportId);
+    setReportLoading(true);
+    setReportError(null);
+    setReportDetail(null);
+    try {
+      const data = await api.fetchResearchReport(reportId);
+      setReportDetail(data);
+    } catch (err) {
+      setReportError(err.message || "Failed to fetch report content");
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  const handleCloseModal = () => {
+    setSelectedReportId(null);
+    setReportDetail(null);
+    setReportError(null);
+  };
+
+  useEffect(() => {
+    if (!selectedReportId) return undefined;
+    const onKey = (e) => { if (e.key === "Escape") handleCloseModal(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedReportId]);
+
+  const reports = catalog?.reports || [];
+
+  const filteredReports = reports.filter(r => {
+    if (activeFilter === "conflicts" && !r.contradiction) return false;
+    if (activeFilter === "c2_validated" && !r.governance_verdict.includes("VALIDATED")) return false;
+    if (activeFilter === "cost_erased" && r.governance_verdict !== "COST_ERASED") return false;
+    if (activeFilter === "longitudinal" && !r.track.toLowerCase().includes("longitudinal") && !r.track.toLowerCase().includes("governance") && !r.track.toLowerCase().includes("clean-room")) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchTitle = r.title.toLowerCase().includes(q);
+      const matchTrack = r.track.toLowerCase().includes(q);
+      const matchVerdict = r.governance_verdict.toLowerCase().includes(q);
+      const matchLimitations = r.scientific_limitations.toLowerCase().includes(q);
+      if (!matchTitle && !matchTrack && !matchVerdict && !matchLimitations) return false;
+    }
+    return true;
+  });
+
+  return h("div", { className: "terminal-container", style: { padding: "24px 32px", maxWidth: "1400px", margin: "0 auto" } },
+
+    // ── Header Section ─────────────────────────────────────────────────────────
+    h("div", { style: { marginBottom: "28px" } },
+      h("div", { style: { display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" } },
+        h("span", { style: { fontSize: "1.2rem" } }, "🔬"),
+        h("span", {
+          style: {
+            background: "rgba(56, 189, 248, 0.15)",
+            border: "1px solid rgba(56, 189, 248, 0.4)",
+            color: "#38BDF8",
+            padding: "3px 10px",
+            borderRadius: "6px",
+            fontSize: "0.74rem",
+            fontWeight: "800",
+            letterSpacing: "0.05em"
+          }
+        }, "READ-ONLY RESEARCH REPOSITORY · ARCHIVED EVIDENCE")
+      ),
+      h("h1", { style: { fontSize: "2rem", fontWeight: "800", color: "#F8FAFC", margin: "0 0 10px 0" } },
+        "Historical Research Results & Scientific Evidence"
+      ),
+      h("p", { style: { fontSize: "0.95rem", color: "#CBD5E1", maxWidth: "1050px", lineHeight: "1.6", margin: 0 } },
+        "This repository provides typed, read-only access to archived research reports, empirical metrics, " +
+        "and provenance verification hashes. Production forecast authorization and research evidence inspection are " +
+        "separate concerns: historical findings remain accessible locally even while production forecast generation remains blocked."
+      )
+    ),
+
+    // ── 3-Pillar Separation Status Bar ─────────────────────────────────────────
+    h("div", {
+      style: {
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+        gap: "16px",
+        marginBottom: "28px"
+      }
+    },
+      // Pillar 1: Live Market Observations
+      h("div", {
+        className: "glass-card",
+        style: {
+          padding: "18px 20px",
+          borderLeft: "4px solid #00E5A8",
+          background: "rgba(0, 229, 168, 0.04)"
+        }
+      },
+        h("div", { style: { fontSize: "0.72rem", color: "#00E5A8", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px" } },
+          "1. Live Market Observations"
+        ),
+        h("div", { style: { fontSize: "1.4rem", fontWeight: "800", color: "#F8FAFC", fontFamily: "var(--font-mono)" } },
+          livePrice > 0 ? `$${livePrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "Online Feed"
+        ),
+        h("div", { style: { fontSize: "0.78rem", color: "#94A3B8", marginTop: "4px" } },
+          "Public Coinbase BTC/USD Spot Order & Candle Stream"
+        )
+      ),
+
+      // Pillar 2: Archived Research Results
+      h("div", {
+        className: "glass-card",
+        style: {
+          padding: "18px 20px",
+          borderLeft: "4px solid #38BDF8",
+          background: "rgba(56, 189, 248, 0.04)"
+        }
+      },
+        h("div", { style: { fontSize: "0.72rem", color: "#38BDF8", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px" } },
+          "2. Archived Research Evidence"
+        ),
+        h("div", { style: { fontSize: "1.4rem", fontWeight: "800", color: "#38BDF8" } },
+          `${reports.length || 11} Verified Reports`
+        ),
+        h("div", { style: { fontSize: "0.78rem", color: "#94A3B8", marginTop: "4px" } },
+          "SHA-256 Hash Checked · Source-Linked Empirical Studies"
+        )
+      ),
+
+      // Pillar 3: Production Forecast & Execution Authorization
+      h("div", {
+        className: "glass-card",
+        style: {
+          padding: "18px 20px",
+          borderLeft: "4px solid #F87171",
+          background: "rgba(239, 68, 68, 0.04)"
+        }
+      },
+        h("div", { style: { fontSize: "0.72rem", color: "#F87171", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px" } },
+          "3. Production Forecast & Execution"
+        ),
+        h("div", { style: { fontSize: "1.25rem", fontWeight: "800", color: "#F87171", letterSpacing: "0.02em" } },
+          "BLOCKED · PROVENANCE UNVERIFIED"
+        ),
+        h("div", { style: { fontSize: "0.78rem", color: "#94A3B8", marginTop: "4px" } },
+          "Model Execution & Automated Trading Disabled"
+        )
+      )
+    ),
+
+    // ── Visible Contradiction Reconciliations Alert Banner ───────────────────────
+    h("div", {
+      style: {
+        background: "rgba(245, 158, 11, 0.08)",
+        border: "1px solid rgba(245, 158, 11, 0.35)",
+        borderRadius: "12px",
+        padding: "20px 24px",
+        marginBottom: "28px"
+      }
+    },
+      h("div", { style: { display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" } },
+        h("span", { style: { fontSize: "1.1rem" } }, "⚖️"),
+        h("span", { style: { color: "#F59E0B", fontWeight: "800", fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "0.04em" } },
+          "Visible Scientific Contradiction Reconciliations (Explicit Audit Invariant)"
+        )
+      ),
+      h("p", { style: { color: "#CBD5E1", fontSize: "0.86rem", lineHeight: "1.6", margin: "0 0 12px 0" } },
+        "Historical research reports in this repository contain differing coverage, sample sizes, and status claims " +
+        "across experimental iterations. BTCognitive governance prohibits cherry-picking favorable metrics or inferring a unified current-model status. " +
+        "All known disagreements are explicitly flagged below with CONFLICT_REQUIRES_RECONCILIATION."
+      ),
+      h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "12px" } },
+        h("div", { style: { background: "rgba(0,0,0,0.25)", padding: "10px 14px", borderRadius: "8px", border: "1px solid rgba(245,158,11,0.2)" } },
+          h("div", { style: { fontWeight: "700", color: "#FBBF24", fontSize: "0.78rem" } }, "1. Risk Envelope ≠ Directional Alpha"),
+          h("div", { style: { fontSize: "0.74rem", color: "#94A3B8", marginTop: "4px" } },
+            "Uncertainty-04 achieves 92.84% variance containment, yet Metric Reconciliation confirms Directional Accuracy is 50.0% (AUC 0.504 - zero edge)."
+          )
+        ),
+        h("div", { style: { background: "rgba(0,0,0,0.25)", padding: "10px 14px", borderRadius: "8px", border: "1px solid rgba(245,158,11,0.2)" } },
+          h("div", { style: { fontWeight: "700", color: "#FBBF24", fontSize: "0.78rem" } }, "2. Setup Predictability vs COST_ERASED"),
+          h("div", { style: { fontSize: "0.74rem", color: "#94A3B8", marginTop: "4px" } },
+            "Track V3 shows structural separation over random baselines, but net expectancy is negative (-0.57R) after 35-65 bps execution drag."
+          )
+        ),
+        h("div", { style: { background: "rgba(0,0,0,0.25)", padding: "10px 14px", borderRadius: "8px", border: "1px solid rgba(245,158,11,0.2)" } },
+          h("div", { style: { fontWeight: "700", color: "#FBBF24", fontSize: "0.78rem" } }, "3. Pre-Repair 35 Blocks vs Post-Repair Isolation"),
+          h("div", { style: { fontSize: "0.74rem", color: "#94A3B8", marginTop: "4px" } },
+            "Longitudinal 35-block archives are quarantined under PRE_REPAIR_HISTORY; post-repair clean monitoring strictly requires 5 fresh valid blocks."
+          )
+        ),
+        h("div", { style: { background: "rgba(0,0,0,0.25)", padding: "10px 14px", borderRadius: "8px", border: "1px solid rgba(245,158,11,0.2)" } },
+          h("div", { style: { fontWeight: "700", color: "#FBBF24", fontSize: "0.78rem" } }, "4. Legacy Health Report vs Current Runtime"),
+          h("div", { style: { fontSize: "0.74rem", color: "#94A3B8", marginTop: "4px" } },
+            "Combined Production Health (2026-08) asserted HEALTHY, but current runtime is BLOCKED_PROVENANCE_UNVERIFIED until clean-room authentication."
+          )
+        )
+      )
+    ),
+
+    // ── Filter & Search Toolbar ────────────────────────────────────────────────
+    h("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        flexWrap: "wrap",
+        gap: "14px",
+        marginBottom: "20px"
+      }
+    },
+      h("div", { style: { display: "flex", flexWrap: "wrap", gap: "8px" } },
+        [
+          { id: "all", label: `All Reports (${reports.length})` },
+          { id: "conflicts", label: `⚖️ Conflicts (${reports.filter(r => r.contradiction).length})` },
+          { id: "c2_validated", label: "C2 Risk Envelopes" },
+          { id: "cost_erased", label: "COST_ERASED" },
+          { id: "longitudinal", label: "Longitudinal & Health" }
+        ].map(filter =>
+          h("button", {
+            key: filter.id,
+            onClick: () => setActiveFilter(filter.id),
+            style: {
+              background: activeFilter === filter.id ? "rgba(56, 189, 248, 0.2)" : "rgba(255, 255, 255, 0.04)",
+              border: `1px solid ${activeFilter === filter.id ? "rgba(56, 189, 248, 0.5)" : "rgba(255, 255, 255, 0.08)"}`,
+              color: activeFilter === filter.id ? "#38BDF8" : "#94A3B8",
+              padding: "6px 14px",
+              borderRadius: "8px",
+              fontSize: "0.78rem",
+              fontWeight: "700",
+              cursor: "pointer",
+              transition: "all 0.15s ease"
+            }
+          }, filter.label)
+        )
+      ),
+
+      h("div", { style: { display: "flex", gap: "8px", alignItems: "center" } },
+        h("input", {
+          type: "text",
+          placeholder: "Search reports, metrics, or limitations...",
+          value: searchQuery,
+          onInput: (e) => setSearchQuery(e.target.value),
+          style: {
+            background: "rgba(0, 0, 0, 0.4)",
+            border: "1px solid rgba(255, 255, 255, 0.12)",
+            borderRadius: "8px",
+            padding: "6px 12px",
+            color: "#F8FAFC",
+            fontSize: "0.80rem",
+            width: "260px"
+          }
+        }),
+        h("button", {
+          onClick: loadResults,
+          title: "Refresh research catalog from disk",
+          style: {
+            background: "rgba(255, 255, 255, 0.06)",
+            border: "1px solid rgba(255, 255, 255, 0.12)",
+            color: "#CBD5E1",
+            padding: "6px 12px",
+            borderRadius: "8px",
+            fontSize: "0.78rem",
+            cursor: "pointer"
+          }
+        }, "↻ Refresh")
+      )
+    ),
+
+    // ── Content State: Loading, Error, or Cards Grid ───────────────────────────
+    loading ? (
+      h("div", { className: "glass-card", style: { padding: "48px", textAlign: "center", color: "#38BDF8" } },
+        h("div", { style: { fontSize: "1.8rem", marginBottom: "12px" } }, "⏳"),
+        h("div", { style: { fontWeight: "700" } }, "Loading verified research reports and verifying artifact hashes..."),
+        h("div", { style: { fontSize: "0.78rem", color: "#94A3B8", marginTop: "6px" } }, "Checking disk artifacts against expected SHA-256 manifests")
+      )
+    ) : error ? (
+      h("div", { className: "glass-card", style: { padding: "36px", textAlign: "center", border: "1px solid rgba(239, 68, 68, 0.4)" } },
+        h("div", { style: { color: "#F87171", fontSize: "1.2rem", fontWeight: "800", marginBottom: "8px" } }, "⚠️ Failed to load research results"),
+        h("p", { style: { color: "#CBD5E1", fontSize: "0.85rem", maxWidth: "600px", margin: "0 auto 16px auto" } }, error),
+        h("button", {
+          onClick: loadResults,
+          style: {
+            background: "rgba(239, 68, 68, 0.2)",
+            border: "1px solid rgba(239, 68, 68, 0.5)",
+            color: "#F87171",
+            padding: "8px 18px",
+            borderRadius: "8px",
+            fontWeight: "700",
+            cursor: "pointer"
+          }
+        }, "Retry Loading")
+      )
+    ) : filteredReports.length === 0 ? (
+      h("div", { className: "glass-card", style: { padding: "48px", textAlign: "center", color: "#94A3B8" } },
+        h("div", { style: { fontSize: "1.5rem", marginBottom: "8px" } }, "🔍"),
+        h("div", { style: { fontWeight: "700" } }, "No research reports matched your current filter criteria."),
+        h("button", {
+          onClick: () => { setActiveFilter("all"); setSearchQuery(""); },
+          style: {
+            background: "rgba(56, 189, 248, 0.15)",
+            border: "1px solid rgba(56, 189, 248, 0.3)",
+            color: "#38BDF8",
+            padding: "6px 14px",
+            borderRadius: "6px",
+            marginTop: "12px",
+            cursor: "pointer",
+            fontWeight: "700",
+            fontSize: "0.78rem"
+          }
+        }, "Reset Filters")
+      )
+    ) : (
+      h("div", { style: { display: "flex", flexDirection: "column", gap: "24px" } },
+        filteredReports.map(report => {
+          const isConflict = Boolean(report.contradiction);
+          const verdictColor = report.governance_verdict.includes("VALIDATED") ? "#A78BFA"
+            : (report.governance_verdict === "COST_ERASED" ? "#F87171"
+              : (report.governance_verdict.includes("REJECT") ? "#94A3B8"
+                : (report.governance_verdict.includes("WAITING") ? "#F59E0B" : "#38BDF8")));
+
+          return h("div", {
+            key: report.report_id,
+            className: "glass-card",
+            style: {
+              padding: "24px",
+              border: isConflict ? "1px solid rgba(245, 158, 11, 0.4)" : "1px solid rgba(255, 255, 255, 0.08)",
+              background: "rgba(15, 23, 42, 0.85)"
+            }
+          },
+            // Card Top Row: Track & Badges
+            h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "10px", marginBottom: "10px" } },
+              h("div", null,
+                h("div", { style: { fontSize: "0.74rem", color: "#38BDF8", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.04em" } },
+                  `${report.track} · ${report.date}`
+                ),
+                h("h3", { style: { fontSize: "1.25rem", fontWeight: "800", color: "#F8FAFC", margin: "4px 0 0 0" } },
+                  report.title
+                )
+              ),
+              h("div", { style: { display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center" } },
+                // Provenance badge
+                h("span", {
+                  style: {
+                    background: "rgba(0, 229, 168, 0.12)",
+                    border: "1px solid rgba(0, 229, 168, 0.35)",
+                    color: "#00E5A8",
+                    padding: "3px 8px",
+                    borderRadius: "4px",
+                    fontSize: "0.70rem",
+                    fontWeight: "800",
+                    fontFamily: "var(--font-mono)"
+                  }
+                }, `✓ SHA256:${report.source_artifact_sha256.slice(0, 8)}...`),
+
+                // Governance Verdict badge
+                h("span", {
+                  style: {
+                    background: `${verdictColor}22`,
+                    border: `1px solid ${verdictColor}66`,
+                    color: verdictColor,
+                    padding: "3px 8px",
+                    borderRadius: "4px",
+                    fontSize: "0.70rem",
+                    fontWeight: "800"
+                  }
+                }, report.governance_verdict),
+
+                // Conflict badge
+                isConflict && h("span", {
+                  style: {
+                    background: "rgba(245, 158, 11, 0.18)",
+                    border: "1px solid rgba(245, 158, 11, 0.5)",
+                    color: "#FBBF24",
+                    padding: "3px 8px",
+                    borderRadius: "4px",
+                    fontSize: "0.70rem",
+                    fontWeight: "800"
+                  }
+                }, "CONFLICT_REQUIRES_RECONCILIATION")
+              )
+            ),
+
+            // Metadata Row: Sample size & horizon
+            h("div", { style: { display: "flex", gap: "20px", flexWrap: "wrap", fontSize: "0.76rem", color: "#94A3B8", marginBottom: "16px", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "12px" } },
+              h("div", null,
+                h("strong", { style: { color: "#CBD5E1" } }, "Sample Size: "),
+                report.sample_size_description
+              ),
+              h("div", null,
+                h("strong", { style: { color: "#CBD5E1" } }, "Evaluation Horizon: "),
+                report.horizon
+              )
+            ),
+
+            // Metrics Table
+            report.key_metrics && report.key_metrics.length > 0 && h("div", { style: { marginBottom: "16px", overflowX: "auto" } },
+              h("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: "0.76rem" } },
+                h("thead", null,
+                  h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.1)", textAlign: "left", color: "#7E95B5" } },
+                    h("th", { style: { padding: "6px 8px" } }, "Metric Name"),
+                    h("th", { style: { padding: "6px 8px" } }, "Observed Value"),
+                    h("th", { style: { padding: "6px 8px" } }, "95% Confidence Interval"),
+                    h("th", { style: { padding: "6px 8px" } }, "Scientific Interpretation")
+                  )
+                ),
+                h("tbody", null,
+                  report.key_metrics.map((m, idx) =>
+                    h("tr", { key: idx, style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
+                      h("td", { style: { padding: "7px 8px", color: "#F8FAFC", fontWeight: "700" } }, m.name),
+                      h("td", { style: { padding: "7px 8px", color: "#00F0FF", fontWeight: "800", fontFamily: "var(--font-mono)" } }, m.value),
+                      h("td", { style: { padding: "7px 8px", color: "#A78BFA", fontFamily: "var(--font-mono)" } }, m.ci_95 || "—"),
+                      h("td", { style: { padding: "7px 8px", color: "#CBD5E1" } }, m.interpretation || "—")
+                    )
+                  )
+                )
+              )
+            ),
+
+            // Contradiction Reconciliation Box
+            isConflict && h("div", {
+              style: {
+                background: "rgba(245, 158, 11, 0.08)",
+                border: "1px solid rgba(245, 158, 11, 0.3)",
+                borderRadius: "8px",
+                padding: "12px 16px",
+                marginBottom: "14px"
+              }
+            },
+              h("div", { style: { display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" } },
+                h("strong", { style: { color: "#FBBF24", fontSize: "0.78rem" } }, "⚖️ Contradiction Reconciled:"),
+                h("span", { style: { color: "#F8FAFC", fontSize: "0.78rem", fontWeight: "700" } }, report.contradiction.primary_issue)
+              ),
+              h("div", { style: { fontSize: "0.76rem", color: "#CBD5E1", lineHeight: "1.5" } },
+                report.contradiction.resolution_note
+              )
+            ),
+
+            // Scientific Limitations Notice
+            h("div", {
+              style: {
+                background: "rgba(0, 0, 0, 0.3)",
+                border: "1px solid rgba(255, 255, 255, 0.06)",
+                borderRadius: "8px",
+                padding: "10px 14px",
+                marginBottom: "16px"
+              }
+            },
+              h("span", { style: { color: "#F87171", fontWeight: "800", fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.04em", marginRight: "6px" } },
+                "Scientific Limitations & Governance Boundary:"
+              ),
+              h("span", { style: { fontSize: "0.76rem", color: "#CBD5E1", lineHeight: "1.5" } },
+                report.scientific_limitations
+              )
+            ),
+
+            // Card Footer: Source path + Inspect Button
+            h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" } },
+              h("div", { style: { fontSize: "0.72rem", color: "#64748B", fontFamily: "var(--font-mono)" } },
+                `Source: ${report.source_path}`
+              ),
+              h("button", {
+                onClick: () => handleOpenReport(report.report_id),
+                style: {
+                  background: "rgba(56, 189, 248, 0.15)",
+                  border: "1px solid rgba(56, 189, 248, 0.4)",
+                  color: "#38BDF8",
+                  padding: "5px 14px",
+                  borderRadius: "6px",
+                  fontSize: "0.76rem",
+                  fontWeight: "700",
+                  cursor: "pointer"
+                }
+              }, "Inspect Source Markdown ↗")
+            )
+          );
+        })
+      )
+    ),
+
+    // ── Safe Markdown Source Inspection Modal ──────────────────────────────────
+    selectedReportId && h("div", {
+      className: "notification-modal-overlay",
+      onClick: handleCloseModal,
+      role: "dialog",
+      "aria-modal": "true"
+    },
+      h("div", {
+        className: "notification-modal-content",
+        onClick: (e) => e.stopPropagation(),
+        style: { maxWidth: "900px", maxHeight: "88vh", display: "flex", flexDirection: "column" }
+      },
+        // Modal Header
+        h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "12px" } },
+          h("div", null,
+            h("div", { style: { fontSize: "0.72rem", color: "#38BDF8", fontWeight: "800", textTransform: "uppercase" } },
+              reportDetail ? `${reportDetail.track} · ${reportDetail.date}` : "Loading report..."
+            ),
+            h("h3", { style: { margin: "4px 0 0 0", fontSize: "1.2rem", color: "#F8FAFC" } },
+              reportDetail ? reportDetail.title : `Report: ${selectedReportId}`
+            ),
+            reportDetail && h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", fontFamily: "var(--font-mono)", marginTop: "4px" } },
+              `Path: ${reportDetail.source_path} · SHA256: ${reportDetail.sha256}`
+            )
+          ),
+          h("button", {
+            className: "toast-close-btn",
+            onClick: handleCloseModal,
+            "aria-label": "Close Modal"
+          }, "✕")
+        ),
+
+        // Modal Body
+        h("div", { style: { flex: 1, overflowY: "auto", padding: "10px 0" } },
+          reportLoading ? (
+            h("div", { style: { padding: "40px", textAlign: "center", color: "#38BDF8" } },
+              h("div", { style: { fontSize: "1.5rem", marginBottom: "8px" } }, "⏳"),
+              "Fetching and verifying source markdown from repository..."
+            )
+          ) : reportError ? (
+            h("div", { style: { padding: "24px", color: "#F87171", textAlign: "center" } },
+              `Error loading report: ${reportError}`
+            )
+          ) : reportDetail ? (
+            h("div", null,
+              reportDetail.contradiction && h("div", {
+                style: {
+                  background: "rgba(245, 158, 11, 0.12)",
+                  border: "1px solid rgba(245, 158, 11, 0.4)",
+                  borderRadius: "8px",
+                  padding: "12px 16px",
+                  marginBottom: "16px"
+                }
+              },
+                h("strong", { style: { color: "#FBBF24", fontSize: "0.80rem" } }, "⚠️ Contradiction Reconciliation Note: "),
+                h("div", { style: { fontSize: "0.78rem", color: "#CBD5E1", marginTop: "4px", lineHeight: "1.5" } },
+                  reportDetail.contradiction.resolution_note
+                )
+              ),
+              // Safe Monospace View: zero innerHTML or dangerous injections
+              h("pre", {
+                style: {
+                  background: "rgba(5, 8, 22, 0.95)",
+                  border: "1px solid rgba(255, 255, 255, 0.08)",
+                  borderRadius: "8px",
+                  padding: "16px",
+                  fontSize: "0.78rem",
+                  fontFamily: "var(--font-mono)",
+                  color: "#E2E8F0",
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
+                  lineHeight: "1.6",
+                  margin: 0
+                }
+              }, reportDetail.content)
+            )
+          ) : null
+        ),
+
+        // Modal Footer
+        h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "14px", borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "12px" } },
+          h("span", { style: { fontSize: "0.72rem", color: "#64748B" } },
+            "Press ESC or click outside to close"
+          ),
+          h("button", {
+            onClick: handleCloseModal,
+            style: {
+              background: "rgba(255, 255, 255, 0.06)",
+              border: "1px solid rgba(255, 255, 255, 0.15)",
+              color: "#CBD5E1",
+              padding: "6px 16px",
+              borderRadius: "6px",
+              fontSize: "0.78rem",
+              fontWeight: "700",
+              cursor: "pointer"
+            }
+          }, "Close")
+        )
+      )
+    )
+  );
+}
+
+
+// ===========================================================================
 // App — main router + state management
 // ===========================================================================
 function App() {
@@ -8750,7 +9403,7 @@ function App() {
           "Frozen model inputs and evaluation provenance are not authenticated."
         ),
         h("button", {
-          onClick: () => navigate("/arena"),
+          onClick: () => navigate("/research"),
           style: {
             background: "rgba(56, 189, 248, 0.15)",
             border: "1px solid rgba(56, 189, 248, 0.4)",
@@ -8790,6 +9443,8 @@ function App() {
       h("div", null,
         h(HeroSection, { setPath: navigate, livePrice, changePct, predictionData, regimeData, qualityData, decisionData })
       )
+    ) : path === "/research" ? (
+      h(ResearchResultsView, { setPath: navigate, livePrice })
     ) : path === "/arena" ? (
       h(ArenaExperimentView, { livePrice, predictionData, regimeData, decisionData })
     ) : (

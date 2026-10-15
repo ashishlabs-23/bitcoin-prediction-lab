@@ -223,6 +223,12 @@ const api = {
     const headers = {};
     if (adminKey) headers["X-API-Key"] = adminKey;
     return resilientFetch(`${getApiBaseUrl()}/api/arena/reset`, { method: "POST", headers }, 0);
+  },
+  async fetchResearchResults() {
+    return resilientFetch(`${getApiBaseUrl()}/api/research/results`);
+  },
+  async fetchResearchReport(reportId) {
+    return resilientFetch(`${getApiBaseUrl()}/api/research/reports/${encodeURIComponent(reportId)}`);
   }
 };
 
