@@ -1,0 +1,683 @@
+{
+  "audit_timestamp": "2026-10-15T17:57:44.923849+00:00",
+  "total_historical_bars": 40902,
+  "date_range": {
+    "start": "2022-01-01 00:00:00+00:00",
+    "end": "2026-09-01 06:00:00+00:00"
+  },
+  "target_accuracy_claim": ">= 70.0% Directional Accuracy",
+  "horizons_audited": {
+    "1H": {
+      "Majority_Class_Baseline": {
+        "n_evaluated": 33919,
+        "n_effective": 35181.6,
+        "accuracy": 50.4,
+        "ci_95": [
+          49.87,
+          50.93
+        ],
+        "balanced_accuracy": 50.0,
+        "roc_auc": 0.4973,
+        "brier_score": 0.25,
+        "log_loss": 0.6931,
+        "test_p_less_70": 0.0,
+        "test_p_greater_50": 0.07131977525573022,
+        "trading": {
+          "win_rate": 50.4,
+          "mean_net_return_base_bps": -34.8,
+          "mean_net_return_cons_bps": -64.8
+        },
+        "regime_accuracy": {
+          "TRENDING_BULL": {
+            "count": 13775,
+            "accuracy": 0.4883484573502722
+          },
+          "TRENDING_BEAR": {
+            "count": 12486,
+            "accuracy": 0.5180201826045171
+          },
+          "RANGING_SIDEWAYS": {
+            "count": 7658,
+            "accuracy": 0.5092713502219901
+          }
+        }
+      },
+      "Momentum_Persistence": {
+        "n_evaluated": 33919,
+        "n_effective": 35181.6,
+        "accuracy": 47.09,
+        "ci_95": [
+          46.56,
+          47.63
+        ],
+        "balanced_accuracy": 47.08,
+        "roc_auc": 0.4708,
+        "brier_score": 0.5291,
+        "log_loss": 7.3092,
+        "test_p_less_70": 0.0,
+        "test_p_greater_50": 1.0,
+        "trading": {
+          "win_rate": 47.09,
+          "mean_net_return_base_bps": -35.6,
+          "mean_net_return_cons_bps": -65.6
+        },
+        "regime_accuracy": {
+          "TRENDING_BULL": {
+            "count": 13775,
+            "accuracy": 0.46823956442831216
+          },
+          "TRENDING_BEAR": {
+            "count": 12486,
+            "accuracy": 0.47445138555181804
+          },
+          "RANGING_SIDEWAYS": {
+            "count": 7658,
+            "accuracy": 0.47009663097414467
+          }
+        }
+      },
+      "Logistic_Regression_L2": {
+        "n_evaluated": 33919,
+        "n_effective": 35181.6,
+        "accuracy": 52.74,
+        "ci_95": [
+          52.21,
+          53.27
+        ],
+        "balanced_accuracy": 52.67,
+        "roc_auc": 0.5417,
+        "brier_score": 0.2488,
+        "log_loss": 0.6907,
+        "test_p_less_70": 0.0,
+        "test_p_greater_50": 3.029185623691865e-24,
+        "trading": {
+          "win_rate": 52.74,
+          "mean_net_return_base_bps": -35.1,
+          "mean_net_return_cons_bps": -65.1
+        },
+        "regime_accuracy": {
+          "TRENDING_BULL": {
+            "count": 13775,
+            "accuracy": 0.5218148820326679
+          },
+          "TRENDING_BEAR": {
+            "count": 12486,
+            "accuracy": 0.5337978535960276
+          },
+          "RANGING_SIDEWAYS": {
+            "count": 7658,
+            "accuracy": 0.5270305562810134
+          }
+        }
+      },
+      "Random_Forest": {
+        "n_evaluated": 33919,
+        "n_effective": 35181.6,
+        "accuracy": 53.25,
+        "ci_95": [
+          52.72,
+          53.78
+        ],
+        "balanced_accuracy": 53.21,
+        "roc_auc": 0.5448,
+        "brier_score": 0.2485,
+        "log_loss": 0.6902,
+        "test_p_less_70": 0.0,
+        "test_p_greater_50": 2.8625983406235917e-33,
+        "trading": {
+          "win_rate": 53.25,
+          "mean_net_return_base_bps": -34.9,
+          "mean_net_return_cons_bps": -64.9
+        },
+        "regime_accuracy": {
+          "TRENDING_BULL": {
+            "count": 13775,
+            "accuracy": 0.5347368421052632
+          },
+          "TRENDING_BEAR": {
+            "count": 12486,
+            "accuracy": 0.5343584814992792
+          },
+          "RANGING_SIDEWAYS": {
+            "count": 7658,
+            "accuracy": 0.5253329851136067
+          }
+        }
+      },
+      "Gradient_Boosting": {
+        "n_evaluated": 33919,
+        "n_effective": 35181.6,
+        "accuracy": 53.3,
+        "ci_95": [
+          52.77,
+          53.83
+        ],
+        "balanced_accuracy": 53.28,
+        "roc_auc": 0.5435,
+        "brier_score": 0.249,
+        "log_loss": 0.6913,
+        "test_p_less_70": 0.0,
+        "test_p_greater_50": 3.0395693762165934e-34,
+        "trading": {
+          "win_rate": 53.3,
+          "mean_net_return_base_bps": -34.6,
+          "mean_net_return_cons_bps": -64.6
+        },
+        "regime_accuracy": {
+          "TRENDING_BULL": {
+            "count": 13775,
+            "accuracy": 0.534010889292196
+          },
+          "TRENDING_BEAR": {
+            "count": 12486,
+            "accuracy": 0.5341182123978856
+          },
+          "RANGING_SIDEWAYS": {
+            "count": 7658,
+            "accuracy": 0.5292504570383912
+          }
+        }
+      },
+      "Selective_Prediction_Gradient_Boosting": {
+        "coverage_100pct": {
+          "active_trades": 33919,
+          "empirical_coverage_pct": 100.0,
+          "accuracy": 53.3,
+          "ci_95": [
+            52.77,
+            53.83
+          ],
+          "mean_net_return_base_bps": -34.6
+        },
+        "coverage_50pct": {
+          "active_trades": 16960,
+          "empirical_coverage_pct": 50.0,
+          "accuracy": 54.98,
+          "ci_95": [
+            54.23,
+            55.73
+          ],
+          "mean_net_return_base_bps": -34.6
+        },
+        "coverage_25pct": {
+          "active_trades": 8482,
+          "empirical_coverage_pct": 25.01,
+          "accuracy": 55.87,
+          "ci_95": [
+            54.81,
+            56.93
+          ],
+          "mean_net_return_base_bps": -33.9
+        },
+        "coverage_10pct": {
+          "active_trades": 3392,
+          "empirical_coverage_pct": 10.0,
+          "accuracy": 57.05,
+          "ci_95": [
+            55.37,
+            58.7
+          ],
+          "mean_net_return_base_bps": -32.2
+        },
+        "coverage_5pct": {
+          "active_trades": 1696,
+          "empirical_coverage_pct": 5.0,
+          "accuracy": 56.19,
+          "ci_95": [
+            53.82,
+            58.54
+          ],
+          "mean_net_return_base_bps": -32.9
+        }
+      }
+    },
+    "4H": {
+      "Majority_Class_Baseline": {
+        "n_evaluated": 33916,
+        "n_effective": 4970.1,
+        "accuracy": 50.6,
+        "ci_95": [
+          50.07,
+          51.14
+        ],
+        "balanced_accuracy": 50.08,
+        "roc_auc": 0.4963,
+        "brier_score": 0.25,
+        "log_loss": 0.6931,
+        "test_p_less_70": 0.0,
+        "test_p_greater_50": 0.013179528157576226,
+        "trading": {
+          "win_rate": 50.6,
+          "mean_net_return_base_bps": -34.0,
+          "mean_net_return_cons_bps": -64.0
+        },
+        "regime_accuracy": {
+          "TRENDING_BULL": {
+            "count": 13772,
+            "accuracy": 0.48562300319488816
+          },
+          "TRENDING_BEAR": {
+            "count": 12486,
+            "accuracy": 0.5302739067755886
+          },
+          "RANGING_SIDEWAYS": {
+            "count": 7658,
+            "accuracy": 0.5032645599373204
+          }
+        }
+      },
+      "Momentum_Persistence": {
+        "n_evaluated": 33916,
+        "n_effective": 4970.1,
+        "accuracy": 46.93,
+        "ci_95": [
+          46.4,
+          47.46
+        ],
+        "balanced_accuracy": 46.91,
+        "roc_auc": 0.4691,
+        "brier_score": 0.5307,
+        "log_loss": 7.3318,
+        "test_p_less_70": 0.0,
+        "test_p_greater_50": 1.0,
+        "trading": {
+          "win_rate": 46.92,
+          "mean_net_return_base_bps": -35.6,
+          "mean_net_return_cons_bps": -65.6
+        },
+        "regime_accuracy": {
+          "TRENDING_BULL": {
+            "count": 13772,
+            "accuracy": 0.4738600058088876
+          },
+          "TRENDING_BEAR": {
+            "count": 12486,
+            "accuracy": 0.45466922953708155
+          },
+          "RANGING_SIDEWAYS": {
+            "count": 7658,
+            "accuracy": 0.48498302428832596
+          }
+        }
+      },
+      "Logistic_Regression_L2": {
+        "n_evaluated": 33916,
+        "n_effective": 4970.1,
+        "accuracy": 52.96,
+        "ci_95": [
+          52.43,
+          53.49
+        ],
+        "balanced_accuracy": 52.91,
+        "roc_auc": 0.5368,
+        "brier_score": 0.2493,
+        "log_loss": 0.6919,
+        "test_p_less_70": 0.0,
+        "test_p_greater_50": 5.051406174011057e-28,
+        "trading": {
+          "win_rate": 52.96,
+          "mean_net_return_base_bps": -35.4,
+          "mean_net_return_cons_bps": -65.4
+        },
+        "regime_accuracy": {
+          "TRENDING_BULL": {
+            "count": 13772,
+            "accuracy": 0.5290444379901249
+          },
+          "TRENDING_BEAR": {
+            "count": 12486,
+            "accuracy": 0.5411661060387634
+          },
+          "RANGING_SIDEWAYS": {
+            "count": 7658,
+            "accuracy": 0.5118829981718465
+          }
+        }
+      },
+      "Random_Forest": {
+        "n_evaluated": 33916,
+        "n_effective": 4970.1,
+        "accuracy": 52.64,
+        "ci_95": [
+          52.11,
+          53.18
+        ],
+        "balanced_accuracy": 52.68,
+        "roc_auc": 0.5392,
+        "brier_score": 0.249,
+        "log_loss": 0.6911,
+        "test_p_less_70": 0.0,
+        "test_p_greater_50": 1.0360829841745717e-22,
+        "trading": {
+          "win_rate": 52.64,
+          "mean_net_return_base_bps": -35.3,
+          "mean_net_return_cons_bps": -65.3
+        },
+        "regime_accuracy": {
+          "TRENDING_BULL": {
+            "count": 13772,
+            "accuracy": 0.5289718268951495
+          },
+          "TRENDING_BEAR": {
+            "count": 12486,
+            "accuracy": 0.5370014416146084
+          },
+          "RANGING_SIDEWAYS": {
+            "count": 7658,
+            "accuracy": 0.5047009663097415
+          }
+        }
+      },
+      "Gradient_Boosting": {
+        "n_evaluated": 33916,
+        "n_effective": 4970.1,
+        "accuracy": 52.54,
+        "ci_95": [
+          52.01,
+          53.07
+        ],
+        "balanced_accuracy": 52.55,
+        "roc_auc": 0.5329,
+        "brier_score": 0.251,
+        "log_loss": 0.6956,
+        "test_p_less_70": 0.0,
+        "test_p_greater_50": 4.069366341070786e-21,
+        "trading": {
+          "win_rate": 52.54,
+          "mean_net_return_base_bps": -34.3,
+          "mean_net_return_cons_bps": -64.3
+        },
+        "regime_accuracy": {
+          "TRENDING_BULL": {
+            "count": 13772,
+            "accuracy": 0.5272291606157421
+          },
+          "TRENDING_BEAR": {
+            "count": 12486,
+            "accuracy": 0.5349191094025308
+          },
+          "RANGING_SIDEWAYS": {
+            "count": 7658,
+            "accuracy": 0.5066597022721337
+          }
+        }
+      },
+      "Selective_Prediction_Gradient_Boosting": {
+        "coverage_100pct": {
+          "active_trades": 33916,
+          "empirical_coverage_pct": 100.0,
+          "accuracy": 52.54,
+          "ci_95": [
+            52.01,
+            53.07
+          ],
+          "mean_net_return_base_bps": -34.3
+        },
+        "coverage_50pct": {
+          "active_trades": 16958,
+          "empirical_coverage_pct": 50.0,
+          "accuracy": 53.76,
+          "ci_95": [
+            53.01,
+            54.51
+          ],
+          "mean_net_return_base_bps": -34.2
+        },
+        "coverage_25pct": {
+          "active_trades": 8479,
+          "empirical_coverage_pct": 25.0,
+          "accuracy": 54.86,
+          "ci_95": [
+            53.8,
+            55.92
+          ],
+          "mean_net_return_base_bps": -33.1
+        },
+        "coverage_10pct": {
+          "active_trades": 3394,
+          "empirical_coverage_pct": 10.01,
+          "accuracy": 53.03,
+          "ci_95": [
+            51.35,
+            54.71
+          ],
+          "mean_net_return_base_bps": -35.7
+        },
+        "coverage_5pct": {
+          "active_trades": 1696,
+          "empirical_coverage_pct": 5.0,
+          "accuracy": 53.01,
+          "ci_95": [
+            50.63,
+            55.37
+          ],
+          "mean_net_return_base_bps": -38.0
+        }
+      }
+    },
+    "24H": {
+      "Majority_Class_Baseline": {
+        "n_evaluated": 33900,
+        "n_effective": 741.7,
+        "accuracy": 49.72,
+        "ci_95": [
+          49.19,
+          50.25
+        ],
+        "balanced_accuracy": 49.31,
+        "roc_auc": 0.4925,
+        "brier_score": 0.2503,
+        "log_loss": 0.6938,
+        "test_p_less_70": 0.0,
+        "test_p_greater_50": 0.8502182256933664,
+        "trading": {
+          "win_rate": 49.72,
+          "mean_net_return_base_bps": -41.7,
+          "mean_net_return_cons_bps": -71.7
+        },
+        "regime_accuracy": {
+          "TRENDING_BULL": {
+            "count": 13763,
+            "accuracy": 0.5142047518709584
+          },
+          "TRENDING_BEAR": {
+            "count": 12488,
+            "accuracy": 0.48006085842408713
+          },
+          "RANGING_SIDEWAYS": {
+            "count": 7649,
+            "accuracy": 0.4945744541770166
+          }
+        }
+      },
+      "Momentum_Persistence": {
+        "n_evaluated": 33900,
+        "n_effective": 741.7,
+        "accuracy": 47.74,
+        "ci_95": [
+          47.21,
+          48.27
+        ],
+        "balanced_accuracy": 47.65,
+        "roc_auc": 0.4765,
+        "brier_score": 0.5226,
+        "log_loss": 7.2203,
+        "test_p_less_70": 0.0,
+        "test_p_greater_50": 1.0,
+        "trading": {
+          "win_rate": 47.74,
+          "mean_net_return_base_bps": -29.9,
+          "mean_net_return_cons_bps": -59.9
+        },
+        "regime_accuracy": {
+          "TRENDING_BULL": {
+            "count": 13763,
+            "accuracy": 0.4886289326454988
+          },
+          "TRENDING_BEAR": {
+            "count": 12488,
+            "accuracy": 0.45019218449711723
+          },
+          "RANGING_SIDEWAYS": {
+            "count": 7649,
+            "accuracy": 0.501503464505164
+          }
+        }
+      },
+      "Logistic_Regression_L2": {
+        "n_evaluated": 33900,
+        "n_effective": 741.7,
+        "accuracy": 50.49,
+        "ci_95": [
+          49.96,
+          51.02
+        ],
+        "balanced_accuracy": 50.56,
+        "roc_auc": 0.5066,
+        "brier_score": 0.2525,
+        "log_loss": 0.6983,
+        "test_p_less_70": 0.0,
+        "test_p_greater_50": 0.03525519792565343,
+        "trading": {
+          "win_rate": 50.49,
+          "mean_net_return_base_bps": -42.9,
+          "mean_net_return_cons_bps": -72.9
+        },
+        "regime_accuracy": {
+          "TRENDING_BULL": {
+            "count": 13763,
+            "accuracy": 0.5070842112911429
+          },
+          "TRENDING_BEAR": {
+            "count": 12488,
+            "accuracy": 0.5080076873798847
+          },
+          "RANGING_SIDEWAYS": {
+            "count": 7649,
+            "accuracy": 0.49601255066021704
+          }
+        }
+      },
+      "Random_Forest": {
+        "n_evaluated": 33900,
+        "n_effective": 741.7,
+        "accuracy": 50.53,
+        "ci_95": [
+          50.0,
+          51.06
+        ],
+        "balanced_accuracy": 50.64,
+        "roc_auc": 0.5109,
+        "brier_score": 0.2544,
+        "log_loss": 0.7025,
+        "test_p_less_70": 0.0,
+        "test_p_greater_50": 0.02625243487481695,
+        "trading": {
+          "win_rate": 50.53,
+          "mean_net_return_base_bps": -42.8,
+          "mean_net_return_cons_bps": -72.8
+        },
+        "regime_accuracy": {
+          "TRENDING_BULL": {
+            "count": 13763,
+            "accuracy": 0.5075201627552133
+          },
+          "TRENDING_BEAR": {
+            "count": 12488,
+            "accuracy": 0.5064061499039078
+          },
+          "RANGING_SIDEWAYS": {
+            "count": 7649,
+            "accuracy": 0.4994116878023271
+          }
+        }
+      },
+      "Gradient_Boosting": {
+        "n_evaluated": 33900,
+        "n_effective": 741.7,
+        "accuracy": 50.4,
+        "ci_95": [
+          49.87,
+          50.94
+        ],
+        "balanced_accuracy": 50.46,
+        "roc_auc": 0.5066,
+        "brier_score": 0.2598,
+        "log_loss": 0.7156,
+        "test_p_less_70": 0.0,
+        "test_p_greater_50": 0.0690721716477845,
+        "trading": {
+          "win_rate": 50.4,
+          "mean_net_return_base_bps": -41.9,
+          "mean_net_return_cons_bps": -71.9
+        },
+        "regime_accuracy": {
+          "TRENDING_BULL": {
+            "count": 13763,
+            "accuracy": 0.5017801351449539
+          },
+          "TRENDING_BEAR": {
+            "count": 12488,
+            "accuracy": 0.517296604740551
+          },
+          "RANGING_SIDEWAYS": {
+            "count": 7649,
+            "accuracy": 0.4864688194535233
+          }
+        }
+      },
+      "Selective_Prediction_Gradient_Boosting": {
+        "coverage_100pct": {
+          "active_trades": 33900,
+          "empirical_coverage_pct": 100.0,
+          "accuracy": 50.4,
+          "ci_95": [
+            49.87,
+            50.94
+          ],
+          "mean_net_return_base_bps": -41.9
+        },
+        "coverage_50pct": {
+          "active_trades": 16954,
+          "empirical_coverage_pct": 50.01,
+          "accuracy": 50.38,
+          "ci_95": [
+            49.63,
+            51.14
+          ],
+          "mean_net_return_base_bps": -47.5
+        },
+        "coverage_25pct": {
+          "active_trades": 8475,
+          "empirical_coverage_pct": 25.0,
+          "accuracy": 50.47,
+          "ci_95": [
+            49.4,
+            51.53
+          ],
+          "mean_net_return_base_bps": -51.3
+        },
+        "coverage_10pct": {
+          "active_trades": 3411,
+          "empirical_coverage_pct": 10.06,
+          "accuracy": 54.03,
+          "ci_95": [
+            52.35,
+            55.7
+          ],
+          "mean_net_return_base_bps": -37.7
+        },
+        "coverage_5pct": {
+          "active_trades": 1696,
+          "empirical_coverage_pct": 5.0,
+          "accuracy": 53.3,
+          "ci_95": [
+            50.92,
+            55.67
+          ],
+          "mean_net_return_base_bps": -48.8
+        }
+      }
+    }
+  }
+}
