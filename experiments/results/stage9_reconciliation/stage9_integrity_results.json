@@ -1,0 +1,149 @@
+{
+  "timestamp": "2026-10-16T10:05:14.803401+00:00",
+  "stage_git_commit": "50e362e6d92a20a13cd17ac1258c70107ca805af",
+  "production_model_state": {
+    "authorized_production_model": "HAR-RS-DOW-v1.0",
+    "model_type": "volatility_range",
+    "authorization_status": "AUTHORIZED_FOR_PRODUCTION",
+    "directional_research_baseline": "directional-gbm-4lag-v1",
+    "directional_authorization_status": "OFFLINE_RESEARCH_ONLY"
+  },
+  "runtime_dependency_iv7d_audit": {
+    "dependency": "data/raw/iv7d.parquet",
+    "classification": "RESEARCH_BENCHMARK",
+    "is_runtime_inference": false,
+    "origin": "Historical VOL-EDGE-01 benchmark evaluation",
+    "active_model_requirement": "HAR-RS-DOW-v1.0 requires ONLY ohlcv.parquet; zero IV features in active schema",
+    "startup_gate_impact": "Fail-closed startup gate checks only runtime inference dependencies; missing iv7d.parquet does not block runtime"
+  },
+  "baseline_reconciliation": {
+    "stage6_total_bars": 40702,
+    "stage8_total_bars": 40730,
+    "stage6_test_bars": 33919,
+    "stage8_test_bars": 33942,
+    "common_test_bars": 33916,
+    "prediction_agreement_pct": 97.76,
+    "reported_stage6_accuracy": 53.28,
+    "reported_stage8_accuracy": 53.13,
+    "common_slice_stage6_accuracy": 53.28,
+    "common_slice_stage8_accuracy": 53.13,
+    "root_cause_explanation": "Discrepancy (53.28% vs 53.13%) is entirely explained by two preprocessing differences: 1. Feature lookback warm-up: Stage 6 required 200 hours (for sma_ratio_200), starting 2022-01-09 07:00. Stage 8 required only 168 hours (ret_168h), starting 31 hours earlier on 2022-01-08 00:00. 2. Forward target trimming: Stage 8 dropped 4 trailing bars for fwd_ret_4h vs 1 bar in Stage 6. These 28 extra rows shifted the PurgedWalkForwardSplit 5-fold boundary indices by 5 bars per fold, causing greedy tree splits to yield 97.76% identical predictions with a 0.15% sample variation."
+  },
+  "cost_model_reconciliation": {
+    "reconciliation_table": [
+      {
+        "coverage_tier": "100pct",
+        "turnover_transitions_per_bar": 0.764,
+        "mean_gross_return_bps": 0.07,
+        "reported_net_inst_14bps": -5.28,
+        "audited_correct_net_inst_14bps": -5.28,
+        "institutional_discrepancy_bps": 0.0,
+        "reported_net_retail_35bps": -13.31,
+        "audited_correct_net_retail_35bps": -13.3,
+        "retail_discrepancy_bps": 0.01
+      },
+      {
+        "coverage_tier": "50pct",
+        "turnover_transitions_per_bar": 1.133,
+        "mean_gross_return_bps": 0.36,
+        "reported_net_inst_14bps": -4.5,
+        "audited_correct_net_inst_14bps": -7.57,
+        "institutional_discrepancy_bps": -3.07,
+        "reported_net_retail_35bps": -11.79,
+        "audited_correct_net_retail_35bps": -19.47,
+        "retail_discrepancy_bps": -7.68
+      },
+      {
+        "coverage_tier": "25pct",
+        "turnover_transitions_per_bar": 1.422,
+        "mean_gross_return_bps": 0.84,
+        "reported_net_inst_14bps": -4.52,
+        "audited_correct_net_inst_14bps": -9.11,
+        "institutional_discrepancy_bps": -4.59,
+        "reported_net_retail_35bps": -12.57,
+        "audited_correct_net_retail_35bps": -24.04,
+        "retail_discrepancy_bps": -11.47
+      },
+      {
+        "coverage_tier": "10pct",
+        "turnover_transitions_per_bar": 1.579,
+        "mean_gross_return_bps": 0.36,
+        "reported_net_inst_14bps": -5.26,
+        "audited_correct_net_inst_14bps": -10.69,
+        "institutional_discrepancy_bps": -5.43,
+        "reported_net_retail_35bps": -13.7,
+        "audited_correct_net_retail_35bps": -27.27,
+        "retail_discrepancy_bps": -13.57
+      },
+      {
+        "coverage_tier": "5pct",
+        "turnover_transitions_per_bar": 1.708,
+        "mean_gross_return_bps": 1.41,
+        "reported_net_inst_14bps": -4.64,
+        "audited_correct_net_inst_14bps": -10.55,
+        "institutional_discrepancy_bps": -5.91,
+        "reported_net_retail_35bps": -13.73,
+        "audited_correct_net_retail_35bps": -28.48,
+        "retail_discrepancy_bps": -14.75
+      }
+    ],
+    "audit_finding": "CRITICAL FLAW DISCOVERED: In Stage 6, 7, and 8, selective prediction simulations incremented the 'total_transitions' counter when moving from an active position to cash in the 'else' block, but appended to 'net_returns' ONLY in the 'if' (active) block. Consequently, the 7 bps exit fee for closing positions into cash was silently dropped from the mean net return calculation! At 5% coverage, true net institutional return is -10.55 bps/bar (not -4.64 bps), and true retail net return is -28.48 bps/bar (not -13.73 bps). Selective trading is far more unprofitable than previously reported."
+  },
+  "funding_causal_audit": {
+    "total_funding_records": 5113,
+    "minute_distribution": {
+      "0": 5113
+    },
+    "second_distribution": {
+      "0": 5113
+    },
+    "settlement_hours": [
+      0,
+      8,
+      16
+    ],
+    "causal_assessment": "Binance funding timestamps settle at exactly 00:00:00.00x, 08:00:00.00x, and 16:00:00.00x UTC. Because ohlcv.parquet 'timestamp' represents the candle open time and 'available_time' represents candle close, a merge_asof(direction='backward') matching candle open timestamp t against settlement timestamp <= t ensures that the funding rate from hour t is only evaluated after the candle closes at t + 1 hour. Zero lookahead leakage occurred in Stage 8."
+  },
+  "primary_experiment_deadzone": {
+    "hypothesis": "H_deadzone: Filtering micro-noise improves directional predictability on significant moves.",
+    "sample_size_all": 33945,
+    "sample_size_significant": 20965,
+    "significant_coverage_pct": 61.76,
+    "baseline_gbdt": {
+      "accuracy_all_bars_pct": 53.13,
+      "accuracy_significant_moves_pct": 53.4,
+      "roc_auc_all": 0.5446,
+      "roc_auc_significant": 0.5498,
+      "economics": {
+        "gross_bps": 0.06,
+        "turnover_rate": 0.764,
+        "net_inst_14bps": -5.28,
+        "net_retail_35bps": -13.31
+      }
+    },
+    "deadzone_challenger": {
+      "accuracy_all_bars_pct": 53.08,
+      "accuracy_significant_moves_pct": 53.47,
+      "roc_auc_all": 0.544,
+      "roc_auc_significant": 0.5489,
+      "economics": {
+        "gross_bps": 0.22,
+        "turnover_rate": 0.747,
+        "net_inst_14bps": -5.01,
+        "net_retail_35bps": -12.86
+      },
+      "paired_diff_significant": {
+        "delta_pct": 0.07,
+        "bootstrap_95_ci": [
+          -0.28,
+          0.42
+        ],
+        "bootstrap_p_val": 0.6838,
+        "mcnemar_stat": 0.1383,
+        "mcnemar_p_val": 0.71,
+        "statistically_significant": false
+      }
+    },
+    "verdict": "On all bars, Baseline achieves 53.13% vs Deadzone Challenger 53.08%. On significant moves (|r| >= tau, N=20,965, 61.76%), Baseline achieves 53.4% vs Deadzone Challenger 53.47% (delta = +0.07%, 95% CI: [-0.28%, 0.42%], p = 0.6838). Conclusion: Removing micro-noise from the training target does not improve directional accuracy on significant moves. The 53.3% barrier reflects an informational boundary of price lags rather than target noise."
+  }
+}

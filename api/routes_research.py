@@ -21,6 +21,7 @@ Security & Architectural Invariants:
 """
 
 import os
+import json
 import hashlib
 import re
 from typing import Dict, List, Any, Optional
@@ -571,6 +572,285 @@ REPORT_REGISTRY: Dict[str, Dict[str, Any]] = {
                 "gains. Simulated arena returns must not be confused with executable production performance."
             )
         }
+    },
+    "stage2-audit": {
+        "title": "Stage 2: Application Necessity and Accuracy Improvement Plan",
+        "track": "Application Architecture & Necessity Audit",
+        "date": "2026-10-15",
+        "relative_path": "research/reports/application_necessity_and_accuracy_improvement_plan.md",
+        "expected_sha256": "3fbbc21c466a2246c66ec4744f9cd947a8b4c8cc772d62244d75e9f7059e65b7",
+        "sample_size_description": "Comprehensive architectural audit across 40,902 hourly bars and all active components",
+        "horizon": "System Architecture & Offline Research",
+        "governance_verdict": "AUDIT_COMPLETED",
+        "provenance_state": "INTEGRITY_CHECKED",
+        "scientific_limitations": (
+            "Audits empirical validity of 70% accuracy target and component necessity. "
+            "Confirms that directional accuracy remains ~53% across full sample and ~56.8% at low coverage. "
+            "70% directional accuracy on hourly BTC is unsupported by all available empirical data."
+        ),
+        "key_metrics": [
+            {
+                "name": "Directional Accuracy (1H)",
+                "value": "53.28%",
+                "ci_95": "[52.78%, 53.78%]",
+                "unit": "%",
+                "interpretation": "Observed 1H directional accuracy across 33,919 out-of-sample observations"
+            },
+            {
+                "name": "Selective Prediction (5% Coverage)",
+                "value": "56.66%",
+                "ci_95": "[54.01%, 58.67%]",
+                "unit": "%",
+                "interpretation": "Empirical accuracy under selective abstention (95% CI well below 70%)"
+            },
+            {
+                "name": "Net Expectancy After Friction",
+                "value": "-13.09 bps/bar",
+                "ci_95": None,
+                "unit": "bps",
+                "interpretation": "Negative net expectancy after realistic taker fees and slippage"
+            }
+        ],
+        "contradiction": {
+            "flag": "CONFLICT_REQUIRES_RECONCILIATION",
+            "conflicting_reports": ["uncertainty-04"],
+            "primary_issue": "Conformal Volatility Containment (90%+) vs Directional Price Forecasting (~53%)",
+            "resolution_note": (
+                "Conformal risk envelopes bound realized variance dispersion (92.84% empirical containment), "
+                "which must never be confused with directional price prediction accuracy (~53%). "
+                "The two metrics address fundamentally separate mathematical questions."
+            )
+        }
+    },
+    "stage3-validation": {
+        "title": "Stage 3: Verified Corrections and Safe Simplification Report",
+        "track": "Production Integrity & Directional Pipeline Verification",
+        "date": "2026-10-16",
+        "relative_path": "research/reports/stage3_implementation_and_validation_report.md",
+        "expected_sha256": "e4457ad31995555b52499731467c67d02ee39770fb72c950bf92e8fad58fbdba",
+        "sample_size_description": "N = 33,919 out-of-sample evaluated hourly predictions (5-fold purged cross-validation)",
+        "horizon": "Multi-horizon directional pipeline & risk envelope separation",
+        "governance_verdict": "VERIFIED_CORRECTIONS_IMPLEMENTED",
+        "provenance_state": "INTEGRITY_CHECKED",
+        "scientific_limitations": (
+            "4-lag feature reduction matches 15-feature accuracy (53.28% vs 53.14%, p=0.4315) with 3.4x faster "
+            "training and zero loss in performance. Selective prediction reaches 56.66% at 5% coverage (95% CI "
+            "[54.01%, 58.67%]), but net returns remain negative after friction (-13.07 bps on active bars)."
+        ),
+        "key_metrics": [
+            {
+                "name": "4-Lag Directional Accuracy",
+                "value": "53.28%",
+                "ci_95": "[52.78%, 53.78%]",
+                "unit": "%",
+                "interpretation": "Statistically identical to 15-full model (+0.14% delta, p=0.4315)"
+            },
+            {
+                "name": "Selective Prediction (5% Target Coverage)",
+                "value": "56.66%",
+                "ci_95": "[54.01%, 58.67%]",
+                "unit": "%",
+                "interpretation": "Calibrated selective prediction on independent validation folds"
+            },
+            {
+                "name": "Runtime Dependency Separation",
+                "value": "VERIFIED (ohlcv.parquet only)",
+                "ci_95": None,
+                "unit": "status",
+                "interpretation": "iv7d.parquet cleanly separated as historical research benchmark"
+            },
+            {
+                "name": "Turnover Cost Hurdle (10% Coverage)",
+                "value": "-2.66 bps/bar (-13.07 bps active)",
+                "ci_95": None,
+                "unit": "bps",
+                "interpretation": "Net expectancy remains negative under realistic transaction friction"
+            }
+        ],
+        "contradiction": {
+            "flag": "CONFLICT_REQUIRES_RECONCILIATION",
+            "conflicting_reports": ["volatility-compression-arena"],
+            "primary_issue": "Stylized Arena Assumptions vs Turnover Friction Reality",
+            "resolution_note": (
+                "Stage 3 rigorously confirms that accounting for position changes and taker fees converts "
+                "apparent directional accuracy into negative net realized expectancy. Directional models "
+                "must remain in offline research mode."
+            )
+        }
+    },
+    "stage4-audit": {
+        "title": "Stage 4: Independent Scientific, Statistical, and Runtime Integrity Audit",
+        "track": "Scientific Integrity & Statistical Verification",
+        "date": "2026-10-16",
+        "relative_path": "research/reports/stage4_independent_integrity_audit.md",
+        "expected_sha256": "5aa81306141c805d0ce750cd31d5e6bac1595f5eb6d50d57696e0d6d4efe73a5",
+        "sample_size_description": "N = 33,919 out-of-sample evaluated hourly predictions (5-fold purged cross-validation)",
+        "horizon": "System Architecture, Statistical Verification & Trading Economics",
+        "governance_verdict": "AUDIT_COMPLETED_AND_RECONCILED",
+        "provenance_state": "INTEGRITY_CHECKED",
+        "scientific_limitations": (
+            "Independent audit confirms directional accuracy equivalence (53.28% 4-lag vs 53.14% 15-full, p=0.41). "
+            "Reconciles turnover metrics (79.23% volume reduction vs 58.85% event reduction). "
+            "Under strictly causal in-train thresholding, selective prediction achieves 56.06% at 8.5% coverage. "
+            "Net trading return remains negative (-13.07 bps on active bars); live trading is strictly prohibited."
+        ),
+        "key_metrics": [
+            {
+                "name": "4-Lag vs 15-Full Equivalence",
+                "value": "Delta = +0.14% (p = 0.4101)",
+                "ci_95": "[-0.20%, +0.46%]",
+                "unit": "delta_pct",
+                "interpretation": "Difference is statistically indistinguishable from zero; 4-lag model verified"
+            },
+            {
+                "name": "Causal Selective Prediction (10% Target)",
+                "value": "56.06% (8.52% coverage)",
+                "ci_95": None,
+                "unit": "%",
+                "interpretation": "Strictly causal in-train thresholding without test lookahead"
+            },
+            {
+                "name": "Traded Volume Reduction",
+                "value": "79.23%",
+                "ci_95": None,
+                "unit": "%",
+                "interpretation": "Traded exposure volume reduction (5,348 vs 25,745 units)"
+            },
+            {
+                "name": "Transition Events Decomposition",
+                "value": "5,297 total events",
+                "ci_95": None,
+                "unit": "events",
+                "interpretation": "2,623 entries + 2,623 exits + 51 reversals = 5,297 events"
+            }
+        ],
+        "contradiction": {
+            "flag": "CONFLICT_REQUIRES_RECONCILIATION",
+            "conflicting_reports": ["stage3-validation"],
+            "primary_issue": "Retrospective vs In-Train Causal Threshold Calibration",
+            "resolution_note": (
+                "Stage 3 retrospective ranking had a +1.4% optimistic bias at the 5% tier (56.66% vs 55.26% causal). "
+                "Causal in-train thresholding should be preferred for prospective evaluation."
+            )
+        }
+    },
+    "stage5-hardening": {
+        "title": "Stage 5: Production Integrity, Architecture Simplification, and Predictive Research Hardening",
+        "track": "Production Integrity & Research Hardening",
+        "date": "2026-10-16",
+        "relative_path": "research/reports/stage5_production_integrity_and_architecture_hardening.md",
+        "expected_sha256": "3f4894a0676f7084e8d516d1a3f0778bc7eb78ff79e83abf1a1a0795ec161231",
+        "sample_size_description": "Full architectural audit: 24 targeted tests, decoupled dependencies, 10-feature HAR-RS-DOW pipeline",
+        "horizon": "Production Lifecycle, Model Identity Single Source of Truth & Evaluation Contract",
+        "governance_verdict": "PRODUCTION_HARDENED_AND_VERIFIED",
+        "provenance_state": "INTEGRITY_CHECKED",
+        "scientific_limitations": (
+            "Establishes HAR-RS-DOW-v1.0 as the single authoritative production volatility model (168h variance). "
+            "Directional forecasting models remain in offline research; 4-lag baseline achieves 53.28% out-of-sample accuracy. "
+            "70% directional accuracy is empirically unsupported. Live trading is strictly prohibited."
+        ),
+        "key_metrics": [
+            {
+                "name": "Authoritative Production Model",
+                "value": "HAR-RS-DOW-v1.0",
+                "ci_95": None,
+                "unit": "model_id",
+                "interpretation": "Single source of truth established across API, UI, and model cards"
+            },
+            {
+                "name": "Runtime Dependency Separation",
+                "value": "VERIFIED (ohlcv.parquet strictly)",
+                "ci_95": None,
+                "unit": "status",
+                "interpretation": "iv7d.parquet cleanly decoupled as offline research benchmark"
+            },
+            {
+                "name": "Production Feature Extraction",
+                "value": "CLEAN (engine/har_rs_dow_features.py)",
+                "ci_95": None,
+                "unit": "status",
+                "interpretation": "Eliminated runtime imports of research evaluation scripts"
+            },
+            {
+                "name": "Fixed Directional Evaluation Contract",
+                "value": "CODIFIED (research/directional_experiment_contract.py)",
+                "ci_95": None,
+                "unit": "status",
+                "interpretation": "Purged 5-fold CV, causal in-train thresholding, 14 bps friction hurdle"
+            }
+        ],
+        "contradiction": None
+    },
+    "stage6-experiments": {
+        "title": "Stage 6: Runtime Verification, Predictive Signal Research, and Controlled Model Improvement",
+        "track": "Predictive Experiments & Runtime Verification",
+        "date": "2026-10-16",
+        "relative_path": "research/reports/stage6_runtime_verification_and_predictive_experiments.md",
+        "expected_sha256": "dd91b14a9cd031d64da7d06fb8be98a18345d4f6f753f77c9d8a7cac0bda4c26",
+        "sample_size_description": "34,343 parity observations; 33,919 out-of-fold evaluated directional predictions across 5 purged expanding folds",
+        "horizon": "24h Production Volatility / 1h Directional Research (h=1)",
+        "governance_verdict": "STAGE6_VERIFIED_AND_CONTROLLED",
+        "provenance_state": "INTEGRITY_CHECKED",
+        "scientific_limitations": (
+            "HAR-RS-DOW-v1.0 feature parity verified with 0.0 error across 34,343 rows. "
+            "Directional baseline reproduces at 53.28% out-of-sample accuracy. Feature ablation demonstrates that technical oscillators "
+            "and larger feature stacks degrade performance (53.08% for 15-full stack). Selective prediction reaches 56.06% accuracy at "
+            "8.52% coverage, but net returns remain strictly negative after friction (-4.35 to -14.08 bps/trade). Live trading is prohibited."
+        ),
+        "key_metrics": [
+            {
+                "name": "Feature Parity Max Discrepancy",
+                "value": "0.00000000",
+                "ci_95": None,
+                "unit": "diff",
+                "interpretation": "Exact bit-for-bit parity across all 10 features and 34,343 training rows"
+            },
+            {
+                "name": "4-Lag GBDT Baseline Accuracy",
+                "value": "53.28%",
+                "ci_95": "[52.75%, 53.81%]",
+                "unit": "%",
+                "interpretation": "Reproduced exact historical out-of-sample benchmark (ROC-AUC 0.5445)"
+            },
+            {
+                "name": "Feature Ablation Best Space",
+                "value": "4 Lags (53.28% vs 53.08% 15-full)",
+                "ci_95": None,
+                "unit": "comparison",
+                "interpretation": "4-lag configuration strictly outperforms bloated 15-feature stack"
+            },
+            {
+                "name": "Model Challenger (L2 Logistic)",
+                "value": "53.20% (Delta -0.08%, p=0.7279)",
+                "ci_95": "[-0.50%, +0.36%]",
+                "unit": "%",
+                "interpretation": "Linear model matches GBDT with 412x faster execution (0.08s runtime)"
+            },
+            {
+                "name": "Selective Prediction (Top Decile)",
+                "value": "56.06% (8.52% coverage)",
+                "ci_95": "[54.24%, 57.86%]",
+                "unit": "%",
+                "interpretation": "Calibrated accuracy gain on high-confidence tail"
+            },
+            {
+                "name": "Net Economic Expectancy",
+                "value": "-4.35 to -14.08 bps/trade",
+                "ci_95": None,
+                "unit": "bps",
+                "interpretation": "Negative net returns across all coverage tiers under both 14 bps and 35 bps friction"
+            }
+        ],
+        "contradiction": {
+            "flag": "CONFLICT_REQUIRES_RECONCILIATION",
+            "conflicting_reports": ["entry-tp-sl-v3", "stage3-validation"],
+            "primary_issue": "Gross Directional Accuracy (~56%) vs Net Economic Feasibility (Negative Expectancy)",
+            "resolution_note": (
+                "Selective prediction demonstrates that 1-hour directional accuracy can be boosted to 56.06% on high-confidence "
+                "subsets, but gross alpha (+0.88 bps/trade) cannot overcome round-trip friction (14 to 35 bps). "
+                "Directional classifiers must not be deployed for standalone trading."
+            )
+        }
     }
 }
 
@@ -816,3 +1096,157 @@ def get_research_report_content(
         content=content,
         contradiction=ContradictionSchema(**meta["contradiction"]) if meta.get("contradiction") else None
     )
+
+
+@router.get("/directional-audit")
+def get_directional_research_audit():
+    """
+    Returns empirical results of the offline directional forecasting pipeline audit.
+    Strictly isolated to offline research: NOT authorized for live production inference.
+    """
+    results_path = os.path.join(
+        REPO_ROOT, "experiments", "results", "stage3_validation", "stage3_directional_pipeline_results.json"
+    )
+    if not os.path.isfile(results_path):
+        raise HTTPException(status_code=404, detail="Stage 3 directional pipeline validation results not found.")
+
+    try:
+        with open(results_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read validation results: {e}")
+
+    return {
+        "research_category": "OFFLINE_DIRECTIONAL_RESEARCH_BENCHMARK",
+        "production_inference_status": "SEPARATE_OFFLINE_RESEARCH_NOT_AUTHORIZED_FOR_PRODUCTION",
+        "epistemic_disclaimer": (
+            "These directional forecasting metrics represent offline research experiments only. "
+            "The active production model produces volatility risk envelopes (not directional predictions). "
+            "Directional forecasts are not authorized for production inference or live capital deployment. "
+            "Directional accuracy is approximately 53.3% unconditionally and 56.7% under 5% coverage; "
+            "after transaction friction, simulated net returns remain negative. "
+            "No historical metric guarantees future outcomes, and 70% directional accuracy is unsupported."
+        ),
+        "results": data
+    }
+
+
+@router.get("/shadow-status")
+def get_shadow_validation_status():
+    """
+    Returns the real-time status, horizon scorecards, and tamper-evident ledger integrity
+    of the Stage 10 prospective shadow validation pipeline.
+    """
+    scorecard_path = os.path.join(
+        REPO_ROOT, "experiments", "results", "stage10_shadow_validation", "stage10_shadow_scorecard.json"
+    )
+    manifest_path = os.path.join(
+        REPO_ROOT, "experiments", "results", "stage10_shadow_validation", "stage10_preregistered_manifest.json"
+    )
+
+    if not os.path.isfile(scorecard_path) or not os.path.isfile(manifest_path):
+        raise HTTPException(status_code=404, detail="Stage 10 shadow validation scorecard or manifest not found.")
+
+    try:
+        with open(scorecard_path, "r", encoding="utf-8") as f:
+            scorecard = json.load(f)
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            manifest = json.load(f)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load shadow validation data: {e}")
+
+    return {
+        "pipeline_version": "STAGE10-SHADOW-VAL-v1.0",
+        "evaluation_mode": "PROSPECTIVE_SHADOW_EVALUATION",
+        "governance": {
+            "production_model": manifest["governance"]["production_model"],
+            "production_task": manifest["governance"]["production_task"],
+            "directional_research_baseline": manifest["governance"]["directional_model"],
+            "live_trading_status": manifest["governance"]["live_trading_status"],
+            "order_execution_calls_allowed": manifest["governance"]["order_execution_calls_allowed"]
+        },
+        "scorecard": scorecard,
+        "epistemic_notice": (
+            "Prospective shadow predictions are recorded before outcome maturity and resolved strictly after. "
+            "Directional accuracy on prospective data remains ~52.1% (1h) and ~52.0% (4h). "
+            "70% predictive accuracy is mathematically and empirically UNSUBSTANTIATED. "
+            "Simulated net trading expectancy remains negative after realistic transaction friction."
+        )
+    }
+
+
+@router.get("/shadow-ledger")
+def get_shadow_validation_ledger(limit: int = Query(50, ge=1, le=500), event_type: Optional[str] = None):
+    """
+    Returns recent events from the append-only cryptographic shadow prediction ledger.
+    """
+    ledger_path = os.path.join(
+        REPO_ROOT, "experiments", "results", "stage10_shadow_validation", "shadow_prediction_ledger.jsonl"
+    )
+    if not os.path.isfile(ledger_path):
+        raise HTTPException(status_code=404, detail="Shadow prediction ledger not found.")
+
+    events = []
+    try:
+        with open(ledger_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                ev = json.loads(line)
+                if event_type is None or ev.get("event_type") == event_type:
+                    events.append(ev)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read ledger: {e}")
+
+    # Return the most recent 'limit' events
+    recent = events[-limit:]
+    return {
+        "total_matching_events": len(events),
+        "returned_events_count": len(recent),
+        "events": recent
+    }
+
+
+@router.get("/forward-status")
+def get_forward_validation_status():
+    """
+    Returns the real-time status and manifest of the Stage 11 genuine forward-only validation pipeline.
+    """
+    scorecard_path = os.path.join(
+        REPO_ROOT, "experiments", "results", "stage11_forward_validation", "stage11_forward_scorecard.json"
+    )
+    manifest_path = os.path.join(
+        REPO_ROOT, "experiments", "results", "stage11_forward_validation", "stage11_forward_validation_manifest.json"
+    )
+
+    if not os.path.isfile(scorecard_path) or not os.path.isfile(manifest_path):
+        raise HTTPException(status_code=404, detail="Stage 11 forward validation scorecard or manifest not found.")
+
+    try:
+        with open(scorecard_path, "r", encoding="utf-8") as f:
+            scorecard = json.load(f)
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            manifest = json.load(f)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load forward validation data: {e}")
+
+    return {
+        "pipeline_version": "STAGE11-FORWARD-VAL-v1.0",
+        "evaluation_mode": "GENUINE_FORWARD_ONLY_EVALUATION",
+        "governance": {
+            "production_model": manifest["governance"]["production_model"],
+            "production_task": manifest["governance"]["production_task"],
+            "directional_research_baseline": manifest["governance"]["directional_model"],
+            "live_trading_status": manifest["governance"]["live_trading_status"],
+            "order_execution_integrations": manifest["governance"]["order_execution_integrations"]
+        },
+        "forward_frontier": manifest["audit_classification"]["forward_evaluation_frontier"],
+        "stage10_classification": manifest["audit_classification"]["stage10_classification"],
+        "scorecard": scorecard,
+        "epistemic_notice": (
+            "Stage 11 enforces genuine forward-only evaluation strictly beyond the 2026-09-01T06:00:00Z frontier. "
+            "Stage 10 holdout results are verified as a Valid Historical Out-of-Sample Replay (52.14% 1h accuracy). "
+            "70% directional accuracy is mathematically and empirically UNSUBSTANTIATED."
+        )
+    }

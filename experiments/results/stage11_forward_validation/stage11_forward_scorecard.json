@@ -1,0 +1,18 @@
+{
+  "evaluation_timestamp": "2026-10-16T10:34:59.994535+00:00",
+  "git_commit": "50e362e6d92a20a13cd17ac1258c70107ca805af",
+  "manifest_version": "STAGE11-FORWARD-VAL-v1.0",
+  "evaluation_mode": "GENUINE_FORWARD_ONLY_EVALUATION",
+  "forward_frontier": "2026-09-01T06:00:00Z",
+  "total_ledger_events": 0,
+  "total_forecasts_committed": 0,
+  "total_forecasts_resolved": 0,
+  "total_unresolved_pending": 0,
+  "status": "COLLECTING",
+  "seventy_percent_objective_assessment": {
+    "substantiated_on_forward_data": false,
+    "status": "UNSUBSTANTIATED",
+    "notice": "70% accuracy remains unsubstantiated. Requires N_eff >= 1,000 forward observations with 95% bootstrap lower bound >= 70.0%."
+  },
+  "horizons": {}
+}

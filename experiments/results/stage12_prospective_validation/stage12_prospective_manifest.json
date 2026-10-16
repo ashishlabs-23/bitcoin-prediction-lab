@@ -1,0 +1,107 @@
+{
+  "manifest_version": "STAGE12-PROSPECTIVE-VAL-v1.0",
+  "created_at_utc": "2026-10-16T10:45:00+00:00",
+  "git_commit": "50e362e6d92a20a13cd17ac1258c70107ca805af",
+  "epistemic_audit_classification": {
+    "stage10_evaluation_period": {
+      "span": "2026-01-01T00:00:00Z to 2026-09-01T05:00:00Z",
+      "epistemic_status": "VALID_HISTORICAL_OUT_OF_SAMPLE_REPLAY",
+      "rationale": "Models were frozen strictly on pre-2026 data and features evaluated point-in-time, but execution occurred in batch replay on 2026-10-16."
+    },
+    "historical_gap_period": {
+      "span": "2026-09-01T06:00:00Z to 2026-10-16T10:45:00Z",
+      "epistemic_status": "HISTORICAL_DATA_GAP_UNVERIFIED",
+      "rationale": "No prospective collector was installed or running during this interval. Retrospective backfill cannot be claimed as prospective."
+    },
+    "genuine_prospective_frontier": {
+      "frontier_timestamp_utc": "2026-10-16T10:45:00Z",
+      "epistemic_status": "GENUINE_FORWARD_ONLY_EVALUATION",
+      "rationale": "First verifiable operational timestamp of the forward collector on streaming live market data."
+    },
+    "hash_chain_limitation_statement": "Local SHA-256 recursive hash chaining guarantees internal tamper-evidence from the moment the ledger is generated. It does NOT independently prove historical existence prior to generation without external RFC 3161 TSA or public blockchain commitment."
+  },
+  "governance": {
+    "production_model": "HAR-RS-DOW-v1.0",
+    "production_task": "Annualized Forward 7-Day Realized Variance (rv7d_var_ann) & C2 Conformal Risk Envelope",
+    "production_authorization": "AUTHORIZED_FOR_PRODUCTION_VOLATILITY_INTELLIGENCE",
+    "directional_model": "directional-gbm-4lag-v1",
+    "directional_authorization": "OFFLINE_RESEARCH_ONLY",
+    "live_trading_status": "DISABLED",
+    "order_execution_integrations": "DISABLED"
+  },
+  "evaluated_models": {
+    "HAR-RS-DOW-v1.0": {
+      "artifact_path": "experiments/results/freeze/har_rs_dow_v1.joblib",
+      "sha256": "750b5d15ed84c3cf24b8484ae928ff7c8098cab0c35eafe310ab28bf57ed285b",
+      "target": "rv7d_var_ann",
+      "horizon_hours": 168,
+      "calibration_method": "Strictly Causal C2 Conformal Prediction (alpha=0.10, nominal 90%)"
+    },
+    "directional-gbm-1h-v1": {
+      "artifact_path": "models/registry/research/directional_gbm_1h_v1.joblib",
+      "sha256": "29589feb99a00bf86d71b46c5986d25d410a71fbf0e630345a70d4fe9da97ac1",
+      "target": "sign(ln(P_{t+1}/P_t)) > 0",
+      "horizon_hours": 1
+    },
+    "directional-gbm-4h-v1": {
+      "artifact_path": "models/registry/research/directional_gbm_4h_v1.joblib",
+      "sha256": "70bd910add16f9b63152a6c8884b51762d2aea56cdef83f2387df733bea6f57d",
+      "target": "sign(ln(P_{t+4}/P_t)) > 0",
+      "horizon_hours": 4
+    },
+    "directional-gbm-24h-v1": {
+      "artifact_path": "models/registry/research/directional_gbm_24h_v1.joblib",
+      "sha256": "637201570381aa8a3cf2fa812a0fac1f80b2a67a8910b414cf85abe605ef0348",
+      "target": "sign(ln(P_{t+24}/P_t)) > 0",
+      "horizon_hours": 24
+    }
+  },
+  "causal_execution_rules": {
+    "candle_closure_rule": "Forecasts are emitted ONLY after the hourly candle closes and finalizes.",
+    "issuance_logging_rule": "Forecast event is appended to ledger BEFORE the future outcome window elapses.",
+    "delayed_resolution_rule": "Resolutions occur strictly after origin + horizon_hours has fully closed.",
+    "causal_conformal_calibration_rule": "Scale estimates and calibration pools for conformal intervals use ONLY outcomes resolved strictly before forecast origin."
+  },
+  "sample_size_requirements": {
+    "1h": {
+      "nominal_n_required": 2130,
+      "overlap_factor": 1,
+      "effective_n_required": 2130
+    },
+    "4h": {
+      "nominal_n_required": 4260,
+      "overlap_factor": 4,
+      "effective_n_required": 1065
+    },
+    "24h": {
+      "nominal_n_required": 8520,
+      "overlap_factor": 24,
+      "effective_n_required": 355
+    },
+    "168h_volatility": {
+      "nominal_n_required": 5000,
+      "overlap_factor": 168,
+      "effective_n_required": 30
+    }
+  },
+  "cost_models": {
+    "institutional_14bps": {
+      "half_spread_bps": 2.0,
+      "taker_fee_bps": 5.0,
+      "transition_fee_bps": 7.0,
+      "round_trip_bps": 14.0
+    },
+    "retail_35bps": {
+      "half_spread_bps": 2.5,
+      "taker_fee_bps": 15.0,
+      "transition_fee_bps": 17.5,
+      "round_trip_bps": 35.0
+    }
+  },
+  "statistical_acceptance_criteria": {
+    "null_hypothesis": "Directional Accuracy <= 50.0%",
+    "minimum_detectable_edge": "+1.85% (at alpha=0.05, power=0.80 for 1h)",
+    "seventy_percent_claim_hurdle": "95% stationary block bootstrap lower confidence bound must be >= 70.0% on forward data.",
+    "current_status": "UNSUBSTANTIATED (Upper bound on holdout is 53.36%, 16.64% below 70.0%)"
+  }
+}

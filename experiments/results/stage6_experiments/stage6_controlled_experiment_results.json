@@ -1,0 +1,224 @@
+{
+  "timestamp": "2026-10-16T03:15:34.280355+00:00",
+  "total_bars": 40702,
+  "evaluated_test_bars": 33919,
+  "experiment_a_ablation": {
+    "4_lags": {
+      "feature_count": 4,
+      "features": [
+        "ret_1h",
+        "ret_4h",
+        "ret_24h",
+        "ret_168h"
+      ],
+      "accuracy_pct": 53.28,
+      "balanced_accuracy_pct": 53.27,
+      "roc_auc": 0.5445,
+      "brier_score": 0.2488,
+      "log_loss": 0.6908,
+      "ece": 0.0122,
+      "train_time_sec": 34.48
+    },
+    "lags_plus_oscillators": {
+      "feature_count": 10,
+      "features": [
+        "ret_1h",
+        "ret_4h",
+        "ret_24h",
+        "ret_168h",
+        "rsi_14",
+        "macd",
+        "macd_signal",
+        "sma_ratio_20",
+        "sma_ratio_50",
+        "sma_ratio_200"
+      ],
+      "accuracy_pct": 53.22,
+      "balanced_accuracy_pct": 53.22,
+      "roc_auc": 0.5433,
+      "brier_score": 0.2491,
+      "log_loss": 0.6916,
+      "ece": 0.0138,
+      "train_time_sec": 81.85,
+      "paired_bootstrap_vs_4lag": {
+        "mean_delta_pct": -0.06,
+        "ci_95": [
+          -0.33,
+          0.23
+        ],
+        "se": 0.142,
+        "p_val": 0.6468,
+        "mcnemar_stat": 0.1841,
+        "mcnemar_p_val": 0.6679
+      }
+    },
+    "lags_plus_volatility": {
+      "feature_count": 9,
+      "features": [
+        "ret_1h",
+        "ret_4h",
+        "ret_24h",
+        "ret_168h",
+        "realized_vol_24h",
+        "realized_vol_168h",
+        "parkinson_vol_24h",
+        "atr_14_ratio",
+        "volume_zscore_24h"
+      ],
+      "accuracy_pct": 53.27,
+      "balanced_accuracy_pct": 53.25,
+      "roc_auc": 0.5455,
+      "brier_score": 0.2487,
+      "log_loss": 0.6905,
+      "ece": 0.0129,
+      "train_time_sec": 37.51,
+      "paired_bootstrap_vs_4lag": {
+        "mean_delta_pct": -0.01,
+        "ci_95": [
+          -0.28,
+          0.27
+        ],
+        "se": 0.149,
+        "p_val": 0.9684,
+        "mcnemar_stat": 0.0004,
+        "mcnemar_p_val": 0.9837
+      }
+    },
+    "15_full": {
+      "feature_count": 15,
+      "features": [
+        "ret_1h",
+        "ret_4h",
+        "ret_24h",
+        "ret_168h",
+        "rsi_14",
+        "macd",
+        "macd_signal",
+        "sma_ratio_20",
+        "sma_ratio_50",
+        "sma_ratio_200",
+        "realized_vol_24h",
+        "realized_vol_168h",
+        "parkinson_vol_24h",
+        "atr_14_ratio",
+        "volume_zscore_24h"
+      ],
+      "accuracy_pct": 53.08,
+      "balanced_accuracy_pct": 53.06,
+      "roc_auc": 0.5422,
+      "brier_score": 0.2492,
+      "log_loss": 0.6916,
+      "ece": 0.0158,
+      "train_time_sec": 60.94,
+      "paired_bootstrap_vs_4lag": {
+        "mean_delta_pct": -0.2,
+        "ci_95": [
+          -0.52,
+          0.15
+        ],
+        "se": 0.171,
+        "p_val": 0.2347,
+        "mcnemar_stat": 1.3652,
+        "mcnemar_p_val": 0.2426
+      }
+    }
+  },
+  "experiment_b_challenger": {
+    "model_baseline": "GBDT (4 Lags)",
+    "model_challenger": "L2 Logistic Regression (4 Lags)",
+    "gbdt_accuracy_pct": 53.28,
+    "logistic_accuracy_pct": 53.2,
+    "logistic_roc_auc": 0.5419,
+    "logistic_brier_score": 0.2489,
+    "logistic_ece": 0.0131,
+    "gbdt_train_time_sec": 34.48,
+    "logistic_train_time_sec": 0.08,
+    "runtime_speedup": 412.0,
+    "paired_difference_pct": -0.08,
+    "paired_bootstrap_95_ci": [
+      -0.5,
+      0.36
+    ],
+    "bootstrap_p_val": 0.7279,
+    "mcnemar_stat": 0.1075,
+    "mcnemar_p_val": 0.743,
+    "conclusion": "Logistic Regression achieves 53.20% vs GBDT 53.28% (delta = -0.08%, p = 0.7279). Statistically identical predictive performance with 412.0x faster training time."
+  },
+  "experiment_c_selective": {
+    "100pct": {
+      "target_coverage_pct": 100.0,
+      "empirical_coverage_pct": 100.0,
+      "active_samples": 33919,
+      "accuracy_pct": 53.28,
+      "wilson_95_ci": [
+        52.75,
+        53.81
+      ],
+      "total_transitions": 25745,
+      "mean_gross_return_active_bps": 0.19,
+      "mean_net_return_institutional_14bps": -5.12,
+      "mean_net_return_retail_35bps": -13.09,
+      "economic_viability": "NEGATIVE_NET_EXPECTANCY (UNPROFITABLE)"
+    },
+    "50pct": {
+      "target_coverage_pct": 50.0,
+      "empirical_coverage_pct": 48.14,
+      "active_samples": 16328,
+      "accuracy_pct": 55.23,
+      "wilson_95_ci": [
+        54.47,
+        55.99
+      ],
+      "total_transitions": 18627,
+      "mean_gross_return_active_bps": 0.45,
+      "mean_net_return_institutional_14bps": -4.35,
+      "mean_net_return_retail_35bps": -11.54,
+      "economic_viability": "NEGATIVE_NET_EXPECTANCY (UNPROFITABLE)"
+    },
+    "25pct": {
+      "target_coverage_pct": 25.0,
+      "empirical_coverage_pct": 23.32,
+      "active_samples": 7909,
+      "accuracy_pct": 55.77,
+      "wilson_95_ci": [
+        54.67,
+        56.86
+      ],
+      "total_transitions": 11345,
+      "mean_gross_return_active_bps": 0.4,
+      "mean_net_return_institutional_14bps": -4.95,
+      "mean_net_return_retail_35bps": -12.97,
+      "economic_viability": "NEGATIVE_NET_EXPECTANCY (UNPROFITABLE)"
+    },
+    "10pct": {
+      "target_coverage_pct": 10.0,
+      "empirical_coverage_pct": 8.52,
+      "active_samples": 2890,
+      "accuracy_pct": 56.06,
+      "wilson_95_ci": [
+        54.24,
+        57.86
+      ],
+      "total_transitions": 4712,
+      "mean_gross_return_active_bps": 0.88,
+      "mean_net_return_institutional_14bps": -4.9,
+      "mean_net_return_retail_35bps": -13.57,
+      "economic_viability": "NEGATIVE_NET_EXPECTANCY (UNPROFITABLE)"
+    },
+    "5pct": {
+      "target_coverage_pct": 5.0,
+      "empirical_coverage_pct": 4.15,
+      "active_samples": 1406,
+      "accuracy_pct": 55.26,
+      "wilson_95_ci": [
+        52.65,
+        57.84
+      ],
+      "total_transitions": 2498,
+      "mean_gross_return_active_bps": 1.57,
+      "mean_net_return_institutional_14bps": -4.69,
+      "mean_net_return_retail_35bps": -14.08,
+      "economic_viability": "NEGATIVE_NET_EXPECTANCY (UNPROFITABLE)"
+    }
+  }
+}

@@ -294,28 +294,44 @@ def run_verification(strict: bool = False) -> int:
                f"stored={stored_schema_hash[:16]}... "
                f"recomputed={recomputed_schema_hash[:16]}...")
 
-    # ── CHECK 5: Training data integrity ──────────────────────────────────
+    # ── CHECK 5: Data integrity & dependency classification ──────────────
     ohlcv_path = os.path.join(DATA_RAW_DIR, "ohlcv.parquet")
     iv7d_path  = os.path.join(DATA_RAW_DIR, "iv7d.parquet")
     stored_data = manifest.get("training_data_snapshot", {})
 
-    for fname, fpath, key in [
-        ("ohlcv.parquet",  ohlcv_path, "ohlcv_parquet_sha256"),
-        ("iv7d.parquet",   iv7d_path,  "iv7d_parquet_sha256"),
-    ]:
-        stored_fhash = stored_data.get(key, "")
-        if not os.path.exists(fpath):
-            record(FAIL, f"Training data — {fname}", f"File not found: {fpath}")
+    # CHECK 5A: Runtime inference dependencies (hard requirement)
+    ohlcv_stored = stored_data.get("ohlcv_parquet_sha256", "")
+    if not os.path.exists(ohlcv_path):
+        record(FAIL, "Runtime dependency — ohlcv.parquet", f"File not found: {ohlcv_path}")
+    else:
+        live_fhash = sha256_file(ohlcv_path)
+        if live_fhash == ohlcv_stored:
+            record(PASS, "Runtime dependency — ohlcv.parquet",
+                   f"hash={live_fhash[:16]}...")
         else:
-            live_fhash = sha256_file(fpath)
-            if live_fhash == stored_fhash:
-                record(PASS, f"Training data — {fname}",
-                       f"hash={live_fhash[:16]}...")
-            else:
-                record(WARN, f"Training data — {fname}",
-                       f"Hash changed (data re-ingested?)\n"
-                       f"           stored={stored_fhash[:16]}... "
-                       f"live={live_fhash[:16]}...")
+            record(WARN, "Runtime dependency — ohlcv.parquet",
+                   f"Hash changed (data re-ingested?)\n"
+                   f"           stored={ohlcv_stored[:16]}... "
+                   f"live={live_fhash[:16]}...")
+
+    # CHECK 5B: Historical research benchmarks (audit / reproducibility)
+    iv7d_stored = stored_data.get("iv7d_parquet_sha256", "")
+    if not os.path.exists(iv7d_path):
+        if strict or ("--audit-all" in sys.argv):
+            record(FAIL, "Research benchmark — iv7d.parquet",
+                   f"File not found for full audit: {iv7d_path}")
+        else:
+            record(WARN, "Research benchmark — iv7d.parquet (informational)",
+                   f"Historical research benchmark missing: {iv7d_path}\n"
+                   f"           (Evaluated in VOL-EDGE-01 M4/M5/M6; NOT required for HAR-RS-DOW runtime inference)")
+    else:
+        live_iv_hash = sha256_file(iv7d_path)
+        if live_iv_hash == iv7d_stored:
+            record(PASS, "Research benchmark — iv7d.parquet",
+                   f"hash={live_iv_hash[:16]}...")
+        else:
+            record(WARN, "Research benchmark — iv7d.parquet",
+                   f"Hash changed: stored={iv7d_stored[:16]}... live={live_iv_hash[:16]}...")
 
     # ── CHECK 6: C2 configuration integrity ──────────────────────────────
     stored_c2_hash = manifest.get("C2_config_hash", "")

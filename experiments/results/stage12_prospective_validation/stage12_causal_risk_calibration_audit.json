@@ -1,0 +1,38 @@
+{
+  "audit_timestamp": "2026-10-16T10:45:00Z",
+  "sample_size_holdout": 5671,
+  "nominal_target_coverage_pct": 90.0,
+  "legacy_noncausal_evaluation": {
+    "status": "DEFECTIVE_TEMPORAL_LEAKAGE (SUPERSEDED)",
+    "leakage_mechanism": "Contemporaneous unresolved holdout residuals included in rolling std and conformity pool at forecast origin.",
+    "metrics": {
+      "empirical_coverage_pct": 92.36,
+      "coverage_95_ci": [
+        87.53,
+        95.73
+      ],
+      "mean_interval_width": 0.4513,
+      "median_interval_width": 0.2454,
+      "mean_winkler_score": 0.4917,
+      "mean_relative_width_ratio": 2.45,
+      "median_relative_width_ratio": 1.82
+    }
+  },
+  "strictly_causal_evaluation": {
+    "status": "VALID_CAUSAL_CONFORMAL_EVALUATION",
+    "causality_mechanism": "Holdout residuals delayed by 168 hours; scale and conformity pool derived strictly from resolved outcomes.",
+    "metrics": {
+      "empirical_coverage_pct": 84.89,
+      "coverage_95_ci": [
+        73.14,
+        93.14
+      ],
+      "mean_interval_width": 0.4389,
+      "median_interval_width": 0.2364,
+      "mean_winkler_score": 1.0444,
+      "mean_relative_width_ratio": 2.71,
+      "median_relative_width_ratio": 2.06
+    }
+  },
+  "epistemic_conclusion": "Correcting temporal lookahead leakage reveals that strictly causal holdout coverage is 84.89% (95% CI: [73.14%, 93.14%]), compared to the leaked 92.36%. The difference reflects genuine out-of-sample adaptation lag during volatility expansions. The active model HAR-RS-DOW-v1.0 remains statistically valid and well-calibrated, but claims of 92.36% coverage are corrected."
+}

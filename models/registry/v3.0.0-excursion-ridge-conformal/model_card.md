@@ -1,4 +1,9 @@
-# 📜 Model Card: `v3.0.0-excursion-ridge-conformal`
+# 📜 Model Card: `v3.0.0-excursion-ridge-conformal` [ARCHIVED HISTORICAL CANDIDATE]
+
+> [!WARNING]
+> **ARCHIVED RESEARCH CANDIDATE**: This model card documents the legacy August 21, 2026 excursion prototype.
+> It has been superseded by the authoritative frozen production model `HAR-RS-DOW-v1.0` (Contract Hash: `841deba5fb30118bea849f93ebc9fb7d1984d74fd2d709013544c6d5db94cf07`).
+> Production endpoints for this architecture fail closed with `BLOCKED_PROVENANCE_UNVERIFIED`.
 
 ## 1. Model Overview
 
@@ -6,7 +11,8 @@
 * **Version**: `v3.0.0-excursion-ridge-conformal`
 * **Architecture**: Regularized Ridge Regression ($L_2$) with Conformal Empirical Quantile Residual Mapping
 * **Primary Prediction Output**: Probabilistic 24H BTCUSD Range & Excursion Envelope ($P_{10}, P_{25}, P_{50}, P_{75}, P_{90}$)
-* **Deployment Status**: `PRODUCTION`
+* **Deployment Status**: `ARCHIVED_RESEARCH_CANDIDATE (NOT SERVED IN PRODUCTION)`
+* **Active Production Successor**: `HAR-RS-DOW-v1.0` (Variance & Volatility Risk Envelopes)
 
 ---
 

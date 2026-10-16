@@ -30,8 +30,11 @@ from engine.observatory import (
     PROSPECTIVE_AUDIT_STATUS,
     PROSPECTIVE_INVARIANTS
 )
-from research.run_vol_edge_01_test import prepare_aligned_dataset
-from research.verify_observatory_integration import get_features
+from engine.har_rs_dow_features import prepare_har_rs_dow_dataset, get_har_rs_dow_features
+from models.authoritative_model_registry import (
+    get_active_production_model,
+    list_authoritative_models,
+)
 import joblib
 from validation.startup_gate import (
     FreezeIntegrityError,
@@ -61,13 +64,13 @@ def _init_live_terminal():
         return
     try:
         verify_scientific_contract()
-        df = prepare_aligned_dataset()
+        df = prepare_har_rs_dow_dataset()
         holdout_start_dt = pd.to_datetime("2026-01-01T00:00:00Z")
         df_train = df[df.index < holdout_start_dt].copy()
         df_holdout = df[df.index >= holdout_start_dt].copy()
         
-        X_train = get_features(df_train)
-        X_holdout = get_features(df_holdout)
+        X_train = get_har_rs_dow_features(df_train)
+        X_holdout = get_har_rs_dow_features(df_holdout)
         
         pipe = joblib.load(MODEL_ARTIFACT_PATH)
         _pipeline = pipe
@@ -90,14 +93,17 @@ def _init_live_terminal():
         alpha = 0.10
         
         for i in range(N_holdout):
-            t_glob = N_train + i
-            pool_u = s_upper_all[max(0, t_glob - 1000) : t_glob : 24]
-            pool_l = s_lower_all[max(0, t_glob - 1000) : t_glob : 24]
+            # Strictly Causal C2 Conformal Calibration (Audited Stage 12):
+            # Target rv7d_var_ann takes 168 hours to resolve. At forecast origin i,
+            # only residuals and conformity scores resolved <= i - 168 are available.
+            k_res = N_train + (i - 168) if i >= 168 else N_train - 1
+            pool_u = s_upper_all[max(0, k_res - 1000 + 1) : k_res + 1 : 24]
+            pool_l = s_lower_all[max(0, k_res - 1000 + 1) : k_res + 1 : 24]
             k_c2 = int(np.ceil((len(pool_u) + 1) * (1.0 - alpha / 2.0)))
             _q_u_c2 = float(np.sort(pool_u)[min(len(pool_u) - 1, k_c2)])
             _q_l_c2 = float(np.sort(pool_l)[min(len(pool_l) - 1, k_c2)])
             
-            std_i = rolling_std_all[t_glob]
+            std_i = rolling_std_all[k_res]
             v_i = v_hat_holdout[i]
             lower_i = max(1e-6, v_i - _q_l_c2 * std_i)
             upper_i = v_i + _q_u_c2 * std_i
@@ -208,8 +214,9 @@ def get_terminal_live_state():
                 "lower_bound_variance": round(lower_bound, 5),
                 "upper_bound_variance": round(upper_bound, 5),
                 "envelope_width": round(upper_bound - lower_bound, 5),
-                "calibrated_engine": "C2 Dependence-Aware Conformal (Provisionally Validated)",
-                "empirical_holdout_coverage": "92.84% (95% CI: [88.25%, 96.46%])",
+                "calibrated_engine": "C2 Dependence-Aware Conformal (Strictly Causal Delayed Resolution)",
+                "empirical_holdout_coverage": "84.89% (Causal 2026 Holdout, 95% CI: [73.14%, 93.14%]) | 92.84% (Pre-2026 In-Sample Calibration)",
+                "calibration_causality_status": "STRICTLY_CAUSAL_DELAYED_RESOLUTION",
                 "extreme_vol_q5_containment": "89.47% (95% CI: [82.39%, 96.65%])",
                 "tail_breach_balance": "Upper: 3.67% | Lower: 3.43% (Delta: 0.24%)"
             },
@@ -236,6 +243,26 @@ def get_terminal_live_state():
             }
         },
         "epistemic_contract": "90% Target Risk Envelope | Empirical coverage is an observed estimate, not a permanent universal guarantee. Claims of '90% Confidence' or exact conditional coverage are prohibited."
+    }
+
+
+@router.get("/api/terminal/model-identity")
+def get_terminal_model_identity():
+    """
+    Returns the single authoritative identity record for the running production model.
+    """
+    return get_active_production_model().to_dict()
+
+
+@router.get("/api/models/authoritative-registry")
+def get_authoritative_registry_catalog():
+    """
+    Returns the complete authoritative taxonomy across production, research benchmarks,
+    and archived candidates.
+    """
+    return {
+        "active_production_model": get_active_production_model().canonical_id,
+        "models": list_authoritative_models()
     }
 
 

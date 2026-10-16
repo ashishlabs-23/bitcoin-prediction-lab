@@ -1,0 +1,92 @@
+{
+  "evaluation_timestamp": "2026-10-16T10:21:51.161878+00:00",
+  "git_commit": "50e362e6d92a20a13cd17ac1258c70107ca805af",
+  "total_ledger_events": 46515,
+  "total_forecasts_committed": 23356,
+  "total_forecasts_resolved": 23159,
+  "total_unresolved_pending": 197,
+  "horizons": {
+    "1h": {
+      "status": "EVALUATING",
+      "model_id": "directional-gbm-1h-v1",
+      "nominal_sample_size": 5838,
+      "effective_sample_size": 5838,
+      "overlap_factor": 1,
+      "accuracy_pct": 52.14,
+      "accuracy_95_ci": [
+        51.16,
+        53.36
+      ],
+      "balanced_accuracy_pct": 52.16,
+      "roc_auc": 0.5347,
+      "brier_score": 0.2494,
+      "prevalence_majority_accuracy_pct": 49.79,
+      "economics": {
+        "mean_gross_return_bps": -0.9,
+        "turnover_transitions_per_bar": 0.689,
+        "net_institutional_14bps": -5.72,
+        "net_retail_35bps": -12.95,
+        "economically_profitable": false
+      }
+    },
+    "4h": {
+      "status": "EVALUATING",
+      "model_id": "directional-gbm-4h-v1",
+      "nominal_sample_size": 5835,
+      "effective_sample_size": 1458,
+      "overlap_factor": 4,
+      "accuracy_pct": 52.0,
+      "accuracy_95_ci": [
+        50.35,
+        53.49
+      ],
+      "balanced_accuracy_pct": 52.01,
+      "roc_auc": 0.5266,
+      "brier_score": 0.2502,
+      "prevalence_majority_accuracy_pct": 49.84,
+      "economics": {
+        "mean_gross_return_bps": 0.39,
+        "turnover_transitions_per_bar": 0.555,
+        "net_institutional_14bps": -3.49,
+        "net_retail_35bps": -9.33,
+        "economically_profitable": false
+      }
+    },
+    "24h": {
+      "status": "COLLECTING",
+      "model_id": "directional-gbm-24h-v1",
+      "nominal_sample_size": 5815,
+      "effective_sample_size": 242,
+      "overlap_factor": 24,
+      "accuracy_pct": 48.65,
+      "accuracy_95_ci": [
+        45.18,
+        52.18
+      ],
+      "balanced_accuracy_pct": 48.73,
+      "roc_auc": 0.4871,
+      "brier_score": 0.2536,
+      "prevalence_majority_accuracy_pct": 50.9,
+      "economics": {
+        "mean_gross_return_bps": -13.13,
+        "turnover_transitions_per_bar": 0.328,
+        "net_institutional_14bps": -15.43,
+        "net_retail_35bps": -18.88,
+        "economically_profitable": false
+      }
+    },
+    "168h_volatility": {
+      "status": "VALIDATED_PRODUCTION_ENVELOPE",
+      "model_id": "HAR-RS-DOW-v1.0",
+      "nominal_sample_size": 5671,
+      "empirical_coverage_pct": 99.79,
+      "nominal_target_coverage_pct": 90.0,
+      "is_adequately_covered": true
+    }
+  },
+  "seventy_percent_objective_assessment": {
+    "substantiated_on_prospective_data": false,
+    "scientific_status": "UNSUBSTANTIATED",
+    "finding": "Prospective directional accuracy across all evaluated horizons remains strictly within 51.5% to 53.5%. Unconditional 70% directional accuracy is neither mathematically nor empirically supported. Even selective high-confidence tiers remain deeply negative after realistic transaction costs."
+  }
+}

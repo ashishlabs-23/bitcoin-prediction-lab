@@ -1,0 +1,71 @@
+{
+  "1h": {
+    "model_id": "directional-gbm-1h-v1",
+    "artifact_file": "directional_gbm_1h_v1.joblib",
+    "artifact_path": "models/registry/research/directional_gbm_1h_v1.joblib",
+    "artifact_sha256": "29589feb99a00bf86d71b46c5986d25d410a71fbf0e630345a70d4fe9da97ac1",
+    "training_samples": 34894,
+    "training_start": "2022-01-08T00:00:00+00:00",
+    "training_end": "2025-12-31T22:00:00+00:00",
+    "feature_schema": [
+      "ret_1h",
+      "ret_4h",
+      "ret_24h",
+      "ret_168h"
+    ],
+    "target": "Sign of forward 1h return (ln(Close_{t+1h}/Close_t) > 0)",
+    "hyperparameters": {
+      "algorithm": "GradientBoostingClassifier",
+      "n_estimators": 100,
+      "max_depth": 3,
+      "learning_rate": 0.05,
+      "random_state": 42
+    }
+  },
+  "4h": {
+    "model_id": "directional-gbm-4h-v1",
+    "artifact_file": "directional_gbm_4h_v1.joblib",
+    "artifact_path": "models/registry/research/directional_gbm_4h_v1.joblib",
+    "artifact_sha256": "70bd910add16f9b63152a6c8884b51762d2aea56cdef83f2387df733bea6f57d",
+    "training_samples": 34891,
+    "training_start": "2022-01-08T00:00:00+00:00",
+    "training_end": "2025-12-31T19:00:00+00:00",
+    "feature_schema": [
+      "ret_1h",
+      "ret_4h",
+      "ret_24h",
+      "ret_168h"
+    ],
+    "target": "Sign of forward 4h return (ln(Close_{t+4h}/Close_t) > 0)",
+    "hyperparameters": {
+      "algorithm": "GradientBoostingClassifier",
+      "n_estimators": 100,
+      "max_depth": 3,
+      "learning_rate": 0.05,
+      "random_state": 42
+    }
+  },
+  "24h": {
+    "model_id": "directional-gbm-24h-v1",
+    "artifact_file": "directional_gbm_24h_v1.joblib",
+    "artifact_path": "models/registry/research/directional_gbm_24h_v1.joblib",
+    "artifact_sha256": "637201570381aa8a3cf2fa812a0fac1f80b2a67a8910b414cf85abe605ef0348",
+    "training_samples": 34871,
+    "training_start": "2022-01-08T00:00:00+00:00",
+    "training_end": "2025-12-30T23:00:00+00:00",
+    "feature_schema": [
+      "ret_1h",
+      "ret_4h",
+      "ret_24h",
+      "ret_168h"
+    ],
+    "target": "Sign of forward 24h return (ln(Close_{t+24h}/Close_t) > 0)",
+    "hyperparameters": {
+      "algorithm": "GradientBoostingClassifier",
+      "n_estimators": 100,
+      "max_depth": 3,
+      "learning_rate": 0.05,
+      "random_state": 42
+    }
+  }
+}

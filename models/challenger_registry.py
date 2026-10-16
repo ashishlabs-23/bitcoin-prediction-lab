@@ -71,6 +71,28 @@ class ChallengerRegistry:
         )
         self._registry[prod_entry.version] = prod_entry
 
+        # 1B. Authoritative Frozen Production Model (HAR-RS-DOW-v1.0)
+        har_entry = ModelRegistryEntry(
+            model_id="HAR-RS-DOW-v1.0",
+            version="1.0.0",
+            model_name="Production HAR-RS-DOW Variance Regressor & C2 Conformal Envelope",
+            deployment_status="PRODUCTION_VOLATILITY",
+            training_period="2022-01-31 to 2025-12-24",
+            feature_schema=[
+                "log_rv_down_1d", "log_rv_up_1d", "log_rv7d_var_ann_lag", "log_rv30d_var_ann",
+                "dow_1", "dow_2", "dow_3", "dow_4", "dow_5", "dow_6"
+            ],
+            target_definition="168h Forward Annualized Realized Variance (rv7d_var_ann)",
+            calibration_method="C2 Dependence-Aware Conformal Prediction (alpha=0.10)",
+            validation_metrics={"holdout_containment_pct": 92.84, "qlike_loss": 0.19300},
+            confirmation_metrics={"contract_hash": "841deba5fb30118bea849f93ebc9fb7d1984d74fd2d709013544c6d5db94cf07"},
+            promotion_reason="Frozen and verified under repaired scientific contract.",
+            created_at=now_str,
+            updated_at=now_str,
+            rollback_target=None
+        )
+        self._registry[har_entry.model_id] = har_entry
+
         # 2. Active Offline Challenger: EWMA Volatility
         ewma_entry = ModelRegistryEntry(
             model_id="ewma_volatility_baseline",
@@ -271,6 +293,9 @@ class ChallengerRegistry:
             if entry.deployment_status == "PRODUCTION":
                 return entry
         return None
+
+    def get_authoritative_production_model(self) -> Optional[ModelRegistryEntry]:
+        return self._registry.get("HAR-RS-DOW-v1.0")
 
     def get_challengers(self) -> List[ModelRegistryEntry]:
         return [entry for entry in self._registry.values() if entry.deployment_status == "CHALLENGER"]

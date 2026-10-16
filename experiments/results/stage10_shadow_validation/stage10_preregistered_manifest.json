@@ -1,0 +1,157 @@
+{
+  "manifest_version": "STAGE10-SHADOW-VAL-v1.0",
+  "registration_timestamp": "2026-10-16T10:18:00Z",
+  "git_commit": "50e362e6d92a20a13cd17ac1258c70107ca805af",
+  "governance": {
+    "production_model": "HAR-RS-DOW-v1.0",
+    "production_model_authorization": "AUTHORIZED_FOR_PRODUCTION",
+    "production_task": "Hourly Volatility & C2 Conformal Risk Envelope (7-day horizon)",
+    "directional_model": "directional-gbm-4lag-v1",
+    "directional_model_authorization": "OFFLINE_RESEARCH_ONLY",
+    "live_trading_status": "DISABLED",
+    "order_execution_calls_allowed": false,
+    "semantic_invariants": [
+      "Volatility quantile containment (92.84%) is NEVER reported as directional accuracy.",
+      "Directional accuracy is NEVER represented as an authorized production trade signal.",
+      "Zero live capital execution or live order routing is permitted."
+    ]
+  },
+  "data_contracts": {
+    "primary_source": "data/raw/ohlcv.parquet",
+    "instrument": "BTC/USD (Coinbase)",
+    "sampling_frequency": "1 hour",
+    "timestamp_convention": "Candle open time in UTC (timestamp), available at candle close (available_time)",
+    "candle_finalization_rule": "Observations are strictly causal: features for bar t are computed only after candle t closes (t + 1 hour).",
+    "outage_handling": "Gaps greater than 2 hours trigger ABSTAIN_DATA_GAP and are excluded from forward return resolution."
+  },
+  "evaluation_horizons": {
+    "1h": {
+      "horizon_bars": 1,
+      "horizon_seconds": 3600,
+      "target_type": "directional_binary",
+      "target_definition": "Sign of forward 1-hour log return: y_t = 1 if ln(Close_{t+1}/Close_t) > 0 else 0",
+      "overlap_factor": 1,
+      "min_sample_size_nominal": 2130,
+      "min_sample_size_eff": 2130,
+      "planned_duration_days": 89,
+      "model_id": "directional-gbm-1h-v1"
+    },
+    "4h": {
+      "horizon_bars": 4,
+      "horizon_seconds": 14400,
+      "target_type": "directional_binary",
+      "target_definition": "Sign of forward 4-hour log return: y_t = 1 if ln(Close_{t+4}/Close_t) > 0 else 0",
+      "overlap_factor": 4,
+      "min_sample_size_nominal": 4000,
+      "min_sample_size_eff": 1000,
+      "planned_duration_days": 167,
+      "model_id": "directional-gbm-4h-v1"
+    },
+    "24h": {
+      "horizon_bars": 24,
+      "horizon_seconds": 86400,
+      "target_type": "directional_binary",
+      "target_definition": "Sign of forward 24-hour log return: y_t = 1 if ln(Close_{t+24}/Close_t) > 0 else 0",
+      "overlap_factor": 24,
+      "min_sample_size_nominal": 24000,
+      "min_sample_size_eff": 1000,
+      "planned_duration_days": 1000,
+      "model_id": "directional-gbm-24h-v1"
+    },
+    "168h_volatility": {
+      "horizon_bars": 168,
+      "horizon_seconds": 604800,
+      "target_type": "volatility_conformal_interval",
+      "target_definition": "Realized variance over forward 168 hours; evaluated against C2 conformal interval [L_t, U_t]",
+      "overlap_factor": 168,
+      "nominal_coverage": 0.90,
+      "min_sample_size_nominal": 2000,
+      "model_id": "HAR-RS-DOW-v1.0"
+    }
+  },
+  "frozen_models": {
+    "HAR-RS-DOW-v1.0": {
+      "role": "PRODUCTION_VOLATILITY",
+      "artifact_path": "experiments/results/freeze/har_rs_dow_v1.joblib",
+      "artifact_sha256": "750b5d15ed84c3cf24b8484ae928ff7c8098cab0c35eafe310ab28bf57ed285b",
+      "feature_count": 12,
+      "training_holdout_boundary": "2026-01-01T00:00:00Z"
+    },
+    "directional-gbm-1h-v1": {
+      "role": "DIRECTIONAL_RESEARCH_BENCHMARK",
+      "artifact_path": "models/registry/research/directional_gbm_1h_v1.joblib",
+      "artifact_sha256": "29589feb99a00bf86d71b46c5986d25d410a71fbf0e630345a70d4fe9da97ac1",
+      "feature_schema": ["ret_1h", "ret_4h", "ret_24h", "ret_168h"],
+      "training_holdout_boundary": "2026-01-01T00:00:00Z"
+    },
+    "directional-gbm-4h-v1": {
+      "role": "DIRECTIONAL_RESEARCH_BENCHMARK",
+      "artifact_path": "models/registry/research/directional_gbm_4h_v1.joblib",
+      "artifact_sha256": "70bd910add16f9b63152a6c8884b51762d2aea56cdef83f2387df733bea6f57d",
+      "feature_schema": ["ret_1h", "ret_4h", "ret_24h", "ret_168h"],
+      "training_holdout_boundary": "2026-01-01T00:00:00Z"
+    },
+    "directional-gbm-24h-v1": {
+      "role": "DIRECTIONAL_RESEARCH_BENCHMARK",
+      "artifact_path": "models/registry/research/directional_gbm_24h_v1.joblib",
+      "artifact_sha256": "637201570381aa8a3cf2fa812a0fac1f80b2a67a8910b414cf85abe605ef0348",
+      "feature_schema": ["ret_1h", "ret_4h", "ret_24h", "ret_168h"],
+      "training_holdout_boundary": "2026-01-01T00:00:00Z"
+    }
+  },
+  "baselines": [
+    {
+      "name": "Prevalence Majority Class",
+      "description": "Predicts constant upward movement based on pre-2026 training prevalence (51.2% up)."
+    },
+    {
+      "name": "Random Walk (Zero Expected Drift)",
+      "description": "Predicts unbiased probability 0.50 (martingale benchmark)."
+    },
+    {
+      "name": "Canonical Directional GBDT 4-Lag",
+      "description": "Frozen GBDT model using 4 return lags."
+    },
+    {
+      "name": "HAR-RS-DOW C2 Conformal Risk Envelope",
+      "description": "Production volatility point forecast with 90% conformal uncertainty bands."
+    }
+  ],
+  "selective_prediction_tiers": [
+    {"tier": "100pct_unfiltered", "hurdle": 0.50},
+    {"tier": "50pct_selective", "hurdle": 0.52},
+    {"tier": "25pct_selective", "hurdle": 0.54},
+    {"tier": "10pct_selective", "hurdle": 0.56},
+    {"tier": "5pct_selective", "hurdle": 0.58}
+  ],
+  "transaction_cost_scenarios": {
+    "institutional_14bps": {
+      "half_turn_fee_bps": 7.0,
+      "round_trip_fee_bps": 14.0,
+      "turnover_rule": "Counts every transition between positions +1, 0 (cash), and -1.",
+      "formula": "Net = Gross - Turnover * 7.0"
+    },
+    "retail_35bps": {
+      "half_turn_fee_bps": 17.5,
+      "round_trip_fee_bps": 35.0,
+      "turnover_rule": "Counts every transition between positions +1, 0 (cash), and -1.",
+      "formula": "Net = Gross - Turnover * 17.5"
+    }
+  },
+  "ledger_integrity": {
+    "format": "JSON Lines (append-only)",
+    "file_path": "experiments/results/stage10_shadow_validation/shadow_prediction_ledger.jsonl",
+    "tamper_evidence": "Cryptographic SHA256 hash chaining (prev_event_hash -> event_hash)",
+    "genesis_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "idempotency_key": "(model_id, horizon, forecast_origin_timestamp)"
+  },
+  "stopping_and_inconclusive_criteria": {
+    "min_bars_for_evaluation": 500,
+    "min_bars_for_definitive_test": 2130,
+    "confidence_level": 0.95,
+    "bootstrap_block_size_hours": 24,
+    "bootstrap_iterations": 1000,
+    "rejection_criterion": "Hypothesis of directional edge is rejected if 95% bootstrap lower bound <= 50.0% on N >= 2130 bars.",
+    "seventy_percent_objective_rule": "70% accuracy is NOT substantiated unless prospective N >= 2130 bars yields 95% bootstrap lower bound >= 70.0%."
+  }
+}

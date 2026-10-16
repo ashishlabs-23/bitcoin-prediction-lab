@@ -1,0 +1,350 @@
+{
+  "timestamp": "2026-10-16T09:45:02.876955+00:00",
+  "experiment_1_canonical_history_funding": {
+    "baseline_gbdt_4lags": {
+      "model": "baseline_gbdt_4lags",
+      "overall_accuracy_pct": 53.13,
+      "balanced_accuracy_pct": 53.11,
+      "roc_auc": 0.5446,
+      "brier_score": 0.2488,
+      "log_loss": 0.6907,
+      "ece": 0.0136,
+      "train_time_sec": 12.91,
+      "per_fold_accuracy": [
+        53.73,
+        54.17,
+        53.71,
+        51.77,
+        52.27
+      ],
+      "per_fold_std": 0.93
+    },
+    "baseline_logistic_4lags": {
+      "model": "baseline_logistic_4lags",
+      "overall_accuracy_pct": 53.18,
+      "balanced_accuracy_pct": 53.08,
+      "roc_auc": 0.542,
+      "brier_score": 0.2489,
+      "log_loss": 0.6909,
+      "ece": 0.0129,
+      "train_time_sec": 0.06,
+      "per_fold_accuracy": [
+        54.77,
+        53.98,
+        53.7,
+        51.33,
+        52.14
+      ],
+      "per_fold_std": 1.26,
+      "paired_vs_baseline_gbdt": {
+        "mean_delta_pct": 0.05,
+        "bootstrap_95_ci": [
+          -0.37,
+          0.48
+        ],
+        "bootstrap_se": 0.217,
+        "bootstrap_p_val": 0.8069,
+        "mcnemar_stat": 0.0498,
+        "mcnemar_p_val": 0.8234,
+        "holm_bonferroni_adj_p_val": 1.0,
+        "statistically_significant_adjusted": false
+      }
+    },
+    "challenger_gbdt_funding_level": {
+      "model": "challenger_gbdt_funding_level",
+      "overall_accuracy_pct": 53.13,
+      "balanced_accuracy_pct": 53.12,
+      "roc_auc": 0.5446,
+      "brier_score": 0.2488,
+      "log_loss": 0.6908,
+      "ece": 0.0139,
+      "train_time_sec": 14.6,
+      "per_fold_accuracy": [
+        53.99,
+        53.71,
+        53.8,
+        51.83,
+        52.33
+      ],
+      "per_fold_std": 0.88,
+      "paired_vs_baseline_gbdt": {
+        "mean_delta_pct": 0.0,
+        "bootstrap_95_ci": [
+          -0.14,
+          0.14
+        ],
+        "bootstrap_se": 0.072,
+        "bootstrap_p_val": 0.9674,
+        "mcnemar_stat": 0.0,
+        "mcnemar_p_val": 1.0,
+        "holm_bonferroni_adj_p_val": 1.0,
+        "statistically_significant_adjusted": false
+      }
+    },
+    "challenger_gbdt_funding_all": {
+      "model": "challenger_gbdt_funding_all",
+      "overall_accuracy_pct": 53.08,
+      "balanced_accuracy_pct": 53.08,
+      "roc_auc": 0.5437,
+      "brier_score": 0.2489,
+      "log_loss": 0.691,
+      "ece": 0.0144,
+      "train_time_sec": 18.6,
+      "per_fold_accuracy": [
+        53.86,
+        53.9,
+        53.39,
+        51.78,
+        52.47
+      ],
+      "per_fold_std": 0.83,
+      "paired_vs_baseline_gbdt": {
+        "mean_delta_pct": -0.05,
+        "bootstrap_95_ci": [
+          -0.26,
+          0.16
+        ],
+        "bootstrap_se": 0.105,
+        "bootstrap_p_val": 0.6543,
+        "mcnemar_stat": 0.1758,
+        "mcnemar_p_val": 0.675,
+        "holm_bonferroni_adj_p_val": 1.0,
+        "statistically_significant_adjusted": false
+      }
+    },
+    "challenger_logistic_funding_all": {
+      "model": "challenger_logistic_funding_all",
+      "overall_accuracy_pct": 53.11,
+      "balanced_accuracy_pct": 53.02,
+      "roc_auc": 0.5412,
+      "brier_score": 0.2489,
+      "log_loss": 0.6909,
+      "ece": 0.0119,
+      "train_time_sec": 0.06,
+      "per_fold_accuracy": [
+        54.7,
+        53.64,
+        53.46,
+        51.37,
+        52.37
+      ],
+      "per_fold_std": 1.14,
+      "paired_vs_baseline_gbdt": {
+        "mean_delta_pct": -0.02,
+        "bootstrap_95_ci": [
+          -0.44,
+          0.43
+        ],
+        "bootstrap_se": 0.226,
+        "bootstrap_p_val": 0.9274,
+        "mcnemar_stat": 0.0058,
+        "mcnemar_p_val": 0.9391,
+        "holm_bonferroni_adj_p_val": 1.0,
+        "statistically_significant_adjusted": false
+      }
+    }
+  },
+  "experiment_2_common_period_oi": {
+    "baseline_common_4lags": {
+      "model": "baseline_common_4lags",
+      "sample_size": 2232,
+      "overall_accuracy_pct": 52.02,
+      "balanced_accuracy_pct": 52.09,
+      "roc_auc": 0.5213,
+      "brier_score": 0.2548
+    },
+    "challenger_common_funding": {
+      "model": "challenger_common_funding",
+      "sample_size": 2232,
+      "overall_accuracy_pct": 53.32,
+      "balanced_accuracy_pct": 53.39,
+      "roc_auc": 0.532,
+      "brier_score": 0.2541,
+      "paired_vs_baseline_common": {
+        "mean_delta_pct": 1.3,
+        "bootstrap_95_ci": [
+          -0.63,
+          3.23
+        ],
+        "bootstrap_p_val": 0.2056,
+        "mcnemar_p_val": 0.2278,
+        "holm_bonferroni_adj_p_val": 0.6167,
+        "statistically_significant_adjusted": false
+      }
+    },
+    "challenger_common_open_interest": {
+      "model": "challenger_common_open_interest",
+      "sample_size": 2232,
+      "overall_accuracy_pct": 51.88,
+      "balanced_accuracy_pct": 51.97,
+      "roc_auc": 0.5088,
+      "brier_score": 0.2552,
+      "paired_vs_baseline_common": {
+        "mean_delta_pct": -0.13,
+        "bootstrap_95_ci": [
+          -2.02,
+          2.2
+        ],
+        "bootstrap_p_val": 0.9007,
+        "mcnemar_p_val": 0.9359,
+        "holm_bonferroni_adj_p_val": 1.0,
+        "statistically_significant_adjusted": false
+      }
+    },
+    "challenger_common_combined": {
+      "model": "challenger_common_combined",
+      "sample_size": 2232,
+      "overall_accuracy_pct": 51.39,
+      "balanced_accuracy_pct": 51.44,
+      "roc_auc": 0.5137,
+      "brier_score": 0.255,
+      "paired_vs_baseline_common": {
+        "mean_delta_pct": -0.63,
+        "bootstrap_95_ci": [
+          -2.82,
+          1.7
+        ],
+        "bootstrap_p_val": 0.5858,
+        "mcnemar_p_val": 0.6441,
+        "holm_bonferroni_adj_p_val": 1.0,
+        "statistically_significant_adjusted": false
+      }
+    }
+  },
+  "experiment_3_multihorizon_4h": {
+    "baseline_4h_4lags": {
+      "overall_accuracy_pct": 53.04,
+      "roc_auc": 0.539,
+      "brier_score": 0.2496
+    },
+    "challenger_4h_funding_all": {
+      "overall_accuracy_pct": 52.84,
+      "roc_auc": 0.5385,
+      "brier_score": 0.25,
+      "paired_vs_baseline": {
+        "mean_delta_pct": -0.2,
+        "bootstrap_95_ci": [
+          -0.59,
+          0.19
+        ],
+        "bootstrap_p_val": 0.3282
+      }
+    }
+  },
+  "experiment_4_economic_viability": {
+    "baseline_gbdt_4lags": {
+      "100pct": {
+        "target_coverage_pct": 100.0,
+        "empirical_coverage_pct": 100.0,
+        "active_samples": 33942,
+        "accuracy_pct": 53.13,
+        "turnover_rate": 0.764,
+        "mean_gross_return_bps": 0.07,
+        "mean_net_institutional_14bps": -5.28,
+        "mean_net_retail_35bps": -13.31,
+        "economic_viability": "NEGATIVE_NET_EXPECTANCY"
+      },
+      "50pct": {
+        "target_coverage_pct": 50.0,
+        "empirical_coverage_pct": 50.02,
+        "active_samples": 16977,
+        "accuracy_pct": 55.28,
+        "turnover_rate": 1.133,
+        "mean_gross_return_bps": 0.36,
+        "mean_net_institutional_14bps": -4.5,
+        "mean_net_retail_35bps": -11.79,
+        "economic_viability": "NEGATIVE_NET_EXPECTANCY"
+      },
+      "25pct": {
+        "target_coverage_pct": 25.0,
+        "empirical_coverage_pct": 25.0,
+        "active_samples": 8486,
+        "accuracy_pct": 56.38,
+        "turnover_rate": 1.422,
+        "mean_gross_return_bps": 0.84,
+        "mean_net_institutional_14bps": -4.52,
+        "mean_net_retail_35bps": -12.57,
+        "economic_viability": "NEGATIVE_NET_EXPECTANCY"
+      },
+      "10pct": {
+        "target_coverage_pct": 10.0,
+        "empirical_coverage_pct": 10.0,
+        "active_samples": 3395,
+        "accuracy_pct": 55.49,
+        "turnover_rate": 1.579,
+        "mean_gross_return_bps": 0.36,
+        "mean_net_institutional_14bps": -5.26,
+        "mean_net_retail_35bps": -13.7,
+        "economic_viability": "NEGATIVE_NET_EXPECTANCY"
+      },
+      "5pct": {
+        "target_coverage_pct": 5.0,
+        "empirical_coverage_pct": 5.01,
+        "active_samples": 1699,
+        "accuracy_pct": 57.15,
+        "turnover_rate": 1.708,
+        "mean_gross_return_bps": 1.41,
+        "mean_net_institutional_14bps": -4.64,
+        "mean_net_retail_35bps": -13.73,
+        "economic_viability": "NEGATIVE_NET_EXPECTANCY"
+      }
+    },
+    "challenger_gbdt_funding_all": {
+      "100pct": {
+        "target_coverage_pct": 100.0,
+        "empirical_coverage_pct": 100.0,
+        "active_samples": 33942,
+        "accuracy_pct": 53.08,
+        "turnover_rate": 0.754,
+        "mean_gross_return_bps": 0.21,
+        "mean_net_institutional_14bps": -5.06,
+        "mean_net_retail_35bps": -12.98,
+        "economic_viability": "NEGATIVE_NET_EXPECTANCY"
+      },
+      "50pct": {
+        "target_coverage_pct": 50.0,
+        "empirical_coverage_pct": 50.0,
+        "active_samples": 16971,
+        "accuracy_pct": 55.29,
+        "turnover_rate": 1.131,
+        "mean_gross_return_bps": 0.52,
+        "mean_net_institutional_14bps": -4.33,
+        "mean_net_retail_35bps": -11.62,
+        "economic_viability": "NEGATIVE_NET_EXPECTANCY"
+      },
+      "25pct": {
+        "target_coverage_pct": 25.0,
+        "empirical_coverage_pct": 25.0,
+        "active_samples": 8486,
+        "accuracy_pct": 55.75,
+        "turnover_rate": 1.384,
+        "mean_gross_return_bps": 0.06,
+        "mean_net_institutional_14bps": -5.13,
+        "mean_net_retail_35bps": -12.92,
+        "economic_viability": "NEGATIVE_NET_EXPECTANCY"
+      },
+      "10pct": {
+        "target_coverage_pct": 10.0,
+        "empirical_coverage_pct": 10.0,
+        "active_samples": 3395,
+        "accuracy_pct": 56.49,
+        "turnover_rate": 1.528,
+        "mean_gross_return_bps": 1.36,
+        "mean_net_institutional_14bps": -4.07,
+        "mean_net_retail_35bps": -12.21,
+        "economic_viability": "NEGATIVE_NET_EXPECTANCY"
+      },
+      "5pct": {
+        "target_coverage_pct": 5.0,
+        "empirical_coverage_pct": 5.0,
+        "active_samples": 1698,
+        "accuracy_pct": 55.42,
+        "turnover_rate": 1.603,
+        "mean_gross_return_bps": 0.06,
+        "mean_net_institutional_14bps": -5.6,
+        "mean_net_retail_35bps": -14.09,
+        "economic_viability": "NEGATIVE_NET_EXPECTANCY"
+      }
+    }
+  }
+}

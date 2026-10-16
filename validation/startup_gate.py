@@ -102,14 +102,24 @@ def verify_full_freeze_integrity() -> bool:
     blocking_warnings = [
         line.strip()
         for line in output.splitlines()
-        if "WARN   Training data" in line
+        if "WARN   Runtime dependency" in line
+        or "WARN   Training data — ohlcv" in line
         or "WARN   Package" in line
         or "WARN   Python version" in line
     ]
     if result.returncode != 0 or blocking_warnings:
         lines = output.splitlines()
-        missing_data = any("FAIL   Training data" in line for line in lines)
-        changed_data = any("WARN   Training data" in line for line in lines)
+        missing_data = any(
+            "FAIL   Runtime dependency" in line
+            or "FAIL   Training data — ohlcv" in line
+            or "FAIL   Training data" in line
+            for line in lines
+        )
+        changed_data = any(
+            "WARN   Runtime dependency" in line
+            or "WARN   Training data — ohlcv" in line
+            for line in lines
+        )
         runtime_drift = any(
             "WARN   Package" in line or "WARN   Python version" in line
             for line in lines

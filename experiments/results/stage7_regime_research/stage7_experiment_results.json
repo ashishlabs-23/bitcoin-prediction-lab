@@ -1,0 +1,858 @@
+{
+  "timestamp": "2026-10-16T09:26:39.362144+00:00",
+  "total_bars": 40702,
+  "evaluated_test_bars": 33919,
+  "pre_registered_hypothesis": {
+    "id": "H1",
+    "statement": "Bitcoin's directional predictability varies across objectively defined market states, and a simple model conditioned on those states may outperform the existing global model on some states without sacrificing robustness across the full evaluation period.",
+    "falsifiable": true,
+    "acceptance_criteria": "Conditioned model must demonstrate statistically significant outperformance (paired bootstrap p < 0.05 and McNemar p < 0.05 after Holm-Bonferroni correction) over the global 4-lag baseline, maintain stability across chronological folds, and show positive net expectancy under realistic transaction costs."
+  },
+  "experiment_a_regime_diagnostics": {
+    "volatility_terciles": {
+      "Vol_Low": {
+        "sample_count": 15759,
+        "coverage_pct": 46.46,
+        "class_balance_pct_positive": 50.46,
+        "majority_class_baseline_pct": 50.46,
+        "gbdt": {
+          "accuracy_pct": 53.21,
+          "balanced_accuracy_pct": 53.22,
+          "roc_auc": 0.542,
+          "brier_score": 0.249,
+          "wilson_95_ci": [
+            52.43,
+            53.99
+          ],
+          "per_fold_accuracy": [
+            54.09,
+            54.02,
+            53.34,
+            52.15,
+            51.99
+          ],
+          "per_fold_std": 0.9,
+          "delta_vs_global_pct": -0.07,
+          "bootstrap_diff_p_val": 0.8619
+        },
+        "logistic_regression": {
+          "accuracy_pct": 53.14,
+          "balanced_accuracy_pct": 53.06,
+          "roc_auc": 0.5399,
+          "brier_score": 0.2492,
+          "wilson_95_ci": [
+            52.36,
+            53.92
+          ],
+          "per_fold_accuracy": [
+            54.6,
+            53.56,
+            53.76,
+            50.94,
+            52.44
+          ],
+          "per_fold_std": 1.26,
+          "delta_vs_global_pct": -0.07
+        }
+      },
+      "Vol_Normal": {
+        "sample_count": 10998,
+        "coverage_pct": 32.42,
+        "class_balance_pct_positive": 50.43,
+        "majority_class_baseline_pct": 50.43,
+        "gbdt": {
+          "accuracy_pct": 53.15,
+          "balanced_accuracy_pct": 53.12,
+          "roc_auc": 0.5454,
+          "brier_score": 0.2487,
+          "wilson_95_ci": [
+            52.21,
+            54.08
+          ],
+          "per_fold_accuracy": [
+            54.27,
+            53.52,
+            53.3,
+            52.14,
+            52.97
+          ],
+          "per_fold_std": 0.7,
+          "delta_vs_global_pct": -0.13,
+          "bootstrap_diff_p_val": 0.7651
+        },
+        "logistic_regression": {
+          "accuracy_pct": 53.24,
+          "balanced_accuracy_pct": 53.15,
+          "roc_auc": 0.5414,
+          "brier_score": 0.249,
+          "wilson_95_ci": [
+            52.3,
+            54.17
+          ],
+          "per_fold_accuracy": [
+            55.83,
+            54.5,
+            53.8,
+            51.8,
+            51.54
+          ],
+          "per_fold_std": 1.63,
+          "delta_vs_global_pct": 0.03
+        }
+      },
+      "Vol_High": {
+        "sample_count": 7162,
+        "coverage_pct": 21.12,
+        "class_balance_pct_positive": 51.52,
+        "majority_class_baseline_pct": 51.52,
+        "gbdt": {
+          "accuracy_pct": 53.63,
+          "balanced_accuracy_pct": 53.55,
+          "roc_auc": 0.5497,
+          "brier_score": 0.2485,
+          "wilson_95_ci": [
+            52.47,
+            54.78
+          ],
+          "per_fold_accuracy": [
+            53.62,
+            55.27,
+            54.91,
+            51.02,
+            52.44
+          ],
+          "per_fold_std": 1.57,
+          "delta_vs_global_pct": 0.35,
+          "bootstrap_diff_p_val": 0.5122
+        },
+        "logistic_regression": {
+          "accuracy_pct": 53.3,
+          "balanced_accuracy_pct": 53.23,
+          "roc_auc": 0.5516,
+          "brier_score": 0.2479,
+          "wilson_95_ci": [
+            52.14,
+            54.45
+          ],
+          "per_fold_accuracy": [
+            54.87,
+            54.17,
+            53.49,
+            51.83,
+            52.57
+          ],
+          "per_fold_std": 1.09,
+          "delta_vs_global_pct": 0.09
+        }
+      }
+    },
+    "trend_terciles": {
+      "Trend_Bear": {
+        "sample_count": 9977,
+        "coverage_pct": 29.41,
+        "class_balance_pct_positive": 53.13,
+        "majority_class_baseline_pct": 53.13,
+        "gbdt": {
+          "accuracy_pct": 53.38,
+          "balanced_accuracy_pct": 52.19,
+          "roc_auc": 0.5381,
+          "brier_score": 0.2483,
+          "wilson_95_ci": [
+            52.4,
+            54.36
+          ],
+          "per_fold_accuracy": [
+            53.73,
+            53.9,
+            54.8,
+            53.12,
+            51.62
+          ],
+          "per_fold_std": 1.05,
+          "delta_vs_global_pct": 0.1,
+          "bootstrap_diff_p_val": 0.8265
+        },
+        "logistic_regression": {
+          "accuracy_pct": 53.49,
+          "balanced_accuracy_pct": 52.19,
+          "roc_auc": 0.5342,
+          "brier_score": 0.2484,
+          "wilson_95_ci": [
+            52.51,
+            54.47
+          ],
+          "per_fold_accuracy": [
+            56.05,
+            54.67,
+            54.55,
+            52.21,
+            51.19
+          ],
+          "per_fold_std": 1.77,
+          "delta_vs_global_pct": 0.29
+        }
+      },
+      "Trend_Range": {
+        "sample_count": 12939,
+        "coverage_pct": 38.15,
+        "class_balance_pct_positive": 50.85,
+        "majority_class_baseline_pct": 50.85,
+        "gbdt": {
+          "accuracy_pct": 52.74,
+          "balanced_accuracy_pct": 52.75,
+          "roc_auc": 0.5338,
+          "brier_score": 0.2496,
+          "wilson_95_ci": [
+            51.88,
+            53.6
+          ],
+          "per_fold_accuracy": [
+            53.68,
+            53.37,
+            51.58,
+            51.54,
+            52.91
+          ],
+          "per_fold_std": 0.9,
+          "delta_vs_global_pct": -0.54,
+          "bootstrap_diff_p_val": 0.1947
+        },
+        "logistic_regression": {
+          "accuracy_pct": 52.82,
+          "balanced_accuracy_pct": 52.66,
+          "roc_auc": 0.5327,
+          "brier_score": 0.2493,
+          "wilson_95_ci": [
+            51.96,
+            53.68
+          ],
+          "per_fold_accuracy": [
+            54.12,
+            53.19,
+            52.76,
+            50.77,
+            52.69
+          ],
+          "per_fold_std": 1.09,
+          "delta_vs_global_pct": -0.39
+        }
+      },
+      "Trend_Bull": {
+        "sample_count": 11003,
+        "coverage_pct": 32.44,
+        "class_balance_pct_positive": 48.24,
+        "majority_class_baseline_pct": 51.76,
+        "gbdt": {
+          "accuracy_pct": 53.82,
+          "balanced_accuracy_pct": 53.35,
+          "roc_auc": 0.5446,
+          "brier_score": 0.2483,
+          "wilson_95_ci": [
+            52.89,
+            54.75
+          ],
+          "per_fold_accuracy": [
+            54.99,
+            55.17,
+            54.72,
+            51.18,
+            52.9
+          ],
+          "per_fold_std": 1.54,
+          "delta_vs_global_pct": 0.54,
+          "bootstrap_diff_p_val": 0.2457
+        },
+        "logistic_regression": {
+          "accuracy_pct": 53.39,
+          "balanced_accuracy_pct": 53.19,
+          "roc_auc": 0.5429,
+          "brier_score": 0.2487,
+          "wilson_95_ci": [
+            52.46,
+            54.33
+          ],
+          "per_fold_accuracy": [
+            55.15,
+            54.49,
+            53.66,
+            51.18,
+            52.53
+          ],
+          "per_fold_std": 1.41,
+          "delta_vs_global_pct": 0.19
+        }
+      }
+    },
+    "trajectory_patterns": {
+      "Traj_Bull_Push": {
+        "sample_count": 9707,
+        "coverage_pct": 28.62,
+        "class_balance_pct_positive": 45.73,
+        "majority_class_baseline_pct": 54.27,
+        "gbdt": {
+          "accuracy_pct": 53.93,
+          "balanced_accuracy_pct": 50.7,
+          "roc_auc": 0.5164,
+          "brier_score": 0.2485,
+          "wilson_95_ci": [
+            52.94,
+            54.92
+          ],
+          "per_fold_accuracy": [
+            54.79,
+            54.6,
+            54.53,
+            52.42,
+            53.22
+          ],
+          "per_fold_std": 0.93,
+          "delta_vs_global_pct": 0.65,
+          "bootstrap_diff_p_val": 0.1705
+        },
+        "logistic_regression": {
+          "accuracy_pct": 54.07,
+          "balanced_accuracy_pct": 51.7,
+          "roc_auc": 0.5223,
+          "brier_score": 0.2488,
+          "wilson_95_ci": [
+            53.08,
+            55.06
+          ],
+          "per_fold_accuracy": [
+            56.15,
+            54.16,
+            54.63,
+            52.58,
+            52.81
+          ],
+          "per_fold_std": 1.3,
+          "delta_vs_global_pct": 0.87
+        }
+      },
+      "Traj_Bull_Pullback": {
+        "sample_count": 7939,
+        "coverage_pct": 23.41,
+        "class_balance_pct_positive": 52.32,
+        "majority_class_baseline_pct": 52.32,
+        "gbdt": {
+          "accuracy_pct": 53.07,
+          "balanced_accuracy_pct": 52.23,
+          "roc_auc": 0.5363,
+          "brier_score": 0.2487,
+          "wilson_95_ci": [
+            51.97,
+            54.16
+          ],
+          "per_fold_accuracy": [
+            53.34,
+            53.89,
+            53.41,
+            51.36,
+            53.31
+          ],
+          "per_fold_std": 0.88,
+          "delta_vs_global_pct": -0.21,
+          "bootstrap_diff_p_val": 0.6973
+        },
+        "logistic_regression": {
+          "accuracy_pct": 52.53,
+          "balanced_accuracy_pct": 51.07,
+          "roc_auc": 0.5343,
+          "brier_score": 0.2487,
+          "wilson_95_ci": [
+            51.43,
+            53.62
+          ],
+          "per_fold_accuracy": [
+            53.91,
+            53.64,
+            53.1,
+            49.21,
+            52.72
+          ],
+          "per_fold_std": 1.7,
+          "delta_vs_global_pct": -0.68
+        }
+      },
+      "Traj_Bear_Push": {
+        "sample_count": 8791,
+        "coverage_pct": 25.92,
+        "class_balance_pct_positive": 54.81,
+        "majority_class_baseline_pct": 54.81,
+        "gbdt": {
+          "accuracy_pct": 54.37,
+          "balanced_accuracy_pct": 50.71,
+          "roc_auc": 0.5221,
+          "brier_score": 0.248,
+          "wilson_95_ci": [
+            53.33,
+            55.41
+          ],
+          "per_fold_accuracy": [
+            54.29,
+            56.57,
+            55.15,
+            53.86,
+            52.27
+          ],
+          "per_fold_std": 1.42,
+          "delta_vs_global_pct": 1.09,
+          "bootstrap_diff_p_val": 0.0338
+        },
+        "logistic_regression": {
+          "accuracy_pct": 54.48,
+          "balanced_accuracy_pct": 50.47,
+          "roc_auc": 0.5122,
+          "brier_score": 0.2483,
+          "wilson_95_ci": [
+            53.43,
+            55.51
+          ],
+          "per_fold_accuracy": [
+            55.47,
+            56.51,
+            55.32,
+            52.8,
+            52.54
+          ],
+          "per_fold_std": 1.57,
+          "delta_vs_global_pct": 1.27
+        }
+      },
+      "Traj_Bear_Bounce": {
+        "sample_count": 7482,
+        "coverage_pct": 22.06,
+        "class_balance_pct_positive": 50.48,
+        "majority_class_baseline_pct": 50.48,
+        "gbdt": {
+          "accuracy_pct": 51.38,
+          "balanced_accuracy_pct": 51.47,
+          "roc_auc": 0.5228,
+          "brier_score": 0.2502,
+          "wilson_95_ci": [
+            50.24,
+            52.51
+          ],
+          "per_fold_accuracy": [
+            53.62,
+            50.93,
+            51.79,
+            49.67,
+            50.85
+          ],
+          "per_fold_std": 1.31,
+          "delta_vs_global_pct": -1.9,
+          "bootstrap_diff_p_val": 0.0011
+        },
+        "logistic_regression": {
+          "accuracy_pct": 51.3,
+          "balanced_accuracy_pct": 51.4,
+          "roc_auc": 0.5209,
+          "brier_score": 0.2498,
+          "wilson_95_ci": [
+            50.16,
+            52.43
+          ],
+          "per_fold_accuracy": [
+            53.36,
+            51.34,
+            51.26,
+            50.39,
+            50.1
+          ],
+          "per_fold_std": 1.14,
+          "delta_vs_global_pct": -1.91
+        }
+      }
+    }
+  },
+  "experiment_b_challenger_models": {
+    "baseline_gbdt_4lags": {
+      "model_identifier": "baseline_gbdt_4lags",
+      "overall_accuracy_pct": 53.28,
+      "balanced_accuracy_pct": 53.27,
+      "roc_auc": 0.5445,
+      "brier_score": 0.2488,
+      "log_loss": 0.6908,
+      "ece": 0.0122,
+      "train_time_sec": 13.29,
+      "per_fold_accuracy": [
+        54.06,
+        54.12,
+        53.81,
+        51.94,
+        52.47
+      ],
+      "per_fold_std": 0.9,
+      "per_fold_min": 51.94,
+      "per_fold_max": 54.12
+    },
+    "baseline_logistic_4lags": {
+      "model_identifier": "baseline_logistic_4lags",
+      "overall_accuracy_pct": 53.2,
+      "balanced_accuracy_pct": 53.1,
+      "roc_auc": 0.5419,
+      "brier_score": 0.2489,
+      "log_loss": 0.6909,
+      "ece": 0.0131,
+      "train_time_sec": 0.06,
+      "per_fold_accuracy": [
+        54.83,
+        54.0,
+        53.69,
+        51.36,
+        52.13
+      ],
+      "per_fold_std": 1.27,
+      "per_fold_min": 51.36,
+      "per_fold_max": 54.83,
+      "paired_vs_baseline_gbdt": {
+        "mean_delta_pct": -0.08,
+        "bootstrap_95_ci": [
+          -0.5,
+          0.36
+        ],
+        "bootstrap_se": 0.22,
+        "bootstrap_p_val": 0.7279,
+        "mcnemar_stat": 0.1075,
+        "mcnemar_p_val": 0.743,
+        "holm_bonferroni_adj_p_val": 1.0,
+        "statistically_significant_adjusted": false
+      }
+    },
+    "challenger_gbdt_regime_interactions": {
+      "model_identifier": "challenger_gbdt_regime_interactions",
+      "overall_accuracy_pct": 53.23,
+      "balanced_accuracy_pct": 53.21,
+      "roc_auc": 0.5447,
+      "brier_score": 0.2488,
+      "log_loss": 0.6907,
+      "ece": 0.0124,
+      "train_time_sec": 18.48,
+      "per_fold_accuracy": [
+        54.14,
+        54.3,
+        53.87,
+        51.66,
+        52.17
+      ],
+      "per_fold_std": 1.09,
+      "per_fold_min": 51.66,
+      "per_fold_max": 54.3,
+      "paired_vs_baseline_gbdt": {
+        "mean_delta_pct": -0.05,
+        "bootstrap_95_ci": [
+          -0.25,
+          0.15
+        ],
+        "bootstrap_se": 0.106,
+        "bootstrap_p_val": 0.6154,
+        "mcnemar_stat": 0.205,
+        "mcnemar_p_val": 0.6507,
+        "holm_bonferroni_adj_p_val": 1.0,
+        "statistically_significant_adjusted": false
+      }
+    },
+    "challenger_logistic_regime_interactions": {
+      "model_identifier": "challenger_logistic_regime_interactions",
+      "overall_accuracy_pct": 53.06,
+      "balanced_accuracy_pct": 52.98,
+      "roc_auc": 0.543,
+      "brier_score": 0.249,
+      "log_loss": 0.6911,
+      "ece": 0.0069,
+      "train_time_sec": 0.11,
+      "per_fold_accuracy": [
+        53.97,
+        54.02,
+        54.0,
+        51.53,
+        51.76
+      ],
+      "per_fold_std": 1.15,
+      "per_fold_min": 51.53,
+      "per_fold_max": 54.02,
+      "paired_vs_baseline_gbdt": {
+        "mean_delta_pct": -0.22,
+        "bootstrap_95_ci": [
+          -0.68,
+          0.26
+        ],
+        "bootstrap_se": 0.237,
+        "bootstrap_p_val": 0.3448,
+        "mcnemar_stat": 0.8889,
+        "mcnemar_p_val": 0.3458,
+        "holm_bonferroni_adj_p_val": 1.0,
+        "statistically_significant_adjusted": false
+      }
+    },
+    "challenger_gbdt_vol_partitioned": {
+      "model_identifier": "challenger_gbdt_vol_partitioned",
+      "overall_accuracy_pct": 52.83,
+      "balanced_accuracy_pct": 52.84,
+      "roc_auc": 0.5379,
+      "brier_score": 0.2501,
+      "log_loss": 0.6936,
+      "ece": 0.0232,
+      "train_time_sec": 12.4,
+      "per_fold_accuracy": [
+        53.8,
+        53.31,
+        53.24,
+        52.01,
+        51.78
+      ],
+      "per_fold_std": 0.79,
+      "per_fold_min": 51.78,
+      "per_fold_max": 53.8,
+      "paired_vs_baseline_gbdt": {
+        "mean_delta_pct": -0.45,
+        "bootstrap_95_ci": [
+          -0.86,
+          -0.05
+        ],
+        "bootstrap_se": 0.216,
+        "bootstrap_p_val": 0.0357,
+        "mcnemar_stat": 4.4085,
+        "mcnemar_p_val": 0.0358,
+        "holm_bonferroni_adj_p_val": 0.1785,
+        "statistically_significant_adjusted": false
+      }
+    },
+    "challenger_logistic_vol_partitioned": {
+      "model_identifier": "challenger_logistic_vol_partitioned",
+      "overall_accuracy_pct": 53.39,
+      "balanced_accuracy_pct": 53.34,
+      "roc_auc": 0.5429,
+      "brier_score": 0.249,
+      "log_loss": 0.6912,
+      "ece": 0.0092,
+      "train_time_sec": 0.1,
+      "per_fold_accuracy": [
+        54.8,
+        54.31,
+        53.59,
+        52.35,
+        51.92
+      ],
+      "per_fold_std": 1.11,
+      "per_fold_min": 51.92,
+      "per_fold_max": 54.8,
+      "paired_vs_baseline_gbdt": {
+        "mean_delta_pct": 0.11,
+        "bootstrap_95_ci": [
+          -0.3,
+          0.53
+        ],
+        "bootstrap_se": 0.215,
+        "bootstrap_p_val": 0.593,
+        "mcnemar_stat": 0.2659,
+        "mcnemar_p_val": 0.6061,
+        "holm_bonferroni_adj_p_val": 1.0,
+        "statistically_significant_adjusted": false
+      }
+    }
+  },
+  "experiment_c_decision_quality": {
+    "baseline_gbdt": {
+      "100pct": {
+        "target_coverage_pct": 100.0,
+        "empirical_coverage_pct": 100.0,
+        "active_samples": 33919,
+        "accuracy_pct": 53.28,
+        "wilson_95_ci": [
+          52.75,
+          53.81
+        ],
+        "total_transitions": 25745,
+        "turnover_rate": 0.759,
+        "mean_gross_return_active_bps": 0.19,
+        "mean_net_return_institutional_14bps": -5.12,
+        "mean_net_return_retail_35bps": -13.09,
+        "economic_viability": "NEGATIVE_NET_EXPECTANCY (UNPROFITABLE)"
+      },
+      "50pct": {
+        "target_coverage_pct": 50.0,
+        "empirical_coverage_pct": 50.03,
+        "active_samples": 16970,
+        "accuracy_pct": 55.12,
+        "wilson_95_ci": [
+          54.37,
+          55.87
+        ],
+        "total_transitions": 19021,
+        "turnover_rate": 1.121,
+        "mean_gross_return_active_bps": 0.3,
+        "mean_net_return_institutional_14bps": -4.48,
+        "mean_net_return_retail_35bps": -11.64,
+        "economic_viability": "NEGATIVE_NET_EXPECTANCY (UNPROFITABLE)"
+      },
+      "25pct": {
+        "target_coverage_pct": 25.0,
+        "empirical_coverage_pct": 25.04,
+        "active_samples": 8492,
+        "accuracy_pct": 55.69,
+        "wilson_95_ci": [
+          54.63,
+          56.74
+        ],
+        "total_transitions": 11927,
+        "turnover_rate": 1.404,
+        "mean_gross_return_active_bps": 0.22,
+        "mean_net_return_institutional_14bps": -5.02,
+        "mean_net_return_retail_35bps": -12.88,
+        "economic_viability": "NEGATIVE_NET_EXPECTANCY (UNPROFITABLE)"
+      },
+      "10pct": {
+        "target_coverage_pct": 10.0,
+        "empirical_coverage_pct": 10.02,
+        "active_samples": 3399,
+        "accuracy_pct": 55.96,
+        "wilson_95_ci": [
+          54.28,
+          57.62
+        ],
+        "total_transitions": 5479,
+        "turnover_rate": 1.612,
+        "mean_gross_return_active_bps": 0.54,
+        "mean_net_return_institutional_14bps": -5.19,
+        "mean_net_return_retail_35bps": -13.79,
+        "economic_viability": "NEGATIVE_NET_EXPECTANCY (UNPROFITABLE)"
+      },
+      "5pct": {
+        "target_coverage_pct": 5.0,
+        "empirical_coverage_pct": 5.13,
+        "active_samples": 1741,
+        "accuracy_pct": 56.81,
+        "wilson_95_ci": [
+          54.47,
+          59.12
+        ],
+        "total_transitions": 3016,
+        "turnover_rate": 1.732,
+        "mean_gross_return_active_bps": 1.35,
+        "mean_net_return_institutional_14bps": -4.77,
+        "mean_net_return_retail_35bps": -13.94,
+        "economic_viability": "NEGATIVE_NET_EXPECTANCY (UNPROFITABLE)"
+      }
+    },
+    "regime_interaction_gbdt": {
+      "100pct": {
+        "target_coverage_pct": 100.0,
+        "empirical_coverage_pct": 100.0,
+        "active_samples": 33919,
+        "accuracy_pct": 53.23,
+        "wilson_95_ci": [
+          52.7,
+          53.76
+        ],
+        "total_transitions": 25841,
+        "turnover_rate": 0.762,
+        "mean_gross_return_active_bps": 0.22,
+        "mean_net_return_institutional_14bps": -5.12,
+        "mean_net_return_retail_35bps": -13.12,
+        "economic_viability": "NEGATIVE_NET_EXPECTANCY (UNPROFITABLE)"
+      },
+      "50pct": {
+        "target_coverage_pct": 50.0,
+        "empirical_coverage_pct": 50.16,
+        "active_samples": 17015,
+        "accuracy_pct": 55.24,
+        "wilson_95_ci": [
+          54.49,
+          55.99
+        ],
+        "total_transitions": 19527,
+        "turnover_rate": 1.148,
+        "mean_gross_return_active_bps": 0.22,
+        "mean_net_return_institutional_14bps": -4.7,
+        "mean_net_return_retail_35bps": -12.09,
+        "economic_viability": "NEGATIVE_NET_EXPECTANCY (UNPROFITABLE)"
+      },
+      "25pct": {
+        "target_coverage_pct": 25.0,
+        "empirical_coverage_pct": 25.06,
+        "active_samples": 8501,
+        "accuracy_pct": 55.57,
+        "wilson_95_ci": [
+          54.51,
+          56.62
+        ],
+        "total_transitions": 12197,
+        "turnover_rate": 1.435,
+        "mean_gross_return_active_bps": 0.66,
+        "mean_net_return_institutional_14bps": -4.71,
+        "mean_net_return_retail_35bps": -12.77,
+        "economic_viability": "NEGATIVE_NET_EXPECTANCY (UNPROFITABLE)"
+      },
+      "10pct": {
+        "target_coverage_pct": 10.0,
+        "empirical_coverage_pct": 10.03,
+        "active_samples": 3403,
+        "accuracy_pct": 56.51,
+        "wilson_95_ci": [
+          54.84,
+          58.17
+        ],
+        "total_transitions": 5552,
+        "turnover_rate": 1.632,
+        "mean_gross_return_active_bps": 1.15,
+        "mean_net_return_institutional_14bps": -4.74,
+        "mean_net_return_retail_35bps": -13.57,
+        "economic_viability": "NEGATIVE_NET_EXPECTANCY (UNPROFITABLE)"
+      },
+      "5pct": {
+        "target_coverage_pct": 5.0,
+        "empirical_coverage_pct": 5.05,
+        "active_samples": 1714,
+        "accuracy_pct": 56.01,
+        "wilson_95_ci": [
+          53.65,
+          58.34
+        ],
+        "total_transitions": 2914,
+        "turnover_rate": 1.7,
+        "mean_gross_return_active_bps": 1.93,
+        "mean_net_return_institutional_14bps": -4.12,
+        "mean_net_return_retail_35bps": -13.2,
+        "economic_viability": "NEGATIVE_NET_EXPECTANCY (UNPROFITABLE)"
+      }
+    }
+  },
+  "robustness_sensitivity": {
+    "realized_vol_48h": {
+      "Vol48_Low": {
+        "sample_count": 16703,
+        "accuracy_pct": 53.05,
+        "delta_vs_global": -0.23
+      },
+      "Vol48_Normal": {
+        "sample_count": 10330,
+        "accuracy_pct": 53.77,
+        "delta_vs_global": 0.49
+      },
+      "Vol48_High": {
+        "sample_count": 6886,
+        "accuracy_pct": 53.11,
+        "delta_vs_global": -0.17
+      }
+    },
+    "sma_ratio_50": {
+      "TrendSMA_Bear": {
+        "sample_count": 9670,
+        "accuracy_pct": 53.25,
+        "delta_vs_global": -0.03
+      },
+      "TrendSMA_Range": {
+        "sample_count": 12891,
+        "accuracy_pct": 52.7,
+        "delta_vs_global": -0.58
+      },
+      "TrendSMA_Bull": {
+        "sample_count": 11358,
+        "accuracy_pct": 53.97,
+        "delta_vs_global": 0.69
+      }
+    }
+  }
+}

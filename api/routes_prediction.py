@@ -62,6 +62,8 @@ def _unavailable_range_payload(horizon: str = "24h") -> Dict[str, Any]:
         "availability": "UNAVAILABLE",
         "symbol": "BTCUSD",
         "horizon": horizon,
+        "authoritative_production_model": "HAR-RS-DOW-v1.0",
+        "blocked_candidate_model": "v3.0.0-excursion-ridge-conformal",
         "model_version": None,
         "context_version": None,
         "current_price": None,
@@ -81,6 +83,7 @@ def _unavailable_range_payload(horizon: str = "24h") -> Dict[str, Any]:
         "natural_language_explanation": None,
         "reason": UNVERIFIED_RESEARCH_REASON,
         "forecast": None,
+        "model_identity_source": "/api/terminal/model-identity",
     }
 
 
@@ -90,6 +93,8 @@ async def get_prediction_latest(live: bool = False, horizon: Optional[str] = Non
         "status": "BLOCKED_PROVENANCE_UNVERIFIED",
         "availability": "UNAVAILABLE",
         "direction": "SKIP",
+        "authoritative_production_model": "HAR-RS-DOW-v1.0",
+        "blocked_candidate_model": "v3.0.0-excursion-ridge-conformal",
         "probability": None,
         "probability_pct": None,
         "entry_price": None,
@@ -101,6 +106,7 @@ async def get_prediction_latest(live: bool = False, horizon: Optional[str] = Non
         "validation_status": "NOT VALIDATED FOR PREDICTIVE OR ECONOMIC SUPERIORITY (RESEARCH ONLY)",
         "governance_disclaimer": "Exploratory directional model. Not validated by HAR-RS-DOW/C2 scientific research.",
         "reason": UNVERIFIED_RESEARCH_REASON,
+        "model_identity_source": "/api/terminal/model-identity",
     }
 
 
