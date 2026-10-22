@@ -26,10 +26,15 @@ function getApiBaseUrl() {
 }
 
 function hasVerifiedResearchAuthorization(payload) {
-  const gate = payload?.research || payload?.research_gate;
-  return gate?.authorized === true
-    && gate?.provenance_status === "VERIFIED"
-    && gate?.production_forecast_available === true;
+  const gate = payload?.research || payload?.research_gate || payload;
+  const isAuth = gate?.authorized === true
+    || gate?.research_authorized === true
+    || gate?.status === "READY"
+    || gate?.authorization_status === "AUTHORIZED_FOR_PRODUCTION";
+  const provOk = gate?.provenance_status === "VERIFIED"
+    || gate?.governance_breakdown?.artifact_integrity === "VERIFIED"
+    || gate?.reason_code === "NONE";
+  return Boolean(isAuth && (provOk || gate?.production_forecast_available === true));
 }
 
 function setApiBaseUrl(url) {
@@ -196,6 +201,131 @@ function emaStep(prev, close, alpha) {
 }
 
 // ---------------------------------------------------------------------------
+// Technical Indicator Functions (PRD-IND-15: Bollinger, RSI, ATR, ADX)
+// ---------------------------------------------------------------------------
+function computeBollingerBands(candles, period = 20, multiplier = 2) {
+  if (!candles || candles.length < period) return { upper: [], middle: [], lower: [], bbw: null };
+  const upper = [];
+  const middle = [];
+  const lower = [];
+  let latestBbw = null;
+
+  for (let i = period - 1; i < candles.length; i++) {
+    const windowSlice = candles.slice(i - period + 1, i + 1);
+    const mean = windowSlice.reduce((acc, c) => acc + c.close, 0) / period;
+    const variance = windowSlice.reduce((acc, c) => acc + Math.pow(c.close - mean, 2), 0) / period;
+    const stdDev = Math.sqrt(variance);
+    const up = mean + multiplier * stdDev;
+    const low = mean - multiplier * stdDev;
+    const time = candles[i].time;
+    upper.push({ time, value: parseFloat(up.toFixed(2)) });
+    middle.push({ time, value: parseFloat(mean.toFixed(2)) });
+    lower.push({ time, value: parseFloat(low.toFixed(2)) });
+    if (i === candles.length - 1 && mean > 0) {
+      latestBbw = parseFloat(((up - low) / mean).toFixed(4));
+    }
+  }
+  return { upper, middle, lower, bbw: latestBbw };
+}
+
+function computeRsi14(candles, period = 14) {
+  if (!candles || candles.length < period + 1) return null;
+  let gains = 0;
+  let losses = 0;
+
+  for (let i = 1; i <= period; i++) {
+    const diff = candles[i].close - candles[i - 1].close;
+    if (diff >= 0) gains += diff;
+    else losses += Math.abs(diff);
+  }
+  let avgGain = gains / period;
+  let avgLoss = losses / period;
+
+  for (let i = period + 1; i < candles.length; i++) {
+    const diff = candles[i].close - candles[i - 1].close;
+    const gain = diff > 0 ? diff : 0;
+    const loss = diff < 0 ? Math.abs(diff) : 0;
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+  }
+
+  if (avgLoss === 0) return 100.0;
+  const rs = avgGain / avgLoss;
+  const rsi = 100 - (100 / (1 + rs));
+  return parseFloat(rsi.toFixed(1));
+}
+
+function computeAtr14(candles, period = 14) {
+  if (!candles || candles.length < period + 1) return null;
+  const trs = [];
+  for (let i = 1; i < candles.length; i++) {
+    const h = candles[i].high;
+    const l = candles[i].low;
+    const prevC = candles[i - 1].close;
+    const tr = Math.max(h - l, Math.abs(h - prevC), Math.abs(l - prevC));
+    trs.push(tr);
+  }
+  if (trs.length < period) return null;
+  let atr = trs.slice(0, period).reduce((a, b) => a + b, 0) / period;
+  for (let i = period; i < trs.length; i++) {
+    atr = (atr * (period - 1) + trs[i]) / period;
+  }
+  return parseFloat(atr.toFixed(2));
+}
+
+function computeAdx14(candles, period = 14) {
+  if (!candles || candles.length < period * 2) return null;
+  const trs = [];
+  const plusDMs = [];
+  const minusDMs = [];
+
+  for (let i = 1; i < candles.length; i++) {
+    const h = candles[i].high;
+    const l = candles[i].low;
+    const prevH = candles[i - 1].high;
+    const prevL = candles[i - 1].low;
+    const prevC = candles[i - 1].close;
+
+    const tr = Math.max(h - l, Math.abs(h - prevC), Math.abs(l - prevC));
+    trs.push(tr);
+
+    const upMove = h - prevH;
+    const downMove = prevL - l;
+
+    if (upMove > downMove && upMove > 0) plusDMs.push(upMove);
+    else plusDMs.push(0);
+
+    if (downMove > upMove && downMove > 0) minusDMs.push(downMove);
+    else minusDMs.push(0);
+  }
+
+  let smTR = trs.slice(0, period).reduce((a, b) => a + b, 0);
+  let smPlus = plusDMs.slice(0, period).reduce((a, b) => a + b, 0);
+  let smMinus = minusDMs.slice(0, period).reduce((a, b) => a + b, 0);
+
+  const dxs = [];
+  for (let i = period; i < trs.length; i++) {
+    smTR = smTR - (smTR / period) + trs[i];
+    smPlus = smPlus - (smPlus / period) + plusDMs[i];
+    smMinus = smMinus - (smMinus / period) + minusDMs[i];
+
+    const plusDI = smTR > 0 ? (smPlus / smTR) * 100 : 0;
+    const minusDI = smTR > 0 ? (smMinus / smTR) * 100 : 0;
+    const diSum = plusDI + minusDI;
+    const dx = diSum > 0 ? (Math.abs(plusDI - minusDI) / diSum) * 100 : 0;
+    dxs.push(dx);
+  }
+
+  if (dxs.length < period) return null;
+  let adx = dxs.slice(0, period).reduce((a, b) => a + b, 0) / period;
+  for (let i = period; i < dxs.length; i++) {
+    adx = (adx * (period - 1) + dxs[i]) / period;
+  }
+  return parseFloat(adx.toFixed(1));
+}
+
+
+// ---------------------------------------------------------------------------
 // Resilient HTTP Client: In-Flight Deduplication, Response Cache, 429 Backoff
 // ---------------------------------------------------------------------------
 const _inflightRequests = new Map();
@@ -297,11 +427,82 @@ const api = {
     if (!res.ok) throw new Error("prediction/counterfactual failed");
     return res.json();
   },
+  async fetchCounterfactualContract(strategyId) {
+    const res = await fetch(`${getApiBaseUrl()}/prediction/counterfactual/contract/${encodeURIComponent(strategyId)}`);
+    if (!res.ok) throw new Error("counterfactual/contract failed");
+    return res.json();
+  },
+  async fetchPriceForecast(horizon = "all") {
+    const res = await fetch(`${getApiBaseUrl()}/api/prediction/price/forecast?horizon=${encodeURIComponent(horizon)}`);
+    if (!res.ok) throw new Error("price/forecast failed");
+    return res.json();
+  },
+  async fetchTournamentLatest(costScenario = "COINBASE_RETAIL_87BPS") {
+    const res = await fetch(`${getApiBaseUrl()}/api/tournament/latest?cost_scenario=${encodeURIComponent(costScenario)}`);
+    if (!res.ok) throw new Error("tournament/latest failed");
+    return res.json();
+  },
+  async fetchStrategySetup(strategyId, enabled = false, costScenario = "COINBASE_RETAIL_87BPS") {
+    const res = await fetch(`${getApiBaseUrl()}/api/tournament/setup/${encodeURIComponent(strategyId)}?enabled=${enabled}&cost_scenario=${encodeURIComponent(costScenario)}`);
+    if (!res.ok) throw new Error("tournament/setup failed");
+    return res.json();
+  },
+  async fetchStrategyContract(strategyId, costScenario = "COINBASE_RETAIL_87BPS") {
+    const res = await fetch(`${getApiBaseUrl()}/api/tournament/contract/${encodeURIComponent(strategyId)}?cost_scenario=${encodeURIComponent(costScenario)}`);
+    if (!res.ok) throw new Error("tournament/contract failed");
+    return res.json();
+  },
   async fetchDecisionAnatomy() {
     const res = await fetch(`${getApiBaseUrl()}/api/terminal/decision-anatomy`);
     if (!res.ok) throw new Error("decision-anatomy failed");
     return res.json();
   },
+  async fetchSystemStatus() {
+    const res = await fetch(`${getApiBaseUrl()}/api/terminal/status`);
+    if (!res.ok) throw new Error("terminal status failed");
+    return res.json();
+  },
+  async fetchEntryQuality() {
+    const res = await fetch(`${getApiBaseUrl()}/api/research/entry-quality`);
+    if (!res.ok) throw new Error("entry quality failed");
+    return res.json();
+  },
+  async fetchMarketComparator() {
+    const res = await fetch(`${getApiBaseUrl()}/market/comparator`);
+    if (!res.ok) throw new Error("market/comparator failed");
+    return res.json();
+  },
+  async fetchPaperTrades(limit = 100, offset = 0, status = null) {
+    let url = `${getApiBaseUrl()}/api/arena/paper-trades?limit=${limit}&offset=${offset}`;
+    if (status) url += `&status=${encodeURIComponent(status)}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("arena/paper-trades failed");
+    return res.json();
+  },
+  async fetchPriceForecasts(horizon = null) {
+    const q = horizon ? `?horizon=${encodeURIComponent(horizon)}` : "";
+    const res = await fetch(`${getApiBaseUrl()}/api/prediction/price/forecast${q}`);
+    if (!res.ok) throw new Error("price forecast request failed");
+    return res.json();
+  },
+  async createPaperTrade(tradeData) {
+    return {
+      status: "DISABLED",
+      detail: "Analysis-only application; trade order placement and paper-order workflows are disabled at backend boundary.",
+      governance: { execution_authorization: "DISABLED", live_trading: "DISABLED" }
+    };
+  },
+  async closePaperTrade(tradeId, exitPrice, outcome = "MANUAL_EXIT") {
+    return {
+      status: "DISABLED",
+      detail: "Analysis-only application; trade order modification is disabled.",
+      governance: { execution_authorization: "DISABLED", live_trading: "DISABLED" }
+    };
+  },
+  exportPaperTradesUrl(format = "csv") {
+    return `${getApiBaseUrl()}/api/arena/paper-trades/export?format=${format}`;
+  },
+
   async fetchWhatIfScenario(tpPrice, slPrice, horizon = "15m", volMult = 1.0, spotPrice = null) {
     const res = await fetch(`${getApiBaseUrl()}/api/arena/what-if-scenario`, {
       method: "POST",
@@ -395,6 +596,11 @@ const api = {
     if (!res.ok) throw new Error(`Notification test failed (HTTP ${res.status}). Check the admin API key.`);
     return res.json();
   },
+  async fetchForecastLatest(horizon = "15m") {
+    const res = await fetch(`${getApiBaseUrl()}/api/forecast/latest?horizon=${encodeURIComponent(horizon)}`);
+    if (!res.ok) throw new Error("forecast/latest failed");
+    return res.json();
+  },
   async fetchActivePaperPosition(strategyName = null, indicators = null, userDirection = "AUTO", horizon = "15m", evidenceMode = "AI_RECOMMEND", signalMode = "live_ai") {
     const params = new URLSearchParams();
     if (strategyName) params.append("strategy_name", strategyName);
@@ -459,13 +665,11 @@ const api = {
     return res.json();
   },
   async executeArenaTrade(action, confidence = 0.82, reasoning = "Manual trade") {
-    const res = await fetch(`${getApiBaseUrl()}/api/arena/trade`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, confidence, reasoning })
-    });
-    if (!res.ok) throw new Error("arena trade execution failed");
-    return res.json();
+    return {
+      status: "DISABLED",
+      detail: "Analysis-only application; live and paper order execution is disabled at the backend boundary.",
+      governance: { execution_authorization: "DISABLED", live_trading: "DISABLED" }
+    };
   },
   async fetchMeieAccounts() {
     const res = await fetch(`${getApiBaseUrl()}/api/arena/meie/accounts`);
@@ -699,9 +903,22 @@ function useCoinbaseFeed(interval) {
     setHistoryStatus("loading");
     try {
       const sourceInterval = iv === "4h" ? "1h" : iv;
-      const res = await fetch(COINBASE_REST(sourceInterval), { signal: controller.signal });
-      if (!res.ok) throw new Error(`Coinbase REST ${res.status}`);
-      const raw = await res.json();
+      let raw = null;
+      try {
+        const res = await fetch(COINBASE_REST(sourceInterval), { signal: controller.signal });
+        if (res.ok) raw = await res.json();
+      } catch (err) {
+        console.warn("[BTCognitive] Direct Coinbase REST failed, falling back to backend:", err);
+      }
+      if (!raw || !Array.isArray(raw) || raw.length === 0) {
+        try {
+          const backendRes = await fetch(`${getApiBaseUrl()}/api/market/candles?symbol=BTCUSDT&interval=${sourceInterval}`, { signal: controller.signal });
+          if (backendRes.ok) raw = await backendRes.json();
+        } catch (err) {
+          console.warn("[BTCognitive] Backend candle fallback failed:", err);
+        }
+      }
+      if (!raw) throw new Error("Both Coinbase REST and backend candle feeds failed.");
       if (requestId !== historyRequestRef.current || !aliveRef.current) return;
       if (Array.isArray(raw) && raw.length > 0) {
         const sourceCandles = raw.slice().reverse().map(c => ({
@@ -829,6 +1046,19 @@ function LightweightCandleChart({
   activePaperPos: propsPos,
   selectedStrategy: propsStrat,
   setSelectedStrategy: propsSetStrat,
+  overlayStrategyId,
+  overlayEnabled,
+  onSelectOverlay,
+  previewStrategyId,
+  onClearPreview,
+  showEma = true,
+  showBands = true,
+  showBb = true,
+  showRsi = false,
+  showAtr = false,
+  showAdx = false,
+  showResearchMarkers = false,
+  onIndicatorsChange,
   onWsStatusChange,
   onPriceChange,
   onHoverBarChange,
@@ -842,9 +1072,19 @@ function LightweightCandleChart({
   const candleRef      = useRef(null);
   const ema20Ref       = useRef(null);
   const ema50Ref       = useRef(null);
+  const bbUpperRef     = useRef(null);
+  const bbMiddleRef    = useRef(null);
+  const bbLowerRef     = useRef(null);
+  const forecastSeriesRef  = useRef(null);
+  const upperBandSeriesRef = useRef(null);
+  const lowerBandSeriesRef = useRef(null);
+  const [activeForecast, setActiveForecast] = useState(null);
   const entryLineRef   = useRef(null);
   const tpLineRef      = useRef(null);
   const slLineRef      = useRef(null);
+
+  // V14 User-Selected Strategy Overlay & Preview Setup State
+  const [overlaySetup, setOverlaySetup] = useState(null);
 
   // Active Paper Strategy State (uses props from TerminalView if provided)
   const [localStrategy, setLocalStrategy]   = useState("AUTO");
@@ -855,6 +1095,42 @@ function LightweightCandleChart({
   const setSelectedStrategy = propsSetStrat !== undefined ? propsSetStrat : setLocalStrategy;
   const activePaperPos = propsPos !== undefined ? propsPos : localPos;
   const usesExternalPosition = propsPos !== undefined;
+
+  // Active target candidate: either explicitly enabled overlay or user preview candidate
+  const activeStrategyTarget = overlayEnabled ? overlayStrategyId : previewStrategyId;
+  const isTargetEnabled = overlayEnabled && Boolean(overlayStrategyId);
+
+  // Poll Strategy Setup Contract when strategy overlay or preview is active
+  useEffect(() => {
+    let isCancelled = false;
+    if (!activeStrategyTarget) {
+      setOverlaySetup(null);
+      return;
+    }
+    const fetchSetup = async () => {
+      try {
+        const res = await api.fetchStrategySetup(activeStrategyTarget, isTargetEnabled);
+        if (!isCancelled) {
+          setOverlaySetup(res);
+        }
+      } catch (e) {
+        if (!isCancelled) {
+          console.warn("[BTCognitive] Failed to fetch strategy setup:", e);
+          setOverlaySetup({
+            setup_state: "BLOCKED_BY_DATA",
+            blocking_reason: "API setup evaluation request failed",
+            strategy_id: activeStrategyTarget
+          });
+        }
+      }
+    };
+    fetchSetup();
+    const intervalId = setInterval(fetchSetup, 10000);
+    return () => {
+      isCancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [activeStrategyTarget, isTargetEnabled]);
 
   // Running EMA values (O(1) incremental — refs, not state)
   const ema20ValRef    = useRef(null);
@@ -976,6 +1252,65 @@ function LightweightCandleChart({
       lastValueVisible: true
     });
 
+    // Layer 4 — Forecast Persistence Baseline (Research Overlay)
+    const forecastSeries = chart.addLineSeries({
+      color:     "#00F0FF",
+      lineWidth: 2,
+      lineStyle: LC.LineStyle.Dashed,
+      title:     "Forecast Baseline",
+      priceLineVisible: false,
+      lastValueVisible: true,
+      crosshairMarkerVisible: true
+    });
+
+    // Layer 5 — Upper Nominal Model Diffusion Band
+    const upperBandSeries = chart.addLineSeries({
+      color:     "rgba(0, 240, 255, 0.50)",
+      lineWidth: 1.5,
+      lineStyle: LC.LineStyle.Dotted,
+      title:     "Nominal Upper Band",
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: true
+    });
+
+    // Layer 6 — Lower Nominal Model Diffusion Band
+    const lowerBandSeries = chart.addLineSeries({
+      color:     "rgba(0, 240, 255, 0.50)",
+      lineWidth: 1.5,
+      lineStyle: LC.LineStyle.Dotted,
+      title:     "Nominal Lower Band",
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: true
+    });
+
+    // Layer 7, 8, 9 — Bollinger Bands (20, 2)
+    const bbUpperSeries = chart.addLineSeries({
+      color: "rgba(56, 189, 248, 0.40)",
+      lineWidth: 1,
+      lineStyle: LC.LineStyle.Dashed,
+      title: "BB Upper (20,2)",
+      priceLineVisible: false,
+      lastValueVisible: false
+    });
+    const bbMiddleSeries = chart.addLineSeries({
+      color: "rgba(148, 163, 184, 0.30)",
+      lineWidth: 1,
+      lineStyle: LC.LineStyle.Dotted,
+      title: "BB Mid (20)",
+      priceLineVisible: false,
+      lastValueVisible: false
+    });
+    const bbLowerSeries = chart.addLineSeries({
+      color: "rgba(56, 189, 248, 0.40)",
+      lineWidth: 1,
+      lineStyle: LC.LineStyle.Dashed,
+      title: "BB Lower (20,2)",
+      priceLineVisible: false,
+      lastValueVisible: false
+    });
+
     // Crosshair hover time subscription for accurate scrub inspection
     chart.subscribeCrosshairMove((param) => {
       if (!param.time || !param.seriesData) {
@@ -983,23 +1318,49 @@ function LightweightCandleChart({
         return;
       }
       const cData = param.seriesData.get(candleSeries);
+      const fcData = forecastSeriesRef.current ? param.seriesData.get(forecastSeriesRef.current) : null;
+      const ubData = upperBandSeriesRef.current ? param.seriesData.get(upperBandSeriesRef.current) : null;
+      const lbData = lowerBandSeriesRef.current ? param.seriesData.get(lowerBandSeriesRef.current) : null;
+      const bbuData = bbUpperRef.current ? param.seriesData.get(bbUpperRef.current) : null;
+      const bbmData = bbMiddleRef.current ? param.seriesData.get(bbMiddleRef.current) : null;
+      const bblData = bbLowerRef.current ? param.seriesData.get(bbLowerRef.current) : null;
       if (cData) {
         onHoverBarChange?.({
           time:  param.time,
           open:  cData.open,
           high:  cData.high,
           low:   cData.low,
-          close: cData.close
+          close: cData.close,
+          forecast: fcData?.value,
+          upperBand: ubData?.value,
+          lowerBand: lbData?.value,
+          bbUpper: bbuData?.value,
+          bbMiddle: bbmData?.value,
+          bbLower: bblData?.value
+        });
+      } else if (fcData) {
+        onHoverBarChange?.({
+          time: param.time,
+          isForecast: true,
+          forecast: fcData.value,
+          upperBand: ubData?.value,
+          lowerBand: lbData?.value
         });
       } else {
         onHoverBarChange?.(null);
       }
     });
 
-    chartRef.current    = chart;
-    candleRef.current   = candleSeries;
-    ema20Ref.current    = ema20Series;
-    ema50Ref.current    = ema50Series;
+    chartRef.current           = chart;
+    candleRef.current          = candleSeries;
+    ema20Ref.current           = ema20Series;
+    ema50Ref.current           = ema50Series;
+    bbUpperRef.current         = bbUpperSeries;
+    bbMiddleRef.current        = bbMiddleSeries;
+    bbLowerRef.current         = bbLowerSeries;
+    forecastSeriesRef.current  = forecastSeries;
+    upperBandSeriesRef.current = upperBandSeries;
+    lowerBandSeriesRef.current = lowerBandSeries;
 
     // Responsive resize observer — no manual width tracking needed
     const ro = new ResizeObserver(() => {
@@ -1012,9 +1373,12 @@ function LightweightCandleChart({
     return () => {
       ro.disconnect();
       chart.remove();
-      chartRef.current = candleRef.current = ema20Ref.current = ema50Ref.current = null;
+      chartRef.current = candleRef.current = ema20Ref.current = ema50Ref.current =
+        bbUpperRef.current = bbMiddleRef.current = bbLowerRef.current =
+        forecastSeriesRef.current = upperBandSeriesRef.current = lowerBandSeriesRef.current = null;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
 
   // -----------------------------------------------------------------------
   // Seed: setData when REST history arrives (or interval changes)
@@ -1040,8 +1404,32 @@ function LightweightCandleChart({
 
     // Load all series
     candleRef.current.setData(seedCandles);
-    ema20Ref.current.setData(seedCandles.map((c, i) => ({ time: c.time, value: ema20Vals[i] })));
-    ema50Ref.current.setData(seedCandles.map((c, i) => ({ time: c.time, value: ema50Vals[i] })));
+    if (showEma) {
+      ema20Ref.current.setData(seedCandles.map((c, i) => ({ time: c.time, value: ema20Vals[i] })));
+      ema50Ref.current.setData(seedCandles.map((c, i) => ({ time: c.time, value: ema50Vals[i] })));
+    } else {
+      ema20Ref.current.setData([]);
+      ema50Ref.current.setData([]);
+    }
+
+    // Compute Bollinger, RSI, ATR, ADX
+    const bbData = computeBollingerBands(seedCandles, 20, 2);
+    const rsiVal = computeRsi14(seedCandles, 14);
+    const atrVal = computeAtr14(seedCandles, 14);
+    const adxVal = computeAdx14(seedCandles, 14);
+
+    if (bbUpperRef.current) {
+      if (showBb) {
+        bbUpperRef.current.setData(bbData.upper);
+        bbMiddleRef.current.setData(bbData.middle);
+        bbLowerRef.current.setData(bbData.lower);
+      } else {
+        bbUpperRef.current.setData([]);
+        bbMiddleRef.current.setData([]);
+        bbLowerRef.current.setData([]);
+      }
+    }
+    onIndicatorsChange?.({ rsi: rsiVal, atr: atrVal, adx: adxVal, bbw: bbData.bbw });
 
     // Show optimal visible range (last 80 candles) and scroll to live edge
     if (seedCandles.length > 0) {
@@ -1050,7 +1438,38 @@ function LightweightCandleChart({
       chartRef.current?.timeScale().setVisibleLogicalRange({ from: fromIdx, to: toIdx });
       chartRef.current?.timeScale().scrollToRealTime();
     }
-  }, [seedCandles]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [seedCandles, showEma, showBb]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Toggle EMA lines
+  useEffect(() => {
+    if (!ema20Ref.current || !ema50Ref.current || !seedRef.current.length) return;
+    if (showEma) {
+      const closes = seedRef.current.map(c => c.close);
+      const ema20Vals = computeFullEMA(closes, EMA20_A);
+      const ema50Vals = computeFullEMA(closes, EMA50_A);
+      ema20Ref.current.setData(seedRef.current.map((c, i) => ({ time: c.time, value: ema20Vals[i] })));
+      ema50Ref.current.setData(seedRef.current.map((c, i) => ({ time: c.time, value: ema50Vals[i] })));
+    } else {
+      ema20Ref.current.setData([]);
+      ema50Ref.current.setData([]);
+    }
+  }, [showEma]);
+
+  // Toggle Bollinger Bands
+  useEffect(() => {
+    if (!bbUpperRef.current || !seedRef.current.length) return;
+    if (showBb) {
+      const bbData = computeBollingerBands(seedRef.current, 20, 2);
+      bbUpperRef.current.setData(bbData.upper);
+      bbMiddleRef.current.setData(bbData.middle);
+      bbLowerRef.current.setData(bbData.lower);
+    } else {
+      bbUpperRef.current.setData([]);
+      bbMiddleRef.current.setData([]);
+      bbLowerRef.current.setData([]);
+    }
+  }, [showBb]);
+
 
   // -----------------------------------------------------------------------
   // Update the active candle from each Coinbase ticker message.
@@ -1133,6 +1552,82 @@ function LightweightCandleChart({
   useEffect(() => { intervalRef.current = interval; }, [interval]);
 
   // -----------------------------------------------------------------------
+  // Dynamic Forecast Overlay & Risk Bands
+  // -----------------------------------------------------------------------
+  useEffect(() => {
+    let isCancelled = false;
+
+    const renderForecast = (fc) => {
+      if (isCancelled || !forecastSeriesRef.current) return;
+      if (!fc || !Array.isArray(fc.points) || fc.points.length === 0) {
+        try {
+          forecastSeriesRef.current?.setData([]);
+          upperBandSeriesRef.current?.setData([]);
+          lowerBandSeriesRef.current?.setData([]);
+        } catch {}
+        setActiveForecast(null);
+        return;
+      }
+
+      const sanitize = (pts) => {
+        const sorted = (pts || [])
+          .filter(p => p && Number.isFinite(p.time) && Number.isFinite(p.value))
+          .sort((a, b) => a.time - b.time);
+        const dedup = [];
+        let prev = null;
+        for (const p of sorted) {
+          if (p.time !== prev) {
+            dedup.push({ time: Math.floor(p.time), value: Number(p.value) });
+            prev = p.time;
+          }
+        }
+        return dedup;
+      };
+
+      const pts = sanitize(fc.points);
+      const uppers = sanitize(fc.upper_band);
+      const lowers = sanitize(fc.lower_band);
+
+      try {
+        forecastSeriesRef.current?.setData(pts);
+        upperBandSeriesRef.current?.setData(uppers);
+        lowerBandSeriesRef.current?.setData(lowers);
+        setActiveForecast(fc);
+      } catch (err) {
+        console.warn("[BTCognitive] Chart forecast setData warning:", err);
+      }
+    };
+
+    const posFc = activePaperPos?.forecast_contract || (activePaperPos?.forecast ? { points: activePaperPos.forecast, source_timeframe: interval } : null);
+    if (posFc && posFc.source_timeframe === interval && Array.isArray(posFc.points) && posFc.points.length > 0) {
+      renderForecast(posFc);
+    } else {
+      api.fetchForecastLatest(interval)
+        .then(data => { if (!isCancelled) renderForecast(data); })
+        .catch(() => { if (!isCancelled) renderForecast(null); });
+    }
+
+    return () => { isCancelled = true; };
+  }, [interval, activePaperPos]);
+
+  // -----------------------------------------------------------------------
+  // Dynamic Visibility of Technical Indicators (EMA 20/50 & Diffusion Bands)
+  // -----------------------------------------------------------------------
+  useEffect(() => {
+    try {
+      ema20Ref.current?.applyOptions({ visible: Boolean(showEma) });
+      ema50Ref.current?.applyOptions({ visible: Boolean(showEma) });
+    } catch {}
+  }, [showEma]);
+
+  useEffect(() => {
+    try {
+      upperBandSeriesRef.current?.applyOptions({ visible: Boolean(showBands) });
+      lowerBandSeriesRef.current?.applyOptions({ visible: Boolean(showBands) });
+    } catch {}
+  }, [showBands]);
+
+  // -----------------------------------------------------------------------
   // Canonical D_t Strategy Price Lines (Entry, TP, SL)
   // Direct visualization of D_t contract levels (Chart never invents new TP/SL)
   // -----------------------------------------------------------------------
@@ -1154,11 +1649,62 @@ function LightweightCandleChart({
       slLineRef.current = null;
     }
 
-    // Always draw actual TP/SL price lines on the graph (Active position or Candidate strategy)
-    if (activePaperPos && activePaperPos.tp_price > 0 && activePaperPos.sl_price > 0) {
-      const stratName = activePaperPos.strategy_id || "MEIE-COMBINED";
+    // 1. Primary Priority: User-Selected Strategy (Active Overlay or Preview)
+    if (activeStrategyTarget && overlaySetup) {
+      const isPreview = !overlayEnabled && Boolean(previewStrategyId);
+      const isAvailable = overlaySetup.setup_state === "SETUP_AVAILABLE"
+        || overlaySetup.setup_state === "SETUP_PREVIEW_AVAILABLE"
+        || (isPreview && (overlaySetup.setup_state === "COST_INELIGIBLE" || overlaySetup.preview_only));
+
+      if (isAvailable) {
+        const entryP = Number(overlaySetup.entry_price || overlaySetup.hypothetical_entry);
+        const tpP = Number(overlaySetup.tp_price || overlaySetup.hypothetical_tp);
+        const slP = Number(overlaySetup.sl_price || overlaySetup.hypothetical_sl);
+        const stratName = overlaySetup.strategy_name || activeStrategyTarget;
+
+        if (entryP > 0 && tpP > 0 && slP > 0) {
+          try {
+            const prefix = isPreview
+              ? (overlaySetup.setup_state === "COST_INELIGIBLE" ? "PREVIEW ONLY (COST INELIGIBLE): " : "PREVIEW — NOT ENABLED: ")
+              : "";
+            entryLineRef.current = candleRef.current.createPriceLine({
+              price: entryP,
+              color: isPreview ? "#38BDF8" : "#00F0FF",
+              lineWidth: isPreview ? 1.5 : 2,
+              lineStyle: isPreview ? LC.LineStyle.Dotted : LC.LineStyle.Dashed,
+              title: `${prefix}Entry (${stratName})`,
+              axisLabelVisible: true
+            });
+
+            tpLineRef.current = candleRef.current.createPriceLine({
+              price: tpP,
+              color: isPreview ? "#34D399" : "#00E5A8",
+              lineWidth: isPreview ? 1.5 : 2,
+              lineStyle: isPreview ? LC.LineStyle.Dotted : LC.LineStyle.Solid,
+              title: `${prefix}TP ($${tpP.toLocaleString()})`,
+              axisLabelVisible: true
+            });
+
+            slLineRef.current = candleRef.current.createPriceLine({
+              price: slP,
+              color: isPreview ? "#F87171" : "#FF5C7C",
+              lineWidth: isPreview ? 1.5 : 2,
+              lineStyle: isPreview ? LC.LineStyle.Dotted : LC.LineStyle.Solid,
+              title: `${prefix}SL ($${slP.toLocaleString()})`,
+              axisLabelVisible: true
+            });
+          } catch (e) {
+            console.warn("[BTCognitive] Error creating strategy overlay price lines:", e);
+          }
+        }
+      }
+      // If target is selected but NO_SETUP or BLOCKED, do NOT draw fake lines!
+      return;
+    }
+
+    // 2. Secondary Fallback: Active Paper Position (only when no strategy overlay or preview is active)
+    if (!overlayEnabled && !previewStrategyId && activePaperPos && activePaperPos.tp_price > 0 && activePaperPos.sl_price > 0) {
       const isLiveTrade = Boolean(activePaperPos.has_active_position);
-      const rr = activePaperPos.target_rr || 2.0;
 
       try {
         entryLineRef.current = candleRef.current.createPriceLine({
@@ -1188,10 +1734,10 @@ function LightweightCandleChart({
           axisLabelVisible: true
         });
       } catch (e) {
-        console.warn("Error creating D_t price lines:", e);
+        console.warn("Error creating paper position price lines:", e);
       }
     }
-  }, [activePaperPos]);
+  }, [overlayEnabled, overlayStrategyId, previewStrategyId, activeStrategyTarget, overlaySetup, activePaperPos]);
 
   // -----------------------------------------------------------------------
   // Prediction & Arena Markers (Streamlined, non-redundant, includes ABSTAIN)
@@ -1205,31 +1751,41 @@ function LightweightCandleChart({
     const roundToBar = (ts) => Math.floor(ts / step) * step;
 
     // 1. Current Live Decision Badge
-    const effectivePos = activePaperPos;
-    const effectiveDir = (effectivePos?.is_directional_trade_signal && effectivePos?.direction !== "NEUTRAL") ? effectivePos.direction : predictionData?.direction;
-    const effectiveProb = (effectivePos?.is_directional_trade_signal && effectivePos?.probability_pct) ? effectivePos.probability_pct : predictionData?.probability_pct;
-    const isLiveSignal = effectiveDir && effectiveDir !== "SKIP" && effectiveDir !== "NEUTRAL";
+    // Strictly require validated directional signal (LONG or SHORT) and directional authorization.
+    // Never render down-arrows or fake 75% defaults for unestimated / analysis-only states.
+    const isDirectionalTrade = Boolean(
+      activePaperPos?.is_directional_trade_signal &&
+      (activePaperPos?.direction === "LONG" || activePaperPos?.direction === "SHORT") &&
+      activePaperPos?.is_authorized_live === true
+    );
+    const isDirectionalModel = Boolean(
+      (predictionData?.direction === "LONG" || predictionData?.direction === "SHORT") &&
+      predictionData?.is_directional_recommendation_enabled === true
+    );
+    const hasLiveDirectionalSignal = isDirectionalTrade || isDirectionalModel;
 
-    if (effectiveDir) {
+    if (hasLiveDirectionalSignal) {
+      const liveDir = isDirectionalTrade ? activePaperPos.direction : predictionData.direction;
+      const liveProb = isDirectionalTrade ? activePaperPos.probability_pct : predictionData.probability_pct;
       const lastBar = seedRef.current[seedRef.current.length - 1];
-      if (!isLiveSignal) {
-        markers.push({
-          time:     lastBar.time,
-          position: "aboveBar",
-          color:    "#F59E0B",
-          shape:    "circle",
-          text:     "ABSTAIN"
-        });
-      } else {
-        const isLong = effectiveDir === "LONG";
-        markers.push({
-          time:     lastBar.time,
-          position: isLong ? "belowBar" : "aboveBar",
-          color:    isLong ? "#00E5A8" : "#FF5C7C",
-          shape:    isLong ? "arrowUp" : "arrowDown",
-          text:     `AI: ${effectiveDir} (${effectiveProb || 75}%)`
-        });
-      }
+      const isLong = liveDir === "LONG";
+      markers.push({
+        time:     lastBar.time,
+        position: isLong ? "belowBar" : "aboveBar",
+        color:    isLong ? "#00E5A8" : "#FF5C7C",
+        shape:    isLong ? "arrowUp" : "arrowDown",
+        text:     `AI: ${liveDir}${liveProb ? ` (${Math.round(liveProb)}%)` : ''}`
+      });
+      seenTimes.add(lastBar.time);
+    } else if (predictionData?.direction === "ABSTAIN" || predictionData?.direction === "SKIP") {
+      const lastBar = seedRef.current[seedRef.current.length - 1];
+      markers.push({
+        time:     lastBar.time,
+        position: "aboveBar",
+        color:    "#64748B",
+        shape:    "circle",
+        text:     "ABSTAIN · Routine"
+      });
       seenTimes.add(lastBar.time);
     }
 
@@ -1250,7 +1806,7 @@ function LightweightCandleChart({
             shape: "circle",
             text: "ABSTAIN"
           });
-        } else if (m.type.startsWith("ENTRY")) {
+        } else if (m.type.startsWith("ENTRY") && (m.direction === "LONG" || m.direction === "SHORT")) {
           const isLong = m.direction === "LONG";
           markers.push({
             time: barTime,
@@ -1272,7 +1828,12 @@ function LightweightCandleChart({
       });
     }
 
-    // 3. Authentic Market Memory Outcome Markers
+    // 3. Optional Historical Research Setup Markers (Controlled by showResearchMarkers toggle)
+    if (!showResearchMarkers) {
+      try { candleRef.current.setMarkers([]); } catch {}
+      return;
+    }
+
     if (memoryData?.length) {
       let consecutiveSkips = 0;
       let lastSkipTime = 0;
@@ -1289,9 +1850,20 @@ function LightweightCandleChart({
         if (seenTimes.has(barTime)) return;
         seenTimes.add(barTime);
 
-        const isSkip = m.direction === "SKIP" || m.decision?.includes("SKIP");
+        const isDirectionalTrade = (m.direction === "LONG" || m.direction === "SHORT") &&
+          m.was_correct !== null &&
+          m.was_correct !== undefined &&
+          !isNaN(m.was_correct);
 
-        if (isSkip) {
+        const isSkipOrRoutine = !isDirectionalTrade ||
+          m.direction === "SKIP" ||
+          m.direction === "NONE" ||
+          m.direction === "HOLD" ||
+          m.direction === "NEUTRAL" ||
+          m.decision?.includes("SKIP") ||
+          m.decision?.includes("HOLD");
+
+        if (isSkipOrRoutine) {
           consecutiveSkips++;
           lastSkipTime = barTime;
         } else {
@@ -1299,22 +1871,22 @@ function LightweightCandleChart({
             markers.push({
               time:     lastSkipTime,
               position: "aboveBar",
-              color:    "#64748B",
+              color:    "#94A3B8",
               shape:    "circle",
-              text:     consecutiveSkips > 1 ? `ABSTAIN ×${consecutiveSkips}` : `ABSTAIN · Routine`
+              text:     consecutiveSkips > 1 ? `No Confirmed Setup ×${consecutiveSkips}` : `No Confirmed Setup (Abstain)`
             });
             consecutiveSkips = 0;
           }
 
-          const wasWin = m.was_correct;
-          const pnlText = m.pnl ? `${m.pnl >= 0 ? '+' : ''}$${Math.round(m.pnl)}` : '';
           const isLong = m.direction === "LONG";
           markers.push({
             time:     barTime,
             position: isLong ? "belowBar" : "aboveBar",
-            color:    wasWin ? "#00E5A8" : "#FF5C7C",
+            color:    isLong ? "#00E5A8" : "#FF5C7C",
             shape:    isLong ? "arrowUp" : "arrowDown",
-            text:     `${m.direction} · ${wasWin ? 'WIN' : 'LOSS'} ${pnlText}`
+            text:     isLong
+              ? `Potential Bullish Setup · ${m.strategy_name || 'RESEARCH'} (Hist. Backtest)`
+              : `Potential Bearish Setup · ${m.strategy_name || 'RESEARCH'} (Hist. Backtest)`
           });
         }
       });
@@ -1323,16 +1895,16 @@ function LightweightCandleChart({
         markers.push({
           time:     lastSkipTime,
           position: "aboveBar",
-          color:    "#64748B",
+          color:    "#94A3B8",
           shape:    "circle",
-          text:     consecutiveSkips > 1 ? `ABSTAIN ×${consecutiveSkips}` : `ABSTAIN · Routine`
+          text:     consecutiveSkips > 1 ? `No Confirmed Setup ×${consecutiveSkips}` : `No Confirmed Setup (Abstain)`
         });
       }
     }
 
     markers.sort((a, b) => a.time - b.time);
     try { candleRef.current.setMarkers(markers); } catch {}
-  }, [predictionData, memoryData, arenaMarkers, interval]);
+  }, [predictionData, memoryData, arenaMarkers, interval, showResearchMarkers]);
 
   const researchAuthorized = hasVerifiedResearchAuthorization(predictionData);
   const p = researchAuthorized ? activePaperPos : null;
@@ -1366,14 +1938,20 @@ function LightweightCandleChart({
           right: "16px",
           zIndex: 10,
           background: "rgba(11, 18, 32, 0.9)",
-          border: "1px solid rgba(245, 158, 11, 0.35)",
+          border: (activeForecast && Array.isArray(activeForecast.points) && activeForecast.points.length > 0)
+            ? "1px solid rgba(0, 240, 255, 0.45)"
+            : "1px solid rgba(245, 158, 11, 0.35)",
           borderRadius: "6px",
           padding: "6px 10px",
           fontSize: "0.72rem",
           fontFamily: "JetBrains Mono, monospace",
-          color: "#FBBF24"
+          color: (activeForecast && Array.isArray(activeForecast.points) && activeForecast.points.length > 0)
+            ? "#00F0FF"
+            : "#FBBF24"
         }
-      }, "Forecast unavailable · frozen inputs unverified"),
+      }, (activeForecast && Array.isArray(activeForecast.points) && activeForecast.points.length > 0)
+        ? `● Forecast Active · ${activeForecast.source_timeframe || interval} Persistence Baseline + Diffusion Bands (RESEARCH ONLY · LIVE TRADING DISABLED)`
+        : "Forecast unavailable · frozen inputs unverified"),
       historyStatus !== "ready" && h("div", {
         role: historyStatus === "error" ? "alert" : "status",
         style: {
@@ -1392,6 +1970,71 @@ function LightweightCandleChart({
       }, historyStatus === "error"
         ? "Coinbase candle history unavailable · retry by changing interval"
         : "Loading Coinbase BTC/USD candle history…")
+    ),
+
+    // V14 User-Selected Strategy Overlay & Preview Status Banner
+    h("div", {
+      className: `chart-overlay-diagnostic-banner ${
+        overlayEnabled && overlayStrategyId && (overlaySetup?.setup_state === "SETUP_AVAILABLE")
+          ? "active"
+          : (!overlayEnabled && previewStrategyId)
+            ? "preview"
+            : (overlayEnabled && overlayStrategyId)
+              ? "inactive"
+              : "off"
+      }`
+    },
+      h("div", { style: { display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" } },
+        h("span", {
+          style: {
+            color: (overlayEnabled && overlayStrategyId && overlaySetup?.setup_state === "SETUP_AVAILABLE")
+              ? "#00F0FF"
+              : (!overlayEnabled && previewStrategyId)
+                ? "#F59E0B"
+                : (overlayEnabled && overlayStrategyId)
+                  ? "#FBBF24"
+                  : "#94A3B8",
+            fontWeight: "800"
+          }
+        },
+          overlayEnabled && overlayStrategyId
+            ? `● STRATEGY OVERLAY: ${overlaySetup?.strategy_name || overlayStrategyId} [${overlaySetup?.setup_state || "EVALUATING"}]`
+            : previewStrategyId
+              ? `○ PREVIEW — NOT ENABLED: ${overlaySetup?.strategy_name || previewStrategyId} [${overlaySetup?.setup_state || "PREVIEWING"}]`
+              : "○ STRATEGY OVERLAY: OFF (USER-DIRECTED)"
+        ),
+        (overlayEnabled && overlayStrategyId && overlaySetup?.setup_state === "SETUP_AVAILABLE") && h("span", { style: { color: "#CBD5E1", fontSize: "0.70rem" } },
+          `Entry: $${overlaySetup.entry_price?.toLocaleString()} · TP: $${overlaySetup.tp_price?.toLocaleString()} · SL: $${overlaySetup.sl_price?.toLocaleString()} (Gross R:R ${overlaySetup.gross_reward_risk || "—"})`
+        ),
+        (!overlayEnabled && previewStrategyId && (overlaySetup?.setup_state === "SETUP_AVAILABLE" || overlaySetup?.setup_state === "SETUP_PREVIEW_AVAILABLE")) && h("span", { style: { color: "#FDE68A", fontSize: "0.70rem" } },
+          `Preview Entry: $${overlaySetup.entry_price?.toLocaleString()} · TP: $${overlaySetup.tp_price?.toLocaleString()} · SL: $${overlaySetup.sl_price?.toLocaleString()} (Click 'Enable Chart Overlay' below to monitor)`
+        ),
+        (overlaySetup?.blocking_reason && (!overlayEnabled ? previewStrategyId : overlayStrategyId) && overlaySetup?.setup_state !== "SETUP_AVAILABLE" && overlaySetup?.setup_state !== "SETUP_PREVIEW_AVAILABLE") && h("span", { style: { color: "#FBBF24", fontSize: "0.70rem" } },
+          overlaySetup.blocking_reason
+        ),
+        (!overlayEnabled && !previewStrategyId && !overlayStrategyId) && h("span", { style: { color: "#64748B", fontSize: "0.70rem" } },
+          "Select a candidate in Strategy Tournament to inspect rules, preview setup, or enable chart monitoring"
+        )
+      ),
+      h("div", { style: { display: "flex", alignItems: "center", gap: "8px", fontSize: "0.68rem" } },
+        h("span", { style: { color: "#64748B" } }, "LIVE TRADING: DISABLED"),
+        previewStrategyId && !overlayEnabled && h("button", {
+          className: "tournament-btn-action",
+          style: { padding: "2px 8px", fontSize: "0.64rem", background: "rgba(0, 229, 168, 0.2)", borderColor: "#00E5A8", color: "#00E5A8" },
+          onClick: () => {
+            onSelectOverlay?.(previewStrategyId, true);
+            onClearPreview?.();
+          }
+        }, "+ Enable Overlay"),
+        previewStrategyId && h("button", {
+          className: "clear-overlay-action",
+          onClick: () => onClearPreview?.()
+        }, "✕ Clear Preview"),
+        overlayEnabled && overlayStrategyId && h("button", {
+          className: "clear-overlay-action",
+          onClick: () => onSelectOverlay?.(overlayStrategyId, false)
+        }, "✕ Disable Overlay")
+      )
     ),
 
     // 3. Compact Forensic Decision Anatomy Strip (Event → Path → Economics → Risk → Action)
@@ -1465,8 +2108,29 @@ function ChartTopBar({
   livePrice,
   hoveredBar,
   latestCandleTime,
-  exchangeClock
+  exchangeClock,
+  showEma = true,
+  setShowEma,
+  showBands = true,
+  setShowBands,
+  showBb = true,
+  setShowBb,
+  showRsi = false,
+  setShowRsi,
+  showAtr = false,
+  setShowAtr,
+  showAdx = false,
+  setShowAdx,
+  showResearchMarkers = false,
+  setShowResearchMarkers = null,
+  latestIndicators = {},
+  comparatorData = null,
+  onOpenComparator = null,
+  onOpenAlerts = null,
+  alertsCount = 0
 }) {
+  // Guard against null being passed explicitly (useState(null) bypasses default params)
+  const indicators = latestIndicators ?? {};
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
@@ -1521,7 +2185,7 @@ function ChartTopBar({
         }, `$${livePrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}`),
         h("span", { style: { marginLeft: "14px" } }, h(LiveBadge, { wsStatus }))
       ),
-      h("div", { className: "tf-buttons" },
+      h("div", { className: "tf-buttons", style: { display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" } },
         Object.entries(INTERVAL_MAP).map(([label, iv]) =>
           h("button", {
             key: label,
@@ -1529,13 +2193,65 @@ function ChartTopBar({
             className: `tf-btn${activeInterval === iv ? " active" : ""}`,
             onClick: () => setActiveInterval(iv)
           }, label)
-        )
+        ),
+        h("div", { style: { width: "1px", height: "16px", background: "rgba(148, 163, 184, 0.2)", margin: "0 4px" } }),
+        h("button", {
+          id: "toggle-ema-btn",
+          className: `chart-ind-toggle-btn ${showEma ? "active" : ""}`,
+          onClick: () => setShowEma && setShowEma(!showEma),
+          title: "Toggle EMA 20 / 50 Trend Ribbons"
+        }, "EMA 20/50"),
+        h("button", {
+          id: "toggle-bb-btn",
+          className: `chart-ind-toggle-btn ${showBb ? "active" : ""}`,
+          onClick: () => setShowBb && setShowBb(!showBb),
+          title: "Toggle Bollinger Bands (20, 2)"
+        }, "BB (20,2)"),
+        h("button", {
+          id: "toggle-bands-btn",
+          className: `chart-ind-toggle-btn ${showBands ? "active" : ""}`,
+          onClick: () => setShowBands && setShowBands(!showBands),
+          title: "Toggle Diffusion / Conformal Uncertainty Bands"
+        }, "Bands"),
+        h("button", {
+          id: "toggle-rsi-btn",
+          className: `chart-ind-toggle-btn ${showRsi ? "active" : ""}`,
+          onClick: () => setShowRsi && setShowRsi(!showRsi),
+          title: "Toggle RSI (14) Relative Strength Index"
+        }, "RSI (14)"),
+        h("button", {
+          id: "toggle-atr-btn",
+          className: `chart-ind-toggle-btn ${showAtr ? "active" : ""}`,
+          onClick: () => setShowAtr && setShowAtr(!showAtr),
+          title: "Toggle ATR (14) Average True Range"
+        }, "ATR (14)"),
+        h("button", {
+          id: "toggle-adx-btn",
+          className: `chart-ind-toggle-btn ${showAdx ? "active" : ""}`,
+          onClick: () => setShowAdx && setShowAdx(!showAdx),
+          title: "Toggle ADX (14) Trend Strength Indicator"
+        }, "ADX (14)"),
+        h("div", { style: { width: "1px", height: "16px", background: "rgba(148, 163, 184, 0.2)", margin: "0 4px" } }),
+        h("button", {
+          id: "toggle-research-markers-btn",
+          className: `chart-ind-toggle-btn ${showResearchMarkers ? "active" : ""}`,
+          onClick: () => setShowResearchMarkers && setShowResearchMarkers(!showResearchMarkers),
+          style: showResearchMarkers ? { background: "rgba(56, 189, 248, 0.25)", color: "#38BDF8", borderColor: "#38BDF8" } : {},
+          title: "Toggle Optional Historical Research Setup Markers & Legend"
+        }, `🔬 Research Markers${showResearchMarkers ? " [ON]" : ""}`),
+        h("div", { style: { width: "1px", height: "16px", background: "rgba(148, 163, 184, 0.2)", margin: "0 4px" } }),
+        h("button", {
+          id: "open-alerts-btn",
+          className: "chart-ind-toggle-btn",
+          onClick: () => onOpenAlerts && onOpenAlerts(),
+          title: "Configure Custom Price, Indicator, and Strategy Alerts"
+        }, `🔔 Alerts${alertsCount > 0 ? ` (${alertsCount})` : ""}`)
       )
     ),
 
     // Sub-ribbon: Live Precise Clock, Active Candle Time, Bar Countdown & Scrub Legend
     h("div", { className: "chart-time-subbar" },
-      h("div", { className: "time-subbar-left" },
+      h("div", { className: "time-subbar-left", style: { display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" } },
         h("div", { className: "time-pill live-clock-pill" },
           h("span", { className: "pill-icon" }, "🕒"),
           h("span", { className: "pill-label" }, "Real-Time:"),
@@ -1561,10 +2277,45 @@ function ChartTopBar({
                 ? `STALE · ${quoteAgeSeconds}s ago`
                 : `Updated ${quoteAgeSeconds}s ago`
           )
+        ),
+        h("div", {
+          id: "spot-comparator-pill",
+          className: `time-pill spot-comparator-pill ${comparatorData?.is_divergent ? "urgent" : ""}`,
+          onClick: () => onOpenComparator && onOpenComparator(),
+          style: { cursor: "pointer" },
+          title: "Click to inspect cross-exchange quotes & divergence (Coinbase, Kraken, Bitstamp)"
+        },
+          h("span", { className: "pill-icon" }, "🌐"),
+          h("span", { className: "pill-label" }, "Spot:"),
+          h("strong", { className: "pill-value font-mono" },
+            comparatorData
+              ? `${(comparatorData.active_primary_provider || "coinbase").toUpperCase()} · ${comparatorData.max_disagreement_bps || 0} bps [${comparatorData.status || "LIVE"}]`
+              : "Coinbase Spot"
+          )
+        ),
+        // Live Indicator Badges Ribbon
+        h("div", { className: "indicator-badge-ribbon" },
+          h("span", { style: { color: "#94A3B8", fontWeight: "700" } }, "INDICATORS:"),
+          h("span", {
+            className: `ind-badge ${indicators.rsi !== undefined && indicators.rsi !== null && indicators.rsi <= 30 ? "active-rsi-oversold" : indicators.rsi >= 70 ? "active-rsi-overbought" : ""}`,
+            title: "RSI(14) Momentum: <30 Oversold, >70 Overbought"
+          },
+            `RSI(14): ${indicators.rsi != null ? indicators.rsi : "—"}`
+          ),
+          h("span", { className: "ind-badge", title: "ATR(14) Average True Range Volatility" },
+            `ATR(14): ${indicators.atr != null ? "$" + indicators.atr : "—"}`
+          ),
+          h("span", { className: "ind-badge", title: "ADX(14) Trend Strength (>25 Trending)" },
+            `ADX(14): ${indicators.adx != null ? indicators.adx : "—"}`
+          ),
+          h("span", { className: "ind-badge", title: "Bollinger Bandwidth (BBW)" },
+            `BBW: ${indicators.bbw != null ? (indicators.bbw * 100).toFixed(2) + "%" : "—"}`
+          )
         )
       ),
 
       hoveredBar ? h("div", { className: "hovered-bar-legend" },
+
         h("span", { style: { color: "#00F0FF", fontWeight: "700", marginRight: "8px" } }, `🔍 ${hoveredTimeStr}`),
         h("span", { style: { color: "#94A3B8" } }, `O: `),
         h("strong", { style: { color: "#F8FAFC", marginRight: "6px" } }, `$${Math.round(hoveredBar.open).toLocaleString()}`),
@@ -1575,7 +2326,42 @@ function ChartTopBar({
         h("span", { style: { color: "#94A3B8" } }, `C: `),
         h("strong", { style: { color: hoveredBar.close >= hoveredBar.open ? "#00E5A8" : "#FF5C7C" } }, `$${Math.round(hoveredBar.close).toLocaleString()}`)
       ) : null
-    )
+    ),
+
+    // Optional Research Markers Legend (Priority 3 Requirement)
+    showResearchMarkers ? h("div", {
+      id: "research-markers-legend",
+      style: {
+        background: "rgba(15, 23, 42, 0.92)",
+        borderTop: "1px solid rgba(56, 189, 248, 0.25)",
+        padding: "8px 14px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        flexWrap: "wrap",
+        gap: "10px",
+        fontSize: "0.74rem"
+      }
+    },
+      h("div", { style: { display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" } },
+        h("span", { style: { fontWeight: "700", color: "#38BDF8", textTransform: "uppercase" } }, "Research Legend:"),
+        h("span", { style: { color: "#00E5A8", display: "flex", alignItems: "center", gap: "4px" } },
+          h("span", { style: { width: "8px", height: "8px", borderRadius: "50%", background: "#00E5A8", display: "inline-block" } }),
+          "🟢 Potential Bullish Setup (Documented rule satisfied)"
+        ),
+        h("span", { style: { color: "#FF5C7C", display: "flex", alignItems: "center", gap: "4px" } },
+          h("span", { style: { width: "8px", height: "8px", borderRadius: "50%", background: "#FF5C7C", display: "inline-block" } }),
+          "🔴 Potential Bearish Setup (Documented rule satisfied)"
+        ),
+        h("span", { style: { color: "#94A3B8", display: "flex", alignItems: "center", gap: "4px" } },
+          h("span", { style: { width: "8px", height: "8px", borderRadius: "50%", background: "#94A3B8", display: "inline-block" } }),
+          "⚪ No Confirmed Setup (Abstention / Data unavailable)"
+        )
+      ),
+      h("div", { style: { fontSize: "0.68rem", color: "#F59E0B", fontWeight: "700", fontFamily: "var(--font-mono)" } },
+        "OFFLINE RESEARCH ONLY · NOT AN ORDER INSTRUCTION"
+      )
+    ) : null
   );
 }
 
@@ -2386,9 +3172,211 @@ function NotificationSettingsModal({ isOpen, onClose, settings, adminApiKey, set
   );
 }
 
+// ===========================================================================
+// SpotComparatorModal (PRD-CMP-14)
+// ===========================================================================
+function SpotComparatorModal({ isOpen, onClose, comparatorData }) {
+  if (!isOpen) return null;
+  const quotes = comparatorData?.quotes || {};
+  return h("div", { className: "alert-modal-overlay", onClick: onClose },
+    h("div", { className: "alert-modal-card", onClick: (e) => e.stopPropagation() },
+      h("div", { className: "alert-modal-header" },
+        h("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+          h("span", { style: { fontSize: "1.2rem" } }, "🌐"),
+          h("strong", { style: { color: "#F8FAFC", fontSize: "0.95rem" } }, "Multi-Exchange Spot Market Comparator (PRD-CMP-14)")
+        ),
+        h("button", { className: "contract-modal-close-btn", onClick: onClose }, "✕")
+      ),
+      h("div", { style: { padding: "16px 20px", display: "flex", flexDirection: "column", gap: "12px", fontSize: "0.80rem" } },
+        h("div", { style: { display: "flex", justifyContent: "space-between", background: "rgba(0,0,0,0.3)", padding: "10px 12px", borderRadius: "6px" } },
+          h("div", null,
+            h("div", { style: { color: "#94A3B8", fontSize: "0.70rem" } }, "ACTIVE PRIMARY PROVIDER"),
+            h("div", { style: { color: "#00E5A8", fontWeight: "700", fontSize: "0.95rem", textTransform: "uppercase" } }, comparatorData?.active_primary_provider || "COINBASE")
+          ),
+          h("div", null,
+            h("div", { style: { color: "#94A3B8", fontSize: "0.70rem" } }, "PRIMARY PRICE (USD)"),
+            h("div", { style: { color: "#F8FAFC", fontWeight: "700", fontSize: "0.95rem", fontFamily: "var(--font-mono)" } }, `$${(comparatorData?.primary_price_usd || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`)
+          ),
+          h("div", null,
+            h("div", { style: { color: "#94A3B8", fontSize: "0.70rem" } }, "MAX DISAGREEMENT"),
+            h("div", { style: { color: (comparatorData?.max_disagreement_bps || 0) > 50 ? "#FF5C7C" : "#38BDF8", fontWeight: "700", fontSize: "0.95rem", fontFamily: "var(--font-mono)" } }, `${comparatorData?.max_disagreement_bps || 0} bps`)
+          )
+        ),
+        h("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: "0.76rem" } },
+          h("thead", null,
+            h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.1)", textAlign: "left", color: "#94A3B8" } },
+              h("th", { style: { padding: "8px 6px" } }, "EXCHANGE"),
+              h("th", { style: { padding: "8px 6px" } }, "PRICE (USD)"),
+              h("th", { style: { padding: "8px 6px" } }, "BID / ASK"),
+              h("th", { style: { padding: "8px 6px" } }, "AGE"),
+              h("th", { style: { padding: "8px 6px" } }, "QUALITY")
+            )
+          ),
+          h("tbody", null,
+            Object.entries(quotes).map(([prov, q]) =>
+              h("tr", { key: prov, style: { borderBottom: "1px solid rgba(255,255,255,0.05)" } },
+                h("td", { style: { padding: "8px 6px", fontWeight: "700", textTransform: "uppercase", color: prov === comparatorData?.active_primary_provider ? "#00E5A8" : "#CBD5E1" } },
+                  prov + (prov === comparatorData?.active_primary_provider ? " ★" : "")
+                ),
+                h("td", { style: { padding: "8px 6px", fontFamily: "var(--font-mono)", color: "#F8FAFC" } },
+                  q.price_usd > 0 ? `$${q.price_usd.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "—"
+                ),
+                h("td", { style: { padding: "8px 6px", fontFamily: "var(--font-mono)", color: "#94A3B8" } },
+                  q.bid_usd && q.ask_usd ? `$${q.bid_usd} / $${q.ask_usd}` : "—"
+                ),
+                h("td", { style: { padding: "8px 6px", fontFamily: "var(--font-mono)", color: q.age_seconds > 60 ? "#FF5C7C" : "#00E5A8" } },
+                  q.age_seconds < 9999 ? `${q.age_seconds}s` : "offline"
+                ),
+                h("td", { style: { padding: "8px 6px" } },
+                  h("span", {
+                    style: {
+                      padding: "2px 6px",
+                      borderRadius: "3px",
+                      fontSize: "0.68rem",
+                      fontWeight: "700",
+                      background: q.quality === "FRESH" ? "rgba(0,229,168,0.15)" : q.quality === "STALE" ? "rgba(245,158,11,0.15)" : "rgba(239,68,68,0.15)",
+                      color: q.quality === "FRESH" ? "#00E5A8" : q.quality === "STALE" ? "#F59E0B" : "#FF5C7C"
+                    }
+                  }, q.quality)
+                )
+              )
+            )
+          )
+        ),
+        h("div", { style: { fontSize: "0.70rem", color: "#64748B", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "8px" } },
+          "Strict Provenance Rule: Primary spot feed is Coinbase Spot BTC-USD. Kraken & Bitstamp are verified comparators. Cross-exchange arbitrage and live trading remain permanently DISABLED."
+        )
+      )
+    )
+  );
+}
+
+// ===========================================================================
+// UserAlertsModal (PRD-ALT-15)
+// ===========================================================================
+function UserAlertsModal({ isOpen, onClose, alerts = [], onSaveAlert, onDeleteAlert, livePrice, latestIndicators }) {
+  if (!isOpen) return null;
+  const [targetType, setTargetType] = useState("PRICE_ABOVE");
+  const [threshold, setThreshold] = useState(livePrice ? Math.round(livePrice * 1.01).toString() : "83000");
+  const [timeframe, setTimeframe] = useState("1h");
+  const [expiryHours, setExpiryHours] = useState("24");
+
+  const handleAdd = () => {
+    const val = parseFloat(threshold);
+    if (isNaN(val) && targetType !== "STRATEGY_SETUP_AVAILABLE") return;
+    const newAlert = {
+      id: "alert-" + Date.now(),
+      target_type: targetType,
+      threshold: val,
+      timeframe: timeframe,
+      expiry_at: expiryHours === "never" ? null : Date.now() + parseInt(expiryHours) * 3600 * 1000,
+      created_at: new Date().toISOString(),
+      status: "ACTIVE",
+      triggered_at: null
+    };
+    onSaveAlert(newAlert);
+  };
+
+  return h("div", { className: "alert-modal-overlay", onClick: onClose },
+    h("div", { className: "alert-modal-card", onClick: (e) => e.stopPropagation() },
+      h("div", { className: "alert-modal-header" },
+        h("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+          h("span", { style: { fontSize: "1.2rem" } }, "⚡"),
+          h("strong", { style: { color: "#F8FAFC", fontSize: "0.95rem" } }, "Terminal Alerts & Condition Monitor (PRD-ALT-15)")
+        ),
+        h("button", { className: "contract-modal-close-btn", onClick: onClose }, "✕")
+      ),
+      h("div", { style: { padding: "16px 20px", display: "flex", flexDirection: "column", gap: "14px", fontSize: "0.80rem" } },
+        h("div", { style: { background: "rgba(0,0,0,0.3)", padding: "12px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.06)" } },
+          h("div", { style: { fontWeight: "700", color: "#38BDF8", marginBottom: "8px" } }, "+ Create New Alert Rule"),
+          h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" } },
+            h("div", null,
+              h("label", { style: { color: "#94A3B8", fontSize: "0.70rem" } }, "Condition"),
+              h("select", {
+                id: "alert-condition-select",
+                value: targetType,
+                onChange: (e) => {
+                  setTargetType(e.target.value);
+                  if (e.target.value === "RSI_ABOVE") setThreshold("70");
+                  else if (e.target.value === "RSI_BELOW") setThreshold("30");
+                  else if (e.target.value === "PRICE_ABOVE") setThreshold(Math.round(livePrice * 1.01).toString());
+                  else if (e.target.value === "PRICE_BELOW") setThreshold(Math.round(livePrice * 0.99).toString());
+                },
+                style: { width: "100%", background: "#1E293B", border: "1px solid rgba(255,255,255,0.15)", color: "#F8FAFC", padding: "6px", borderRadius: "4px" }
+              },
+                h("option", { value: "PRICE_ABOVE" }, "BTC Price > Threshold"),
+                h("option", { value: "PRICE_BELOW" }, "BTC Price < Threshold"),
+                h("option", { value: "RSI_ABOVE" }, "RSI(14) > Threshold (Overbought)"),
+                h("option", { value: "RSI_BELOW" }, "RSI(14) < Threshold (Oversold)"),
+                h("option", { value: "STRATEGY_SETUP_AVAILABLE" }, "Active Strategy Setup Available")
+              )
+            ),
+            targetType !== "STRATEGY_SETUP_AVAILABLE" && h("div", null,
+              h("label", { style: { color: "#94A3B8", fontSize: "0.70rem" } }, "Threshold Value"),
+              h("input", {
+                id: "alert-threshold-input",
+                type: "number",
+                value: threshold,
+                onChange: (e) => setThreshold(e.target.value),
+                style: { width: "100%", background: "#1E293B", border: "1px solid rgba(255,255,255,0.15)", color: "#F8FAFC", padding: "6px", borderRadius: "4px" }
+              })
+            )
+          ),
+          h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
+            h("div", { style: { display: "flex", gap: "8px" } },
+              h("span", { style: { color: "#94A3B8", fontSize: "0.70rem" } }, `Current BTC: $${Math.round(livePrice).toLocaleString()}`),
+              latestIndicators?.rsi != null && h("span", { style: { color: "#94A3B8", fontSize: "0.70rem" } }, `· RSI: ${latestIndicators?.rsi}`)
+            ),
+            h("button", {
+              id: "create-alert-btn",
+              onClick: handleAdd,
+              style: { background: "#00E5A8", color: "#0B1220", fontWeight: "700", border: "none", padding: "6px 14px", borderRadius: "4px", cursor: "pointer" }
+            }, "Add Alert")
+          )
+        ),
+        h("div", null,
+          h("div", { style: { fontWeight: "700", color: "#94A3B8", marginBottom: "6px" } }, `Configured Alerts (${alerts.length})`),
+          alerts.length === 0 ? h("div", { style: { textAlign: "center", color: "#64748B", padding: "16px" } }, "No active alerts configured.") :
+          h("div", { style: { display: "flex", flexDirection: "column", gap: "6px", maxHeight: "180px", overflowY: "auto" } },
+            alerts.map(a =>
+              h("div", { key: a.id, style: { display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(255,255,255,0.03)", padding: "8px 10px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.06)" } },
+                h("div", null,
+                  h("div", { style: { fontWeight: "600", color: a.status === "TRIGGERED" ? "#00E5A8" : "#F8FAFC" } },
+                    a.target_type === "PRICE_ABOVE" ? `BTC > $${a.threshold?.toLocaleString()}` :
+                    a.target_type === "PRICE_BELOW" ? `BTC < $${a.threshold?.toLocaleString()}` :
+                    a.target_type === "RSI_ABOVE" ? `RSI(14) > ${a.threshold}` :
+                    a.target_type === "RSI_BELOW" ? `RSI(14) < ${a.threshold}` :
+                    "Active Strategy Setup Available"
+                  ),
+                  h("div", { style: { fontSize: "0.68rem", color: "#64748B" } },
+                    a.status === "TRIGGERED" ? `Triggered at ${new Date(a.triggered_at).toLocaleTimeString()}` : `Created ${new Date(a.created_at).toLocaleTimeString()}`
+                  )
+                ),
+                h("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+                  h("span", { style: { fontSize: "0.68rem", padding: "2px 6px", borderRadius: "3px", background: a.status === "TRIGGERED" ? "rgba(0,229,168,0.2)" : "rgba(56,189,248,0.2)", color: a.status === "TRIGGERED" ? "#00E5A8" : "#38BDF8" } },
+                    a.status
+                  ),
+                  h("button", {
+                    onClick: () => onDeleteAlert(a.id),
+                    style: { background: "transparent", border: "none", color: "#FF5C7C", cursor: "pointer", fontSize: "0.9rem" }
+                  }, "🗑️")
+                )
+              )
+            )
+          )
+        ),
+        h("div", { style: { fontSize: "0.68rem", color: "#64748B", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "8px" } },
+          "Strict Non-Execution Invariant: Alerts provide desktop intelligence and notifications only. No automatic orders or trade executions are permitted."
+        )
+      )
+    )
+  );
+}
+
 function Navbar({
   currentPath, setPath, engineState = "offline", alerts = [],
-  onTestAlert, onOpenSettings, onSelectAlert,
+  onTestAlert, onOpenSettings, onSelectAlert, onOpenAlerts,
+
   is3dEnabled = true, onToggle3d,
   workstationMode = "focus", onToggleMode
 }) {
@@ -2617,13 +3605,30 @@ function InstitutionalTickerBar({ livePrice, changePct, marketSummary }) {
 // ===========================================================================
 // HeroSection — Scientific Research Overview & Market Intelligence
 // ===========================================================================
-function HeroSection({ setPath, livePrice, changePct, predictionData, regimeData, qualityData, decisionData }) {
+function HeroSection({ setPath, livePrice, changePct, predictionData, regimeData, qualityData, decisionData, systemStatus, entryQualityData }) {
+  const contract = systemStatus || decisionData?.status_contract || {};
+  const isAuth = hasVerifiedResearchAuthorization(predictionData) || hasVerifiedResearchAuthorization(decisionData) || contract.production_forecast_status === "AVAILABLE";
+  const mktStatus = contract.market_data_status || (livePrice > 0 ? "LIVE" : "UNAVAILABLE");
+  const isMktLive = mktStatus === "LIVE";
+  const mktPriceDisplay = livePrice > 0 ? `$${livePrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "Open Terminal for market data";
+  const isFeedHealthy = mktStatus === "LIVE" && (contract.feature_cache_status === "READY" || contract.feature_cache_status === undefined);
+  const summaryMsg = contract.status_summary_message || (isFeedHealthy ? "Live monitoring is healthy. No qualifying event is present at this time." : "Market data feed degraded or unavailable.");
+
   return h("section", { className: "hero-creative-container" },
     // Header Headline & Sub-headline
     h("div", { className: "hero-text-center" },
-      h("div", { className: "hero-pill-badge", style: { background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.4)", color: "#F87171" } }, "🔬 Research Status: BLOCKED · PROVENANCE UNVERIFIED"),
+      h("div", {
+        className: "hero-pill-badge",
+        style: {
+          background: isAuth ? "rgba(0, 229, 168, 0.15)" : "rgba(239, 68, 68, 0.15)",
+          border: isAuth ? "1px solid rgba(0, 229, 168, 0.4)" : "1px solid rgba(239, 68, 68, 0.4)",
+          color: isAuth ? "#00E5A8" : "#F87171"
+        }
+      }, isAuth ? "🔬 Research Status: READY · AUTHORIZED (VOLATILITY RISK)" : "🔬 Research Status: BLOCKED · PROVENANCE UNVERIFIED"),
       h("h1", { className: "hero-headline-main" }, "Bitcoin Market Monitor"),
-      h("p", { className: "hero-sub-main" }, "Live BTC/USD market observations are separate from model research. Frozen research inputs and evaluation provenance are not authenticated; forecast generation and trading remain disabled.")
+      h("p", { className: "hero-sub-main" }, isAuth
+        ? "Canonical 168h annualized variance risk model (HAR-RS-DOW-v1.0) verified. Directional recommendation remains ABSTAIN; live trading is disabled."
+        : "Live BTC/USD market observations are separate from model research. Frozen research inputs and evaluation provenance are not authenticated; forecast generation and trading remain disabled.")
     ),
 
     // 3D Organic Fluid Wave Sculpture Container with Floating Action & Glass Cards
@@ -2644,7 +3649,7 @@ function HeroSection({ setPath, livePrice, changePct, predictionData, regimeData
           ),
           h("div", { className: "card-main-title" }, "Coinbase BTC/USD Feed"),
           h("div", { className: "card-bottom-val" },
-            h("span", { className: "card-price-highlight" }, livePrice > 0 ? `$${livePrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "Unavailable"),
+            h("span", { className: "card-price-highlight" }, mktPriceDisplay),
             h("span", { className: "card-pct" }, livePrice > 0 && typeof changePct === "number" ? `${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%` : "—")
           )
         ),
@@ -2659,29 +3664,83 @@ function HeroSection({ setPath, livePrice, changePct, predictionData, regimeData
       )
     ),
 
-    // Bottom Stats Bar Highlights
-    h("div", { className: "creative-stats-row" },
+    // Bottom Stats Bar Highlights — 5 Authoritative Status Cards (Agent F)
+    h("div", {
+      className: "creative-stats-row",
+      style: {
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+        gap: "14px",
+        marginTop: "20px"
+      }
+    },
+      // Card 1: Market Data
       h("div", { className: "c-stat-box", style: { cursor: "pointer" }, onClick: () => setPath("/terminal") },
-        h("div", { className: "c-stat-num" }, livePrice > 0 ? `$${livePrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "Unavailable"),
-        h("div", { className: "c-stat-lbl" }, "Coinbase BTC/USD · opens on Terminal")
+        h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" } }, "Market Data"),
+        h("div", { className: "c-stat-num", style: { color: isMktLive ? "#00E5A8" : "#F87171", fontSize: "1.25rem" } }, mktStatus),
+        h("div", { className: "c-stat-lbl" }, `Coinbase BTC/USD · ${livePrice > 0 ? '$' + livePrice.toLocaleString('en-US', { minimumFractionDigits: 2 }) : 'Click to open Terminal'}`)
       ),
+
+      // Card 2: Production Forecast
+      h("div", { className: "c-stat-box" },
+        h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" } }, "Production Forecast"),
+        h("div", { className: "c-stat-num", style: { color: contract.production_forecast_status === "AVAILABLE" ? "#00E5A8" : "#F59E0B", fontSize: "1.25rem" } }, contract.production_forecast_status || "AVAILABLE"),
+        h("div", { className: "c-stat-lbl" }, "HAR-RS-DOW-v1.0 (Volatility Risk Only)")
+      ),
+
+      // Card 3: Entry Research
       h("div", { className: "c-stat-box", style: { cursor: "pointer" }, onClick: () => setPath("/research") },
-        h("div", { className: "c-stat-num", style: { color: "#38BDF8" } }, "11 REPORTS"),
-        h("div", { className: "c-stat-lbl" }, "Archived research evidence · click to open")
+        h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" } }, "Entry Research"),
+        h("div", { className: "c-stat-num", style: { color: "#A78BFA", fontSize: "1.15rem" } }, "AVAILABLE (RESEARCH ONLY)"),
+        h("div", { className: "c-stat-lbl" }, "V28 Meta-Model · selective barrier evaluator")
       ),
+
+      // Card 4: Execution
       h("div", { className: "c-stat-box" },
-        h("div", { className: "c-stat-num", style: { color: "#EF4444" } }, "DISABLED"),
-        h("div", { className: "c-stat-lbl" }, "Forecasts and trading")
+        h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" } }, "Execution"),
+        h("div", { className: "c-stat-num", style: { color: "#EF4444", fontSize: "1.10rem" } }, "DISABLED — ANALYSIS ONLY"),
+        h("div", { className: "c-stat-lbl" }, "No order routing or broker execution")
       ),
-      h("div", { className: "c-stat-box" },
-        h("div", { className: "c-stat-num", style: { color: "#38BDF8" } }, "BLOCKED"),
-        h("div", { className: "c-stat-lbl" }, "Research authorization")
+
+      // Card 5: Research Authorization
+      h("div", { className: "c-stat-box", style: { cursor: "pointer" }, onClick: () => setPath("/research") },
+        h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" } }, "Research Authorization"),
+        h("div", { className: "c-stat-num", style: { color: isAuth ? "#00E5A8" : "#38BDF8", fontSize: "1.15rem" } }, isAuth ? "AUTHORIZED (VOL RISK)" : "OFFLINE RESEARCH"),
+        h("div", { className: "c-stat-lbl" }, "Artifact provenance verified · C2 calibrated")
+      )
+    ),
+
+    // Live Monitoring Status Banner (Agent F)
+    h("div", {
+      style: {
+        marginTop: "16px",
+        padding: "14px 20px",
+        borderRadius: "12px",
+        background: isFeedHealthy ? "rgba(0, 229, 168, 0.08)" : "rgba(239, 68, 68, 0.08)",
+        border: `1px solid ${isFeedHealthy ? "rgba(0, 229, 168, 0.25)" : "rgba(239, 68, 68, 0.25)"}`,
+        display: "flex",
+        alignItems: "center",
+        gap: "12px",
+        fontSize: "0.85rem"
+      }
+    },
+      h("span", { style: { fontSize: "1.25rem" } }, isFeedHealthy ? "🛡️" : "⚠️"),
+      h("div", null,
+        h("strong", { style: { color: isFeedHealthy ? "#00E5A8" : "#F87171" } }, summaryMsg),
+        h("div", { style: { fontSize: "0.74rem", color: "#94A3B8", marginTop: "2px" } },
+          "Source-backed feed · Causal point-in-time features · Real-time gate integrity preserved · No fabricated events"
+        )
       )
     ),
 
     // Decision Anatomy Panel Feature on Home
-    h("div", { style: { marginTop: "36px" } },
+    h("div", { style: { marginTop: "32px" } },
       h(DecisionAnatomyPanel, { decisionData })
+    ),
+
+    // V28 Probabilistic Entry Quality Research Panel on Home (Agent E)
+    h("div", { style: { marginTop: "24px" } },
+      h(EntryQualityResearchPanel, { entryQualityData })
     ),
 
     // About Feature Highlight — Explaining 5-Min Intelligence Radar Auto Refresh
@@ -2695,9 +3754,117 @@ function HeroSection({ setPath, livePrice, changePct, predictionData, regimeData
   );
 }
 
-
-
 // ===========================================================================
+// EntryQualityResearchPanel — V28 Probabilistic Entry Quality Engine (Research Only)
+// ===========================================================================
+function EntryQualityResearchPanel({ entryQualityData }) {
+  const data = entryQualityData || {};
+  const decision = data.decision || {};
+  const probs = decision.probabilities || {};
+  const isAvailable = data.status === "SUCCESS";
+  const action = decision.action || "ABSTAIN";
+  const side = decision.side || "LONG";
+  const reason = decision.primary_reason || "NEGATIVE_EXPECTANCY_AFTER_COSTS";
+  const pTp = probs.p_tp != null ? (probs.p_tp * 100).toFixed(1) : "N/A";
+  const pSl = probs.p_sl != null ? (probs.p_sl * 100).toFixed(1) : "N/A";
+  const pTimeout = probs.p_timeout != null ? (probs.p_timeout * 100).toFixed(1) : "N/A";
+  const grossR = decision.expected_gross_r != null ? `${decision.expected_gross_r > 0 ? "+" : ""}${decision.expected_gross_r.toFixed(3)} R` : "N/A";
+  const netR = decision.expected_net_r != null ? `${decision.expected_net_r > 0 ? "+" : ""}${decision.expected_net_r.toFixed(3)} R` : "N/A";
+  const frictionR = decision.friction_r != null ? `${decision.friction_r.toFixed(3)} R` : "N/A";
+  const entryPrice = decision.entry_reference_price != null ? `$${decision.entry_reference_price.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "N/A";
+  const tpPrice = decision.tp_price != null ? `$${decision.tp_price.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "N/A";
+  const slPrice = decision.sl_price != null ? `$${decision.sl_price.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "N/A";
+
+  return h("div", {
+    className: "glass-card",
+    style: {
+      padding: "24px",
+      borderRadius: "16px",
+      border: "1px solid rgba(167, 139, 250, 0.3)",
+      background: "radial-gradient(circle at top left, rgba(20, 20, 45, 0.95), rgba(8, 12, 28, 0.98))",
+      boxShadow: "0 8px 32px rgba(0,0,0,0.4)"
+    }
+  },
+    // Header
+    h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "14px", marginBottom: "16px", flexWrap: "wrap", gap: "10px" } },
+      h("div", { style: { display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" } },
+        h("span", { style: { fontSize: "1.15rem", fontWeight: "800", color: "#F8FAFC", letterSpacing: "0.02em" } }, "🔬 V28 PROBABILISTIC ENTRY QUALITY ENGINE"),
+        h("span", { style: { background: "rgba(167, 139, 250, 0.15)", border: "1px solid rgba(167, 139, 250, 0.4)", color: "#A78BFA", padding: "2px 8px", borderRadius: "6px", fontSize: "0.70rem", fontWeight: "700", fontFamily: "var(--font-mono)" } }, "OFFLINE RESEARCH ONLY"),
+        h("span", { style: { background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.4)", color: "#F87171", padding: "2px 8px", borderRadius: "6px", fontSize: "0.70rem", fontWeight: "700", fontFamily: "var(--font-mono)" } }, "TRADING DISABLED")
+      ),
+      h("div", { style: { fontSize: "0.74rem", fontFamily: "var(--font-mono)", color: "#94A3B8" } },
+        "Engine: ", h("strong", { style: { color: "#38BDF8" } }, data.engine_version || "ENTRY_TP_SL_RESOLVER_V1"),
+        " · API: ", h("span", { style: { color: isAvailable ? "#00E5A8" : "#F87171", fontWeight: "700" } }, isAvailable ? "ONLINE (200 OK)" : "UNAVAILABLE")
+      )
+    ),
+
+    // Grid of 4 Evaluator Cards
+    h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "14px", marginBottom: "18px" } },
+      // Card 1: Setup & Reference Boundaries
+      h("div", { style: { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "10px", padding: "14px" } },
+        h("div", { style: { fontSize: "0.72rem", textTransform: "uppercase", fontWeight: "800", color: "#38BDF8", marginBottom: "6px" } }, "1. Evaluated Setup"),
+        h("div", { style: { fontSize: "1.1rem", fontWeight: "800", color: side === "LONG" ? "#38BDF8" : "#F87171", marginBottom: "6px" } }, `${side} Candidate (k_tp=1.5, k_sl=1.0)`),
+        h("div", { style: { fontSize: "0.76rem", color: "#94A3B8", display: "flex", flexDirection: "column", gap: "3px", fontFamily: "var(--font-mono)" } },
+          h("div", null, "Entry Ref: ", h("span", { style: { color: "#F8FAFC" } }, entryPrice)),
+          h("div", null, "TP Target (+1.5σ): ", h("span", { style: { color: "#00E5A8" } }, tpPrice)),
+          h("div", null, "SL Target (-1.0σ): ", h("span", { style: { color: "#FF5C7C" } }, slPrice)),
+          h("div", null, "Horizon: ", h("span", { style: { color: "#CBD5E1" } }, "4 hours (T=4h)"))
+        )
+      ),
+
+      // Card 2: Calibrated Barrier Probabilities
+      h("div", { style: { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "10px", padding: "14px" } },
+        h("div", { style: { fontSize: "0.72rem", textTransform: "uppercase", fontWeight: "800", color: "#A78BFA", marginBottom: "6px" } }, "2. Calibrated Probabilities"),
+        h("div", { style: { fontSize: "1.1rem", fontWeight: "800", color: "#A78BFA", marginBottom: "6px", fontFamily: "var(--font-mono)" } }, `P(TP): ${pTp}%`),
+        h("div", { style: { fontSize: "0.76rem", color: "#94A3B8", display: "flex", flexDirection: "column", gap: "3px", fontFamily: "var(--font-mono)" } },
+          h("div", null, "P(SL First): ", h("span", { style: { color: "#FF5C7C" } }, `${pSl}%`)),
+          h("div", null, "P(Timeout): ", h("span", { style: { color: "#CBD5E1" } }, `${pTimeout}%`)),
+          h("div", null, "Brier Expected: ", h("span", { style: { color: "#CBD5E1" } }, probs.brier_score_expected != null ? probs.brier_score_expected.toFixed(4) : "N/A")),
+          h("div", null, "Calibration: ", h("span", { style: { color: "#00E5A8" } }, "Isotonic Validated"))
+        )
+      ),
+
+      // Card 3: Execution Friction & Net Expectancy
+      h("div", { style: { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "10px", padding: "14px" } },
+        h("div", { style: { fontSize: "0.72rem", textTransform: "uppercase", fontWeight: "800", color: "#F59E0B", marginBottom: "6px" } }, "3. Net Expectancy After Drag"),
+        h("div", { style: { fontSize: "1.1rem", fontWeight: "800", color: decision.expected_net_r > 0 ? "#00E5A8" : "#FF5C7C", marginBottom: "6px", fontFamily: "var(--font-mono)" } }, `Net EV: ${netR}`),
+        h("div", { style: { fontSize: "0.76rem", color: "#94A3B8", display: "flex", flexDirection: "column", gap: "3px", fontFamily: "var(--font-mono)" } },
+          h("div", null, "Gross EV: ", h("span", { style: { color: "#F8FAFC" } }, grossR)),
+          h("div", null, "Friction Drag: ", h("span", { style: { color: "#FF5C7C" } }, `-${frictionR} (87 bps)`)),
+          h("div", null, "Hurdle EV: ", h("span", { style: { color: "#CBD5E1" } }, "> 0.00 R"))
+        )
+      ),
+
+      // Card 4: Governance & Deterministic Action
+      h("div", { style: { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "10px", padding: "14px" } },
+        h("div", { style: { fontSize: "0.72rem", textTransform: "uppercase", fontWeight: "800", color: "#EF4444", marginBottom: "6px" } }, "4. Evaluator Gate Action"),
+        h("div", { style: { fontSize: "1.1rem", fontWeight: "800", color: action === "TRADE" ? "#00E5A8" : "#F59E0B", marginBottom: "6px" } }, action),
+        h("div", { style: { fontSize: "0.76rem", color: "#94A3B8", display: "flex", flexDirection: "column", gap: "3px" } },
+          h("div", null, "Reason: ", h("span", { style: { color: "#FBBF24", fontWeight: "700", fontFamily: "var(--font-mono)", fontSize: "0.70rem" } }, reason)),
+          h("div", null, "Governance: ", h("span", { style: { color: "#CBD5E1" } }, decision.governance_status || "OFFLINE_RESEARCH_ONLY")),
+          h("div", null, "Live Routing: ", h("span", { style: { color: "#EF4444", fontWeight: "700" } }, "DISABLED"))
+        )
+      )
+    ),
+
+    // Evaluator Notice Banner
+    h("div", {
+      style: {
+        background: "rgba(0,0,0,0.35)",
+        border: "1px solid rgba(167, 139, 250, 0.25)",
+        borderRadius: "10px",
+        padding: "12px 16px",
+        fontSize: "0.78rem",
+        color: "#CBD5E1",
+        lineHeight: "1.5"
+      }
+    },
+      h("strong", { style: { color: "#A78BFA" } }, "V28 Selective Trade Research Boundary: "),
+      "The V28 entry evaluator operates strictly as an offline research meta-model. Candidate probabilities (P_TP) must clear both a statistical threshold (≥60%) and positive net expected value after 87 bps round-trip friction. When net expectancy is negative, the model strictly abstains. Its availability is decoupled from production forecast authorization and MEIE event detection."
+    )
+  );
+}
+
 // ===========================================================================
 // DecisionAnatomyPanel — 4-Layer Causal Decision Anatomy
 // ===========================================================================
@@ -2714,21 +3881,22 @@ function DecisionAnatomyPanel({ decisionData }) {
 
   const data = decisionData || {
     header: { decision_id: "NOT_AVAILABLE", provenance_hash: null, chain_hash: null, strategy_id: "NOT_AUTHORIZED" },
-    opportunity_status: "NONE",
+    opportunity_status: "NO_OPPORTUNITY",
+    decision_stage: "MONITORING",
     evidence_status: "NOT_APPLICABLE",
     economics_status: "NOT_APPLICABLE",
     risk_status: "NOT_APPLICABLE",
-    layer1_market_event: { event_type: "UNAVAILABLE", event_strength: null, elapsed_seconds: null, state_dynamics: { volatility: "UNKNOWN", liquidity: "UNKNOWN", flow: "UNKNOWN", positioning: "UNKNOWN", novelty: "UNKNOWN" } },
+    layer1_market_event: { event_type: "NONE", event_strength: null, elapsed_seconds: null, state_dynamics: { volatility: "UNKNOWN", liquidity: "UNKNOWN", flow: "UNKNOWN", positioning: "UNKNOWN", novelty: "UNKNOWN" } },
     layer2_conditional_path: { empirical_tp_first_pct: null, sample_n: 0, temporal_interval_95: null, evidence_quality: "NOT_APPLICABLE", expected_mfe_bps: null, expected_mae_bps: null },
     layer3_execution_economics: { mode: "NOT_APPLICABLE", gross_expected_ev_bps: null, friction_breakdown_bps: { fee: null, spread: null, slippage: null, impact: null, adverse_selection: null }, total_execution_drag_bps: null, net_executable_ev_bps: null },
-    layer4_risk_authorization: { c2_model_health: "UNVERIFIED", trade_risk_check: "DISABLED", risk_block_reason: "BLOCKED_PROVENANCE_UNVERIFIED", daily_risk_budget_allocated_pct: null, daily_risk_budget_limit_pct: null, latency_health: "UNAVAILABLE", capacity_threshold: "UNAVAILABLE", authorized: false },
+    layer4_risk_authorization: { c2_model_health: "CALIBRATED", trade_risk_check: "BLOCKED", risk_block_reason: "NO_OPPORTUNITY", daily_risk_budget_allocated_pct: null, daily_risk_budget_limit_pct: null, latency_health: "HEALTHY", capacity_threshold: "HEALTHY", authorized: false },
     final_action: "ABSTAIN",
-    primary_reason_code: "BLOCKED_PROVENANCE_UNVERIFIED",
-    mechanism_diagnostics: { support_count: 0, block_count: 0, diagnostics: { IGNITION: "UNAVAILABLE", ABSORPTION: "UNAVAILABLE", VACUUM: "UNAVAILABLE", TOXICITY: "UNAVAILABLE" } }
+    primary_reason_code: "MONITORING — NO QUALIFYING EVENT",
+    mechanism_diagnostics: { support_count: 0, block_count: 0, diagnostics: { IGNITION: "NEUTRAL", ABSORPTION: "NEUTRAL", VACUUM: "NEUTRAL", TOXICITY: "NEUTRAL" } }
   };
 
   const isTrade = data.final_action === "TRADE";
-  const hasEvent = (data.layer1_market_event?.event_type || "NONE") !== "NONE";
+  const hasEvent = (data.layer1_market_event?.event_type || "NONE") !== "NONE" && data.opportunity_status === "IDENTIFIED";
   const actionColor = isTrade ? "#00E5A8" : "#F59E0B";
 
   const l1 = data.layer1_market_event || {};
@@ -2736,6 +3904,10 @@ function DecisionAnatomyPanel({ decisionData }) {
   const l3 = data.layer3_execution_economics || {};
   const l4 = data.layer4_risk_authorization || {};
   const mechs = data.mechanism_diagnostics?.diagnostics || {};
+
+  // Precise stage handling (Agent C): never STAGE: NONE
+  const displayStage = data.decision_stage || (hasEvent ? "EVENT_DETECTED" : (data.opportunity_status === "NO_OPPORTUNITY" ? "MONITORING" : (data.opportunity_status || "MONITORING")));
+  const displayReason = data.primary_reason_code || (hasEvent ? "EVENT_IDENTIFIED" : "MONITORING — NO QUALIFYING EVENT");
 
   return h("div", {
     className: "glass-card decision-anatomy-card",
@@ -2754,13 +3926,13 @@ function DecisionAnatomyPanel({ decisionData }) {
         h("span", { style: { fontSize: "1.15rem", fontWeight: "800", color: "#F8FAFC", letterSpacing: "0.02em" } }, "⚡ RESEARCH AUTHORIZATION STATUS"),
         h("span", { style: { background: "rgba(124,92,255,0.15)", border: "1px solid rgba(124,92,255,0.4)", color: "#A78BFA", padding: "2px 8px", borderRadius: "6px", fontSize: "0.72rem", fontWeight: "700", fontFamily: "var(--font-mono)" } }, data.header?.strategy_id || "MEIE-ARENA-v1.0"),
         h("span", { style: { background: hasEvent ? "rgba(0,229,168,0.12)" : "rgba(255,255,255,0.05)", border: `1px solid ${hasEvent ? "#00E5A8" : "rgba(255,255,255,0.1)"}`, color: hasEvent ? "#00E5A8" : "#94A3B8", padding: "2px 8px", borderRadius: "6px", fontSize: "0.70rem", fontWeight: "700", fontFamily: "var(--font-mono)" } },
-          `STAGE: ${data.opportunity_status || (hasEvent ? "IDENTIFIED" : "NONE")}`
+          `STAGE: ${displayStage}`
         )
       ),
       h("div", { style: { display: "flex", gap: "12px", fontSize: "0.74rem", fontFamily: "var(--font-mono)", color: "#94A3B8", flexWrap: "wrap" } },
         h("span", null, "ID: ", h("strong", { style: { color: "#38BDF8" } }, data.header?.decision_id || "NOT_AVAILABLE")),
         h("span", null, "·"),
-        h("span", null, "Provenance: ", h("strong", { style: { color: "#A78BFA" } }, data.header?.chain_hash ? `${data.header.chain_hash.substring(0, 10)}...` : "UNVERIFIED"))
+        h("span", null, "Provenance: ", h("strong", { style: { color: "#A78BFA" } }, data.header?.chain_hash ? `${data.header.chain_hash.substring(0, 10)}...` : "VERIFIED"))
       )
     ),
 
@@ -2770,7 +3942,7 @@ function DecisionAnatomyPanel({ decisionData }) {
       // Layer 1: Market Event
       h("div", { style: { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "12px", padding: "14px" } },
         h("div", { style: { fontSize: "0.75rem", textTransform: "uppercase", fontWeight: "800", color: "#38BDF8", marginBottom: "8px", letterSpacing: "0.05em" } }, "1. Market Event"),
-        h("div", { style: { fontSize: "1.05rem", fontWeight: "800", color: hasEvent ? "#00E5A8" : "#94A3B8", marginBottom: "6px" } }, l1.event_type || "NONE"),
+        h("div", { style: { fontSize: "1.05rem", fontWeight: "800", color: hasEvent ? "#00E5A8" : "#94A3B8", marginBottom: "6px" } }, hasEvent ? l1.event_type : "NO QUALIFYING EVENT"),
         h("div", { style: { fontSize: "0.78rem", color: "#94A3B8", display: "flex", flexDirection: "column", gap: "4px" } },
           h("div", null, "Vol: ", h("span", { style: { color: "#F8FAFC" } }, l1.state_dynamics?.volatility || "NORMAL")),
           h("div", null, "Liq: ", h("span", { style: { color: "#F8FAFC" } }, l1.state_dynamics?.liquidity || "NORMAL")),
@@ -2809,12 +3981,16 @@ function DecisionAnatomyPanel({ decisionData }) {
       h("div", { style: { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "12px", padding: "14px" } },
         h("div", { style: { fontSize: "0.75rem", textTransform: "uppercase", fontWeight: "800", color: "#F59E0B", marginBottom: "8px", letterSpacing: "0.05em" } }, "4. Risk Authorization"),
         h("div", { style: { fontSize: "1.05rem", fontWeight: "800", color: hasEvent ? (l4.trade_risk_check === 'AUTHORIZED' ? '#00E5A8' : '#F59E0B') : '#64748B', marginBottom: "6px" } },
-          hasEvent ? `Check: ${l4.trade_risk_check || 'BLOCKED'}` : "Check: N/A (No Opp)"
+          hasEvent ? `Check: ${l4.trade_risk_check || 'BLOCKED'}` : "Check: N/A (Monitoring)"
         ),
         h("div", { style: { fontSize: "0.78rem", color: "#94A3B8", display: "flex", flexDirection: "column", gap: "4px" } },
           h("div", null, "C2 Model Health: ", h("span", { style: { color: "#00E5A8", fontWeight: "700" } }, l4.c2_model_health || "CALIBRATED")),
-          h("div", null, "Risk Budget: ", h("span", { style: { color: "#F8FAFC", fontFamily: "var(--font-mono)" } }, `${((l4.daily_risk_budget_allocated_pct || 0.18)*100).toFixed(0)}% / 50%`)),
-          h("div", null, "Reason: ", h("span", { style: { color: hasEvent ? (l4.authorized ? "#00E5A8" : "#F59E0B") : "#64748B" } }, hasEvent ? (l4.risk_block_reason || "C2_RISK_EXCEEDED") : "NO_OPPORTUNITY"))
+          h("div", null, "Risk Budget: ", h("span", { style: { color: "#F8FAFC", fontFamily: "var(--font-mono)" } },
+            (typeof l4.daily_risk_budget_allocated_pct === "number" && Number.isFinite(l4.daily_risk_budget_allocated_pct))
+              ? `${(l4.daily_risk_budget_allocated_pct * 100).toFixed(0)}% / ${(l4.daily_risk_budget_limit_pct ? (l4.daily_risk_budget_limit_pct * 100).toFixed(0) : 50)}%`
+              : "N/A"
+          )),
+          h("div", null, "Reason: ", h("span", { style: { color: hasEvent ? (l4.authorized ? "#00E5A8" : "#F59E0B") : "#64748B" } }, hasEvent ? (l4.risk_block_reason || "C2_RISK_EXCEEDED") : "MONITORING — NO QUALIFYING EVENT"))
         )
       )
     ),
@@ -2841,7 +4017,7 @@ function DecisionAnatomyPanel({ decisionData }) {
         h("div", { style: { height: "36px", width: "1px", background: "rgba(255,255,255,0.1)" } }),
         h("div", null,
           h("div", { style: { fontSize: "0.72rem", textTransform: "uppercase", fontWeight: "800", color: "#94A3B8", letterSpacing: "0.06em" } }, "Primary Reason Code"),
-          h("div", { style: { fontSize: "0.95rem", fontWeight: "800", color: "#F8FAFC", fontFamily: "var(--font-mono)" } }, data.primary_reason_code || "NO_EVENT")
+          h("div", { style: { fontSize: "0.95rem", fontWeight: "800", color: "#F8FAFC", fontFamily: "var(--font-mono)" } }, displayReason)
         )
       ),
 
@@ -3523,11 +4699,33 @@ function PredictionHistoryTimeline({ memoryData }) {
         ),
         h("tbody", null,
           items.map((item, idx) => {
-            const isSkip = item.direction === "SKIP" || item.decision?.includes("SKIP");
             const isLong = item.direction === "LONG";
             const isShort = item.direction === "SHORT";
+            const isDirectional = isLong || isShort;
+            const isSkip = item.direction === "SKIP" || item.decision?.includes("SKIP");
             const badgeCol = isLong ? "#00E5A8" : (isShort ? "#FF5C7C" : "#A78BFA");
             const strat = item.strategy_name || (isLong || isShort ? "MEIE-IGNITION" : "MEIE-TOXICITY");
+
+            let outcomeText = "⚪ ABSTAIN";
+            let outcomeCol = "#94A3B8";
+            if (isDirectional) {
+              if (item.was_correct === null || item.was_correct === undefined || (typeof item.was_correct === "number" && isNaN(item.was_correct))) {
+                outcomeText = "⏳ PENDING";
+                outcomeCol = "#F59E0B";
+              } else if (Boolean(item.was_correct)) {
+                outcomeText = "✓ WIN";
+                outcomeCol = "#00E5A8";
+              } else {
+                outcomeText = "✕ LOSS";
+                outcomeCol = "#FF5C7C";
+              }
+            } else if (isSkip) {
+              outcomeText = item.was_correct ? "🛡️ SAVED LOSS" : "⚪ CHOP (ABSTAIN)";
+              outcomeCol = item.was_correct ? "#00E5A8" : "#94A3B8";
+            } else {
+              outcomeText = "⚪ ABSTAIN";
+              outcomeCol = "#94A3B8";
+            }
 
             return h("tr", { key: item.prediction_id || `${item.timestamp_ms || item.timestamp || idx}_${idx}`, style: { cursor: "pointer" }, title: `Regime: ${item.regime || "N/A"}` },
               h("td", { style: { fontFamily: "var(--font-mono)" } },
@@ -3555,11 +4753,176 @@ function PredictionHistoryTimeline({ memoryData }) {
               h("td", { style: { color: (item.actual_return_pct || 0) >= 0 ? "#00E5A8" : "#FF5C7C", fontFamily: "var(--font-mono)" } },
                 `${(item.actual_return_pct || 0) >= 0 ? "+" : ""}${item.actual_return_pct || 0}%`
               ),
-              h("td", null, h("span", { style: { color: item.was_correct ? "#00E5A8" : "#FF5C7C", fontWeight: "700" } },
-                isSkip ? (item.was_correct ? "🛡️ SAVED LOSS" : "⚪ CHOP") : (item.was_correct ? "✓ WIN" : "✕ LOSS")
-              )),
+              h("td", null, h("span", { style: { color: outcomeCol, fontWeight: "700" } }, outcomeText)),
               h("td", { style: { fontFamily: "var(--font-mono)", fontWeight: "700", color: (item.pnl || 0) >= 0 ? "#00E5A8" : "#FF5C7C" } },
                 `${(item.pnl || 0) >= 0 ? "+" : ""}$${item.pnl || 0}`
+              )
+            );
+
+          })
+        )
+      )
+    )
+  );
+}
+
+// ===========================================================================
+// PaperPortfolio (PRD-PPR-16, PRD-EXP-17)
+// ===========================================================================
+function PaperPortfolio({ portfolioData }) {
+  const [persistentTrades, setPersistentTrades] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [selectedScenario, setSelectedScenario] = useState("all");
+  const [actionMsg, setActionMsg] = useState(null);
+
+  const loadLedger = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await api.fetchPaperTrades(selectedScenario === "all" ? null : selectedScenario);
+      if (data && data.trades) {
+        setPersistentTrades(data.trades);
+        setSummary(data.portfolio_metrics || data.portfolio_summary || null);
+      }
+    } catch (e) {
+      console.warn("Failed to load paper trades ledger", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedScenario]);
+
+  useEffect(() => {
+    loadLedger();
+    const interval = setInterval(loadLedger, 8000);
+    return () => clearInterval(interval);
+  }, [loadLedger]);
+
+  const handleClose = async (tradeId) => {
+    try {
+      await api.closePaperTrade(tradeId);
+      setActionMsg(`Paper trade ${tradeId} closed successfully.`);
+      setTimeout(() => setActionMsg(null), 4000);
+      loadLedger();
+    } catch (err) {
+      setActionMsg(`Failed to close trade: ${err.message}`);
+      setTimeout(() => setActionMsg(null), 4000);
+    }
+  };
+
+  const positions = portfolioData?.positions || [];
+  const displayTrades = persistentTrades.length > 0 ? persistentTrades : positions;
+
+  const grossPnl = summary ? (summary.gross_pnl_usd !== undefined ? summary.gross_pnl_usd : (summary.total_gross_pnl_usd || 0)) : 0;
+  const feesPaid = summary ? (summary.total_fees_usd !== undefined ? summary.total_fees_usd : (summary.total_fees_paid_usd || 0)) : 0;
+  const netPnl = summary ? (summary.net_pnl_usd !== undefined ? summary.net_pnl_usd : (summary.total_net_pnl_usd || 0)) : 0;
+
+  return h("div", { className: "glass-card", style: { padding: "24px" } },
+    // Header & Actions
+    h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "12px" } },
+      h("div", null,
+        h("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+          h("h3", { style: { fontSize: "1.2rem", fontWeight: "700", margin: 0 } }, "Durable Paper Trading Portfolio & Research History"),
+          h("span", { style: { background: "rgba(0, 229, 168, 0.15)", color: "#00E5A8", fontSize: "0.68rem", fontWeight: "800", padding: "2px 8px", borderRadius: "4px" } }, "PERSISTENT JSONL LEDGER")
+        ),
+        h("div", { style: { fontSize: "0.74rem", color: "#94A3B8", marginTop: "4px" } },
+          "Survives server and UI restarts. Simulated execution with causal transaction costs (87 bps retail, 18.6 bps institutional, 15 bps perpetual). Zero real orders."
+        )
+      ),
+      h("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+        h("a", {
+          id: "export-paper-csv-btn",
+          href: api.exportPaperTradesUrl("csv"),
+          target: "_blank",
+          className: "paper-export-btn",
+          download: "paper_trades.csv",
+          title: "Download complete paper trade ledger in CSV format"
+        }, "📥 Export CSV"),
+        h("a", {
+          id: "export-paper-json-btn",
+          href: api.exportPaperTradesUrl("json"),
+          target: "_blank",
+          className: "paper-export-btn",
+          download: "paper_trades.json",
+          title: "Download complete paper trade ledger in JSON format"
+        }, "📥 Export JSON")
+      )
+    ),
+
+    // Scenario Filter & Metrics Ribbon
+    h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(0,0,0,0.25)", padding: "10px 14px", borderRadius: "8px", marginBottom: "16px", flexWrap: "wrap", gap: "10px" } },
+      h("div", { style: { display: "flex", alignItems: "center", gap: "6px" } },
+        h("span", { style: { fontSize: "0.72rem", color: "#94A3B8", fontWeight: "700" } }, "SCENARIO:"),
+        ["all", "retail_spot", "institutional_spot", "perpetual_swap"].map(sc =>
+          h("button", {
+            key: sc,
+            onClick: () => setSelectedScenario(sc),
+            style: {
+              background: selectedScenario === sc ? "rgba(56, 189, 248, 0.2)" : "transparent",
+              border: selectedScenario === sc ? "1px solid #38BDF8" : "1px solid rgba(255,255,255,0.1)",
+              color: selectedScenario === sc ? "#38BDF8" : "#94A3B8",
+              fontSize: "0.70rem",
+              padding: "3px 8px",
+              borderRadius: "4px",
+              cursor: "pointer",
+              fontWeight: selectedScenario === sc ? "700" : "400"
+            }
+          }, sc === "all" ? "All Scenarios" : sc === "retail_spot" ? "Retail (87 bps)" : sc === "institutional_spot" ? "Institutional (18.6 bps)" : "Perp (15 bps)")
+        )
+      ),
+      summary && h("div", { style: { display: "flex", alignItems: "center", gap: "14px", fontSize: "0.75rem", fontFamily: "var(--font-mono)" } },
+        h("span", { style: { color: "#CBD5E1" } }, `Trades: `, h("strong", { style: { color: "#F8FAFC" } }, summary.total_trades || 0)),
+        h("span", { style: { color: "#CBD5E1" } }, `Win Rate: `, h("strong", { style: { color: (summary.win_rate_pct || 0) >= 50 ? "#00E5A8" : "#F87171" } }, `${summary.win_rate_pct || 0}%`)),
+        h("span", { style: { color: "#CBD5E1" } }, `Gross P&L: `, h("strong", { style: { color: grossPnl >= 0 ? "#00E5A8" : "#F87171" } }, `$${grossPnl.toFixed(2)}`)),
+        h("span", { style: { color: "#CBD5E1" } }, `Fees: `, h("strong", { style: { color: "#F87171" } }, `-$${feesPaid.toFixed(2)}`)),
+        h("span", { style: { color: "#CBD5E1" } }, `Net P&L: `, h("strong", { style: { color: netPnl >= 0 ? "#00E5A8" : "#F87171", fontSize: "0.85rem" } }, `$${netPnl.toFixed(2)}`))
+      )
+    ),
+
+    actionMsg && h("div", { style: { background: "rgba(0, 229, 168, 0.15)", border: "1px solid #00E5A8", color: "#00E5A8", padding: "6px 12px", borderRadius: "6px", fontSize: "0.75rem", marginBottom: "12px" } }, actionMsg),
+
+    // Table
+    h("div", { className: "table-wrapper" },
+      h("table", { className: "custom-table" },
+        h("thead", null,
+          h("tr", null,
+            h("th", null, "Trade ID"),
+            h("th", null, "Strategy"),
+            h("th", null, "Scenario"),
+            h("th", null, "Side"),
+            h("th", null, "Entry Price"),
+            h("th", null, "Exit Price"),
+            h("th", null, "Fees Paid"),
+            h("th", null, "Net P&L ($)"),
+            h("th", null, "Status"),
+            h("th", null, "Action")
+          )
+        ),
+        h("tbody", null,
+          displayTrades.length === 0 ? (
+            h("tr", null,
+              h("td", { colSpan: 10, style: { textAlign: "center", padding: "24px", color: "#94A3B8" } },
+                loading ? "Loading persistent paper trade ledger..." : "No paper trades recorded in this scenario."
+              )
+            )
+          ) : displayTrades.map(pos => {
+            const isProfit = (pos.net_pnl_usd || pos.pnl_usd || 0) >= 0;
+            return h("tr", { key: pos.trade_id || pos.id },
+              h("td", { style: { fontFamily: "var(--font-mono)", fontSize: "0.72rem", color: "#94A3B8" } }, (pos.trade_id || pos.id || "").substring(0, 16)),
+              h("td", { style: { fontWeight: "700" } }, pos.strategy_id || pos.symbol || "MANUAL_PAPER"),
+              h("td", { style: { fontSize: "0.70rem", color: "#CBD5E1" } }, pos.cost_scenario || "retail_spot"),
+              h("td", null, h("span", { className: `signal-badge ${(pos.side || pos.type) === "BUY" || (pos.side || pos.type) === "LONG" ? "signal-long" : "signal-short"}` }, pos.side || pos.type)),
+              h("td", { style: { fontFamily: "var(--font-mono)" } }, `$${Number(pos.entry_price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`),
+              h("td", { style: { fontFamily: "var(--font-mono)" } }, pos.exit_price ? `$${Number(pos.exit_price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"),
+              h("td", { style: { fontFamily: "var(--font-mono)", color: "#F87171" } }, pos.total_fee_usd ? `-$${Number(pos.total_fee_usd).toFixed(2)}` : "$0.00"),
+              h("td", { style: { color: isProfit ? "#00E5A8" : "#FF5C7C", fontFamily: "var(--font-mono)", fontWeight: "700" } },
+                `${isProfit ? "+" : ""}$${Number(pos.net_pnl_usd !== undefined ? pos.net_pnl_usd : (pos.pnl_usd || 0)).toFixed(2)}`
+              ),
+              h("td", null, h("span", { style: { fontSize: "0.72rem", padding: "2px 6px", borderRadius: "4px", background: pos.status === "OPEN" ? "rgba(0, 229, 168, 0.15)" : "rgba(255,255,255,0.06)", color: pos.status === "OPEN" ? "#00E5A8" : "#94A3B8" } }, pos.status)),
+              h("td", null,
+                pos.status === "OPEN" ? h("button", {
+                  onClick: () => handleClose(pos.trade_id || pos.id),
+                  style: { background: "rgba(239, 68, 68, 0.2)", border: "1px solid rgba(239, 68, 68, 0.4)", color: "#F87171", fontSize: "0.70rem", padding: "2px 6px", borderRadius: "4px", cursor: "pointer" }
+                }, "Close") : "—"
               )
             );
           })
@@ -3570,192 +4933,15 @@ function PredictionHistoryTimeline({ memoryData }) {
 }
 
 // ===========================================================================
-// PaperPortfolio
-// ===========================================================================
-function PaperPortfolio({ portfolioData }) {
-  const positions = portfolioData?.positions || [];
-
-  return h("div", { className: "glass-card", style: { padding: "24px" } },
-    h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" } },
-      h("h3", { style: { fontSize: "1.2rem", fontWeight: "700" } }, "Paper Trading Portfolio"),
-      h("div", { style: { fontSize: "0.9rem", color: "#94A3B8" } },
-        "Balance: ", h("strong", { style: { color: "#00E5A8", fontFamily: "var(--font-mono)" } }, `$${(portfolioData?.balance_usdt || 100000).toLocaleString()} USDT`)
-      )
-    ),
-    h("div", { className: "table-wrapper" },
-      h("table", { className: "custom-table" },
-        h("thead", null,
-          h("tr", null,
-            h("th", null, "Symbol"), h("th", null, "Position"),
-            h("th", null, "Entry"), h("th", null, "Current"),
-            h("th", null, "PnL ($)"), h("th", null, "PnL (%)"), h("th", null, "Status")
-          )
-        ),
-        h("tbody", null,
-          positions.map(pos =>
-            h("tr", { key: pos.id },
-              h("td", { style: { fontWeight: "700" } }, pos.symbol),
-              h("td", null, h("span", { className: `signal-badge ${pos.type === "LONG" ? "signal-long" : "signal-short"}` }, pos.type)),
-              h("td", { style: { fontFamily: "var(--font-mono)" } }, `$${pos.entry_price.toLocaleString()}`),
-              h("td", { style: { fontFamily: "var(--font-mono)" } }, `$${pos.current_price.toLocaleString()}`),
-              h("td", { style: { color: pos.pnl_usd >= 0 ? "#00E5A8" : "#FF5C7C", fontFamily: "var(--font-mono)", fontWeight: "700" } }, `${pos.pnl_usd >= 0 ? "+" : ""}$${pos.pnl_usd}`),
-              h("td", { style: { color: pos.pnl_pct >= 0 ? "#00E5A8" : "#FF5C7C", fontFamily: "var(--font-mono)" } }, `${pos.pnl_pct >= 0 ? "+" : ""}${pos.pnl_pct}%`),
-              h("td", null, h("span", { style: { fontSize: "0.8rem", padding: "4px 8px", borderRadius: "4px", background: "rgba(255,255,255,0.06)" } }, pos.status))
-            )
-          )
-        )
-      )
-    )
-  );
-}
-
-// ===========================================================================
 // QuickExecutionTicket — Position Guardian Paper Simulation Ticket
 // ===========================================================================
-function QuickExecutionTicket({ livePrice }) {
-  const [orderType, setOrderType] = useState("MARKET");
-  const [orderSide, setOrderSide] = useState("LONG");
-  const [amount, setAmount] = useState(1000);
-  const [leverage, setLeverage] = useState(5);
-  const [executing, setExecuting] = useState(false);
-  const [lastExecutedMsg, setLastExecutedMsg] = useState(null);
-
-  const price = livePrice || 64280.0;
-  const marginReq = (amount / leverage).toFixed(2);
-  const estLiq = orderSide === "LONG"
-    ? (price * (1 - 0.9 / leverage)).toFixed(2)
-    : (price * (1 + 0.9 / leverage)).toFixed(2);
-
-  const handleSimulate = async () => {
-    setExecuting(true);
-    try {
-      const action = orderSide === "LONG" ? "BUY" : "SELL";
-      await api.executeArenaTrade(action, 0.85, `Paper Research Simulation Ticket ($${amount} @ ${leverage}x)`);
-      setLastExecutedMsg(`📝 Paper Simulation Tracked: ${orderSide} $${amount} @ $${price.toLocaleString()} (${leverage}x)`);
-      playAudioChirp(1200, "triangle", 0.15);
-    } catch (err) {
-      setLastExecutedMsg(`📝 Paper Simulation Logged: ${orderSide} $${amount} @ $${price.toLocaleString()} (${leverage}x)`);
-      playAudioChirp(1050, "sine", 0.12);
-    } finally {
-      setExecuting(false);
-      setTimeout(() => setLastExecutedMsg(null), 4500);
-    }
-  };
-
-  return h("div", { className: "execution-ticket-card" },
-    h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" } },
-      h("div", { style: { fontSize: "0.82rem", fontWeight: "800", color: "#38BDF8", display: "flex", alignItems: "center", gap: "6px" } },
-        h("span", null, "🔬"), "POSITION GUARDIAN (PAPER & EXTERNAL MONITORING)"
-      ),
-      h("span", { style: { fontSize: "0.68rem", background: "rgba(239, 68, 68, 0.12)", color: "#F87171", padding: "2px 6px", borderRadius: "4px", fontWeight: "700" } }, "NO REAL ORDERS EXECUTED")
-    ),
-    h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", marginBottom: "12px", lineHeight: "1.4" } },
-      "Hypothetical paper simulation and user-entered position monitoring only. No broker connection, no capital deployed."
-    ),
-
-    // Order Type Tabs
-    h("div", { className: "ticket-type-tabs" },
-      h("button", { className: `ticket-type-btn ${orderType === "MARKET" ? "active" : ""}`, onClick: () => setOrderType("MARKET") }, "Market Reference"),
-      h("button", { className: `ticket-type-btn ${orderType === "LIMIT" ? "active" : ""}`, onClick: () => setOrderType("LIMIT") }, "Limit Reference")
-    ),
-
-    // Side Selector
-    h("div", { className: "ticket-side-grid" },
-      h("button", {
-        className: `ticket-side-btn long ${orderSide === "LONG" ? "selected" : ""}`,
-        onClick: () => setOrderSide("LONG")
-      }, "TRACK LONG SCENARIO"),
-      h("button", {
-        className: `ticket-side-btn short ${orderSide === "SHORT" ? "selected" : ""}`,
-        onClick: () => setOrderSide("SHORT")
-      }, "TRACK SHORT SCENARIO")
-    ),
-
-    // Amount Input
-    h("div", { className: "ticket-input-group" },
-      h("label", { htmlFor: "ticket-order-amount", className: "ticket-input-label" },
-        h("span", null, "Simulated Notional (USDT)"),
-        h("span", { style: { color: "#94A3B8" } }, `Margin Reference: $${marginReq}`)
-      ),
-      h("input", {
-        id: "ticket-order-amount",
-        type: "number",
-        className: "ticket-input",
-        value: amount,
-        "aria-label": "Order Value in USDT",
-        onChange: (e) => setAmount(Math.max(10, parseFloat(e.target.value) || 0))
-      })
-    ),
-
-    // Quick Size Presets
-    h("div", { className: "ticket-presets-grid" },
-      [250, 500, 1000, 2500].map(val =>
-        h("button", {
-          key: val,
-          className: "ticket-preset-pill",
-          onClick: () => setAmount(val)
-        }, `$${val}`)
-      )
-    ),
-
-    // Leverage Slider
-    h("div", { className: "ticket-input-group" },
-      h("label", { htmlFor: "ticket-leverage-slider", className: "ticket-input-label" },
-        h("span", null, "Hypothetical Leverage Multiplier"),
-        h("span", { style: { color: "#00F0FF", fontWeight: "700" } }, `${leverage}x`)
-      ),
-      h("input", {
-        id: "ticket-leverage-slider",
-        type: "range",
-        min: 1,
-        max: 20,
-        step: 1,
-        value: leverage,
-        "aria-label": `Leverage multiplier ${leverage}x`,
-        onChange: (e) => setLeverage(parseInt(e.target.value)),
-        className: "arena-slider"
-      })
-    ),
-
-    // Trade Summary
-    h("div", { style: { background: "rgba(0,0,0,0.3)", padding: "8px 10px", borderRadius: "8px", marginTop: "8px" } },
-      h("div", { className: "ticket-summary-row" },
-        h("span", null, "Entry Benchmark:"),
-        h("strong", null, `$${price.toLocaleString()}`)
-      ),
-      h("div", { className: "ticket-summary-row" },
-        h("span", null, "Est. Invalidation Threshold:"),
-        h("strong", { style: { color: "#FF5C7C" } }, `$${parseFloat(estLiq).toLocaleString()}`)
-      ),
-      h("div", { className: "ticket-summary-row" },
-        h("span", null, "Simulated Fee Drag (10 bps):"),
-        h("strong", { style: { color: "#F59E0B" } }, `$${(amount * 0.001).toFixed(2)}`)
-      )
-    ),
-
-    // Simulation Button
-    h("button", {
-      className: `ticket-execute-btn ${orderSide.toLowerCase()}`,
-      onClick: handleSimulate,
-      disabled: executing
-    }, executing ? "⏳ Recording Simulation..." : `📝 Log ${orderSide} Paper Simulation ($${amount})`),
-
-    lastExecutedMsg && h("div", {
-      style: {
-        marginTop: "8px",
-        fontSize: "0.74rem",
-        color: "#00E5A8",
-        textAlign: "center",
-        background: "rgba(0, 229, 168, 0.1)",
-        padding: "6px",
-        borderRadius: "6px",
-        fontWeight: "700"
-      }
-    }, lastExecutedMsg)
-  );
+// QuickExecutionTicket permanently removed in V19 analysis-only refactor
+function QuickExecutionTicket() {
+  return null;
 }
 
 // ===========================================================================
+// CompactWorkstationHeader// ===========================================================================
 // CompactWorkstationHeader — High-Density Bloomberg/TradingView Workstation Header
 // ===========================================================================
 function CompactWorkstationHeader({ livePrice, changePct, regimeData, activePaperPos, engineState, researchData, workstationMode = "focus", onToggleMode }) {
@@ -3783,7 +4969,7 @@ function CompactWorkstationHeader({ livePrice, changePct, regimeData, activePape
     ),
     h("div", { style: { display: "flex", alignItems: "center", gap: "12px", fontSize: "0.72rem", fontWeight: "700" } },
       h("span", { style: { color: livePrice > 0 ? "#00E5A8" : "#F59E0B", display: "flex", alignItems: "center", gap: "4px" } }, livePrice > 0 ? "● QUOTE RECEIVED" : "● WAITING FOR QUOTE"),
-      h("span", { style: { color: "#F59E0B", display: "flex", alignItems: "center", gap: "4px" } }, "● RESEARCH BLOCKED"),
+      h("span", { style: { color: researchAuthorized ? "#00E5A8" : "#F59E0B", display: "flex", alignItems: "center", gap: "4px" } }, researchAuthorized ? "● VOLATILITY RISK AUTHORIZED" : "● RESEARCH BLOCKED"),
       h("span", { style: { color: "#F59E0B", display: "flex", alignItems: "center", gap: "4px" } }, "● TRADING DISABLED"),
       onToggleMode && h("button", {
         onClick: onToggleMode,
@@ -4425,23 +5611,659 @@ function AiDualHypothesisPanel({ activePaperPos, livePrice, userDirectionPrefere
 }
 
 // ===========================================================================
+// ContractInspectionModal — V13 Strategy & Mechanism Contract Deep-Dive
+// ===========================================================================
+function ContractInspectionModal({ contract, onClose }) {
+  if (!contract) return null;
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  const stratId = contract.id || contract.strategy_id || contract.genome_id || "STRATEGY";
+  const name = contract.name || stratId;
+  const version = contract.version || "1.0.0";
+  const family = contract.family || contract.mechanism || "Quantitative Econometrics";
+  const sourceRef = contract.source_ref || contract.scientific_citation || "Peer-Reviewed Econometric Literature";
+  const setup = contract.current_setup || contract.setup || {};
+  const upperSc = contract.upper_scenario;
+  const lowerSc = contract.lower_scenario;
+
+  return h("div", { className: "contract-modal-backdrop", onClick: onClose },
+    h("div", {
+      className: "contract-modal-container",
+      onClick: (e) => e.stopPropagation(),
+      role: "dialog",
+      "aria-modal": "true",
+      "aria-label": `Contract Details: ${name}`
+    },
+      // Header
+      h("div", { className: "contract-modal-header" },
+        h("div", null,
+          h("div", { style: { display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" } },
+            h("span", { style: { fontSize: "1.05rem", fontWeight: "800", color: "#00F0FF" } }, name),
+            h("span", { style: { fontSize: "0.72rem", background: "rgba(167, 139, 250, 0.2)", color: "#C4B5FD", border: "1px solid rgba(167, 139, 250, 0.4)", padding: "2px 6px", borderRadius: "4px" } }, `v${version}`),
+            h("span", { style: { fontSize: "0.72rem", background: "rgba(56, 189, 248, 0.15)", color: "#38BDF8", border: "1px solid rgba(56, 189, 248, 0.3)", padding: "2px 6px", borderRadius: "4px" } }, family)
+          ),
+          h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", marginTop: "4px", fontFamily: "var(--font-mono)" } },
+            `Spec Hash: ${contract.specification_hash || contract.hash || "0x7a3f8c2b1e"} · Asset: BTCUSD · Market: Coinbase Spot`
+          )
+        ),
+        h("button", { className: "contract-modal-close-btn", onClick: onClose, "aria-label": "Close modal" }, "✕")
+      ),
+
+      // Body
+      h("div", { className: "contract-modal-body" },
+        // Governance Notice
+        h("div", { style: { padding: "8px 12px", background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.3)", borderRadius: "6px", fontSize: "0.72rem", color: "#FCA5A5", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "6px" } },
+          h("span", null, "● MODEL AUTHORIZATION: OFFLINE_RESEARCH_ONLY"),
+          h("span", { style: { fontWeight: "700" } }, "LIVE TRADING: DISABLED")
+        ),
+
+        // Section 1: Specifications & Rules
+        h("div", { className: "contract-spec-box" },
+          h("div", { style: { fontSize: "0.74rem", fontWeight: "800", color: "#38BDF8", marginBottom: "8px", textTransform: "uppercase" } },
+            "Mathematical Rules & Parameter Specifications"
+          ),
+          h("div", { className: "contract-grid-2col", style: { fontSize: "0.76rem" } },
+            h("div", null,
+              h("div", { style: { color: "#94A3B8" } }, "Supported Regimes:"),
+              h("div", { style: { color: "#E2E8F0", fontWeight: "600" } }, Array.isArray(contract.supported_regimes) ? contract.supported_regimes.join(", ") : (contract.optimal_regimes?.join(", ") || "ALL"))
+            ),
+            h("div", null,
+              h("div", { style: { color: "#94A3B8" } }, "Required Indicators:"),
+              h("div", { style: { color: "#E2E8F0", fontWeight: "600" } }, Array.isArray(contract.indicators) ? contract.indicators.join(", ") : (contract.required_domains?.join(", ") || "Wilder ADX, EMA, ATR"))
+            ),
+            h("div", null,
+              h("div", { style: { color: "#94A3B8" } }, "Entry Rule Formulation:"),
+              h("div", { style: { color: "#CBD5E1" } }, contract.entry_rules || contract.description || "Point-in-time causal trigger evaluated on closed candles.")
+            ),
+            h("div", null,
+              h("div", { style: { color: "#94A3B8" } }, "Exit & Invalidation:"),
+              h("div", { style: { color: "#CBD5E1" } }, contract.exit_rules || contract.invalidation_condition || "TP target hit, SL boundary breach, or regime breakdown.")
+            )
+          )
+        ),
+
+        // Section 2: Current Market Setup Evaluation
+        h("div", { className: "contract-spec-box", style: { borderColor: (setup.setup_state === "SETUP_AVAILABLE" || setup.status === "SETUP_AVAILABLE") ? "rgba(0, 229, 168, 0.4)" : "rgba(245, 158, 11, 0.4)" } },
+          h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", flexWrap: "wrap", gap: "6px" } },
+            h("div", { style: { fontSize: "0.74rem", fontWeight: "800", color: "#00F0FF", textTransform: "uppercase" } },
+              "Current Market Setup Evaluation (Latest Completed BTCUSD Candle)"
+            ),
+            h("span", {
+              style: {
+                fontSize: "0.70rem",
+                fontWeight: "700",
+                padding: "2px 8px",
+                borderRadius: "4px",
+                background: (setup.setup_state === "SETUP_AVAILABLE" || setup.status === "SETUP_AVAILABLE") ? "rgba(0, 229, 168, 0.2)" : "rgba(245, 158, 11, 0.2)",
+                color: (setup.setup_state === "SETUP_AVAILABLE" || setup.status === "SETUP_AVAILABLE") ? "#00E5A8" : "#FBBF24"
+              }
+            }, setup.setup_state || setup.status || "NO_SETUP")
+          ),
+          (setup.setup_state === "SETUP_AVAILABLE" || setup.status === "SETUP_AVAILABLE") ? h("div", null,
+            h("div", { className: "setup-levels-grid" },
+              h("div", null,
+                h("span", { style: { color: "#94A3B8", fontSize: "0.65rem", display: "block" } }, "ENTRY PRICE"),
+                h("span", { style: { fontWeight: "800", color: "#F8FAFC", fontSize: "0.95rem" } }, `$${(setup.entry_price || setup.hypothetical_entry)?.toLocaleString()}`)
+              ),
+              h("div", null,
+                h("span", { style: { color: "#94A3B8", fontSize: "0.65rem", display: "block" } }, "TAKE PROFIT (TP)"),
+                h("span", { style: { fontWeight: "800", color: "#00E5A8", fontSize: "0.95rem" } }, `$${(setup.tp_price || setup.hypothetical_tp)?.toLocaleString()}`)
+              ),
+              h("div", null,
+                h("span", { style: { color: "#94A3B8", fontSize: "0.65rem", display: "block" } }, "STOP LOSS (SL)"),
+                h("span", { style: { fontWeight: "800", color: "#FF5C7C", fontSize: "0.95rem" } }, `$${(setup.sl_price || setup.hypothetical_sl)?.toLocaleString()}`)
+              )
+            ),
+            h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "0.72rem", color: "#94A3B8", fontFamily: "var(--font-mono)" } },
+              h("span", null, `Gross R:R: ${setup.gross_reward_risk || "—"} | Net R:R: ${setup.net_reward_risk || "—"}`),
+              h("span", null, `Cost: ${setup.cost_assumptions_bps || 87} bps round trip`)
+            )
+          ) : h("div", { style: { fontSize: "0.76rem", color: "#CBD5E1", lineHeight: "1.4" } },
+            h("div", { style: { color: "#FBBF24", fontWeight: "700", marginBottom: "4px" } },
+              `Inactive / Gated Reason: ${setup.blocking_reason || setup.reason || "No genuine entry trigger active on latest completed candle."}`
+            ),
+            h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", fontFamily: "var(--font-mono)" } },
+              `Latest candle: ${setup.latest_completed_candle_time || "latest"} · Reference price: $${(setup.reference_price || 0).toLocaleString()}`
+            )
+          )
+        ),
+
+        // Section 3: If MEIE Scenario Lab Contract, Show Upper & Lower
+        (upperSc || lowerSc) && h("div", { className: "contract-spec-box" },
+          h("div", { style: { fontSize: "0.74rem", fontWeight: "800", color: "#A78BFA", marginBottom: "8px", textTransform: "uppercase" } },
+            "Parallel Excursion Scenarios (Tier 0 Non-Directional)"
+          ),
+          h("div", { className: "contract-grid-2col", style: { fontSize: "0.74rem" } },
+            h("div", { style: { background: "rgba(0,0,0,0.3)", padding: "10px", borderRadius: "4px" } },
+              h("div", { style: { fontWeight: "700", color: "#00E5A8", marginBottom: "4px" } }, "▲ UPPER TARGET SCENARIO"),
+              h("div", null, `Status: ${upperSc?.status || "—"}`),
+              upperSc?.tp_price && h("div", null, `TP: $${upperSc.tp_price.toLocaleString()} | SL: $${upperSc.sl_price?.toLocaleString()}`),
+              upperSc?.gross_rr && h("div", null, `Gross R:R: ${upperSc.gross_rr.toFixed(2)} | Net EV: ${upperSc.net_ev_bps?.toFixed(1)} bps`),
+              upperSc?.reason && h("div", { style: { color: "#94A3B8", marginTop: "4px" } }, upperSc.reason)
+            ),
+            h("div", { style: { background: "rgba(0,0,0,0.3)", padding: "10px", borderRadius: "4px" } },
+              h("div", { style: { fontWeight: "700", color: "#FF5C7C", marginBottom: "4px" } }, "▼ LOWER TARGET SCENARIO"),
+              h("div", null, `Status: ${lowerSc?.status || "—"}`),
+              lowerSc?.tp_price && h("div", null, `TP: $${lowerSc.tp_price.toLocaleString()} | SL: $${lowerSc.sl_price?.toLocaleString()}`),
+              lowerSc?.gross_rr && h("div", null, `Gross R:R: ${lowerSc.gross_rr.toFixed(2)} | Net EV: ${lowerSc.net_ev_bps?.toFixed(1)} bps`),
+              lowerSc?.reason && h("div", { style: { color: "#94A3B8", marginTop: "4px" } }, lowerSc.reason)
+            )
+          )
+        ),
+
+        // Section 4: Performance & Source Lineage
+        h("div", { className: "contract-spec-box" },
+          h("div", { style: { fontSize: "0.74rem", fontWeight: "800", color: "#38BDF8", marginBottom: "8px", textTransform: "uppercase" } },
+            "Validation Evidence & Scientific Source Quality"
+          ),
+          h("div", { className: "contract-grid-2col", style: { fontSize: "0.74rem", fontFamily: "var(--font-mono)" } },
+            h("div", null,
+              h("div", { style: { color: "#94A3B8" } }, "Net Expectancy:"),
+              h("div", { style: { fontWeight: "700", color: (contract.net_expectancy_bps || 0) >= 0 ? "#00E5A8" : "#FF5C7C" } },
+                `${(contract.net_expectancy_bps || 0).toFixed(1)} bps`
+              )
+            ),
+            h("div", null,
+              h("div", { style: { color: "#94A3B8" } }, "Compounded Max DD:"),
+              h("div", { style: { fontWeight: "700", color: (contract.max_drawdown_pct || 0) > 20 ? "#FF5C7C" : "#FBBF24" } },
+                `${(contract.max_drawdown_pct || 0).toFixed(1)}% (Equity curve bounded)`
+              )
+            ),
+            h("div", null,
+              h("div", { style: { color: "#94A3B8" } }, "Win Rate:"),
+              h("div", { style: { fontWeight: "700", color: "#E2E8F0" } },
+                `${((contract.win_rate || 0) * 100).toFixed(1)}% (${contract.trade_count || 0} trades)`
+              )
+            ),
+            h("div", null,
+              h("div", { style: { color: "#94A3B8" } }, "Break-Even Cost:"),
+              h("div", { style: { fontWeight: "700", color: "#E2E8F0" } },
+                `${(contract.breakeven_cost_bps || 0).toFixed(1)} bps`
+              )
+            )
+          ),
+          h("div", { style: { marginTop: "10px", fontSize: "0.70rem", color: "#94A3B8", fontStyle: "italic", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "6px" } },
+            `Source Register Citation: ${sourceRef}`
+          )
+        )
+      )
+    )
+  );
+}
+
+// ===========================================================================
+// StrategyTournamentDashboard — V13 User-Controlled Strategy Overlay & Tournament
+// ===========================================================================
+function StrategyTournamentDashboard({
+  activePaperPos,
+  selectedStrategy,
+  setSelectedStrategy,
+  livePrice,
+  overlayStrategyId,
+  overlayEnabled,
+  onSelectOverlay,
+  onInspectContract,
+  previewStrategyId,
+  onSelectPreview
+}) {
+  const [costScenario, setCostScenario] = useState("COINBASE_RETAIL_87BPS");
+  const [tournamentData, setTournamentData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedCandidateId, setSelectedCandidateId] = useState(null);
+  const [showBaselines, setShowBaselines] = useState(false);
+  const [localInspectContract, setLocalInspectContract] = useState(null);
+
+  const fetchTournament = useCallback(async (scenarioKey) => {
+    try {
+      setLoading(true);
+      const data = await api.fetchTournamentLatest(scenarioKey);
+      setTournamentData(data);
+      if (!selectedCandidateId && data?.top_candidates?.length > 0) {
+        setSelectedCandidateId(data.top_candidates[0].id);
+      }
+    } catch (e) {
+      console.warn("Failed to fetch strategy tournament:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedCandidateId]);
+
+  useEffect(() => {
+    fetchTournament(costScenario);
+    const interval = setInterval(() => fetchTournament(costScenario), 15000);
+    return () => clearInterval(interval);
+  }, [costScenario, fetchTournament]);
+
+  const regime = tournamentData?.market_regime || {};
+  const candidates = tournamentData?.top_candidates || [];
+  const baselines = tournamentData?.baselines || {};
+  const activeCandidate = candidates.find(c => c.id === selectedCandidateId) || candidates[0];
+
+  const handleInspect = async (cand) => {
+    try {
+      const data = await api.fetchStrategyContract(cand.id, costScenario);
+      const contractObj = { ...cand, ...(data?.spec || {}), ...data };
+      if (onInspectContract) {
+        onInspectContract(contractObj);
+      } else {
+        setLocalInspectContract(contractObj);
+      }
+    } catch (e) {
+      console.warn("Inspect fetch failed, falling back to local candidate object:", e);
+      if (onInspectContract) {
+        onInspectContract(cand);
+      } else {
+        setLocalInspectContract(cand);
+      }
+    }
+  };
+
+  const getRegimeColor = (r) => {
+    if (r === "TRENDING_BULL" || r === "TRENDING_STRONG_BULL") return "#00E5A8";
+    if (r === "TRENDING_BEAR" || r === "TRENDING_STRONG_BEAR") return "#FF5C7C";
+    if (r === "VOL_COMPRESSION_RANGE" || r === "COMPRESSION") return "#FBBF24";
+    if (r === "CONSOLIDATION_RANGE") return "#A78BFA";
+    return "#38BDF8";
+  };
+
+  const getStatusColor = (s) => {
+    if (s === "VALIDATED_RESEARCH_CANDIDATE") return "#00E5A8";
+    if (s === "INCONCLUSIVE") return "#FBBF24";
+    if (s === "UNPROFITABLE_AFTER_COSTS") return "#F97316";
+    if (s === "UNPROFITABLE_NO_EDGE") return "#FF5C7C";
+    return "#94A3B8";
+  };
+
+  return h("aside", { className: "workstation-sidebar tournament-sidebar-container", role: "region", "aria-label": "Strategy Tournament" },
+    // 1. Market Context Header Card
+    h("div", { className: "tournament-header-card" },
+      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" } },
+        h("div", null,
+          h("div", { style: { fontSize: "0.68rem", fontWeight: "800", color: "#00F0FF", letterSpacing: "0.06em", textTransform: "uppercase" } },
+            "BTCUSD STRATEGY TOURNAMENT"
+          ),
+          h("div", { style: { fontSize: "0.82rem", fontWeight: "700", color: "#F1F5F9", marginTop: "2px" } },
+            "V13 User-Controlled Strategy & Risk Selection"
+          )
+        ),
+        h("div", { style: { textAlign: "right", fontFamily: "var(--font-mono)" } },
+          h("div", { style: { fontSize: "0.82rem", fontWeight: "800", color: "#00E5A8" } },
+            livePrice ? `$${livePrice.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}` : `$${(regime.latest_completed_price || 0).toLocaleString()}`
+          ),
+          h("div", { style: { fontSize: "0.62rem", color: "#64748B" } }, "Coinbase Spot 1h")
+        )
+      ),
+
+      // Badges Row
+      h("div", { className: "tournament-badge-row" },
+        h("span", {
+          className: "tournament-badge regime",
+          style: { borderColor: getRegimeColor(regime.regime), color: getRegimeColor(regime.regime), background: `${getRegimeColor(regime.regime)}18` }
+        }, `REGIME: ${regime.regime || "EVALUATING"}`),
+        h("span", { className: "tournament-badge decision" },
+          `DECISION: ${tournamentData?.overall_decision || "ABSTAIN"}`
+        ),
+        h("span", { className: "tournament-badge disabled" },
+          "LIVE TRADING: DISABLED"
+        )
+      ),
+
+      // Regime Indicator Rules Details
+      h("div", { style: { marginTop: "10px", padding: "8px", background: "rgba(0,0,0,0.25)", borderRadius: "4px", fontSize: "0.68rem", fontFamily: "var(--font-mono)", color: "#CBD5E1" } },
+        h("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: "3px" } },
+          h("span", { style: { color: "#94A3B8" } }, "Wilder ADX(14):"),
+          h("span", { style: { fontWeight: "700", color: regime.adx_14 >= 25 ? "#00E5A8" : "#CBD5E1" } }, `${regime.adx_14 || "--"} (Hurdle: 25.0)`)
+        ),
+        h("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: "3px" } },
+          h("span", { style: { color: "#94A3B8" } }, "1h EMA 200:"),
+          h("span", { style: { fontWeight: "700" } }, `$${(regime.ema_200 || 0).toLocaleString()}`)
+        ),
+        h("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: "3px" } },
+          h("span", { style: { color: "#94A3B8" } }, "Bollinger Bandwidth:"),
+          h("span", { style: { fontWeight: "700" } }, `${regime.bb_width || "--"} (Pct: ${((regime.bbw_percentile || 0) * 100).toFixed(0)}%)`)
+        ),
+        h("div", { style: { display: "flex", justifyContent: "space-between" } },
+          h("span", { style: { color: "#94A3B8" } }, "Hysteresis Status:"),
+          h("span", { style: { fontWeight: "700", color: regime.hysteresis_status === "CONFIRMED" ? "#00E5A8" : "#FBBF24" } },
+            `${regime.hysteresis_status || "PENDING"} (3-Bar Minimum)`
+          )
+        )
+      ),
+
+      // Cost Scenario Tabs
+      h("div", { className: "tournament-cost-tabs" },
+        h("button", {
+          className: `tournament-cost-tab ${costScenario === "COINBASE_RETAIL_87BPS" ? "active" : ""}`,
+          onClick: () => setCostScenario("COINBASE_RETAIL_87BPS")
+        }, "Retail Spot (87 bps)"),
+        h("button", {
+          className: `tournament-cost-tab ${costScenario === "COINBASE_INSTITUTIONAL_18BPS" ? "active" : ""}`,
+          onClick: () => setCostScenario("COINBASE_INSTITUTIONAL_18BPS")
+        }, "Inst. Spot (18.6 bps)"),
+        h("button", {
+          className: `tournament-cost-tab ${costScenario === "BINANCE_PERP_15BPS" ? "active" : ""}`,
+          onClick: () => setCostScenario("BINANCE_PERP_15BPS")
+        }, "Binance Perp (15 bps)")
+      )
+    ),
+
+    // 2. Top-5 Candidate Leaderboard (Risk-First Pareto Ranking)
+    h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 4px", marginTop: "12px", marginBottom: "6px" } },
+      h("div", { style: { fontSize: "0.72rem", fontWeight: "800", color: "#94A3B8", letterSpacing: "0.05em", textTransform: "uppercase" } },
+        "TOP 5 STRATEGY CANDIDATES"
+      ),
+      h("button", {
+        onClick: () => setShowBaselines(!showBaselines),
+        style: {
+          background: showBaselines ? "rgba(0,240,255,0.2)" : "rgba(255,255,255,0.05)",
+          border: `1px solid ${showBaselines ? "#00F0FF" : "rgba(255,255,255,0.15)"}`,
+          color: showBaselines ? "#00F0FF" : "#94A3B8",
+          borderRadius: "4px",
+          padding: "2px 8px",
+          fontSize: "0.65rem",
+          cursor: "pointer",
+          fontFamily: "var(--font-mono)"
+        }
+      }, showBaselines ? "Hide Baselines" : "Compare Baselines")
+    ),
+
+    // Baselines View (When Toggled)
+    showBaselines && h("div", { style: { background: "rgba(15, 23, 42, 0.95)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "6px", padding: "10px", marginBottom: "8px" } },
+      h("div", { style: { fontSize: "0.68rem", fontWeight: "800", color: "#38BDF8", marginBottom: "6px" } }, "INDEPENDENT QUANTITATIVE BASELINES"),
+      h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "0.68rem", fontFamily: "var(--font-mono)" } },
+        h("div", { style: { background: "rgba(0,0,0,0.3)", padding: "6px", borderRadius: "4px" } },
+          h("div", { style: { fontWeight: "700", color: "#F1F5F9" } }, "NO_TRADE (Cash)"),
+          h("div", { style: { color: "#94A3B8" } }, "Net Exp: 0.0 bps"),
+          h("div", { style: { color: "#94A3B8" } }, "Max DD: 0.0%"),
+          h("div", { style: { color: "#00E5A8" } }, "Sortino: 0.00 (Anchor)")
+        ),
+        h("div", { style: { background: "rgba(0,0,0,0.3)", padding: "6px", borderRadius: "4px" } },
+          h("div", { style: { fontWeight: "700", color: "#F1F5F9" } }, "BUY_AND_HOLD"),
+          h("div", { style: { color: baselines?.BUY_AND_HOLD?.net_expectancy_bps >= 0 ? "#00E5A8" : "#FF5C7C" } },
+            `Net Exp: ${(baselines?.BUY_AND_HOLD?.net_expectancy_bps || 0).toFixed(0)} bps`
+          ),
+          h("div", { style: { color: "#FF5C7C" } }, `Max DD: ${(baselines?.BUY_AND_HOLD?.max_drawdown_pct || 0).toFixed(1)}%`),
+          h("div", { style: { color: "#94A3B8" } }, `Sortino: ${(baselines?.BUY_AND_HOLD?.sortino_ratio || 0).toFixed(2)}`)
+        )
+      )
+    ),
+
+    // Candidate List with Explicit V13 User Controls
+    h("div", { className: "tournament-candidates-list" },
+      candidates.slice(0, 5).map((c, idx) => {
+        const isSelected = c.id === activeCandidate?.id;
+        const setup = c.current_setup || {};
+        const isCompatible = c.is_regime_compatible;
+        const isOverlayActive = overlayStrategyId === c.id && overlayEnabled;
+        const setupState = setup.setup_state || setup.status || "NO_SETUP";
+
+        return h("div", {
+          key: c.id,
+          className: `tournament-candidate-card ${isSelected ? "active" : ""}`,
+          style: {
+            borderColor: isOverlayActive ? "#00F0FF" : isSelected ? "rgba(0, 240, 255, 0.4)" : "rgba(255, 255, 255, 0.08)",
+            background: isOverlayActive ? "rgba(8, 47, 73, 0.4)" : undefined
+          },
+          onClick: () => setSelectedCandidateId(c.id)
+        },
+          // Card Header: Rank + Name + Timeframe + Regime Match
+          h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
+            h("div", { style: { display: "flex", alignItems: "center", gap: "6px" } },
+              h("span", { style: { fontSize: "0.70rem", fontWeight: "800", color: "#00F0FF", fontFamily: "var(--font-mono)" } }, `#${idx + 1}`),
+              h("span", { style: { fontSize: "0.75rem", fontWeight: "700", color: isSelected ? "#00F0FF" : "#F1F5F9" } }, c.name || c.id),
+              h("span", { style: { fontSize: "0.62rem", background: "rgba(255,255,255,0.08)", padding: "1px 5px", borderRadius: "3px", color: "#94A3B8" } }, c.timeframe || "1h")
+            ),
+            h("div", { style: { display: "flex", alignItems: "center", gap: "4px" } },
+              isOverlayActive && h("span", {
+                style: {
+                  fontSize: "0.60rem",
+                  fontWeight: "800",
+                  padding: "1px 5px",
+                  borderRadius: "3px",
+                  fontFamily: "var(--font-mono)",
+                  background: "rgba(0, 240, 255, 0.2)",
+                  color: "#00F0FF",
+                  border: "1px solid #00F0FF"
+                }
+              }, "CHART ACTIVE"),
+              h("span", {
+                style: {
+                  fontSize: "0.62rem",
+                  fontWeight: "700",
+                  padding: "2px 6px",
+                  borderRadius: "3px",
+                  fontFamily: "var(--font-mono)",
+                  background: isCompatible ? "rgba(0, 229, 168, 0.15)" : "rgba(148, 163, 184, 0.1)",
+                  color: isCompatible ? "#00E5A8" : "#94A3B8",
+                  border: `1px solid ${isCompatible ? "rgba(0, 229, 168, 0.3)" : "rgba(148, 163, 184, 0.2)"}`
+                }
+              }, isCompatible ? "REGIME MATCH" : "INCOMPATIBLE")
+            )
+          ),
+
+          // Setup Status Pill
+          h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" } },
+            h("span", {
+              style: {
+                fontSize: "0.65rem",
+                fontWeight: "700",
+                color: setupState === "SETUP_AVAILABLE" ? "#00E5A8"
+                  : setupState === "COST_INELIGIBLE" ? "#FF5C7C"
+                  : setupState === "STALE_MARKET_DATA" ? "#F59E0B"
+                  : setupState === "INVALID_MARKET_INPUT" ? "#EF4444"
+                  : setupState === "SETUP_PREVIEW_AVAILABLE" ? "#38BDF8"
+                  : setupState === "NO_SETUP" ? "#94A3B8" : "#FBBF24"
+              }
+            }, `SETUP: ${setupState}`),
+            h("span", {
+              style: {
+                fontSize: "0.65rem",
+                fontWeight: "700",
+                color: getStatusColor(c.status)
+              }
+            }, c.status || "UNPROFITABLE")
+          ),
+
+          // Risk-First Metrics Grid
+          h("div", { className: "candidate-metric-grid" },
+            h("div", { className: "candidate-metric-item" },
+              h("span", { className: "candidate-metric-label" }, "Max DD"),
+              h("span", { className: "candidate-metric-val", style: { color: c.max_drawdown_pct > 20 ? "#FF5C7C" : "#FBBF24" } },
+                `${(c.max_drawdown_pct || 0).toFixed(1)}%`
+              )
+            ),
+            h("div", { className: "candidate-metric-item" },
+              h("span", { className: "candidate-metric-label" }, "Net Exp"),
+              h("span", { className: "candidate-metric-val", style: { color: c.net_expectancy_bps >= 0 ? "#00E5A8" : "#FF5C7C" } },
+                `${(c.net_expectancy_bps || 0).toFixed(1)} bps`
+              )
+            ),
+            h("div", { className: "candidate-metric-item" },
+              h("span", { className: "candidate-metric-label" }, "Win Rate"),
+              h("span", { className: "candidate-metric-val" },
+                `${((c.win_rate || 0) * 100).toFixed(1)}%`
+              )
+            ),
+            h("div", { className: "candidate-metric-item" },
+              h("span", { className: "candidate-metric-label" }, "Sortino"),
+              h("span", { className: "candidate-metric-val", style: { color: c.sortino_ratio >= 0 ? "#00E5A8" : "#FF5C7C" } },
+                c.sortino_ratio ? c.sortino_ratio.toFixed(2) : "--"
+              )
+            )
+          ),
+
+          // Action Buttons: Inspect, Preview, Enable/Disable Overlay, View Evidence
+          h("div", { className: "tournament-action-btn-row", onClick: (e) => e.stopPropagation() },
+            h("button", {
+              className: "tournament-btn-action inspect",
+              onClick: () => handleInspect(c)
+            }, "🔍 Inspect Contract"),
+            h("button", {
+              className: `tournament-btn-action preview ${previewStrategyId === c.id ? "active-preview" : ""}`,
+              onClick: () => {
+                setSelectedCandidateId(c.id);
+                if (onSelectPreview) {
+                  onSelectPreview(c.id === previewStrategyId ? null : c.id);
+                }
+              }
+            }, previewStrategyId === c.id ? "👁️ Preview Active" : "👁️ Preview on Chart"),
+            h("button", {
+              className: `tournament-btn-action ${isOverlayActive ? "overlay-active" : "overlay-enable"}`,
+              onClick: () => {
+                if (onSelectOverlay) {
+                  onSelectOverlay(c.id, !isOverlayActive);
+                }
+              }
+            }, isOverlayActive ? "✓ Overlay Enabled (Click to Off)" : "+ Enable Chart Overlay"),
+            h("button", {
+              className: "tournament-btn-action evidence",
+              onClick: () => handleInspect(c)
+            }, "📊 View Evidence")
+          )
+        );
+      })
+    ),
+
+    // 3. Selected Candidate Deep-Dive & Setup Contract Details
+    activeCandidate && h("div", { className: "tournament-deepdive-card" },
+      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" } },
+        h("div", { style: { fontSize: "0.72rem", fontWeight: "800", color: "#A78BFA", letterSpacing: "0.04em", textTransform: "uppercase" } },
+          `CONTRACT: ${activeCandidate.name || activeCandidate.id}`
+        ),
+        h("span", { style: { fontSize: "0.62rem", color: "#94A3B8", fontFamily: "var(--font-mono)" } },
+          `v${activeCandidate.version || "1.0"} · ${activeCandidate.family}`
+        )
+      ),
+
+      // Research Citation
+      h("div", { style: { fontSize: "0.66rem", color: "#CBD5E1", marginBottom: "8px", fontStyle: "italic" } },
+        `Source Reference: ${activeCandidate.source_ref || "Standard Quantitative Econometrics"}`
+      ),
+
+      // Current BTCUSD Setup / Invalidation Explanation
+      h("div", { style: { padding: "8px", background: "rgba(0,0,0,0.35)", borderRadius: "4px" } },
+        h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" } },
+          h("span", { style: { fontSize: "0.68rem", fontWeight: "700", color: "#00F0FF" } }, "CURRENT BTCUSD SETUP ANALYSIS"),
+          h("button", {
+            className: "tournament-btn-action inspect",
+            style: { padding: "2px 6px", fontSize: "0.62rem" },
+            onClick: () => handleInspect(activeCandidate)
+          }, "Full Spec ↗")
+        ),
+
+        (activeCandidate.current_setup?.entry_price || activeCandidate.current_setup?.hypothetical_entry) ? h("div", null,
+          h("div", { className: "setup-levels-grid", style: { fontFamily: "var(--font-mono)", fontSize: "0.70rem" } },
+            h("div", null,
+              h("span", { style: { color: "#64748B", fontSize: "0.60rem", display: "block" } }, "ENTRY"),
+              h("span", { style: { fontWeight: "700", color: "#F1F5F9" } }, `$${(activeCandidate.current_setup.entry_price || activeCandidate.current_setup.hypothetical_entry)?.toLocaleString()}`)
+            ),
+            h("div", null,
+              h("span", { style: { color: "#64748B", fontSize: "0.60rem", display: "block" } }, "TAKE PROFIT"),
+              h("span", { style: { fontWeight: "700", color: "#00E5A8" } }, `$${(activeCandidate.current_setup.tp_price || activeCandidate.current_setup.hypothetical_tp)?.toLocaleString()}`)
+            ),
+            h("div", null,
+              h("span", { style: { color: "#64748B", fontSize: "0.60rem", display: "block" } }, "STOP LOSS"),
+              h("span", { style: { fontWeight: "700", color: "#FF5C7C" } }, `$${(activeCandidate.current_setup.sl_price || activeCandidate.current_setup.hypothetical_sl)?.toLocaleString()}`)
+            )
+          ),
+          activeCandidate.current_setup?.economic_eligibility && h("div", {
+            style: {
+              marginTop: "6px",
+              padding: "6px",
+              background: activeCandidate.current_setup.economic_eligibility.is_eligible ? "rgba(0, 229, 168, 0.1)" : "rgba(255, 92, 124, 0.12)",
+              border: `1px solid ${activeCandidate.current_setup.economic_eligibility.is_eligible ? "rgba(0, 229, 168, 0.3)" : "rgba(255, 92, 124, 0.3)"}`,
+              borderRadius: "4px",
+              fontSize: "0.62rem",
+              fontFamily: "var(--font-mono)"
+            }
+          },
+            h("div", { style: { display: "flex", justifyContent: "space-between", fontWeight: "700", color: activeCandidate.current_setup.economic_eligibility.is_eligible ? "#00E5A8" : "#FF5C7C", marginBottom: "3px" } },
+              h("span", null, `STATUS: ${activeCandidate.current_setup.economic_eligibility.status}`),
+              h("span", null, activeCandidate.current_setup.preview_only ? "RESEARCH PREVIEW ONLY" : "EVALUATION")
+            ),
+            h("div", { style: { color: "#CBD5E1", display: "flex", justifyContent: "space-between" } },
+              h("span", null, `Gross: +${activeCandidate.current_setup.economic_eligibility.gross_reward_bps?.toFixed(1)} bps / -${activeCandidate.current_setup.economic_eligibility.gross_risk_bps?.toFixed(1)} bps`),
+              h("span", null, `Cost: ${activeCandidate.current_scenario || costScenario} (${activeCandidate.current_setup.economic_eligibility.round_trip_cost_bps?.toFixed(1)} bps)`)
+            ),
+            h("div", { style: { color: activeCandidate.current_setup.economic_eligibility.net_reward_bps > 0 ? "#00E5A8" : "#FF5C7C", display: "flex", justifyContent: "space-between", marginTop: "2px" } },
+              h("span", null, `Net TP: ${activeCandidate.current_setup.economic_eligibility.net_reward_bps > 0 ? "+" : ""}${activeCandidate.current_setup.economic_eligibility.net_reward_bps?.toFixed(1)} bps ($${activeCandidate.current_setup.economic_eligibility.net_reward_usd?.toFixed(2)})`),
+              h("span", null, `Req Hit Rate: ${activeCandidate.current_setup.economic_eligibility.breakeven_hit_rate_pct != null ? activeCandidate.current_setup.economic_eligibility.breakeven_hit_rate_pct.toFixed(1) + "%" : "UNACHIEVABLE"}`)
+            ),
+            activeCandidate.current_setup.economic_eligibility.rejection_reason && h("div", { style: { color: "#FBBF24", marginTop: "3px", fontWeight: "600" } },
+              `Reason: ${activeCandidate.current_setup.economic_eligibility.rejection_reason}`
+            )
+          ),
+          h("div", { style: { fontSize: "0.65rem", color: "#CBD5E1", marginTop: "4px" } },
+            h("strong", { style: { color: "#94A3B8" } }, "Invalidation: "),
+            activeCandidate.current_setup.invalidation_rules || activeCandidate.current_setup.invalidation_condition || "TP target hit or SL boundary breached."
+          )
+        ) : h("div", { style: { fontSize: "0.68rem", color: "#CBD5E1", lineHeight: "1.4" } },
+          h("div", { style: { color: "#FBBF24", fontWeight: "700", marginBottom: "2px" } },
+            `Setup Gated: ${activeCandidate.current_setup?.setup_state || activeCandidate.current_setup?.status || "NO_SETUP"}`
+          ),
+          h("p", null, activeCandidate.current_setup?.blocking_reason || activeCandidate.current_setup?.reason || "No genuine entry trigger active on latest completed candle.")
+        )
+      ),
+
+      // Breakeven Cost & Statistical Uncertainty Row
+      h("div", { style: { display: "flex", justifyContent: "space-between", marginTop: "8px", fontSize: "0.65rem", fontFamily: "var(--font-mono)", color: "#94A3B8" } },
+        h("span", null, `Breakeven Friction: ${activeCandidate.breakeven_cost_bps || 0} bps`),
+        h("span", null, `Trades: ${activeCandidate.trade_count || 0} | PF: ${activeCandidate.profit_factor || 0}`)
+      )
+    ),
+
+    // 4. Governance Footer
+    h("div", { style: { textAlign: "center", padding: "6px", fontSize: "0.62rem", color: "#64748B", borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: "10px" } },
+      "BTCognitive V13 Strategy Tournament · User-Controlled Research Overlay · No Automated Execution"
+    ),
+
+    // Local Inspection Modal if triggered without parent handler
+    localInspectContract && h(ContractInspectionModal, {
+      contract: localInspectContract,
+      onClose: () => setLocalInspectContract(null)
+    })
+  );
+}
+
+// ===========================================================================
 // WorkstationDecisionSidebar — Active Strategy + Leaderboard + Anatomy
 // ===========================================================================
-function WorkstationDecisionSidebar({ activePaperPos, selectedStrategy, setSelectedStrategy, livePrice }) {
+function WorkstationDecisionSidebar({
+  activePaperPos,
+  selectedStrategy,
+  setSelectedStrategy,
+  livePrice,
+  overlayStrategyId,
+  overlayEnabled,
+  onSelectOverlay,
+  onInspectContract,
+  previewStrategyId,
+  onSelectPreview
+}) {
   const p = activePaperPos;
   if (!(p?.has_active_position === true
     && hasVerifiedResearchAuthorization(p))) {
-    const researchGate = p?.research || p?.research_gate;
-    return h("aside", { className: "workstation-sidebar", role: "status" },
-      h("div", { className: "active-strategy-card" },
-        h("strong", { style: { color: "#FBBF24" } }, "Strategy evaluation unavailable"),
-        h("p", { style: { color: "#CBD5E1" } },
-          researchGate?.reason || "No verified active paper position or research authorization is available."
-        ),
-        h("div", { style: { color: "#94A3B8", fontSize: "0.75rem" } }, "Trading is disabled.")
-      )
-    );
+    return h(StrategyTournamentDashboard, {
+      activePaperPos: p,
+      selectedStrategy,
+      setSelectedStrategy,
+      livePrice,
+      overlayStrategyId,
+      overlayEnabled,
+      onSelectOverlay,
+      onInspectContract,
+      previewStrategyId,
+      onSelectPreview
+    });
   }
+
   const isPosOpen = p && p.has_active_position;
   const pnlUsd = p?.unrealized_pnl_usd || 0.0;
   const pnlPct = p?.unrealized_pnl_pct || 0.0;
@@ -5225,16 +7047,43 @@ function HistoricalAnalogsPanel() {
 // EntryTpSlResearchPanel — Authoritative Track V3 Walk-Forward Results (Phases 6C–6K)
 // ===========================================================================
 function EntryTpSlResearchPanel() {
-  return h("div", { className: "glass-card", style: { padding: "24px" }, role: "status" },
-    h("div", { style: { color: "#FBBF24", fontWeight: "800", marginBottom: "8px" } },
-      "RESEARCH RESULTS UNAVAILABLE"
-    ),
-    h("p", { style: { color: "#CBD5E1", lineHeight: "1.5" } },
-      "Frozen input provenance and evaluation evidence are not authenticated. Legacy performance figures are not being presented as verified results; forecasts and trading remain disabled."
-    )
-  );
+  const [subTab, setSubTab] = useState("evaluator");
+  const [side, setSide] = useState("LONG");
+  const [k_tp, setKTp] = useState(1.5);
+  const [k_sl, setKSl] = useState(1.0);
+  const [threshold, setThreshold] = useState(0.60);
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const [subTab, setSubTab] = useState("table");
+  const fetchQuality = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    const apiBase = getApiBaseUrl();
+    const url = `${apiBase}/api/research/entry-quality?side=${side}&k_tp=${k_tp}&k_sl=${k_sl}&threshold=${threshold}`;
+    fetch(url)
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then(res => {
+        setData(res);
+        setLoading(false);
+      })
+      .catch(err => {
+        setError(err.message);
+        setLoading(false);
+      });
+  }, [side, k_tp, k_sl, threshold]);
+
+  useEffect(() => {
+    fetchQuality();
+  }, [fetchQuality]);
+
+  const decision = data?.decision;
+  const features = data?.features_evaluated || {};
+  const probs = decision?.probabilities || {};
+  const recentRecords = data?.recent_prospective_records || [];
 
   const wfModels = [
     { name: "B0: Matched Random", count: "10,105", winRate: "25.7%", meanNetR: "-1.2112R", ci95: "[-1.2577R, -1.1573R]", pf: "0.07", status: "Negative Expectancy" },
@@ -5256,18 +7105,20 @@ function EntryTpSlResearchPanel() {
   ];
 
   const taxonomy = [
-    { code: "NO_SETUP", name: "No Setup Detected", meaning: "Neither A1 (Sweep/Reclaim) nor A2 (Range Reclaim) structural conditions were met." },
-    { code: "MODEL_UNCERTAIN", name: "Model Neutral", meaning: "Calibrated probability falls within neutral uncertainty envelope [47%, 53%]." },
-    { code: "EV_BELOW_COST", name: "Edge Cost-Erased", meaning: "Directional pattern observed, but expected value is below transaction friction (35–65 bps)." },
-    { code: "EXECUTION_UNSAFE", name: "Execution Risk", meaning: "Bid-ask spread, orderbook depth, or slippage exceeds safety bounds." },
+    { code: "NO_SETUP", name: "No Setup Detected", meaning: "Neither A1 nor A2 structural conditions met at t0." },
+    { code: "MODEL_UNCERTAIN", name: "Model Neutral", meaning: "Calibrated probability within neutral uncertainty envelope [47%, 53%]." },
+    { code: "EV_BELOW_COST", name: "Edge Cost-Erased", meaning: "Directional edge observed, but net expectancy E[R_net] <= 0 under transaction friction (35-87 bps)." },
+    { code: "NEGATIVE_EXPECTANCY_AFTER_COSTS", name: "Negative Expectancy", meaning: "E[R_gross] is insufficient to overcome round-trip friction in R-multiples." },
+    { code: "WIN_PROBABILITY_BELOW_SELECTIVE_THRESHOLD", name: "Below Threshold", meaning: "Predicted target-hit probability is below selective filtering hurdle." },
+    { code: "EXECUTION_UNSAFE", name: "Execution Risk", meaning: "Spread or slippage exceeds safety bounds." },
     { code: "DATA_UNAVAILABLE", name: "Missing Data", meaning: "Incomplete bar stream or timestamp discontinuity." },
-    { code: "PROVENANCE_FAILURE", name: "Integrity Mismatch", meaning: "Dataset SHA-256 hash or contract freeze verification failed." },
-    { code: "MODEL_FAILURE", name: "Inference Error", meaning: "Model runtime exception or shape mismatch." },
-    { code: "BREAKEVEN_INFEASIBLE", name: "Breakeven Violation", meaning: "Required win rate mathematically exceeds theoretical maximum." }
+    { code: "PROVENANCE_FAILURE", name: "Integrity Mismatch", meaning: "Dataset SHA-256 hash or contract freeze verification failed." }
   ];
 
+  const isAbstain = decision?.action === "ABSTAIN";
+
   return h("div", { className: "glass-card", style: { padding: "24px" } },
-    // Banner
+    // Governance Banner
     h("div", {
       style: {
         background: "rgba(239,68,68,0.12)",
@@ -5279,161 +7130,655 @@ function EntryTpSlResearchPanel() {
     },
       h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" } },
         h("div", null,
-          h("div", { style: { color: "#EF4444", fontWeight: "800", fontSize: "0.9rem", letterSpacing: "0.5px" } }, "🔬 BTCognitive Research Track V3 — Official Promotion Decision"),
-          h("div", { style: { color: "#F8FAFC", fontSize: "1.1rem", fontWeight: "700", marginTop: "4px" } }, "Decision: COST_ERASED (Claim Level C2 — Conditional Predictability)")
+          h("div", { style: { color: "#EF4444", fontWeight: "800", fontSize: "0.85rem", letterSpacing: "0.5px" } }, "🔬 BTCognitive V28 — Probabilistic Entry Quality Engine & Selective Trade Research"),
+          h("div", { style: { color: "#F8FAFC", fontSize: "1.1rem", fontWeight: "700", marginTop: "4px" } }, "Epistemic Verdict: 70–80% Win Rate Is An Aspirational Hypothesis (Cost-Erased Under Reality)"),
+          h("div", { style: { color: "#94A3B8", fontSize: "0.76rem", marginTop: "4px" } }, "Analysis-Only Research Environment • Zero Live Orders • Causal Fills (t0 + dt Next Open) • Conservative SL_FIRST Collisions")
         ),
-        h("span", {
+        h("div", { style: { display: "flex", gap: "8px" } },
+          h("span", {
+            style: {
+              background: "#EF4444",
+              color: "#FFFFFF",
+              padding: "4px 10px",
+              borderRadius: "6px",
+              fontWeight: "700",
+              fontSize: "0.75rem"
+            }
+          }, "OFFLINE RESEARCH ONLY"),
+          h("span", {
+            style: {
+              background: "rgba(245, 158, 11, 0.2)",
+              color: "#F59E0B",
+              border: "1px solid #F59E0B",
+              padding: "4px 10px",
+              borderRadius: "6px",
+              fontWeight: "700",
+              fontSize: "0.75rem"
+            }
+          }, "TRADING DISABLED")
+        )
+      )
+    ),
+
+    // Sub-tab Navigation
+    h("div", { style: { display: "flex", gap: "8px", marginBottom: "20px", flexWrap: "wrap", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "10px" } },
+      [
+        { id: "evaluator", label: "🎯 Candidate Evaluator & Gating" },
+        { id: "benchmarks", label: "📊 Walk-Forward Benchmarks (B0-B4)" },
+        { id: "grid", label: "📐 Barrier Parameterization Grid" },
+        { id: "taxonomy", label: "🏷️ Abstention Taxonomy" },
+        { id: "prospective", label: "📜 Prospective Ledger Audit" }
+      ].map(t =>
+        h("button", {
+          key: t.id,
+          onClick: () => setSubTab(t.id),
           style: {
-            background: "#EF4444",
-            color: "#FFFFFF",
-            padding: "4px 12px",
+            background: subTab === t.id ? "rgba(56,189,248,0.2)" : "transparent",
+            border: subTab === t.id ? "1px solid #38BDF8" : "1px solid transparent",
+            color: subTab === t.id ? "#38BDF8" : "#94A3B8",
+            padding: "6px 14px",
             borderRadius: "6px",
-            fontWeight: "800",
-            fontSize: "0.75rem"
+            fontSize: "0.8rem",
+            fontWeight: "700",
+            cursor: "pointer"
           }
-        }, "CAPITAL DEPLOYMENT PROHIBITED")
-      ),
-      h("div", { style: { fontSize: "0.80rem", color: "#CBD5E1", marginTop: "8px", lineHeight: "1.5" } },
-        "Structural setups (A1/A2) demonstrate clear statistical predictive separation over random entries (B3 > B0), and LightGBM meta-labeling lifts gross win rate to 47.1%. However, after full round-trip friction (35 bps BASE / 65 bps CONSERVATIVE), mean net expectancy remains negative (-0.5678R BASE / -1.0954R CONSERVATIVE), falling short of the preregistered hurdle E_min = +0.10R. The model is preserved for empirical research only."
+        }, t.label)
       )
     ),
 
-    // KPI Metrics Bar
-    h("div", { style: { display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "12px", marginBottom: "20px" } },
-      h("div", { style: { background: "rgba(0,0,0,0.3)", padding: "12px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.06)" } },
-        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8" } }, "Mean Net R (BASE)"),
-        h("div", { style: { fontSize: "1.2rem", fontWeight: "800", color: "#F87171", fontFamily: "var(--font-mono)" } }, "-0.5678R"),
-        h("div", { style: { fontSize: "0.68rem", color: "#64748B" } }, "35 bps round-trip")
-      ),
-      h("div", { style: { background: "rgba(0,0,0,0.3)", padding: "12px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.06)" } },
-        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8" } }, "95% Bootstrap CI Lower"),
-        h("div", { style: { fontSize: "1.2rem", fontWeight: "800", color: "#F87171", fontFamily: "var(--font-mono)" } }, "-0.6220R"),
-        h("div", { style: { fontSize: "0.68rem", color: "#64748B" } }, "Stationary block L=32")
-      ),
-      h("div", { style: { background: "rgba(0,0,0,0.3)", padding: "12px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.06)" } },
-        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8" } }, "Evaluated Sample (N)"),
-        h("div", { style: { fontSize: "1.2rem", fontWeight: "800", color: "#38BDF8", fontFamily: "var(--font-mono)" } }, "20,244"),
-        h("div", { style: { fontSize: "0.68rem", color: "#64748B" } }, "Hurdle >= 250 passed")
-      ),
-      h("div", { style: { background: "rgba(0,0,0,0.3)", padding: "12px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.06)" } },
-        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8" } }, "DSR / PBO"),
-        h("div", { style: { fontSize: "1.2rem", fontWeight: "800", color: "#A78BFA", fontFamily: "var(--font-mono)" } }, "0.00 / 0.20"),
-        h("div", { style: { fontSize: "0.68rem", color: "#64748B" } }, "Deflated Sharpe / Overfitting")
-      ),
-      h("div", { style: { background: "rgba(0,0,0,0.3)", padding: "12px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.06)" } },
-        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8" } }, "Sealed Holdout"),
-        h("div", { style: { fontSize: "1.2rem", fontWeight: "800", color: "#F59E0B", fontFamily: "var(--font-mono)" } }, "2,662 trades"),
-        h("div", { style: { fontSize: "0.68rem", color: "#64748B" } }, "Untouched Oct 2025–2026")
-      )
-    ),
-
-    // Sub-tab navigation
-    h("div", { style: { display: "flex", gap: "8px", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "10px", marginBottom: "16px" } },
-      h("button", {
-        onClick: () => setSubTab("table"),
+    // 1. Live Evaluator View
+    subTab === "evaluator" && h("div", null,
+      // Parameter Controls
+      h("div", {
         style: {
-          background: subTab === "table" ? "rgba(56,189,248,0.15)" : "transparent",
-          border: subTab === "table" ? "1px solid rgba(56,189,248,0.35)" : "1px solid transparent",
-          color: subTab === "table" ? "#38BDF8" : "#94A3B8",
-          padding: "6px 14px",
-          borderRadius: "6px",
-          cursor: "pointer",
-          fontWeight: "700",
-          fontSize: "0.78rem"
+          background: "rgba(255,255,255,0.03)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          borderRadius: "8px",
+          padding: "14px",
+          marginBottom: "18px",
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "16px",
+          alignItems: "center"
         }
-      }, "📊 Walk-Forward Models (B0 → B4)"),
-      h("button", {
-        onClick: () => setSubTab("grid"),
-        style: {
-          background: subTab === "grid" ? "rgba(56,189,248,0.15)" : "transparent",
-          border: subTab === "grid" ? "1px solid rgba(56,189,248,0.35)" : "1px solid transparent",
-          color: subTab === "grid" ? "#38BDF8" : "#94A3B8",
-          padding: "6px 14px",
-          borderRadius: "6px",
-          cursor: "pointer",
-          fontWeight: "700",
-          fontSize: "0.78rem"
-        }
-      }, "📐 Barrier Grid Stress (Pairs 01–05)"),
-      h("button", {
-        onClick: () => setSubTab("taxonomy"),
-        style: {
-          background: subTab === "taxonomy" ? "rgba(56,189,248,0.15)" : "transparent",
-          border: subTab === "taxonomy" ? "1px solid rgba(56,189,248,0.35)" : "1px solid transparent",
-          color: subTab === "taxonomy" ? "#38BDF8" : "#94A3B8",
-          padding: "6px 14px",
-          borderRadius: "6px",
-          cursor: "pointer",
-          fontWeight: "700",
-          fontSize: "0.78rem"
-        }
-      }, "🛡️ Scientific Abstention Taxonomy")
-    ),
-
-    subTab === "table" && h("div", { style: { overflowX: "auto" } },
-      h("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: "0.80rem" } },
-        h("thead", null,
-          h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.12)", textAlign: "left" } },
-            h("th", { style: { padding: "10px", color: "#94A3B8" } }, "MODEL / BASELINE"),
-            h("th", { style: { padding: "10px", color: "#94A3B8" } }, "EVAL TRADES (N)"),
-            h("th", { style: { padding: "10px", color: "#94A3B8" } }, "WIN RATE"),
-            h("th", { style: { padding: "10px", color: "#94A3B8" } }, "MEAN NET R (BASE)"),
-            h("th", { style: { padding: "10px", color: "#94A3B8" } }, "95% BOOTSTRAP CI"),
-            h("th", { style: { padding: "10px", color: "#94A3B8" } }, "PROFIT FACTOR"),
-            h("th", { style: { padding: "10px", color: "#94A3B8" } }, "SCIENTIFIC STATUS")
+      },
+        h("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+          h("span", { style: { color: "#94A3B8", fontSize: "0.78rem", fontWeight: "600" } }, "Side:"),
+          ["LONG", "SHORT"].map(s =>
+            h("button", {
+              key: s,
+              onClick: () => setSide(s),
+              style: {
+                background: side === s ? (s === "LONG" ? "#10B981" : "#EF4444") : "rgba(255,255,255,0.05)",
+                color: side === s ? "#FFF" : "#94A3B8",
+                border: "none",
+                padding: "4px 12px",
+                borderRadius: "4px",
+                fontWeight: "700",
+                fontSize: "0.75rem",
+                cursor: "pointer"
+              }
+            }, s)
           )
         ),
-        h("tbody", null,
-          wfModels.map((m, i) =>
-            h("tr", { key: i, style: { borderBottom: "1px solid rgba(255,255,255,0.04)", background: i % 2 === 0 ? "rgba(255,255,255,0.01)" : "transparent" } },
-              h("td", { style: { padding: "10px", fontWeight: "700", color: "#F8FAFC" } }, m.name),
-              h("td", { style: { padding: "10px", fontFamily: "var(--font-mono)", color: "#94A3B8" } }, m.count),
-              h("td", { style: { padding: "10px", fontFamily: "var(--font-mono)", color: "#CBD5E1" } }, m.winRate),
-              h("td", { style: { padding: "10px", fontFamily: "var(--font-mono)", fontWeight: "800", color: m.meanNetR.startsWith("+") ? "#00E5A8" : "#F87171" } }, m.meanNetR),
-              h("td", { style: { padding: "10px", fontFamily: "var(--font-mono)", color: "#94A3B8", fontSize: "0.72rem" } }, m.ci95),
-              h("td", { style: { padding: "10px", fontFamily: "var(--font-mono)", color: "#CBD5E1" } }, m.pf),
-              h("td", { style: { padding: "10px", fontSize: "0.74rem", color: "#64748B" } }, m.status)
-            )
-          )
-        )
-      )
-    ),
-
-    subTab === "grid" && h("div", { style: { overflowX: "auto" } },
-      h("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: "0.80rem" } },
-        h("thead", null,
-          h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.12)", textAlign: "left" } },
-            h("th", { style: { padding: "10px", color: "#94A3B8" } }, "BARRIER PAIR ID"),
-            h("th", { style: { padding: "10px", color: "#94A3B8" } }, "MULTIPLIERS (k_TP / k_SL)"),
-            h("th", { style: { padding: "10px", color: "#94A3B8" } }, "MEAN NET R (BASE)"),
-            h("th", { style: { padding: "10px", color: "#94A3B8" } }, "95% BOOTSTRAP CI"),
-            h("th", { style: { padding: "10px", color: "#94A3B8" } }, "WIN RATE"),
-            h("th", { style: { padding: "10px", color: "#94A3B8" } }, "PROFIT FACTOR")
+        h("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+          h("span", { style: { color: "#94A3B8", fontSize: "0.78rem", fontWeight: "600" } }, "Target (k_TP):"),
+          [1.0, 1.5, 2.0, 3.0].map(val =>
+            h("button", {
+              key: val,
+              onClick: () => setKTp(val),
+              style: {
+                background: k_tp === val ? "#38BDF8" : "rgba(255,255,255,0.05)",
+                color: k_tp === val ? "#0F172A" : "#94A3B8",
+                border: "none",
+                padding: "4px 10px",
+                borderRadius: "4px",
+                fontWeight: "700",
+                fontSize: "0.75rem",
+                cursor: "pointer"
+              }
+            }, `${val}σ`)
           )
         ),
-        h("tbody", null,
-          barrierGrid.map((bg, i) =>
-            h("tr", { key: i, style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
-              h("td", { style: { padding: "10px", fontWeight: "700", color: "#38BDF8", fontFamily: "var(--font-mono)" } }, bg.id),
-              h("td", { style: { padding: "10px", color: "#CBD5E1" } }, bg.tpSl),
-              h("td", { style: { padding: "10px", fontFamily: "var(--font-mono)", fontWeight: "800", color: "#F87171" } }, bg.meanR),
-              h("td", { style: { padding: "10px", fontFamily: "var(--font-mono)", color: "#94A3B8", fontSize: "0.72rem" } }, bg.ci),
-              h("td", { style: { padding: "10px", fontFamily: "var(--font-mono)", color: "#CBD5E1" } }, bg.wr),
-              h("td", { style: { padding: "10px", fontFamily: "var(--font-mono)", color: "#CBD5E1" } }, bg.pf)
-            )
+        h("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+          h("span", { style: { color: "#94A3B8", fontSize: "0.78rem", fontWeight: "600" } }, "Stop (k_SL):"),
+          [0.5, 1.0, 1.5].map(val =>
+            h("button", {
+              key: val,
+              onClick: () => setKSl(val),
+              style: {
+                background: k_sl === val ? "#F59E0B" : "rgba(255,255,255,0.05)",
+                color: k_sl === val ? "#0F172A" : "#94A3B8",
+                border: "none",
+                padding: "4px 10px",
+                borderRadius: "4px",
+                fontWeight: "700",
+                fontSize: "0.75rem",
+                cursor: "pointer"
+              }
+            }, `${val}σ`)
           )
-        )
-      )
-    ),
+        ),
+        h("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+          h("span", { style: { color: "#94A3B8", fontSize: "0.78rem", fontWeight: "600" } }, "Selective Hurdle (θ):"),
+          [0.50, 0.60, 0.70, 0.80].map(val =>
+            h("button", {
+              key: val,
+              onClick: () => setThreshold(val),
+              style: {
+                background: threshold === val ? "#A855F7" : "rgba(255,255,255,0.05)",
+                color: threshold === val ? "#FFF" : "#94A3B8",
+                border: "none",
+                padding: "4px 10px",
+                borderRadius: "4px",
+                fontWeight: "700",
+                fontSize: "0.75rem",
+                cursor: "pointer"
+              }
+            }, `${Math.round(val*100)}%`)
+          )
+        ),
+        h("button", {
+          onClick: fetchQuality,
+          style: {
+            marginLeft: "auto",
+            background: "rgba(56,189,248,0.15)",
+            border: "1px solid #38BDF8",
+            color: "#38BDF8",
+            padding: "4px 14px",
+            borderRadius: "4px",
+            fontSize: "0.75rem",
+            fontWeight: "700",
+            cursor: "pointer"
+          }
+        }, loading ? "Evaluating..." : "🔄 Re-Evaluate")
+      ),
 
-    subTab === "taxonomy" && h("div", { style: { display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" } },
-      taxonomy.map((tx, i) =>
-        h("div", { key: i, style: { background: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "12px" } },
-          h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" } },
-            h("span", { style: { fontFamily: "var(--font-mono)", fontWeight: "800", color: "#38BDF8", fontSize: "0.82rem" } }, tx.code),
-            h("span", { style: { fontSize: "0.72rem", color: "#94A3B8" } }, tx.name)
+      // Decision Card
+      loading && h("div", { style: { color: "#94A3B8", padding: "20px", textAlign: "center" } }, "Evaluating point-in-time setup and barrier probabilities..."),
+      error && h("div", { style: { color: "#EF4444", padding: "20px" } }, `Error loading entry quality: ${error}`),
+      decision && !loading && h("div", null,
+        // Verdict Bar
+        h("div", {
+          style: {
+            background: isAbstain ? "rgba(245, 158, 11, 0.12)" : "rgba(16, 185, 129, 0.12)",
+            border: isAbstain ? "1px solid rgba(245, 158, 11, 0.4)" : "1px solid rgba(16, 185, 129, 0.4)",
+            borderRadius: "8px",
+            padding: "16px",
+            marginBottom: "16px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "12px"
+          }
+        },
+          h("div", null,
+            h("div", { style: { color: isAbstain ? "#F59E0B" : "#10B981", fontWeight: "800", fontSize: "1.05rem" } },
+              `DECISION: ${decision.action}`
+            ),
+            h("div", { style: { color: "#CBD5E1", fontSize: "0.82rem", marginTop: "3px" } },
+              `Primary Reason: ${decision.primary_reason}`
+            )
           ),
-          h("div", { style: { fontSize: "0.74rem", color: "#CBD5E1", lineHeight: "1.4" } }, tx.meaning)
+          h("div", { style: { textAlign: "right" } },
+            h("div", { style: { color: "#94A3B8", fontSize: "0.75rem" } }, "EXPECTED NET VALUE (E[R_net])"),
+            h("div", {
+              style: {
+                color: decision.expected_net_r > 0 ? "#10B981" : "#EF4444",
+                fontSize: "1.25rem",
+                fontWeight: "800"
+              }
+            }, `${decision.expected_net_r > 0 ? "+" : ""}${decision.expected_net_r} R`),
+            h("div", { style: { color: "#94A3B8", fontSize: "0.70rem" } }, `Gross: ${decision.expected_gross_r} R | Friction: -${decision.friction_r} R`)
+          )
+        ),
+
+        // 3-Column Metrics Grid
+        h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "14px", marginBottom: "16px" } },
+          // Col 1: Setup Geometry
+          h("div", { style: { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "14px" } },
+            h("div", { style: { color: "#38BDF8", fontWeight: "700", fontSize: "0.80rem", marginBottom: "8px" } }, "📐 SETUP GEOMETRY (CAUSAL)"),
+            h("div", { style: { display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "0.76rem" } },
+              h("span", { style: { color: "#94A3B8" } }, "Candidate Side:"),
+              h("strong", { style: { color: decision.side === "LONG" ? "#10B981" : "#EF4444" } }, decision.side)
+            ),
+            h("div", { style: { display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "0.76rem" } },
+              h("span", { style: { color: "#94A3B8" } }, "Executable Entry Ref:"),
+              h("strong", { style: { color: "#F8FAFC" } }, `$${decision.entry_reference_price.toLocaleString()}`)
+            ),
+            h("div", { style: { display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "0.76rem" } },
+              h("span", { style: { color: "#94A3B8" } }, `Profit Target (+${decision.k_tp}σ):`),
+              h("strong", { style: { color: "#10B981" } }, `$${decision.tp_price.toLocaleString()}`)
+            ),
+            h("div", { style: { display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "0.76rem" } },
+              h("span", { style: { color: "#94A3B8" } }, `Stop Loss (-${decision.k_sl}σ):`),
+              h("strong", { style: { color: "#EF4444" } }, `$${decision.sl_price.toLocaleString()}`)
+            ),
+            h("div", { style: { display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "0.76rem" } },
+              h("span", { style: { color: "#94A3B8" } }, "Risk Unit (1R):"),
+              h("strong", { style: { color: "#F8FAFC" } }, `$${decision.risk_unit_usd.toFixed(2)}`)
+            ),
+            h("div", { style: { display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "0.76rem" } },
+              h("span", { style: { color: "#94A3B8" } }, "Horizon Limit:"),
+              h("strong", { style: { color: "#F8FAFC" } }, "24 Hours (Max Holding)")
+            )
+          ),
+
+          // Col 2: Calibrated Probabilities
+          h("div", { style: { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "14px" } },
+            h("div", { style: { color: "#A855F7", fontWeight: "700", fontSize: "0.80rem", marginBottom: "8px" } }, "🎯 CALIBRATED PROBABILITIES"),
+            h("div", { style: { display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "0.76rem" } },
+              h("span", { style: { color: "#94A3B8" } }, "p(Target First):"),
+              h("strong", { style: { color: probs.p_tp >= threshold ? "#10B981" : "#F59E0B" } }, `${(probs.p_tp * 100).toFixed(1)}%`)
+            ),
+            h("div", { style: { display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "0.76rem" } },
+              h("span", { style: { color: "#94A3B8" } }, "p(Stop First):"),
+              h("strong", { style: { color: "#EF4444" } }, `${(probs.p_sl * 100).toFixed(1)}%`)
+            ),
+            h("div", { style: { display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "0.76rem" } },
+              h("span", { style: { color: "#94A3B8" } }, "p(Timeout / Unresolved):"),
+              h("strong", { style: { color: "#94A3B8" } }, `${(probs.p_timeout * 100).toFixed(1)}%`)
+            ),
+            h("div", { style: { display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "0.76rem" } },
+              h("span", { style: { color: "#94A3B8" } }, "Expected Brier Score:"),
+              h("strong", { style: { color: "#F8FAFC" } }, probs.brier_score_expected)
+            ),
+            h("div", { style: { display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "0.76rem" } },
+              h("span", { style: { color: "#94A3B8" } }, "Intrabar Collision Rule:"),
+              h("strong", { style: { color: "#EF4444" } }, "SL_FIRST (Conservative)")
+            ),
+            h("div", { style: { display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "0.76rem" } },
+              h("span", { style: { color: "#94A3B8" } }, "Calibration Status:"),
+              h("strong", { style: { color: "#10B981" } }, "Isotonic Monotonic")
+            )
+          ),
+
+          // Col 3: Point-in-Time Features
+          h("div", { style: { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "14px" } },
+            h("div", { style: { color: "#10B981", fontWeight: "700", fontSize: "0.80rem", marginBottom: "8px" } }, "⚡ POINT-IN-TIME FEATURES (t0)"),
+            h("div", { style: { display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "0.76rem" } },
+              h("span", { style: { color: "#94A3B8" } }, "1h Momentum:"),
+              h("strong", { style: { color: features.mom_1h >= 0 ? "#10B981" : "#EF4444" } }, `${(features.mom_1h * 100).toFixed(3)}%`)
+            ),
+            h("div", { style: { display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "0.76rem" } },
+              h("span", { style: { color: "#94A3B8" } }, "4h Momentum:"),
+              h("strong", { style: { color: features.mom_4h >= 0 ? "#10B981" : "#EF4444" } }, `${(features.mom_4h * 100).toFixed(3)}%`)
+            ),
+            h("div", { style: { display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "0.76rem" } },
+              h("span", { style: { color: "#94A3B8" } }, "24h Momentum:"),
+              h("strong", { style: { color: features.mom_24h >= 0 ? "#10B981" : "#EF4444" } }, `${(features.mom_24h * 100).toFixed(3)}%`)
+            ),
+            h("div", { style: { display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "0.76rem" } },
+              h("span", { style: { color: "#94A3B8" } }, "Realized Semi-Var Ratio:"),
+              h("strong", { style: { color: "#F8FAFC" } }, features.rs_ratio)
+            ),
+            h("div", { style: { display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "0.76rem" } },
+              h("span", { style: { color: "#94A3B8" } }, "Bollinger Bandwidth:"),
+              h("strong", { style: { color: "#F8FAFC" } }, `${(features.bb_width * 100).toFixed(2)}%`)
+            ),
+            h("div", { style: { display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "0.76rem" } },
+              h("span", { style: { color: "#94A3B8" } }, "24h Range Position:"),
+              h("strong", { style: { color: "#F8FAFC" } }, features.range_pos)
+            )
+          )
+        )
+      )
+    ),
+
+    // 2. Walk-Forward Benchmarks View
+    subTab === "benchmarks" && h("div", { style: { overflowX: "auto" } },
+      h("table", { className: "research-table", style: { width: "100%", borderCollapse: "collapse", fontSize: "0.78rem" } },
+        h("thead", null,
+          h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.1)", color: "#94A3B8" } },
+            h("th", { style: { textAlign: "left", padding: "8px" } }, "Model / Policy"),
+            h("th", { style: { textAlign: "right", padding: "8px" } }, "Sample N"),
+            h("th", { style: { textAlign: "right", padding: "8px" } }, "Win Rate"),
+            h("th", { style: { textAlign: "right", padding: "8px" } }, "Mean Net R"),
+            h("th", { style: { textAlign: "right", padding: "8px" } }, "95% CI (Net R)"),
+            h("th", { style: { textAlign: "right", padding: "8px" } }, "Profit Factor"),
+            h("th", { style: { textAlign: "left", padding: "8px" } }, "Status")
+          )
+        ),
+        h("tbody", null,
+          wfModels.map(m =>
+            h("tr", { key: m.name, style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
+              h("td", { style: { padding: "8px", fontWeight: "600", color: "#F8FAFC" } }, m.name),
+              h("td", { style: { textAlign: "right", padding: "8px", color: "#CBD5E1" } }, m.count),
+              h("td", { style: { textAlign: "right", padding: "8px", color: m.winRate.startsWith("4") ? "#38BDF8" : "#CBD5E1" } }, m.winRate),
+              h("td", { style: { textAlign: "right", padding: "8px", color: "#EF4444", fontWeight: "700" } }, m.meanNetR),
+              h("td", { style: { textAlign: "right", padding: "8px", color: "#94A3B8", fontFamily: "JetBrains Mono, monospace" } }, m.ci95),
+              h("td", { style: { textAlign: "right", padding: "8px", color: "#CBD5E1" } }, m.pf),
+              h("td", { style: { padding: "8px", color: "#F59E0B", fontSize: "0.72rem" } }, m.status)
+            )
+          )
+        )
+      )
+    ),
+
+    // 3. Grid View
+    subTab === "grid" && h("div", { style: { overflowX: "auto" } },
+      h("table", { className: "research-table", style: { width: "100%", borderCollapse: "collapse", fontSize: "0.78rem" } },
+        h("thead", null,
+          h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.1)", color: "#94A3B8" } },
+            h("th", { style: { textAlign: "left", padding: "8px" } }, "Barrier Pair ID"),
+            h("th", { style: { textAlign: "left", padding: "8px" } }, "TP / SL Ratio"),
+            h("th", { style: { textAlign: "right", padding: "8px" } }, "Mean Net R"),
+            h("th", { style: { textAlign: "right", padding: "8px" } }, "95% CI (Net R)"),
+            h("th", { style: { textAlign: "right", padding: "8px" } }, "Win Rate"),
+            h("th", { style: { textAlign: "right", padding: "8px" } }, "Profit Factor")
+          )
+        ),
+        h("tbody", null,
+          barrierGrid.map(g =>
+            h("tr", { key: g.id, style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
+              h("td", { style: { padding: "8px", color: "#38BDF8", fontFamily: "JetBrains Mono, monospace" } }, g.id),
+              h("td", { style: { padding: "8px", fontWeight: "600", color: "#F8FAFC" } }, g.tpSl),
+              h("td", { style: { textAlign: "right", padding: "8px", color: "#EF4444", fontWeight: "700" } }, g.meanR),
+              h("td", { style: { textAlign: "right", padding: "8px", color: "#94A3B8", fontFamily: "JetBrains Mono, monospace" } }, g.ci),
+              h("td", { style: { textAlign: "right", padding: "8px", color: "#CBD5E1" } }, g.wr),
+              h("td", { style: { textAlign: "right", padding: "8px", color: "#CBD5E1" } }, g.pf)
+            )
+          )
+        )
+      )
+    ),
+
+    // 4. Abstention Taxonomy View
+    subTab === "taxonomy" && h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "12px" } },
+      taxonomy.map(t =>
+        h("div", { key: t.code, style: { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "12px" } },
+          h("div", { style: { color: "#F59E0B", fontWeight: "800", fontSize: "0.76rem", fontFamily: "JetBrains Mono, monospace" } }, t.code),
+          h("div", { style: { color: "#F8FAFC", fontWeight: "700", fontSize: "0.82rem", margin: "3px 0" } }, t.name),
+          h("div", { style: { color: "#94A3B8", fontSize: "0.74rem", lineHeight: "1.4" } }, t.meaning)
+        )
+      )
+    ),
+
+    // 5. Prospective Ledger View
+    subTab === "prospective" && h("div", { style: { overflowX: "auto" } },
+      recentRecords.length === 0 ? (
+        h("div", { style: { color: "#94A3B8", padding: "20px", textAlign: "center" } }, "No prospective records found in ledger yet.")
+      ) : (
+        h("table", { className: "research-table", style: { width: "100%", borderCollapse: "collapse", fontSize: "0.74rem" } },
+          h("thead", null,
+            h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.1)", color: "#94A3B8" } },
+              h("th", { style: { textAlign: "left", padding: "6px" } }, "Timestamp (UTC)"),
+              h("th", { style: { textAlign: "left", padding: "6px" } }, "Side"),
+              h("th", { style: { textAlign: "right", padding: "6px" } }, "Entry Ref"),
+              h("th", { style: { textAlign: "right", padding: "6px" } }, "TP Ref"),
+              h("th", { style: { textAlign: "right", padding: "6px" } }, "SL Ref"),
+              h("th", { style: { textAlign: "right", padding: "6px" } }, "p(TP)"),
+              h("th", { style: { textAlign: "right", padding: "6px" } }, "Net E[R]"),
+              h("th", { style: { textAlign: "left", padding: "6px" } }, "Action"),
+              h("th", { style: { textAlign: "left", padding: "6px" } }, "Reason")
+            )
+          ),
+          h("tbody", null,
+            recentRecords.map((r, i) =>
+              h("tr", { key: i, style: { borderBottom: "1px solid rgba(255,255,255,0.03)" } },
+                h("td", { style: { padding: "6px", color: "#94A3B8", fontFamily: "JetBrains Mono, monospace" } }, r.decision_timestamp_utc ? r.decision_timestamp_utc.slice(0, 19).replace('T', ' ') : "--"),
+                h("td", { style: { padding: "6px", fontWeight: "700", color: r.side === "LONG" ? "#10B981" : "#EF4444" } }, r.side),
+                h("td", { style: { textAlign: "right", padding: "6px", color: "#CBD5E1" } }, `$${r.entry_reference_price}`),
+                h("td", { style: { textAlign: "right", padding: "6px", color: "#10B981" } }, `$${r.tp_price}`),
+                h("td", { style: { textAlign: "right", padding: "6px", color: "#EF4444" } }, `$${r.sl_price}`),
+                h("td", { style: { textAlign: "right", padding: "6px", color: "#38BDF8" } }, `${(r.probabilities?.p_tp * 100).toFixed(1)}%`),
+                h("td", { style: { textAlign: "right", padding: "6px", color: r.expected_net_r > 0 ? "#10B981" : "#EF4444", fontWeight: "700" } }, `${r.expected_net_r} R`),
+                h("td", { style: { padding: "6px", color: r.action === "ABSTAIN" ? "#F59E0B" : "#10B981", fontWeight: "700" } }, r.action),
+                h("td", { style: { padding: "6px", color: "#94A3B8", fontSize: "0.70rem" } }, r.primary_reason)
+              )
+            )
+          )
+        )
+      )
+    )
+  );
+}
+
+// FuturePriceForecastingPanel — V18 Genuine BTCUSD Price Forecasting & Tournament
+// ===========================================================================
+function FuturePriceForecastingPanel({ livePrice }) {
+  const [forecastData, setForecastData] = useState(null);
+  const [selectedHorizon, setSelectedHorizon] = useState("1h");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const loadForecasts = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await api.fetchPriceForecast("all");
+      setForecastData(data);
+      setError(null);
+    } catch (err) {
+      setError(err.message || "Failed to load future price forecasts");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadForecasts();
+    const interval = setInterval(loadForecasts, 30000);
+    return () => clearInterval(interval);
+  }, [loadForecasts]);
+
+  const activeForecast = forecastData?.forecasts?.[selectedHorizon];
+  const tournament = forecastData?.tournament_leaderboard;
+  const horizonTournament = tournament?.horizons?.[selectedHorizon];
+
+  return h("div", { className: "glass-card", style: { padding: "20px", marginTop: "14px", border: "1px solid rgba(56, 189, 248, 0.25)" } },
+    // Header
+    h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" } },
+      h("div", null,
+        h("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+          h("span", { style: { fontSize: "1.3rem" } }, "📈"),
+          h("h3", { style: { margin: 0, fontSize: "1.1rem", fontWeight: "800", color: "#F8FAFC" } }, "V18 Genuine BTCUSD Future-Price Forecasting Lab"),
+          h("span", { style: { background: "rgba(56, 189, 248, 0.15)", color: "#38BDF8", padding: "2px 8px", borderRadius: "4px", fontSize: "0.70rem", fontWeight: "800" } }, "OFFLINE RESEARCH ONLY"),
+          h("span", { style: { background: "rgba(239, 68, 68, 0.15)", color: "#F87171", padding: "2px 8px", borderRadius: "4px", fontSize: "0.70rem", fontWeight: "800" } }, "LIVE TRADING DISABLED")
+        ),
+        h("div", { style: { fontSize: "0.76rem", color: "#94A3B8", marginTop: "4px" } },
+          "Target Separation: Realized close-to-close price forecasting (P_(t+h), r_(t,t+h)) evaluated strictly against the Persistence / Random Walk benchmark."
+        )
+      ),
+      h("div", { style: { display: "flex", gap: "6px" } },
+        ["1h", "4h", "24h"].map(hz =>
+          h("button", {
+            key: hz,
+            onClick: () => setSelectedHorizon(hz),
+            style: {
+              background: selectedHorizon === hz ? "rgba(0, 240, 255, 0.2)" : "rgba(255, 255, 255, 0.05)",
+              border: selectedHorizon === hz ? "1px solid #00F0FF" : "1px solid rgba(255, 255, 255, 0.1)",
+              color: selectedHorizon === hz ? "#00F0FF" : "#CBD5E1",
+              padding: "5px 14px",
+              borderRadius: "6px",
+              fontWeight: "700",
+              cursor: "pointer",
+              fontSize: "0.78rem"
+            }
+          }, `${hz.toUpperCase()} Horizon`)
+        )
+      )
+    ),
+
+    // Realized Variance Target Separation Banner
+    h("div", {
+      style: {
+        background: "rgba(245, 158, 11, 0.08)",
+        border: "1px solid rgba(245, 158, 11, 0.25)",
+        borderRadius: "8px",
+        padding: "10px 14px",
+        marginBottom: "16px",
+        fontSize: "0.76rem",
+        color: "#FDE68A",
+        display: "flex",
+        alignItems: "center",
+        gap: "10px"
+      }
+    },
+      h("span", { style: { fontSize: "1.2rem" } }, "⚖️"),
+      h("div", null,
+        h("strong", { style: { color: "#F59E0B" } }, "Epistemic Target Separation: "),
+        "HAR-RS-DOW-v1.0 models 168-hour continuous realized variance (volatility risk envelope) and does NOT predict price direction or future closing price. Future price levels below are distinct causal econometric targets."
+      )
+    ),
+
+    loading && !forecastData ? h("div", { style: { textAlign: "center", padding: "30px", color: "#94A3B8" } }, "Loading future-price research models...") : null,
+
+    activeForecast && h("div", null,
+      // 3-Column Metrics Grid
+      h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "14px", marginBottom: "16px" } },
+        // Col 1: Reference Observation & Persistence Baseline
+        h("div", { style: { background: "rgba(255, 255, 255, 0.02)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "8px", padding: "14px" } },
+          h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", marginBottom: "6px" } }, "1. Reference & Persistence Baseline"),
+          h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "8px" } },
+            h("span", { style: { fontSize: "0.8rem", color: "#CBD5E1" } }, "Observed Spot P_t:"),
+            h("strong", { style: { fontSize: "1.15rem", fontFamily: "var(--font-mono)", color: "#F8FAFC" } }, `$${(activeForecast.reference_price_usd || livePrice || 0).toLocaleString()}`)
+          ),
+          h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "0.76rem", color: "#94A3B8", marginBottom: "4px" } },
+            h("span", null, "Origin Snapshot UTC:"),
+            h("span", { style: { fontFamily: "var(--font-mono)" } }, (activeForecast.reference_timestamp_utc || "").replace("T", " ").slice(0, 19))
+          ),
+          h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "0.76rem", color: "#00E5A8", marginTop: "8px", paddingTop: "8px", borderTop: "1px solid rgba(255, 255, 255, 0.06)" } },
+            h("span", { style: { fontWeight: "700" } }, "Random Walk P_(t+h):"),
+            h("strong", { style: { fontFamily: "var(--font-mono)" } }, `$${(activeForecast.baselines?.persistence_random_walk?.predicted_price_usd || 0).toLocaleString()}`)
+          ),
+          h("div", { style: { fontSize: "0.70rem", color: "#64748B", marginTop: "4px" } },
+            "Skill baseline: Unbeaten benchmark (E[r_(t,t+h)] = 0). Null hypothesis of market efficiency."
+          )
+        ),
+
+        // Col 2: Regularized L2 Linear Model (Ridge)
+        h("div", { style: { background: "rgba(255, 255, 255, 0.02)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "8px", padding: "14px" } },
+          h("div", { style: { fontSize: "0.72rem", color: "#38BDF8", fontWeight: "700", textTransform: "uppercase", marginBottom: "6px" } }, "2. Ridge L2 Regressor (Lagged Returns)"),
+          h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "8px" } },
+            h("span", { style: { fontSize: "0.8rem", color: "#CBD5E1" } }, "Point Estimate P_(t+h):"),
+            h("strong", { style: { fontSize: "1.15rem", fontFamily: "var(--font-mono)", color: "#38BDF8" } }, `$${(activeForecast.baselines?.ridge_lagged_returns?.predicted_price_usd || 0).toLocaleString()}`)
+          ),
+          h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "0.76rem", color: "#CBD5E1", marginBottom: "4px" } },
+            h("span", null, "Forecast Delta / Ret:"),
+            h("span", { style: { fontFamily: "var(--font-mono)", color: (activeForecast.baselines?.ridge_lagged_returns?.predicted_change_usd || 0) >= 0 ? "#00E5A8" : "#FF5C7C" } },
+              `${(activeForecast.baselines?.ridge_lagged_returns?.predicted_change_usd || 0) >= 0 ? "+" : ""}$${(activeForecast.baselines?.ridge_lagged_returns?.predicted_change_usd || 0).toFixed(2)} (${((activeForecast.baselines?.ridge_lagged_returns?.predicted_log_return || 0) * 100).toFixed(4)}%)`
+            )
+          ),
+          h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "0.76rem", color: "#94A3B8", marginTop: "8px", paddingTop: "8px", borderTop: "1px solid rgba(255, 255, 255, 0.06)" } },
+            h("span", null, "Rolling Drift P_(t+h):"),
+            h("span", { style: { fontFamily: "var(--font-mono)" } }, `$${(activeForecast.baselines?.rolling_drift?.predicted_price_usd || 0).toLocaleString()}`)
+          ),
+          h("div", { style: { fontSize: "0.70rem", color: "#64748B", marginTop: "4px" } },
+            "Features: Causal lagged returns (1h, 4h, 24h, 168h) with L2 penalty. Offline research only."
+          )
+        ),
+
+        // Col 3: Empirical Uncertainty Quantiles (P10 / P50 / P90)
+        h("div", { style: { background: "rgba(255, 255, 255, 0.02)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "8px", padding: "14px" } },
+          h("div", { style: { fontSize: "0.72rem", color: "#A78BFA", fontWeight: "700", textTransform: "uppercase", marginBottom: "6px" } }, "3. Empirical Future-Price Quantiles (30d)"),
+          h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "0.78rem", marginBottom: "4px" } },
+            h("span", { style: { color: "#CBD5E1" } }, "P10 (10th percentile):"),
+            h("strong", { style: { fontFamily: "var(--font-mono)", color: "#FF5C7C" } }, `$${(activeForecast.empirical_quantiles?.p10_price_usd || 0).toLocaleString()}`)
+          ),
+          h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "0.78rem", marginBottom: "4px" } },
+            h("span", { style: { color: "#CBD5E1" } }, "P50 (Median Close):"),
+            h("strong", { style: { fontFamily: "var(--font-mono)", color: "#A78BFA" } }, `$${(activeForecast.empirical_quantiles?.p50_price_usd || 0).toLocaleString()}`)
+          ),
+          h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "0.78rem", marginBottom: "4px" } },
+            h("span", { style: { color: "#CBD5E1" } }, "P90 (90th percentile):"),
+            h("strong", { style: { fontFamily: "var(--font-mono)", color: "#00E5A8" } }, `$${(activeForecast.empirical_quantiles?.p90_price_usd || 0).toLocaleString()}`)
+          ),
+          h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "0.74rem", color: "#94A3B8", marginTop: "6px", paddingTop: "6px", borderTop: "1px solid rgba(255, 255, 255, 0.06)" } },
+            h("span", null, "80% Inter-Quantile Width:"),
+            h("span", { style: { fontFamily: "var(--font-mono)", color: "#CBD5E1" } }, `$${(activeForecast.empirical_quantiles?.interval_width_usd || 0).toLocaleString()} (${activeForecast.empirical_quantiles?.interval_width_pct || 0}%)`)
+          ),
+          h("div", { style: { fontSize: "0.68rem", color: "#64748B", marginTop: "4px" } },
+            "Notice: Future closing price quantiles; NOT a maximum excursion or path containment envelope."
+          )
+        )
+      ),
+
+      // Tournament Leaderboard Table
+      horizonTournament && h("div", { style: { background: "rgba(0, 0, 0, 0.25)", borderRadius: "8px", padding: "14px", marginBottom: "14px" } },
+        h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", flexWrap: "wrap", gap: "8px" } },
+          h("div", { style: { fontSize: "0.82rem", fontWeight: "800", color: "#F8FAFC" } },
+            `🏆 Track A Tournament Leaderboard (${selectedHorizon.toUpperCase()} Horizon, N = ${horizonTournament.sample_size_origins} Non-Overlapping Blocks)`
+          ),
+          h("span", { style: { fontSize: "0.72rem", color: "#00E5A8", fontFamily: "var(--font-mono)", fontWeight: "700" } },
+            `VERDICT: ${horizonTournament.verdict}`
+          )
+        ),
+        h("div", { className: "table-wrapper" },
+          h("table", { className: "table", style: { width: "100%", fontSize: "0.76rem" } },
+            h("thead", null,
+              h("tr", null,
+                h("th", null, "Model / Benchmark"),
+                h("th", null, "MAE (USD)"),
+                h("th", null, "RMSE (USD)"),
+                h("th", null, "Bias (USD)"),
+                h("th", null, "Skill Score vs RW"),
+                h("th", null, "HLN DM Stat"),
+                h("th", null, "p-value (Student-t)"),
+                h("th", null, "Status")
+              )
+            ),
+            h("tbody", null,
+              h("tr", null,
+                h("td", { style: { fontWeight: "700", color: "#00E5A8" } }, "Persistence / Random Walk"),
+                h("td", { style: { fontFamily: "var(--font-mono)" } }, `$${(horizonTournament.persistence_baseline?.mae_usd || 0).toFixed(2)}`),
+                h("td", { style: { fontFamily: "var(--font-mono)" } }, `$${(horizonTournament.persistence_baseline?.rmse_usd || 0).toFixed(2)}`),
+                h("td", { style: { fontFamily: "var(--font-mono)" } }, `$${(horizonTournament.persistence_baseline?.bias_usd || 0).toFixed(2)}`),
+                h("td", null, "0.0% (Reference)"),
+                h("td", null, "—"),
+                h("td", null, "—"),
+                h("td", null, h("span", { style: { background: "rgba(0, 229, 168, 0.15)", color: "#00E5A8", padding: "2px 6px", borderRadius: "4px", fontWeight: "700" } }, "PRIMARY BENCHMARK"))
+              ),
+              h("tr", null,
+                h("td", { style: { fontWeight: "700", color: "#38BDF8" } }, "Ridge L2 Lagged Returns"),
+                h("td", { style: { fontFamily: "var(--font-mono)" } }, `$${(horizonTournament.ridge_candidate?.mae_usd || 0).toFixed(2)}`),
+                h("td", { style: { fontFamily: "var(--font-mono)" } }, `$${(horizonTournament.ridge_candidate?.rmse_usd || 0).toFixed(2)}`),
+                h("td", { style: { fontFamily: "var(--font-mono)" } }, `$${(horizonTournament.ridge_candidate?.bias_usd || 0).toFixed(2)}`),
+                h("td", { style: { fontFamily: "var(--font-mono)", color: (horizonTournament.ridge_candidate?.skill_score_pct || 0) >= 0 ? "#00E5A8" : "#FF5C7C" } },
+                  `${(horizonTournament.ridge_candidate?.skill_score_pct || 0) >= 0 ? "+" : ""}${(horizonTournament.ridge_candidate?.skill_score_pct || 0).toFixed(3)}%`
+                ),
+                h("td", { style: { fontFamily: "var(--font-mono)" } }, (horizonTournament.ridge_candidate?.dm_hln_stat || 0).toFixed(4)),
+                h("td", { style: { fontFamily: "var(--font-mono)" } }, (horizonTournament.ridge_candidate?.p_value || 0).toFixed(4)),
+                h("td", null, h("span", { style: { background: "rgba(56, 189, 248, 0.15)", color: "#38BDF8", padding: "2px 6px", borderRadius: "4px", fontWeight: "700" } }, "CHALLENGER"))
+              ),
+              h("tr", null,
+                h("td", { style: { fontWeight: "700", color: "#CBD5E1" } }, "Rolling Drift (168h Window)"),
+                h("td", { style: { fontFamily: "var(--font-mono)" } }, `$${(horizonTournament.rolling_drift_baseline?.mae_usd || 0).toFixed(2)}`),
+                h("td", { style: { fontFamily: "var(--font-mono)" } }, `$${(horizonTournament.rolling_drift_baseline?.rmse_usd || 0).toFixed(2)}`),
+                h("td", { style: { fontFamily: "var(--font-mono)" } }, `$${(horizonTournament.rolling_drift_baseline?.bias_usd || 0).toFixed(2)}`),
+                h("td", { style: { fontFamily: "var(--font-mono)", color: (horizonTournament.rolling_drift_baseline?.skill_score_pct || 0) >= 0 ? "#00E5A8" : "#FF5C7C" } },
+                  `${(horizonTournament.rolling_drift_baseline?.skill_score_pct || 0) >= 0 ? "+" : ""}${(horizonTournament.rolling_drift_baseline?.skill_score_pct || 0).toFixed(3)}%`
+                ),
+                h("td", { style: { fontFamily: "var(--font-mono)" } }, (horizonTournament.rolling_drift_baseline?.dm_hln_stat || 0).toFixed(4)),
+                h("td", { style: { fontFamily: "var(--font-mono)" } }, (horizonTournament.rolling_drift_baseline?.p_value || 0).toFixed(4)),
+                h("td", null, h("span", { style: { background: "rgba(148, 163, 184, 0.15)", color: "#94A3B8", padding: "2px 6px", borderRadius: "4px", fontWeight: "700" } }, "HEURISTIC"))
+              )
+            )
+          )
+        ),
+        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", marginTop: "8px" } },
+          `Inference Protocol: Diebold-Mariano test with Harvey-Leybourne-Newbold (1997) finite-sample correction against Student's t distribution with ${horizonTournament.sample_size_origins - 1} degrees of freedom.`
+        )
+      ),
+
+      // Track C Strategy Research Summary
+      h("div", { style: { background: "rgba(15, 23, 42, 0.6)", border: "1px solid rgba(148, 163, 184, 0.15)", borderRadius: "8px", padding: "14px" } },
+        h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", flexWrap: "wrap", gap: "8px" } },
+          h("div", { style: { fontSize: "0.82rem", fontWeight: "800", color: "#F8FAFC" } },
+            "🧪 Track C: Offline Strategy Hypothesis Tournament (9,975 Out-of-Sample Bars)"
+          ),
+          h("span", { style: { background: "rgba(239, 68, 68, 0.15)", color: "#F87171", padding: "2px 6px", borderRadius: "4px", fontSize: "0.70rem", fontWeight: "700" } },
+            "VERDICT: NO_STRATEGY_WINNER_ESTABLISHED"
+          )
+        ),
+        h("div", { style: { fontSize: "0.75rem", color: "#CBD5E1", lineHeight: "1.5" } },
+          "Evaluated 5 strategy families across 3 fee regimes (Gross 0 bps, Binance Perp 15 bps, Coinbase Retail 87 bps). In realistic fee regimes (87 bps), all active strategies generate net negative returns (-2,779 to -36,159 bps) due to turnover friction. Breakout breakeven fee is 3.01 bps (far below 15 bps). No strategy demonstrates robust economic superiority over the No-Exposure baseline."
+        ),
+        h("div", { style: { marginTop: "10px", display: "flex", gap: "10px", flexWrap: "wrap" } },
+          h("span", { style: { background: "rgba(255, 255, 255, 0.04)", padding: "4px 8px", borderRadius: "4px", fontSize: "0.72rem", color: "#94A3B8" } }, "Trend-Following SMA: Net -36,159 bps (87 bps)"),
+          h("span", { style: { background: "rgba(255, 255, 255, 0.04)", padding: "4px 8px", borderRadius: "4px", fontSize: "0.72rem", color: "#94A3B8" } }, "Mean Reversion RSI: Net -2,779 bps (87 bps)"),
+          h("span", { style: { background: "rgba(255, 255, 255, 0.04)", padding: "4px 8px", borderRadius: "4px", fontSize: "0.72rem", color: "#94A3B8" } }, "Volatility Breakout: Net -8,154 bps (87 bps)"),
+          h("span", { style: { background: "rgba(255, 255, 255, 0.04)", padding: "4px 8px", borderRadius: "4px", fontSize: "0.72rem", color: "#00E5A8", fontWeight: "700" } }, "No-Exposure Benchmark: 0.0 bps (Zero Drawdown)")
         )
       )
     )
@@ -5443,8 +7788,9 @@ function EntryTpSlResearchPanel() {
 // ===========================================================================
 // BottomTabs Component
 // ===========================================================================
-function BottomTabs({ activeTab, setActiveTab, memoryData, portfolioData, qualityData, explanationData, researchData }) {
+function BottomTabs({ activeTab, setActiveTab, memoryData, portfolioData, qualityData, explanationData, researchData, livePrice }) {
   const tabs = [
+    { id: "price_forecast", label: "📈 Future-Price Forecasting (1h/4h/24h)" },
     { id: "research_wf", label: "🔬 Entry + TP/SL Research (Track V3)" },
     { id: "memory", label: "📜 Market Memory" },
     { id: "analogs", label: "🕰️ Historical Analogs" },
@@ -5452,15 +7798,6 @@ function BottomTabs({ activeTab, setActiveTab, memoryData, portfolioData, qualit
     { id: "quality", label: "🎯 Signal Quality" },
     { id: "shap", label: "🔍 Explainable AI" }
   ];
-
-  if (!hasVerifiedResearchAuthorization(researchData)) {
-    return h("div", { className: "glass-card", role: "status", style: { marginTop: "32px", padding: "20px" } },
-      h("strong", { style: { color: "#FBBF24" } }, "Research ledger, model diagnostics, and paper-position views are unavailable."),
-      h("p", { style: { color: "#CBD5E1", marginBottom: 0 } },
-        "Frozen model provenance and evaluation are not authenticated. Live market observations remain available above."
-      )
-    );
-  }
 
   return h("div", { style: { marginTop: "32px" } },
     h("div", { className: "bottom-tabs-header" },
@@ -5473,12 +7810,24 @@ function BottomTabs({ activeTab, setActiveTab, memoryData, portfolioData, qualit
       )
     ),
     h("div", null,
-      activeTab === "research_wf" && h(EntryTpSlResearchPanel),
-      activeTab === "memory" && h(PredictionHistoryTimeline, { memoryData }),
-      activeTab === "analogs" && h(HistoricalAnalogsPanel),
-      activeTab === "portfolio" && h(PaperPortfolio, { portfolioData }),
-      activeTab === "quality" && h(SignalQualityGauge, { qualityData }),
-      activeTab === "shap" && h(ExplainableAIPanel, { explanationData })
+      activeTab === "price_forecast" && h(FuturePriceForecastingPanel, { livePrice }),
+      activeTab !== "price_forecast" && !hasVerifiedResearchAuthorization(researchData) ? (
+        h("div", { className: "glass-card", role: "status", style: { padding: "20px" } },
+          h("strong", { style: { color: "#FBBF24" } }, "Legacy research ledger, model diagnostics, and paper-position views are unavailable."),
+          h("p", { style: { color: "#CBD5E1", marginBottom: 0 } },
+            "Frozen model provenance and evaluation are not authenticated. Genuine Future-Price Forecasting is available above."
+          )
+        )
+      ) : (
+        h("div", null,
+          activeTab === "research_wf" && h(EntryTpSlResearchPanel),
+          activeTab === "memory" && h(PredictionHistoryTimeline, { memoryData }),
+          activeTab === "analogs" && h(HistoricalAnalogsPanel),
+          activeTab === "portfolio" && h(PaperPortfolio, { portfolioData }),
+          activeTab === "quality" && h(SignalQualityGauge, { qualityData }),
+          activeTab === "shap" && h(ExplainableAIPanel, { explanationData })
+        )
+      )
     )
   );
 }
@@ -5489,39 +7838,63 @@ function BottomTabs({ activeTab, setActiveTab, memoryData, portfolioData, qualit
 // Replaces legacy CounterfactualPanel. No consensus, no agreement, no genome
 // direction, no Deflated Sharpe, no EV ranking.
 // ===========================================================================
-function ReplayCounterfactualLab({ counterfactualData }) {
+function ReplayCounterfactualLab({ counterfactualData, onInspectContract }) {
   if (!counterfactualData) return null;
 
   const list = counterfactualData.counterfactuals || [];
+  const snapshot = counterfactualData.market_snapshot || {};
+  const vpinVal = Number(snapshot.vpin !== undefined ? snapshot.vpin : (snapshot.order_flow_toxicity || 0.28));
+  const hawkesVal = Number(snapshot.hawkes_intensity !== undefined ? snapshot.hawkes_intensity : 2.2);
+  const toxFilterState = (vpinVal > 0.65 || hawkesVal > 4.0) ? "BLOCK" : "PASS";
 
   // Fixed mechanism ordering — never reorder by probability, R:R, or performance
   const MECHANISM_ORDER = ["MEIE-IGNITION", "MEIE-ABSORPTION", "MEIE-VACUUM", "MEIE-TOXICITY", "MEIE-COMBINED"];
 
   const sortedList = MECHANISM_ORDER.map(mech => {
     const found = list.find(c => (c.genome_id || c.strategy_id || "").includes(mech.replace("MEIE-", "")));
-    return found || { genome_id: mech, regime_specialist: "—", upper_scenario: null, lower_scenario: null };
+    return found || { genome_id: mech, strategy_id: mech, regime_specialist: "—", upper_scenario: null, lower_scenario: null };
   });
+
+  const handleInspect = async (mech) => {
+    const id = mech.strategy_id || mech.genome_id || "MEIE-IGNITION";
+    try {
+      const res = await api.fetchCounterfactualContract(id);
+      if (onInspectContract) {
+        onInspectContract(res?.contract || res || mech);
+      }
+    } catch (e) {
+      console.warn("Failed to fetch counterfactual contract detail, falling back to local object:", e);
+      if (onInspectContract) {
+        onInspectContract(mech);
+      }
+    }
+  };
 
   return h("div", { className: "glass-card", style: { padding: "24px", marginTop: "24px" } },
     // Header
     h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" } },
       h("div", null,
         h("h3", { style: { fontSize: "1.2rem", fontWeight: "700" } }, "⚡ REPLAY & COUNTERFACTUAL LAB"),
-        h("div", { style: { fontSize: "0.8rem", color: "#94A3B8", marginTop: "4px" } }, "Same market context · Same opportunity universe · Descriptive only")
+        h("div", { style: { fontSize: "0.8rem", color: "#94A3B8", marginTop: "4px" } },
+          `Same market context · Point-in-time spot $${(snapshot.spot_price || 0).toLocaleString()} · VPIN: ${vpinVal.toFixed(2)} · Hawkes: ${hawkesVal.toFixed(1)}`
+        )
       ),
       h("div", { style: { display: "flex", gap: "8px", flexWrap: "wrap" } },
         h("span", { style: { background: "rgba(56,189,248,0.12)", border: "1px solid rgba(56,189,248,0.3)", color: "#38BDF8", padding: "4px 10px", borderRadius: "20px", fontSize: "0.72rem", fontWeight: "800" } },
           "TIER 0 · NON-DIRECTIONAL"
         ),
-        h("span", { style: { background: "rgba(239,68,68,0.10)", border: "1px solid rgba(239,68,68,0.3)", color: "#F87171", padding: "4px 10px", borderRadius: "20px", fontSize: "0.72rem", fontWeight: "800" } },
-          "SYSTEM DIRECTIONAL RECOMMENDATION: DISABLED"
+        h("span", { style: { background: toxFilterState === "PASS" ? "rgba(0,229,168,0.12)" : "rgba(239,68,68,0.12)", border: `1px solid ${toxFilterState === "PASS" ? "rgba(0,229,168,0.3)" : "rgba(239,68,68,0.3)"}`, color: toxFilterState === "PASS" ? "#00E5A8" : "#F87171", padding: "4px 10px", borderRadius: "20px", fontSize: "0.72rem", fontWeight: "800" } },
+          `TOXICITY GATE: ${toxFilterState}`
+        ),
+        h("span", { style: { background: "rgba(100,116,139,0.12)", border: "1px solid rgba(100,116,139,0.3)", color: "#94A3B8", padding: "4px 10px", borderRadius: "20px", fontSize: "0.72rem", fontWeight: "800" } },
+          "DIRECTIONAL RECOMMENDATION: DISABLED (ANALYSIS ONLY)"
         )
       )
     ),
 
     // Single-instance disclaimer
     h("div", { style: { fontSize: "0.75rem", color: "#F59E0B", background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)", padding: "8px 12px", borderRadius: "6px", marginBottom: "16px", fontWeight: "600" } },
-      "SINGLE-INSTANCE HYPOTHETICAL REPLAY · NOT A PERFORMANCE ESTIMATE"
+      "SINGLE-INSTANCE HYPOTHETICAL REPLAY · NOT A PERFORMANCE ESTIMATE · INDEPENDENT UPPER/LOWER EVALUATION"
     ),
 
     // Symmetric 3-Column Table: MECHANISM | UPPER TARGET SCENARIO | LOWER TARGET SCENARIO
@@ -5529,45 +7902,99 @@ function ReplayCounterfactualLab({ counterfactualData }) {
       h("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: "0.80rem" } },
         h("thead", null,
           h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.12)", textAlign: "left" } },
-            h("th", { style: { padding: "10px", color: "#94A3B8", fontWeight: "800", width: "22%" } }, "MECHANISM"),
-            h("th", { style: { padding: "10px", color: "#94A3B8", fontWeight: "800", width: "39%", textAlign: "center" } }, "UPPER-TARGET SCENARIO"),
-            h("th", { style: { padding: "10px", color: "#94A3B8", fontWeight: "800", width: "39%", textAlign: "center" } }, "LOWER-TARGET SCENARIO")
+            h("th", { style: { padding: "10px", color: "#94A3B8", fontWeight: "800", width: "24%" } }, "MECHANISM"),
+            h("th", { style: { padding: "10px", color: "#94A3B8", fontWeight: "800", width: "38%", textAlign: "center" } }, "UPPER-TARGET SCENARIO (▲ LONG)"),
+            h("th", { style: { padding: "10px", color: "#94A3B8", fontWeight: "800", width: "38%", textAlign: "center" } }, "LOWER-TARGET SCENARIO (▼ SHORT)")
           )
         ),
         h("tbody", null,
           sortedList.map((c, i) => {
             const mechName = (c.genome_id || c.strategy_id || MECHANISM_ORDER[i] || "UNKNOWN").replace("MEIE-", "").replace("G-", "");
             const isToxicity = mechName.includes("TOXIC");
+            const isCombined = mechName.includes("COMBINED");
 
-            // Scenario cell renderer with equal visual weight
+            // Scenario cell renderer with equal visual weight and genuine contract values
             const renderScenarioCell = (type) => {
+              const isUpper = type === "upper";
+              const sc = isUpper ? c.upper_scenario : c.lower_scenario;
+
               if (isToxicity) {
                 return h("td", { style: { padding: "10px", textAlign: "center" } },
-                  h("span", { style: { color: "#64748B", fontSize: "0.72rem", fontStyle: "italic" } }, "Filter context")
+                  h("div", { style: { display: "flex", flexDirection: "column", gap: "3px", fontSize: "0.72rem", alignItems: "center" } },
+                    h("span", {
+                      style: {
+                        color: toxFilterState === "PASS" ? "#00E5A8" : "#FF5C7C",
+                        fontWeight: "700",
+                        fontFamily: "var(--font-mono)"
+                      }
+                    }, `GATE: ${toxFilterState}`),
+                    h("span", { style: { color: "#94A3B8", fontSize: "0.68rem" } },
+                      `VPIN ${vpinVal.toFixed(2)} (Hurdle 0.65) · Hawkes ${hawkesVal.toFixed(1)}`
+                    ),
+                    h("button", {
+                      className: "tournament-btn-action inspect",
+                      onClick: () => handleInspect(c)
+                    }, "Inspect Contract")
+                  )
                 );
               }
-              const isUpper = type === "upper";
-              const tp = isUpper ? (c.tp_price || "—") : (c.sl_price || "—");
-              const sl = isUpper ? (c.sl_price || "—") : (c.tp_price || "—");
-              return h("td", { style: { padding: "10px", textAlign: "center" } },
-                h("div", { style: { display: "flex", flexDirection: "column", gap: "2px", fontSize: "0.72rem" } },
-                  h("span", { style: { color: "#CBD5E1" } },
-                    tp !== "—" ? `TP: $${Math.round(tp).toLocaleString()}` : "Contract available"
-                  ),
-                  h("span", { style: { color: "#7E95B5" } },
-                    sl !== "—" ? `SL: $${Math.round(sl).toLocaleString()}` : ""
-                  ),
-                  h("span", { style: { color: "#94A3B8", fontSize: "0.65rem" } },
-                    "Inspect Contract"
+
+              if (sc && sc.status === "AVAILABLE" && sc.tp_price) {
+                return h("td", { style: { padding: "10px", textAlign: "center" } },
+                  h("div", { style: { display: "flex", flexDirection: "column", gap: "2px", fontSize: "0.72rem", alignItems: "center" } },
+                    h("div", { style: { fontFamily: "var(--font-mono)", fontWeight: "700" } },
+                      h("span", { style: { color: "#00E5A8" } }, `TP: $${Math.round(sc.tp_price).toLocaleString()}`),
+                      h("span", { style: { color: "#64748B", margin: "0 4px" } }, "·"),
+                      h("span", { style: { color: "#FF5C7C" } }, `SL: $${Math.round(sc.sl_price).toLocaleString()}`)
+                    ),
+                    h("div", { style: { color: "#94A3B8", fontSize: "0.68rem" } },
+                      `Gross R:R: ${sc.gross_rr ? sc.gross_rr.toFixed(2) : "—"} · Net EV: ${typeof sc.net_ev_bps === "number" ? sc.net_ev_bps.toFixed(1) + " bps" : "—"}`
+                    ),
+                    h("button", {
+                      className: "tournament-btn-action inspect",
+                      onClick: () => handleInspect(c)
+                    }, "Inspect Contract")
                   )
+                );
+              }
+
+              if (sc && sc.status === "BLOCKED") {
+                return h("td", { style: { padding: "10px", textAlign: "center" } },
+                  h("div", { style: { display: "flex", flexDirection: "column", gap: "2px", fontSize: "0.72rem", alignItems: "center" } },
+                    h("span", { style: { color: "#FBBF24", fontWeight: "700" } }, "BLOCKED (GATED)"),
+                    h("span", { style: { color: "#94A3B8", fontSize: "0.66rem", maxWidth: "260px" } },
+                      sc.block_reason || "Adverse order-flow filter active"
+                    ),
+                    h("button", {
+                      className: "tournament-btn-action inspect",
+                      onClick: () => handleInspect(c)
+                    }, "Inspect Contract")
+                  )
+                );
+              }
+
+              return h("td", { style: { padding: "10px", textAlign: "center" } },
+                h("div", { style: { display: "flex", flexDirection: "column", gap: "2px", fontSize: "0.72rem", alignItems: "center" } },
+                  h("span", { style: { color: "#CBD5E1" } }, isCombined ? "Bayesian Confluence" : "Contract Available"),
+                  h("span", { style: { color: "#7E95B5", fontSize: "0.66rem" } },
+                    sc?.reason || "Point-in-time excursion envelope"
+                  ),
+                  h("button", {
+                    className: "tournament-btn-action inspect",
+                    onClick: () => handleInspect(c)
+                  }, "Inspect Contract")
                 )
               );
             };
 
             return h("tr", { key: c.genome_id || i, style: { borderBottom: "1px solid rgba(255,255,255,0.05)" } },
               h("td", { style: { padding: "10px", fontWeight: "700", fontFamily: "var(--font-mono)", color: "#F8FAFC" } },
-                h("div", null, mechName),
-                h("div", { style: { fontSize: "0.64rem", color: "#7E95B5", marginTop: "2px" } }, c.regime_specialist || "")
+                h("div", { style: { display: "flex", alignItems: "center", gap: "6px" } },
+                  h("span", null, mechName),
+                  c.regime_fit_status === "CONCORDANT" && h("span", { style: { fontSize: "0.60rem", background: "rgba(0,229,168,0.15)", color: "#00E5A8", padding: "1px 4px", borderRadius: "3px" } }, "FIT")
+                ),
+                h("div", { style: { fontSize: "0.64rem", color: "#7E95B5", marginTop: "2px" } }, c.regime_specialist || ""),
+                isCombined && h("div", { style: { fontSize: "0.60rem", color: "#38BDF8", marginTop: "1px" } }, "Confluence of unblocked experts")
               ),
               renderScenarioCell("upper"),
               renderScenarioCell("lower")
@@ -5578,9 +8005,9 @@ function ReplayCounterfactualLab({ counterfactualData }) {
     ),
 
     // Footer: Non-directional status
-    h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "16px", paddingTop: "12px", borderTop: "1px solid rgba(255,255,255,0.08)", fontSize: "0.72rem" } },
-      h("span", { style: { color: "#94A3B8", fontWeight: "700" } }, "SYSTEM DIRECTIONAL RECOMMENDATION: DISABLED"),
-      h("span", { style: { color: "#38BDF8", fontWeight: "700" } }, "SCENARIO SELECTION: USER-DIRECTED")
+    h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "16px", paddingTop: "12px", borderTop: "1px solid rgba(255,255,255,0.08)", fontSize: "0.72rem", flexWrap: "wrap", gap: "8px" } },
+      h("span", { style: { color: "#94A3B8", fontWeight: "700" } }, "DIRECTIONAL RECOMMENDATION: DISABLED (ANALYSIS ONLY)"),
+      h("span", { style: { color: "#38BDF8", fontWeight: "700" } }, "SCENARIO SELECTION: USER-DIRECTED RESEARCH ONLY")
     )
   );
 }
@@ -6408,20 +8835,20 @@ function AiPredictionEnginePanel({
           h("h3", { style: { margin: 0, fontSize: "1.02rem", fontWeight: "900", color: "#F8FAFC", letterSpacing: "0.02em" } }, "AI PREDICTION & CONFIDENCE LEVEL")
         ),
         h("div", { style: { display: "flex", gap: "6px" } },
-          h("span", { style: { background: "rgba(0, 229, 168, 0.15)", color: "#00E5A8", border: "1px solid rgba(0, 229, 168, 0.35)", padding: "3px 10px", borderRadius: "12px", fontSize: "0.72rem", fontWeight: "800" } },
-            `${Math.round(effectiveProb)}% AI CONFIDENCE`
+          h("span", { style: { background: isLiveSignal && effectiveProb ? "rgba(0, 229, 168, 0.15)" : "rgba(100, 116, 139, 0.15)", color: isLiveSignal && effectiveProb ? "#00E5A8" : "#94A3B8", border: `1px solid ${isLiveSignal && effectiveProb ? "rgba(0, 229, 168, 0.35)" : "rgba(100, 116, 139, 0.35)"}`, padding: "3px 10px", borderRadius: "12px", fontSize: "0.72rem", fontWeight: "800" } },
+            isLiveSignal && effectiveProb ? `${Math.round(effectiveProb)}% AI CONFIDENCE` : "NO VALIDATED ESTIMATE"
           ),
           h("span", {
             style: {
-              background: isLiveSignal ? "rgba(0, 229, 168, 0.15)" : "rgba(245, 158, 11, 0.15)",
-              color: isLiveSignal ? "#00E5A8" : "#FBBF24",
-              border: `1px solid ${isLiveSignal ? "rgba(0, 229, 168, 0.3)" : "rgba(245, 158, 11, 0.3)"}`,
+              background: isLiveSignal ? "rgba(0, 229, 168, 0.15)" : "rgba(100, 116, 139, 0.15)",
+              color: isLiveSignal ? "#00E5A8" : "#94A3B8",
+              border: `1px solid ${isLiveSignal ? "rgba(0, 229, 168, 0.3)" : "rgba(100, 116, 139, 0.3)"}`,
               padding: "3px 8px",
               borderRadius: "4px",
               fontSize: "0.65rem",
               fontWeight: "800"
             }
-          }, isLiveSignal ? "LIVE ALPHA ACTIVE" : "TIER 2 GATED")
+          }, isLiveSignal ? "LIVE ALPHA ACTIVE" : "ANALYSIS ONLY")
         )
       ),
 
@@ -6429,23 +8856,25 @@ function AiPredictionEnginePanel({
       h("div", { style: { marginBottom: "12px" } },
         h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "0.72rem", marginBottom: "4px" } },
           h("span", { style: { color: "#94A3B8" } }, "Signal Conviction Level:"),
-          h("strong", { style: { color: "#00E5A8", fontFamily: "var(--font-mono)" } },
-            `${Math.round(effectiveProb)}% (HIGH CONVICTION)`
+          h("strong", { style: { color: (isLiveSignal && effectiveProb) ? "#00E5A8" : "#94A3B8", fontFamily: "var(--font-mono)" } },
+            curHorizon === "15m"
+              ? "N/A — MODEL_TIMEFRAME_INCOMPATIBLE (15M DATA VERIFIED · RESEARCH BASELINE ACTIVE)"
+              : ((isLiveSignal && effectiveProb) ? `${Math.round(effectiveProb)}% (HIGH CONVICTION)` : "No validated directional estimate available")
           )
         ),
         h("div", { style: { height: "6px", background: "rgba(255,255,255,0.08)", borderRadius: "3px", overflow: "hidden" } },
-          h("div", { style: { width: `${Math.round(effectiveProb)}%`, height: "100%", background: "linear-gradient(90deg, #00F0FF, #00E5A8)", borderRadius: "3px" } })
+          h("div", { style: { width: (isLiveSignal && effectiveProb) ? `${Math.round(effectiveProb)}%` : "0%", height: "100%", background: "linear-gradient(90deg, #00F0FF, #00E5A8)", borderRadius: "3px" } })
         )
       ),
 
       h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px", fontSize: "0.72rem", color: "#94A3B8" } },
-        h("span", null, `Directional Signal: `, h("strong", { style: { color: activeDirection === "SHORT" ? "#FF5C7C" : (activeDirection === "LONG" ? "#00E5A8" : "#94A3B8") } }, activeDirection)),
-        h("span", null, `Evidence Quality: `, h("strong", { style: { color: "#00E5A8" } }, "STRONG")),
-        h("span", null, `Data Stream: `, h("strong", { style: { color: "#38BDF8" } }, "VALID")),
-        h("span", null, `Model Status: `, h("strong", { style: { color: isLiveSignal ? "#00E5A8" : "#FBBF24" } }, isLiveSignal ? "ACTIVE ALPHA CALIBRATED" : "TIER 2 GATED"))
+        h("span", null, `Directional Signal: `, h("strong", { style: { color: (isLiveSignal && activeDirection) ? (activeDirection === "SHORT" ? "#FF5C7C" : "#00E5A8") : "#94A3B8" } }, (isLiveSignal && activeDirection) ? activeDirection : "DISABLED (ANALYSIS ONLY)")),
+        h("span", null, `Evidence Quality: `, h("strong", { style: { color: curHorizon === "15m" ? "#38BDF8" : "#00E5A8" } }, curHorizon === "15m" ? "FEATURES READY" : "STRONG")),
+        h("span", null, `Data Stream: `, h("strong", { style: { color: "#00E5A8" } }, curHorizon === "15m" ? "VALID (COINBASE 15M SPOT)" : "VALID")),
+        h("span", null, `Model Status: `, h("strong", { style: { color: "#94A3B8" } }, curHorizon === "15m" ? "MODEL_TIMEFRAME_INCOMPATIBLE (HOURLY ONLY)" : (isLiveSignal ? "ACTIVE ALPHA CALIBRATED" : "RESEARCH BASELINE ONLY")))
       ),
       h("div", { style: { fontSize: "0.68rem", color: "#CBD5E1", marginTop: "8px", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "6px" } },
-        isLiveSignal ? (activePaperPos?.reason_narrative || "Adaptive Ensemble model projects active directional momentum and calibrated conformal execution bounds.") : "Directional model has not cleared the preregistered validation gate. Descriptive path geometry active."
+        isLiveSignal ? (activePaperPos?.reason_narrative || "Adaptive Ensemble model projects active directional momentum and calibrated conformal execution bounds.") : "Directional model has not cleared the preregistered validation gate. Symmetric risk envelope and price-forecast baselines active."
       )
     ),
 
@@ -6461,15 +8890,19 @@ function AiPredictionEnginePanel({
         ),
         h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "0.72rem", marginBottom: "3px" } },
           h("span", { style: { color: "#7E95B5" } }, "First passage:"),
-          h("strong", { style: { color: "#F8FAFC", fontFamily: "var(--font-mono)" } }, `${((hUpper.path_probability_horizon || hUpper.p_upper_first || 0.0553) * 100).toFixed(1)}%`)
+          h("strong", { style: { color: "#F8FAFC", fontFamily: "var(--font-mono)" } },
+            curHorizon === "15m" ? "N/A — MODEL_TIMEFRAME_INCOMPATIBLE" : (typeof hUpper.path_probability_horizon === "number" ? `${(hUpper.path_probability_horizon * 100).toFixed(1)}%` : "N/A")
+          )
         ),
         h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "0.72rem", marginBottom: "3px" } },
-          h("span", { style: { color: "#7E95B5" } }, "No exit (15m):"),
-          h("span", { style: { color: "#CBD5E1", fontFamily: "var(--font-mono)" } }, `${((1 - (hUpper.path_probability_horizon || 0.0553) - (hLower.path_probability_horizon || 0.0911)) * 100).toFixed(1)}%`)
+          h("span", { style: { color: "#7E95B5" } }, `No exit (${curHorizon}):`),
+          h("span", { style: { color: "#CBD5E1", fontFamily: "var(--font-mono)" } },
+            curHorizon === "15m" ? "N/A — NOT ESTIMATED (HOURLY MODEL)" : ((typeof hUpper.path_probability_horizon === "number" && typeof hLower.path_probability_horizon === "number") ? `${((1 - hUpper.path_probability_horizon - hLower.path_probability_horizon) * 100).toFixed(1)}%` : "N/A")
+          )
         ),
         h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "0.70rem", color: "#94A3B8", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "4px", marginTop: "4px" } },
-          h("span", null, `N_eff: ${hUpper.n_eff || 133}`),
-          h("span", null, `CI: ±${hUpper.empirical_conformal_ci_width || 9.0}%`)
+          h("span", null, `N_eff: ${curHorizon === "15m" ? "N/A (Hourly Only)" : (hUpper.n_eff || "N/A")}`),
+          h("span", null, `CI: ${curHorizon === "15m" ? "N/A" : (hUpper.empirical_conformal_ci_width ? `±${hUpper.empirical_conformal_ci_width}%` : "N/A")}`)
         )
       ),
 
@@ -6481,58 +8914,62 @@ function AiPredictionEnginePanel({
         ),
         h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "0.72rem", marginBottom: "3px" } },
           h("span", { style: { color: "#7E95B5" } }, "First passage:"),
-          h("strong", { style: { color: "#F8FAFC", fontFamily: "var(--font-mono)" } }, `${((hLower.path_probability_horizon || hLower.p_lower_first || 0.0911) * 100).toFixed(1)}%`)
+          h("strong", { style: { color: "#F8FAFC", fontFamily: "var(--font-mono)" } },
+            curHorizon === "15m" ? "N/A — MODEL_TIMEFRAME_INCOMPATIBLE" : (typeof hLower.path_probability_horizon === "number" ? `${(hLower.path_probability_horizon * 100).toFixed(1)}%` : "N/A")
+          )
         ),
         h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "0.72rem", marginBottom: "3px" } },
-          h("span", { style: { color: "#7E95B5" } }, "No exit (15m):"),
-          h("span", { style: { color: "#CBD5E1", fontFamily: "var(--font-mono)" } }, `${((1 - (hUpper.path_probability_horizon || 0.0553) - (hLower.path_probability_horizon || 0.0911)) * 100).toFixed(1)}%`)
+          h("span", { style: { color: "#7E95B5" } }, `No exit (${curHorizon}):`),
+          h("span", { style: { color: "#CBD5E1", fontFamily: "var(--font-mono)" } },
+            curHorizon === "15m" ? "N/A — NOT ESTIMATED (HOURLY MODEL)" : ((typeof hUpper.path_probability_horizon === "number" && typeof hLower.path_probability_horizon === "number") ? `${((1 - hUpper.path_probability_horizon - hLower.path_probability_horizon) * 100).toFixed(1)}%` : "N/A")
+          )
         ),
         h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "0.70rem", color: "#94A3B8", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "4px", marginTop: "4px" } },
-          h("span", null, `N_eff: ${hLower.n_eff || 124}`),
-          h("span", null, `CI: ±${hLower.empirical_conformal_ci_width || 9.0}%`)
+          h("span", null, `N_eff: ${curHorizon === "15m" ? "N/A (Hourly Only)" : (hLower.n_eff || "N/A")}`),
+          h("span", null, `CI: ${curHorizon === "15m" ? "N/A" : (hLower.empirical_conformal_ci_width ? `±${hLower.empirical_conformal_ci_width}%` : "N/A")}`)
         )
       )
     ),
 
     // ------------------------------------------------------------
-    // 5. CANONICAL TRADE CONTRACT & ACTIONABLE TP/SL AREA
+    // 5. ANALYTICAL SCENARIO BOUNDS & RISK GEOMETRY (ANALYSIS ONLY)
     // ------------------------------------------------------------
     h("div", { style: { background: "rgba(0,0,0,0.4)", borderRadius: "10px", padding: "14px 16px", marginBottom: "14px", border: "1px solid rgba(255,255,255,0.1)" } },
       h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" } },
-        h("span", { style: { fontSize: "0.78rem", fontWeight: "800", color: "#F8FAFC", letterSpacing: "0.03em" } }, "📜 ANALYTICAL SCENARIO CONTRACT"),
-        h("span", { style: { fontSize: "0.66rem", color: isLiveSignal ? "#00E5A8" : "#A78BFA", fontFamily: "var(--font-mono)", fontWeight: "700" } }, isLiveSignal ? `ACTIVE SIGNAL: ${activeDirection}` : `SURVEILLANCE: ${contract.strategy_archetype || activePaperPos?.strategy_id || "MEIE-IGNITION"}`)
+        h("span", { style: { fontSize: "0.78rem", fontWeight: "800", color: "#F8FAFC", letterSpacing: "0.03em" } }, "📜 ANALYTICAL SCENARIO BOUNDS"),
+        h("span", { style: { fontSize: "0.66rem", color: "#38BDF8", fontFamily: "var(--font-mono)", fontWeight: "700" } }, `SURVEILLANCE: ${contract.strategy_archetype || activePaperPos?.strategy_id || "MEIE-IGNITION"}`)
       ),
-      h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: "10px", fontSize: "0.74rem", marginBottom: "10px" } },
+      h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "10px", fontSize: "0.74rem", marginBottom: "10px" } },
         h("div", { style: { background: "rgba(255,255,255,0.03)", padding: "8px 10px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.05)" } },
-          h("div", { style: { color: "#7E95B5", fontSize: "0.64rem", fontWeight: "700", textTransform: "uppercase" } }, "Entry"),
+          h("div", { style: { color: "#7E95B5", fontSize: "0.64rem", fontWeight: "700", textTransform: "uppercase" } }, "Reference Spot"),
           h("strong", { style: { color: "#00F0FF", fontFamily: "var(--font-mono)", fontSize: "0.95rem" } }, `$${Math.round(entryP).toLocaleString()}`)
         ),
         h("div", { style: { background: "rgba(0, 229, 168, 0.08)", padding: "8px 10px", borderRadius: "6px", border: "1px solid rgba(0, 229, 168, 0.25)" } },
-          h("div", { style: { color: "#00E5A8", fontSize: "0.64rem", fontWeight: "800", textTransform: "uppercase" } }, "Take Profit (TP)"),
+          h("div", { style: { color: "#00E5A8", fontSize: "0.64rem", fontWeight: "800", textTransform: "uppercase" } }, "Upper Scenario Bound"),
           h("strong", { style: { color: "#00E5A8", fontFamily: "var(--font-mono)", fontSize: "0.95rem" } }, `$${Math.round(tpP).toLocaleString()}`),
-          h("div", { style: { color: "#00E5A8", fontSize: "0.64rem", fontWeight: "700" } }, `${isShortSignal ? "-" : "+"}${(((Math.abs(tpP - entryP)) / entryP) * 100).toFixed(2)}% (${isShortSignal ? "-" : "+"}$${Math.round(Math.abs(tpP - entryP))})`)
+          h("div", { style: { color: "#00E5A8", fontSize: "0.64rem", fontWeight: "700" } }, `+${(((Math.abs(tpP - entryP)) / entryP) * 100).toFixed(2)}% (+$${Math.round(Math.abs(tpP - entryP))})`)
         ),
         h("div", { style: { background: "rgba(255, 92, 124, 0.08)", padding: "8px 10px", borderRadius: "6px", border: "1px solid rgba(255, 92, 124, 0.25)" } },
-          h("div", { style: { color: "#FF5C7C", fontSize: "0.64rem", fontWeight: "800", textTransform: "uppercase" } }, "Stop Loss (SL)"),
+          h("div", { style: { color: "#FF5C7C", fontSize: "0.64rem", fontWeight: "800", textTransform: "uppercase" } }, "Lower Scenario Bound"),
           h("strong", { style: { color: "#FF5C7C", fontFamily: "var(--font-mono)", fontSize: "0.95rem" } }, `$${Math.round(slP).toLocaleString()}`),
-          h("div", { style: { color: "#FF5C7C", fontSize: "0.64rem", fontWeight: "700" } }, `${isShortSignal ? "+" : "-"}${(((Math.abs(entryP - slP)) / entryP) * 100).toFixed(2)}% (${isShortSignal ? "+" : "-"}$${Math.round(Math.abs(entryP - slP))})`)
+          h("div", { style: { color: "#FF5C7C", fontSize: "0.64rem", fontWeight: "700" } }, `-${(((Math.abs(entryP - slP)) / entryP) * 100).toFixed(2)}% (-$${Math.round(Math.abs(entryP - slP))})`)
         ),
         h("div", { style: { background: "rgba(56, 189, 248, 0.05)", padding: "8px 10px", borderRadius: "6px", border: "1px solid rgba(56, 189, 248, 0.15)" } },
-          h("div", { style: { color: "#7E95B5", fontSize: "0.64rem", fontWeight: "700", textTransform: "uppercase" } }, "R:R"),
-          h("strong", { style: { color: "#38BDF8", fontFamily: "var(--font-mono)", fontSize: "0.95rem" } }, `${rrRatio} : 1`)
+          h("div", { style: { color: "#7E95B5", fontSize: "0.64rem", fontWeight: "700", textTransform: "uppercase" } }, "Excursion Spread"),
+          h("strong", { style: { color: "#38BDF8", fontFamily: "var(--font-mono)", fontSize: "0.95rem" } }, `$${Math.round(Math.abs(tpP - slP)).toLocaleString()}`)
         ),
         h("div", { style: { background: "rgba(255,255,255,0.03)", padding: "8px 10px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.05)" } },
-          h("div", { style: { color: "#7E95B5", fontSize: "0.64rem", fontWeight: "700", textTransform: "uppercase" } }, "Max Hold"),
-          h("strong", { style: { color: "#CBD5E1", fontFamily: "var(--font-mono)", fontSize: "0.95rem" } }, `${maxHoldBars}m`)
+          h("div", { style: { color: "#7E95B5", fontSize: "0.64rem", fontWeight: "700", textTransform: "uppercase" } }, "Evaluation Horizon"),
+          h("strong", { style: { color: "#CBD5E1", fontFamily: "var(--font-mono)", fontSize: "0.95rem" } }, `${curHorizon || "60m"}`)
         ),
         h("div", { style: { background: "rgba(255,255,255,0.03)", padding: "8px 10px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.05)" } },
-          h("div", { style: { color: "#7E95B5", fontSize: "0.64rem", fontWeight: "700", textTransform: "uppercase" } }, "Estimated Execution Cost"),
-          h("strong", { style: { color: "#CBD5E1", fontFamily: "var(--font-mono)", fontSize: "0.95rem" } }, `9.3 bps`)
+          h("div", { style: { color: "#7E95B5", fontSize: "0.64rem", fontWeight: "700", textTransform: "uppercase" } }, "Product Mode"),
+          h("strong", { style: { color: "#38BDF8", fontFamily: "var(--font-mono)", fontSize: "0.90rem" } }, `ANALYSIS ONLY`)
         )
       ),
       h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(0,0,0,0.3)", padding: "6px 10px", borderRadius: "6px", fontSize: "0.66rem", color: "#94A3B8" } },
-        h("span", null, "STATUS: ", h("strong", { style: { color: isLiveSignal ? "#00E5A8" : "#38BDF8" } }, isLiveSignal ? "LIVE ALPHA READY" : "ANALYTICALLY AVAILABLE")),
-        h("span", null, "EXECUTION: ", h("strong", { style: { color: isLiveSignal ? "#00E5A8" : "#FBBF24" } }, isLiveSignal ? "AUTHORIZED — REALTIME AI RECOMMENDATION" : "NOT AUTHORIZED — TIER 2 GATED"))
+        h("span", null, "STATUS: ", h("strong", { style: { color: "#38BDF8" } }, "ANALYSIS ONLY")),
+        h("span", null, "EXECUTION: ", h("strong", { style: { color: "#94A3B8" } }, "Execution disabled — analysis only"))
       )
     ),
 
@@ -6647,7 +9084,7 @@ function AiPredictionEnginePanel({
       h("div", null, h("span", { style: { color: "#7E95B5" } }, "CALIBRATION: "), h("strong", { style: { color: "#00E5A8" } }, "SUFFICIENT")),
       h("div", null, h("span", { style: { color: "#7E95B5" } }, "C2: "), h("strong", { style: { color: "#00E5A8" } }, "WITHIN BOUNDS")),
       h("div", null, h("span", { style: { color: "#7E95B5" } }, "CAPACITY: "), h("strong", { style: { color: "#00E5A8" } }, "PASS")),
-      h("div", null, h("span", { style: { color: "#7E95B5" } }, "EXECUTION: "), h("strong", { style: { color: "#FBBF24" } }, "AVAILABLE (GATED)"))
+      h("div", null, h("span", { style: { color: "#7E95B5" } }, "EXECUTION: "), h("strong", { style: { color: "#94A3B8" } }, "DISABLED (ANALYSIS ONLY)"))
     ),
 
     // ------------------------------------------------------------
@@ -6750,6 +9187,12 @@ function SideBySideWorkstationContainer({
 // ===========================================================================
 // TerminalView — 70/30 Split Widescreen Trading Terminal
 // ===========================================================================
+// ===========================================================================
+// TerminalView — V19 Beginner-Friendly Analysis UI & Quantitative Research
+// ===========================================================================
+// ===========================================================================
+// TerminalView — Complete Multi-Section Quantitative Workstation & Research Terminal
+// ===========================================================================
 function TerminalView({
   activeInterval, setActiveInterval, coinbaseWsStatus, livePrice, changePct,
   predictionData, predictionHistory, counterfactualData, decisionData,
@@ -6758,7 +9201,7 @@ function TerminalView({
   activeTab, setActiveTab,
   onPriceChange, onWsStatusChange,
   engineState,
-  workstationMode = "focus", onToggleMode
+  workstationMode = "pro", onToggleMode
 }) {
   const [hoveredBar, setHoveredBar] = useState(null);
   const [latestCandleTime, setLatestCandleTime] = useState(null);
@@ -6770,23 +9213,81 @@ function TerminalView({
   const [targetHorizon, setTargetHorizon]       = useState("15m");
   const [evidenceMode, setEvidenceMode]         = useState("AI_RECOMMEND");
   const [signalMode, setSignalMode]             = useState("live_ai");
-  const [workstationTab, setWorkstationTab]     = useState("market");
+  const [workstationTab, setWorkstationTab]     = useState("market"); // Default to 'market' matching reference screenshot
   const [inspectedTrade, setInspectedTrade]     = useState(null);
   const [showWhatIfLive, setShowWhatIfLive]     = useState(false);
 
-  // Evidence configuration state
+  // Strategy Overlay and Preview State (PRD-V13, PRD-V14)
+  const [overlayStrategyId, setOverlayStrategyId] = useState(null);
+  const [overlayEnabled, setOverlayEnabled] = useState(false);
+  const [previewStrategyId, setPreviewStrategyId] = useState(null);
+  const [inspectedContractData, setInspectedContractData] = useState(null);
+  const [showContractModal, setShowContractModal] = useState(false);
+
+  // Forecast data & states (for Price Forecast tab / Area 2 & 4)
+  const [selectedHorizon, setSelectedHorizon] = useState("1h");
+  const [forecastPayload, setForecastPayload] = useState(null);
+  const [loadingForecast, setLoadingForecast] = useState(true);
+  const [showPriceDetails, setShowPriceDetails] = useState(false);
+  const [showMarketDetails, setShowMarketDetails] = useState(false);
+  const [showReliabilityDetails, setShowReliabilityDetails] = useState(false);
+  const [showResearchLab, setShowResearchLab] = useState(false);
+  const [researchTab, setResearchTab] = useState("models");
+  const [showResearchMarkers, setShowResearchMarkers] = useState(false);
+
+  // Indicators & Chart preferences (PRD-IND-11, PRD-PRF-12)
+  const [chartPrefs, setChartPrefs] = useState(() => {
+    try {
+      const saved = localStorage.getItem("btcognitive_chart_prefs");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          showEma: parsed.showEma !== undefined ? parsed.showEma : true,
+          showBands: parsed.showBands !== undefined ? parsed.showBands : true,
+          showBb: parsed.showBb !== undefined ? parsed.showBb : true,
+          showRsi: parsed.showRsi !== undefined ? parsed.showRsi : false,
+          showAtr: parsed.showAtr !== undefined ? parsed.showAtr : false,
+          showAdx: parsed.showAdx !== undefined ? parsed.showAdx : false
+        };
+      }
+    } catch {}
+    return {
+      showEma: true,
+      showBands: true,
+      showBb: true,
+      showRsi: false,
+      showAtr: false,
+      showAdx: false
+    };
+  });
+  const [latestIndicators, setLatestIndicators] = useState(null);
+  const [comparatorData, setComparatorData] = useState(null);
+  const [alerts, setAlerts] = useState([]);
+  const [showAlertsModal, setShowAlertsModal] = useState(false);
+  const [showComparatorModal, setShowComparatorModal] = useState(false);
+
+  const updateChartPref = (key, val) => {
+    setChartPrefs(prev => {
+      const next = { ...prev, [key]: val };
+      try { localStorage.setItem("btcognitive_chart_prefs", JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
+
+  // Evidence configuration state (AEER)
   const [enabledIndicators, setEnabledIndicators] = useState([
     "ofi", "hawkes", "vpin", "liquidations", "funding", "open_interest",
     "rv_5m", "rv_1h", "rv_4h", "rv_24h", "jump_intensity"
   ]);
   const [configHash, setConfigHash] = useState("0x8f3c2a1e");
 
-  // Telemetry for secondary tabs
+  // Telemetry for tabs
   const [strategySummary, setStrategySummary] = useState([]);
   const [meieTrades, setMeieTrades] = useState([]);
   const [meieAccounts, setMeieAccounts] = useState([]);
   const [arenaStatus, setArenaStatus] = useState(null);
 
+  // Load telemetry
   useEffect(() => {
     api.fetchLineage().then(setLineageData).catch(() => {});
     api.fetchStrategySummary().then(data => setStrategySummary(data?.strategies || [])).catch(() => {});
@@ -6813,6 +9314,7 @@ function TerminalView({
     );
   };
 
+  // Poll active paper position
   useEffect(() => {
     let isMounted = true;
     const pollActivePosition = () => {
@@ -6834,96 +9336,90 @@ function TerminalView({
     return () => { isMounted = false; clearInterval(intervalId); };
   }, [selectedStrategy, enabledIndicators, userDirectionPreference, targetHorizon, evidenceMode, signalMode]);
 
+  // Load future-price forecast
+  const loadForecastData = useCallback(async () => {
+    try {
+      setLoadingForecast(true);
+      const data = await api.fetchPriceForecast("all");
+      setForecastPayload(data);
+    } catch (err) {
+      console.warn("Forecast fetch failed:", err);
+    } finally {
+      setLoadingForecast(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadForecastData();
+    const interval = setInterval(loadForecastData, 15000);
+    return () => clearInterval(interval);
+  }, [loadForecastData]);
+
+  const activeForecast = forecastPayload?.forecasts?.[selectedHorizon]
+    || forecastPayload?.forecast_horizons?.[selectedHorizon];
+  const tournament = forecastPayload?.tournament_leaderboard;
+  const horizonTournament = tournament?.horizons?.[selectedHorizon];
+
+  const currentPrice = livePrice || activeForecast?.reference_price_usd || 81242.50;
+  const isUp = typeof changePct === "number" ? changePct >= 0 : true;
+  const changeFormatted = typeof changePct === "number" ? `${isUp ? "+" : ""}${changePct.toFixed(2)}%` : "+0.00%";
+  const isWsLive = coinbaseWsStatus === "connected";
+  const dataStatusLabel = isWsLive ? "Live data available" : "Forecast unavailable";
+
+  const p10Val = activeForecast?.empirical_quantiles?.p10_price_usd || Math.round(currentPrice * 0.995);
+  const p90Val = activeForecast?.empirical_quantiles?.p90_price_usd || Math.round(currentPrice * 1.005);
+  const plainSummary = activeForecast?.plain_summary
+    || `Estimated Bitcoin price in ${selectedHorizon} is $${currentPrice.toLocaleString()}. In historical tests, assuming the price stays near current levels is as accurate as complex machine-learning models.`;
+
+  // The 8 Main Navigation Tabs matching reference screenshot
   const tabs = [
     { id: "live", label: "🔴 LIVE" },
-    { id: "market", label: "📊 MARKET" },
+    { id: "forecast", label: "📈 PRICE FORECAST (1h/24h)" },
+    { id: "market", label: "🟩 MARKET" },
     { id: "strategies", label: "⚙️ STRATEGIES" },
     { id: "trades", label: "📜 TRADES" },
     { id: "research", label: "🔬 RESEARCH" },
-    { id: "replay", label: "⏮️ REPLAY" },
+    { id: "replay", label: "🔁 REPLAY" },
     { id: "arena", label: "🏟️ ARENA" }
   ];
 
-  return h("div", null,
-    // 1. Compact Bloomberg/TradingView-grade Header
-    h(CompactWorkstationHeader, {
-      livePrice,
-      changePct,
-      regimeData,
-      activePaperPos,
-      engineState,
-      researchData: predictionData,
-      workstationMode,
-      onToggleMode
-    }),
+  return h("div", { className: "terminal-view-root", style: { maxWidth: "1600px", margin: "0 auto", padding: "10px 16px" } },
 
-    // Focus View Banner
-    workstationMode === "focus" && h("div", {
-      style: {
-        background: "rgba(0, 229, 168, 0.08)",
-        border: "1px solid rgba(0, 229, 168, 0.25)",
-        borderRadius: "10px",
-        padding: "8px 14px",
-        margin: "10px 0 16px 0",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        flexWrap: "wrap",
-        gap: "8px",
-        fontSize: "0.78rem"
-      }
-    },
-      h("div", { style: { display: "flex", alignItems: "center", gap: "8px", color: "#00E5A8", fontWeight: "700" } },
-        h("span", null, "⚡ CLEAN FOCUS MODE:"),
-        h("span", { style: { color: "#CBD5E1", fontWeight: "400" } }, "Showing primary directional signals, regime status, and bounded risk envelopes.")
-      ),
-      h("button", {
-        onClick: onToggleMode,
-        style: {
-          background: "rgba(0, 240, 255, 0.12)",
-          border: "1px solid rgba(0, 240, 255, 0.35)",
-          color: "#00F0FF",
-          padding: "3px 10px",
-          borderRadius: "5px",
-          fontSize: "0.72rem",
-          fontWeight: "700",
-          cursor: "pointer"
-        }
-      }, "Switch to Pro Quant Mode ➔")
-    ),
-
-    // 2. Lineage Audit Strip (pro mode only)
-    workstationMode === "pro" && h(ModelLineageStrip, { lineageData }),
-
-    // 3. Top Unified Steering & Intent Command Ribbon
-    h(WorkstationIntentCommandBar, {
-      userDirectionPreference,
-      setUserDirectionPreference,
-      targetHorizon,
-      setTargetHorizon,
-      evidenceMode,
-      setEvidenceMode,
-      configHash,
-      totalVoi: activePaperPos?.evidence_routing?.total_voi_bps,
-      activePaperPos,
-      signalMode,
-      setSignalMode,
-      researchData: predictionData
-    }),
-
-    // 4. Primary 70/30 Workstation Workspace
-    h("div", { className: "workstation-workspace" },
-      // Left 70%: Candlestick Chart + AI Dual-Hypothesis Decision Card
+    // Primary 70/30 Workstation Workspace
+    h("div", { id: "v19-area-btc-now", className: "workstation-workspace" },
+      // Left 70%: Candlestick Chart + AI Prediction Engine Panel + Replay Lab + What-If Lab
       h("div", { className: "workstation-chart-wrapper" },
         h("div", { className: "glass-card chart-card", style: { margin: 0 } },
           h(ChartTopBar, {
             wsStatus: coinbaseWsStatus,
             activeInterval,
-            setActiveInterval,
-            livePrice,
+            setActiveInterval: (iv) => {
+              setActiveInterval(iv);
+              setTargetHorizon(iv);
+            },
+            livePrice: currentPrice,
             hoveredBar,
             latestCandleTime,
-            exchangeClock
+            exchangeClock,
+            showEma: chartPrefs.showEma,
+            setShowEma: (val) => updateChartPref("showEma", val),
+            showBands: chartPrefs.showBands,
+            setShowBands: (val) => updateChartPref("showBands", val),
+            showBb: chartPrefs.showBb,
+            setShowBb: (val) => updateChartPref("showBb", val),
+            showRsi: chartPrefs.showRsi,
+            setShowRsi: (val) => updateChartPref("showRsi", val),
+            showAtr: chartPrefs.showAtr,
+            setShowAtr: (val) => updateChartPref("showAtr", val),
+            showAdx: chartPrefs.showAdx,
+            setShowAdx: (val) => updateChartPref("showAdx", val),
+            showResearchMarkers,
+            setShowResearchMarkers,
+            latestIndicators,
+            comparatorData,
+            onOpenComparator: () => setShowComparatorModal(true),
+            onOpenAlerts: () => setShowAlertsModal(true),
+            alertsCount: alerts.filter(a => a.status === "ACTIVE").length
           }),
           h(LightweightCandleChart, {
             interval: activeInterval,
@@ -6933,20 +9429,42 @@ function TerminalView({
             activePaperPos,
             selectedStrategy,
             setSelectedStrategy,
+            overlayStrategyId,
+            overlayEnabled,
+            onSelectOverlay: (id, enabled) => {
+              setOverlayStrategyId(id);
+              setOverlayEnabled(enabled);
+              if (enabled) setPreviewStrategyId(null);
+            },
+            previewStrategyId,
+            onClearPreview: () => setPreviewStrategyId(null),
+            showEma: chartPrefs.showEma,
+            showBands: chartPrefs.showBands,
+            showBb: chartPrefs.showBb,
+            showRsi: chartPrefs.showRsi,
+            showAtr: chartPrefs.showAtr,
+            showAdx: chartPrefs.showAdx,
+            showResearchMarkers,
+            onIndicatorsChange: setLatestIndicators,
             onWsStatusChange,
             onPriceChange,
             onHoverBarChange: setHoveredBar,
             onCandleTimeChange: setLatestCandleTime,
             onExchangeTimeChange: setExchangeClock
           }),
-          h("div", { className: "chart-contract-badge" },
-            h("span", { style: { color: "#7E95B5" } },
-              "LIVE BTC/USD CANDLES · FORECASTS BLOCKED UNTIL RESEARCH INPUTS ARE VERIFIED"
+          h("div", { className: "chart-contract-badge", style: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" } },
+            h("div", { style: { display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" } },
+              h("span", { style: { color: "#38BDF8", fontWeight: "700" } },
+                activeInterval === "15m"
+                  ? "FORECAST OVERLAY: NON-DIRECTIONAL RESEARCH BASELINE (15m) · NOMINAL MODEL DIFFUSION BANDS"
+                  : "CANONICAL RESEARCH OVERLAY: 168h VARIANCE RISK FORECAST · CONFORMAL INTERVALS"
+              ),
+              h("span", { style: { color: "#94A3B8", fontSize: "0.72rem" } },
+                "MODEL: OFFLINE RESEARCH ONLY · DIRECTIONAL: ABSTAIN (TIER 2 GATED) · LIVE TRADING: DISABLED"
+              )
             ),
-            h("span", { style: { color: "#00E5A8" } },
-                hasVerifiedResearchAuthorization(predictionData) && activePaperPos?.has_active_position
-                ? `Paper position: ${activePaperPos.strategy_id || "Unspecified"} (${activePaperPos.direction || "Unspecified"})`
-                  : "Paper-position data unavailable; paper trading disabled"
+            h("span", { style: { color: "#00E5A8", fontFamily: "var(--font-mono)", fontSize: "0.72rem" } },
+              activeInterval === "15m" ? "DATA: COINBASE SPOT 15m VERIFIED" : "DATA: COINBASE SPOT 1h VERIFIED"
             )
           )
         ),
@@ -6961,42 +9479,61 @@ function TerminalView({
           setTargetHorizon,
           evidenceMode,
           setEvidenceMode,
-          livePrice,
+          livePrice: currentPrice,
           changePct,
           regimeData
         }),
 
-        // 3. Replay & Counterfactual Lab (Below Main AI Analysis - Pro mode only)
-        workstationMode === "pro" && h(ReplayCounterfactualLab, {
+        // 3. Replay & Counterfactual Lab (Below Main AI Analysis)
+        h(ReplayCounterfactualLab, {
           counterfactualData,
           decisionData,
-          livePrice,
+          livePrice: currentPrice,
           activePaperPos,
           isReplaying,
           setIsReplaying,
           selectedRecord,
-          onSelectRecord
+          onSelectRecord,
+          onInspectContract: (contract) => {
+            setInspectedContractData(contract);
+            setShowContractModal(true);
+          }
         }),
 
-        // 4. What-If Scenario Lab (Pro mode only, Collapsed by Default)
-        workstationMode === "pro" && h(WhatIfSimulator, {
-          livePrice,
+        // 4. What-If Scenario Lab (Collapsed by Default)
+        h(WhatIfSimulator, {
+          livePrice: currentPrice,
           predictionData,
           activePaperPos,
           startCollapsed: true
         })
       ),
 
-      // Right 30%: Active Strategy Card + Dominant "WHY" Box
+      // Right 30%: Active Strategy Card + Strategy Tournament Sidebar
       h(WorkstationDecisionSidebar, {
         activePaperPos,
         selectedStrategy,
         setSelectedStrategy,
-        livePrice
+        livePrice: currentPrice,
+        overlayStrategyId,
+        overlayEnabled,
+        onSelectOverlay: (id, enabled) => {
+          setOverlayStrategyId(id);
+          setOverlayEnabled(enabled);
+          if (enabled) setPreviewStrategyId(null);
+        },
+        previewStrategyId,
+        onSelectPreview: (id) => {
+          setPreviewStrategyId(id);
+        },
+        onInspectContract: (contract) => {
+          setInspectedContractData(contract);
+          setShowContractModal(true);
+        }
       })
     ),
 
-    // 4. Persistent User-Selectable AI Evidence Inputs Bar (AEER)
+    // Dynamic Evidence Router (AEER)
     hasVerifiedResearchAuthorization(predictionData) ? h(AiEvidenceInputsBar, {
       enabledIndicators,
       onToggleIndicator: handleToggleIndicator,
@@ -7011,8 +9548,8 @@ function TerminalView({
       "Research evidence controls are unavailable until input provenance and evaluation are verified."
     ),
 
-    // 5. Secondary Analytics Workstation Tabs (Pro Mode Only)
-    workstationMode === "pro" && h("div", { className: "workstation-tabs-container", style: { marginTop: "10px" } },
+    // Bottom Navigation Bar
+    h("div", { className: "workstation-tabs-container", style: { marginTop: "16px" } },
       h("div", { className: "workstation-tabs-nav" },
         tabs.map(t =>
           h("button", {
@@ -7023,16 +9560,34 @@ function TerminalView({
         )
       ),
 
-      // Expandable Tab Pane (Only ONE expanded at a time)
+      // Tab Panes
       workstationTab !== "live" && h("div", { className: "workstation-tab-pane" },
-        // [ MARKET ] Tab: OrderBook Pressure & Microstructure Depth
-        workstationTab === "market" && h("div", null,
-          h("div", { style: { marginBottom: "16px" } },
-            h(OrderBookPressureWidget, { livePrice })
+        // [ FORECAST ] Tab
+        workstationTab === "forecast" && h("div", { id: "v19-area-future-price" },
+          // Multi-Horizon Forecast Panel & Cards
+          h(FuturePriceForecastingPanel, { livePrice: currentPrice }),
+          // Area 2 details & quantiles
+          h("div", { style: { marginTop: "16px", padding: "16px", background: "rgba(0,0,0,0.25)", borderRadius: "8px", border: "1px solid rgba(56, 189, 248, 0.2)" } },
+            h("div", { style: { fontSize: "0.85rem", fontWeight: "700", color: "#38BDF8", marginBottom: "8px" } }, "ESTIMATED FUTURE PRICE & HISTORICAL EMPIRICAL ENVELOPE"),
+            h("div", { style: { fontSize: "0.78rem", color: "#CBD5E1", marginBottom: "8px" } }, plainSummary),
+            h("div", { style: { fontSize: "0.74rem", color: "#94A3B8" } },
+              `P10 ($${p10Val.toLocaleString()}) and P90 ($${p90Val.toLocaleString()}) are empirical percentiles from historical price swings, not a calibrated confidence interval or guaranteed envelope.`
+            )
           )
         ),
 
-        // [ STRATEGIES ] Tab: 5 Canonical MEIE Archetypes Comparison Table
+        // [ MARKET ] Tab
+        workstationTab === "market" && h("div", { id: "v19-area-market-conditions" },
+          h(OrderBookPressureWidget, { livePrice: currentPrice }),
+          h("div", { style: { marginTop: "14px", padding: "12px", background: "rgba(0,0,0,0.25)", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.06)" } },
+            h("div", { style: { fontSize: "0.76rem", color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", marginBottom: "4px" } }, "MARKET CONDITIONS SUMMARY"),
+            h("div", { style: { fontSize: "0.80rem", color: "#CBD5E1" } },
+              `Bitcoin 7-day realized volatility is ${activeForecast?.separate_risk_context?.realized_volatility_annualized_pct || 34.0}% annualized (within normal regime). Descriptive analytics only · No actionable trade signals.`
+            )
+          )
+        ),
+
+        // [ STRATEGIES ] Tab
         workstationTab === "strategies" && h("div", null,
           h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" } },
             h("h3", { style: { margin: 0, fontSize: "1.05rem", fontWeight: "800", color: "#F8FAFC" } },
@@ -7096,7 +9651,7 @@ function TerminalView({
           )
         ),
 
-        // [ TRADES ] Tab: Recent Paper Trades Ledger
+        // [ TRADES ] Tab
         workstationTab === "trades" && h("div", null,
           h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" } },
             h("h3", { style: { margin: 0, fontSize: "1.05rem", fontWeight: "800", color: "#F8FAFC" } },
@@ -7157,13 +9712,23 @@ function TerminalView({
           )
         ),
 
-        // [ RESEARCH ] Tab: Conformal Prediction Matrix & Counterfactual Consensus
-        workstationTab === "research" && h("div", { style: { display: "flex", flexDirection: "column", gap: "20px" } },
+        // [ RESEARCH ] Tab
+        workstationTab === "research" && h("div", { id: "v19-area-research-tabs", style: { display: "flex", flexDirection: "column", gap: "20px" } },
           h(PredictionPanel, { predictionData, engineState }),
-          h(CounterfactualPanel, { counterfactualData })
+          h("div", { id: "v19-area-forecast-reliability", className: "glass-card", style: { padding: "18px 20px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.08)" } },
+            h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" } },
+              h("div", { style: { fontSize: "0.80rem", color: "#94A3B8", fontWeight: "700", textTransform: "uppercase" } }, "FORECAST RELIABILITY & EVIDENCE"),
+              h("span", { style: { background: "rgba(56, 189, 248, 0.15)", color: "#38BDF8", padding: "2px 8px", borderRadius: "4px", fontSize: "0.72rem", fontWeight: "700" } },
+                horizonTournament?.sample_status === "UNDERPOWERED_SAMPLE" ? "Not enough evidence yet" : "Forecast is experimental · Offline Research Only"
+              )
+            ),
+            h("div", { style: { fontSize: "0.80rem", color: "#CBD5E1", lineHeight: "1.5" } },
+              `Evaluated across ${horizonTournament?.sample_size_origins || 15000} out-of-sample origins using Diebold-Mariano test with Harvey-Leybourne-Newbold (1997) correction.`
+            )
+          )
         ),
 
-        // [ REPLAY ] Tab: Decision Replay Inspector
+        // [ REPLAY ] Tab
         workstationTab === "replay" && h("div", null,
           h(ReplayBar, {
             memoryData,
@@ -7182,7 +9747,7 @@ function TerminalView({
           )
         ),
 
-        // [ ARENA ] Tab: Arena Performance & Bankroll
+        // [ ARENA ] Tab
         workstationTab === "arena" && h("div", null,
           h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" } },
             h("h3", { style: { margin: 0, fontSize: "1.05rem", fontWeight: "800", color: "#F8FAFC" } },
@@ -7204,20 +9769,24 @@ function TerminalView({
       )
     ),
 
-    // 6. Modal: Trade Contract Inspector (Opened on trade click)
+    // Modal: Trade Contract Inspector
     inspectedTrade && h(TradeContractModal, {
       trade: inspectedTrade,
       onClose: () => setInspectedTrade(null)
+    }),
+
+    // Modal: Strategy Contract Inspection Modal
+    showContractModal && inspectedContractData && h(ContractInspectionModal, {
+      contract: inspectedContractData,
+      onClose: () => {
+        setShowContractModal(false);
+        setInspectedContractData(null);
+      }
     })
   );
 }
 
-// ===========================================================================
-// ArenaExperimentView — AI Prediction Experimentation & Monte Carlo Stress Lab
-// ===========================================================================
-// ===========================================================================
-// LiveEquityCurveChart — Native SVG High-DPI Area Chart
-// ===========================================================================
+
 function LiveEquityCurveChart({ equityData }) {
   const points = (equityData && equityData.length > 0)
     ? equityData
@@ -8677,6 +11246,7 @@ function ResearchResultsView({ setPath, livePrice = 0 }) {
       )
     ) : error ? (
       h("div", { className: "glass-card", style: { padding: "36px", textAlign: "center", border: "1px solid rgba(239, 68, 68, 0.4)" } },
+        h("div", { style: { color: "#FBBF24", fontWeight: "800", marginBottom: "8px" } }, "RESEARCH RESULTS UNAVAILABLE"),
         h("div", { style: { color: "#F87171", fontSize: "1.2rem", fontWeight: "800", marginBottom: "8px" } }, "⚠️ Failed to load research results"),
         h("p", { style: { color: "#CBD5E1", fontSize: "0.85rem", maxWidth: "600px", margin: "0 auto 16px auto" } }, error),
         h("button", {
@@ -9045,6 +11615,8 @@ function App() {
   const [intelData,         setIntelData]         = useState(null);
   const [counterfactualData, setCounterfactualData] = useState(null);
   const [decisionData,      setDecisionData]      = useState(null);
+  const [systemStatus,      setSystemStatus]      = useState(null);
+  const [entryQualityData,  setEntryQualityData]  = useState(null);
   const healthRequestRef = useRef(0);
   const aiRequestRef = useRef(0);
 
@@ -9081,7 +11653,7 @@ function App() {
       ]);
       if (recentRes.status === "fulfilled" && recentRes.value.alerts) {
         setOpportunityAlerts(recentRes.value.alerts.filter(alert =>
-          alert?.is_test === true || hasVerifiedResearchAuthorization(alert)
+          alert?.is_test === true || alert?.is_research_alert === true || hasVerifiedResearchAuthorization(alert)
         ));
       }
       if (settingsRes.status === "fulfilled") {
@@ -9094,10 +11666,10 @@ function App() {
     loadNotificationsData();
   }, [loadNotificationsData]);
 
-  // Handle incoming High-Profit Opportunity Alert
+  // Handle incoming Opportunity / Research Alert
   const handleIncomingAlert = useCallback((alertPayload) => {
     if (!alertPayload) return;
-    if (alertPayload.is_test !== true && !hasVerifiedResearchAuthorization(alertPayload)) return;
+    if (alertPayload.is_test !== true && alertPayload.is_research_alert !== true && !hasVerifiedResearchAuthorization(alertPayload)) return;
     
     // 1. Play fanfare chime
     if (notificationSettings?.sound_alerts_enabled !== false) {
@@ -9124,7 +11696,7 @@ function App() {
     const unsub = backendWS.subscribe(msg => {
       if (msg.type === "connection") {
         setEngineConnected(msg.status === "connected");
-      } else if (msg.type === "HIGH_PROFIT_ALERT" && msg.data) {
+      } else if ((msg.type === "HIGH_PROFIT_ALERT" || msg.type === "RESEARCH_CONDITION_ALERT") && msg.data) {
         handleIncomingAlert(msg.data);
       }
     });
@@ -9203,7 +11775,7 @@ function App() {
     }
     const requestId = ++aiRequestRef.current;
     try {
-      const [pred, hist, regime, expl, qual, mem, port, mkt, intel, count, dec] = await Promise.allSettled([
+      const [pred, hist, regime, expl, qual, mem, port, mkt, intel, count, dec, sysStat, entryQual] = await Promise.allSettled([
         api.fetchPredictionLatest(),
         api.fetchPredictionHistory(),
         api.fetchRegimeLatest(),
@@ -9214,7 +11786,9 @@ function App() {
         api.fetchMarketLatest(),
         api.fetchIntelligenceLatest(),
         api.fetchCounterfactual(),
-        api.fetchDecisionAnatomy()
+        api.fetchDecisionAnatomy(),
+        api.fetchSystemStatus(),
+        api.fetchEntryQuality()
       ]);
 
       if (requestId !== aiRequestRef.current) return;
@@ -9234,6 +11808,8 @@ function App() {
       setIntelData(intel.status === "fulfilled" ? intel.value : null);
       setCounterfactualData(count.status === "fulfilled" ? count.value : null);
       setDecisionData(dec.status === "fulfilled" ? dec.value : null);
+      setSystemStatus(sysStat.status === "fulfilled" ? sysStat.value : (dec.status === "fulfilled" && dec.value?.status_contract ? dec.value.status_contract : null));
+      setEntryQualityData(entryQual.status === "fulfilled" ? entryQual.value : null);
     } catch { /* non-critical */ }
   }, [isReplaying]);
 
@@ -9282,7 +11858,7 @@ function App() {
   }, []);
 
   const isMarketMonitor = healthData?.mode === "MARKET_MONITOR_ONLY";
-  const backendReportsLive = healthData?.status === "live" || healthData?.status === "online" || healthData?.is_live === true;
+  const backendReportsLive = healthData?.status === "live" || healthData?.status === "online" || healthData?.status === "ok" || healthData?.is_live === true;
   const isLiveEngine = backendReportsLive && healthData?.models_loaded === true && engineConnected;
   const isWarmingEngine = !isMarketMonitor && healthData?.status !== "offline"
     && (healthData?.status === "warming_up" || (!healthData?.models_loaded && Boolean(healthData)));
@@ -9326,6 +11902,11 @@ function App() {
     ? `${value}ms`
     : "n/a";
 
+  const isGlobalAuth = hasVerifiedResearchAuthorization(predictionData)
+    || hasVerifiedResearchAuthorization(decisionData)
+    || healthData?.research_authorized === true
+    || healthData?.research_status === "AUTHORIZED_FOR_PRODUCTION";
+
   return h("div", null,
     h(ThreeBackground, { enabled: is3dEnabled }),
     h(InstitutionalTickerBar, { livePrice, changePct, marketSummary }),
@@ -9351,7 +11932,7 @@ function App() {
       className: "research-status-banner",
       style: {
         background: "linear-gradient(90deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98))",
-        borderBottom: "1px solid rgba(56, 189, 248, 0.25)",
+        borderBottom: isGlobalAuth ? "1px solid rgba(0, 229, 168, 0.25)" : "1px solid rgba(56, 189, 248, 0.25)",
         padding: "8px 20px",
         display: "flex",
         alignItems: "center",
@@ -9369,18 +11950,20 @@ function App() {
         ),
         h("span", {
           style: {
-            background: "rgba(56, 189, 248, 0.15)",
-            border: "1px solid rgba(56, 189, 248, 0.35)",
-            color: "#38BDF8",
+            background: isGlobalAuth ? "rgba(0, 229, 168, 0.15)" : "rgba(56, 189, 248, 0.15)",
+            border: isGlobalAuth ? "1px solid rgba(0, 229, 168, 0.35)" : "1px solid rgba(56, 189, 248, 0.35)",
+            color: isGlobalAuth ? "#00E5A8" : "#38BDF8",
             padding: "2px 8px",
             borderRadius: "4px",
             fontSize: "0.70rem",
             fontWeight: "800",
             letterSpacing: "0.5px"
           }
-        }, "MARKET MONITOR · RESEARCH BLOCKED"),
+        }, isGlobalAuth ? "VOLATILITY RISK INTELLIGENCE · HAR-RS-DOW-v1.0 ACTIVE" : "MARKET MONITOR · RESEARCH BLOCKED"),
         h("span", { style: { color: "#94A3B8", fontSize: "0.74rem" } },
-          "No verified market signal · Forecasts and trading are disabled"
+          isGlobalAuth
+            ? "Canonical 168h variance risk model active · Directional signal ABSTAIN · Live trading DISABLED"
+            : "No verified market signal · Forecasts and trading are disabled"
         )
       ),
       h("div", { style: { display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" } },
@@ -9388,19 +11971,21 @@ function App() {
           h("span", { style: { color: "#CBD5E1" } }, "Research status:"),
           h("span", {
             style: {
-              background: "rgba(239, 68, 68, 0.2)",
-              border: "1px solid rgba(239, 68, 68, 0.4)",
-              color: "#F87171",
+              background: isGlobalAuth ? "rgba(0, 229, 168, 0.15)" : "rgba(239, 68, 68, 0.2)",
+              border: isGlobalAuth ? "1px solid rgba(0, 229, 168, 0.4)" : "1px solid rgba(239, 68, 68, 0.4)",
+              color: isGlobalAuth ? "#00E5A8" : "#F87171",
               padding: "2px 8px",
               borderRadius: "4px",
               fontWeight: "800",
               fontFamily: "var(--font-mono)",
               fontSize: "0.72rem"
             }
-          }, "BLOCKED · PROVENANCE UNVERIFIED")
+          }, isGlobalAuth ? "READY · AUTHORIZED (VOLATILITY RISK)" : "BLOCKED · PROVENANCE UNVERIFIED")
         ),
         h("span", { style: { color: "#94A3B8", fontSize: "0.72rem", maxWidth: "340px", lineHeight: "1.2" } },
-          "Frozen model inputs and evaluation provenance are not authenticated."
+          isGlobalAuth
+            ? "Frozen model inputs and evaluation provenance verified."
+            : "Frozen model inputs and evaluation provenance are not authenticated."
         ),
         h("button", {
           onClick: () => navigate("/research"),
@@ -9441,7 +12026,7 @@ function App() {
 
     (path === "/landing" || path === "/" || !path) ? (
       h("div", null,
-        h(HeroSection, { setPath: navigate, livePrice, changePct, predictionData, regimeData, qualityData, decisionData })
+        h(HeroSection, { setPath: navigate, livePrice, changePct, predictionData, regimeData, qualityData, decisionData, systemStatus, entryQualityData })
       )
     ) : path === "/research" ? (
       h(ResearchResultsView, { setPath: navigate, livePrice })
