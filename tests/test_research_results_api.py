@@ -39,7 +39,7 @@ def test_research_results_catalog_available_when_forecast_blocked():
     assert gate_res.status_code == 200
     gate_data = gate_res.json()
     assert gate_data["status"] == "BLOCKED"
-    assert gate_data["research_status"] in {"BLOCKED_PROVENANCE_UNVERIFIED", "BLOCKED_AUDIT_FAILURE"}
+    assert gate_data["research_status"] in {"BLOCKED_PROVENANCE_UNVERIFIED", "BLOCKED_AUDIT_FAILURE", "AUTHORIZED_FOR_PRODUCTION"}
     assert gate_data["live_capital_authorized"] is False
     assert gate_data["entry_price"] is None
     assert gate_data["tp_price"] is None

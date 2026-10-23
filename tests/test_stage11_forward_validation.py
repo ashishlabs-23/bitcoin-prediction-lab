@@ -136,14 +136,15 @@ def test_forward_collector_simulated_stream_and_tamper_evidence():
     try:
         collector = ForwardOnlyCollector(ledger_path=tmp_ledger_path)
 
-        # Create 3 synthetic forward candles starting after frontier
-        t0 = pd.to_datetime("2026-09-01 07:00:00+00:00")
-        t1 = pd.to_datetime("2026-09-01 08:00:00+00:00")
-        t2 = pd.to_datetime("2026-09-01 09:00:00+00:00")
-
         # Include historical lookback so features can be calculated
         df_hist = pd.read_parquet(os.path.join(REPO_ROOT, "data", "raw", "ohlcv.parquet")).tail(200).copy()
         df_hist["timestamp"] = pd.to_datetime(df_hist["timestamp"], utc=True)
+
+        # Create 3 synthetic forward candles starting after frontier
+        last_hist_ts = df_hist["timestamp"].max()
+        t0 = last_hist_ts + pd.Timedelta(hours=1)
+        t1 = t0 + pd.Timedelta(hours=1)
+        t2 = t1 + pd.Timedelta(hours=1)
 
         new_rows = pd.DataFrame([
             {"timestamp": t0, "open": 79000.0, "high": 79200.0, "low": 78900.0, "close": 79100.0, "volume": 100.0},

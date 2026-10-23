@@ -23,12 +23,15 @@ def test_get_prediction_longitudinal_dashboard_payload():
     assert res.status_code == 200
 
     data = res.json()
-    assert data["observed_blocks"] == 8
+    assert data["observed_blocks"] == 0
     assert data["archived_pre_repair_evidence"]["archived_blocks"] == 35
     assert data["target_blocks"] == 90
-    assert data["next_milestone_block"] == 10
-    assert data["observed_metrics"]["mfe_error_pct"] == 0.3980
-    assert data["observed_metrics"]["p90_coverage_pct"] == 91.10
+    assert data["next_milestone_block"] == 5
+    assert data["progress_pct"] == 0.0
+    # Verified: fail-closed fallback returns None when valid evidence is insufficient
+    assert data["observed_metrics"]["mfe_error_pct"] is None
+    assert data["observed_metrics"]["p90_coverage_pct"] is None
+    assert data["observed_metrics"]["baseline_delta_bps"] is None
     assert len(data["milestone_targets"]) == 7
     assert data["milestone_targets"][0]["target_block"] == 5
-    assert data["milestone_targets"][0]["status"] == "OBSERVED"
+    assert data["milestone_targets"][0]["status"] == "NOT_YET_OBSERVED"

@@ -45,3 +45,35 @@ def test_candle_state_manager_forming_vs_closed(tmp_path, monkeypatch):
     assert "model_version" in pred3
     assert "feature_version" in pred3
     assert "regime_version" in pred3
+
+
+def test_candle_state_manager_fails_closed_without_fabrication(tmp_path, monkeypatch):
+    """Verify CandleStateManager fails closed and never fabricates mock 0.68 probabilities or TAKE_LONG."""
+    test_csv = str(tmp_path / "test_market_memory2.csv")
+    test_db = str(tmp_path / "test_market_memory2.db")
+    monkeypatch.setattr("backtest.market_memory.get_memory_file", lambda: test_csv)
+    monkeypatch.setattr("backtest.market_memory.DB_PATH", test_db)
+
+    manager = CandleStateManager(interval_seconds=60)
+    start_ms = 1786636800000
+
+    # Process first tick and then tick past boundary to close candle
+    manager.process_tick(price=100000.0, volume=1.0, timestamp_ms=start_ms)
+    _, closed_pred = manager.process_tick(price=101000.0, volume=1.5, timestamp_ms=start_ms + 61000)
+
+    assert closed_pred is not None
+    assert closed_pred["probability"] is None, "Fabricated probability leaked into prediction!"
+    assert closed_pred["raw_prob"] is None, "Fabricated raw_prob leaked into prediction!"
+    assert closed_pred["tp"] is None, "Fabricated TP leaked into prediction!"
+    assert closed_pred["sl"] is None, "Fabricated SL leaked into prediction!"
+    assert closed_pred["decision"] == "BLOCKED"
+    assert closed_pred["direction"] == "UNAVAILABLE"
+    assert closed_pred["status"] == "BLOCKED_MODEL_UNAUTHORIZED"
+    assert closed_pred["model_version"] == "BLOCKED_UNAUTHORIZED"
+
+    # Verify no fake prediction was written to market memory CSV
+    if os.path.exists(test_csv):
+        import pandas as pd
+        df = pd.read_csv(test_csv)
+        assert len(df) == 0, "Synthetic prediction was written to market memory!"
+

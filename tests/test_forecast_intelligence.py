@@ -39,10 +39,32 @@ def test_get_prediction_intelligence_endpoints():
     assert "production_forecast" in data1
     assert "shadow_forecast" in data1
 
+    # 1. Zero prospective blocks: strictly asserts INSUFFICIENT_EVIDENCE
     res2 = client.get("/prediction/intelligence/health")
     assert res2.status_code == 200
     data2 = res2.json()
-    assert data2["overall_reliability"] == "VERY_HIGH"
+    assert data2["production_blocks"] == 0
+    assert data2["overall_reliability"] == "INSUFFICIENT_EVIDENCE"
+    assert data2["production_status"] == "INSUFFICIENT_EVIDENCE"
+
+
+def test_prediction_intelligence_health_with_sufficient_evidence(monkeypatch):
+    """Verifies transition to VERY_HIGH when post-repair prospective evidence threshold is met."""
+    from engine.longitudinal_status import longitudinal_status_service, LongitudinalStatusReport
+
+    class FakeStatusReport:
+        observed_blocks = 5
+        observed_metrics = {"effective_sample_size": 4.8, "p90_coverage_pct": 91.2}
+        hawkes_shadow_progress = {"effective_sample_size": 18.0}
+
+    monkeypatch.setattr(longitudinal_status_service, "get_status_report", lambda: FakeStatusReport())
+
+    res = client.get("/prediction/intelligence/health")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["production_blocks"] == 5
+    assert data["overall_reliability"] == "VERY_HIGH"
+    assert data["production_status"] == "VALIDATED_PRODUCTION_RANGE_SYSTEM"
 
     res3 = client.get("/research/models")
     assert res3.status_code == 200

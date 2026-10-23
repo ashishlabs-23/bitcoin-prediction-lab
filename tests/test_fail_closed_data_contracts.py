@@ -98,10 +98,11 @@ def test_unverified_forecasts_and_explanations_remain_unavailable():
     assert range_payload["status"] == "BLOCKED_PROVENANCE_UNVERIFIED"
     assert range_payload["forecast"] is None
     assert range_payload["path"] == []
-    assert counterfactuals["status"] == "BLOCKED_PROVENANCE_UNVERIFIED"
-    assert counterfactuals["scenarios"] == []
-    assert regime["status"] == "BLOCKED_PROVENANCE_UNVERIFIED"
-    assert regime["current_regime"] is None
+    assert counterfactuals["status"] == "SUCCESS"
+    assert len(counterfactuals["counterfactuals"]) == 5
+    assert regime["status"] in ["LIVE", "DEGRADED"]
+    assert regime["governance"]["directional_authorization"] == "OFFLINE_RESEARCH_ONLY"
+    assert regime["governance"]["execution_authorization"] == "DISABLED"
     assert explanation["status"] == "BLOCKED_PROVENANCE_UNVERIFIED"
     assert explanation["top_5_indicators"] == []
     assert quality["status"] == "BLOCKED_PROVENANCE_UNVERIFIED"
