@@ -87,6 +87,15 @@ class ForecastOutcomeMonitor:
         upper_cov = bool(act_high <= upper_p90)
         lower_cov = bool(act_low >= lower_p90)
         path_cont = bool(upper_cov and lower_cov)
+        # Causal timing verification: 24h horizon requires >= 86400s elapsed
+        resolved_quality = data_quality
+        try:
+            p_dt = datetime.fromisoformat(pred_ts.replace("Z", "+00:00"))
+            r_dt = datetime.fromisoformat(res_ts.replace("Z", "+00:00"))
+            if (r_dt - p_dt).total_seconds() < 86400.0 and resolved_quality == "VALID":
+                resolved_quality = "PREMATURE_RESOLUTION_UNDER_24H"
+        except Exception:
+            pass
 
         record = ForecastOutcomeRecord(
             outcome_id=outcome_id,
@@ -104,7 +113,7 @@ class ForecastOutcomeMonitor:
             lower_covered=lower_cov,
             path_contained=path_cont,
             regime=regime,
-            data_quality=data_quality
+            data_quality=resolved_quality
         )
 
         self._persist_outcome(record)

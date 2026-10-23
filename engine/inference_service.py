@@ -656,31 +656,36 @@ class LiveInferenceEngine:
             except Exception as fc_err:
                 logger.error(f"Range forecast generation error: {fc_err}")
 
-            # Record prediction & resolve pending outcomes in SQLite WAL
+            # Record prediction & resolve pending outcomes in SQLite WAL (Read-only dashboard must not append side-effects)
+            record_enabled = os.getenv("RECORD_DASHBOARD_DECISIONS", "false").lower() == "true"
+            if record_enabled and direction in ("LONG", "SHORT"):
+                try:
+                    record_prediction(
+                        timestamp=self.latest_prediction["timestamp"],
+                        price=entry_price,
+                        regime=current_regime,
+                        raw_prob=prob,
+                        calibrated_prob=prob,
+                        decision=action,
+                        direction=direction,
+                        tp=tp,
+                        sl=sl,
+                        macro_cycle=onchain_metrics.cycle_phase,
+                        mvrv_val=onchain_metrics.mvrv_ratio,
+                        nupl_val=onchain_metrics.nupl,
+                        data_reliability=unc_breakdown.get('data_reliability', 1.0),
+                        regime_certainty=unc_breakdown.get('regime_certainty', 1.0),
+                        model_agreement=unc_breakdown.get('model_agreement', 1.0),
+                        volatility_stress=unc_breakdown.get('volatility_stress', 1.0),
+                        composite_quality_score=unc_breakdown.get('composite_quality_score', 1.0),
+                        expected_return_gross_pct=round(abs(expected_ret) * 100, 2),
+                        expected_return_net_pct=round(expected_ret_net * 100, 2)
+                    )
+                except Exception as rec_err:
+                    logger.error(f"Error appending decision record: {rec_err}")
+
             try:
-                record_prediction(
-                    timestamp=self.latest_prediction["timestamp"],
-                    price=entry_price,
-                    regime=current_regime,
-                    raw_prob=prob,
-                    calibrated_prob=prob,
-                    decision=action,
-                    direction=direction,
-                    tp=tp,
-                    sl=sl,
-                    macro_cycle=onchain_metrics.cycle_phase,
-                    mvrv_val=onchain_metrics.mvrv_ratio,
-                    nupl_val=onchain_metrics.nupl,
-                    data_reliability=unc_breakdown.get('data_reliability', 1.0),
-                    regime_certainty=unc_breakdown.get('regime_certainty', 1.0),
-                    model_agreement=unc_breakdown.get('model_agreement', 1.0),
-                    volatility_stress=unc_breakdown.get('volatility_stress', 1.0),
-                    composite_quality_score=unc_breakdown.get('composite_quality_score', 1.0),
-                    expected_return_gross_pct=round(abs(expected_ret) * 100, 2),
-                    expected_return_net_pct=round(expected_ret_net * 100, 2)
-                )
                 resolve_pending_outcomes(current_price=entry_price, current_time_str=self.latest_prediction["timestamp"], horizon_hours=OUTCOME_RESOLUTION_HORIZON_HOURS)
-                
                 # Auto-resolve pending canonical decision envelopes (D_t -> R_t)
                 from engine.decision_envelope import canonical_decision_ledger
                 canonical_decision_ledger.resolve_pending_decisions(
@@ -694,6 +699,8 @@ class LiveInferenceEngine:
                 process_candle(df.iloc[-1].to_dict())
             except Exception as mem_err:
                 logger.error(f"Market memory / Decision ledger resolution error: {mem_err}")
+
+
 
 
 # Global Singleton

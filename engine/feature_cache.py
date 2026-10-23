@@ -31,18 +31,40 @@ class FeatureCache:
     def initialize(self):
         """Initializes the in-memory dataframe from local parquet or enters DEGRADED state."""
         feat_path = os.path.join(DATA_PROCESSED_DIR, "features.parquet")
+        raw_ohlcv_path = os.path.join(os.path.dirname(DATA_PROCESSED_DIR), "raw", "ohlcv.parquet")
+
+        df_feat = None
         if os.path.exists(feat_path):
             try:
-                df = pd.read_parquet(feat_path, engine="pyarrow")
-                df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
-                self._df = df.sort_values("timestamp").reset_index(drop=True)
-                self._is_initialized = True
-                self._is_degraded = False
-                self._last_update_ts = time.time()
-                logger.info(f"FeatureCache initialized from parquet with {len(self._df)} rows.")
-                return
+                df_feat = pd.read_parquet(feat_path, engine="pyarrow")
+                df_feat["timestamp"] = pd.to_datetime(df_feat["timestamp"], utc=True)
+                df_feat = df_feat.sort_values("timestamp").reset_index(drop=True)
             except Exception as e:
                 logger.warning(f"FeatureCache failed to read parquet: {e}")
+
+        # Check raw OHLCV for recent closed market candles
+        if os.path.exists(raw_ohlcv_path):
+            try:
+                df_raw = pd.read_parquet(raw_ohlcv_path, engine="pyarrow")
+                df_raw["timestamp"] = pd.to_datetime(df_raw["timestamp"], utc=True)
+                df_raw = df_raw.sort_values("timestamp").reset_index(drop=True)
+
+                if df_feat is None or df_raw["timestamp"].iloc[-1] > df_feat["timestamp"].iloc[-1]:
+                    # Update features using fresh raw candles (last 500 bars)
+                    candles = df_raw.tail(500).to_dict("records")
+                    self.update_from_candles(candles)
+                    logger.info(f"FeatureCache initialized from raw OHLCV with {len(candles)} fresh candles. Latest close: ${self.get_latest_price():,.2f}")
+                    return
+            except Exception as e:
+                logger.warning(f"FeatureCache failed to inspect raw ohlcv: {e}")
+
+        if df_feat is not None and not df_feat.empty:
+            self._df = df_feat
+            self._is_initialized = True
+            self._is_degraded = False
+            self._last_update_ts = time.time()
+            logger.info(f"FeatureCache initialized from parquet with {len(self._df)} rows.")
+            return
 
         # If no real data available, enter DEGRADED state without fabricating prices
         self._df = pd.DataFrame()

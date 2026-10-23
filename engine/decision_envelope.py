@@ -60,6 +60,24 @@ class DecisionEnvelopeLedger:
             pass
         return tail_hash
 
+    def get_record_count(self) -> int:
+        """Returns the total number of records (DECISION + RESOLUTION) in the ledger."""
+        if not os.path.exists(self.ledger_file):
+            return 0
+        count = 0
+        try:
+            with open(self.ledger_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    if line.strip():
+                        count += 1
+        except Exception:
+            pass
+        return count
+
+    def get_last_hash(self) -> str:
+        """Returns the current tail chain hash of the ledger."""
+        return self._last_hash
+
     def get_decision(self, decision_id: str) -> Optional[Dict[str, Any]]:
         """Retrieves a decision envelope by decision_id."""
         if not os.path.exists(self.ledger_file):
@@ -115,10 +133,13 @@ class DecisionEnvelopeLedger:
         evidence_quality: str = "INSUFFICIENT",
         strategy_id: str = "MEIE-ARENA-v1.0",
         research_trial_id: Optional[str] = None,
-        contract_terms: Optional[Dict[str, Any]] = None
+        contract_terms: Optional[Dict[str, Any]] = None,
+        persist: bool = True
     ) -> Dict[str, Any]:
         """
         Creates an immutable, hash-chained D_t decision envelope at t_0.
+        If persist=False (used for read-only GET queries), ledger persistence and
+        chain state mutation are skipped to guarantee idempotency.
         """
         parent_hash = self._last_hash
 
@@ -148,7 +169,8 @@ class DecisionEnvelopeLedger:
 
         # Cryptographic chain hash
         chain_hash = self.compute_record_chain_hash(parent_hash, json_content_str)
-        self._last_hash = chain_hash
+        if persist:
+            self._last_hash = chain_hash
 
         decision_record = {
             "record_type": "DECISION",
@@ -180,12 +202,14 @@ class DecisionEnvelopeLedger:
             "action": action.upper(),
             "primary_reason_code": primary_reason_code.upper(),
             "mechanism_diagnostics": mechanism_diagnostics,
-            "status": "OPEN"
+            "status": "OPEN",
+            "persisted": persist
         }
 
-        # Append to immutable JSONL ledger
-        with open(self.ledger_file, "a", encoding="utf-8") as f:
-            f.write(json.dumps(decision_record) + "\n")
+        # Append to immutable JSONL ledger only when persistence is requested
+        if persist:
+            with open(self.ledger_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(decision_record) + "\n")
 
         return decision_record
 
@@ -473,7 +497,10 @@ class DecisionEnvelopeLedger:
         ex = decision_record.get("execution", {})
         rk = decision_record.get("risk_authorization", {})
 
-        has_event = ev.get("type", "NONE") != "NONE"
+        has_event = ev.get("type", "NONE") not in ["NONE", "UNAVAILABLE", None]
+        opp_st = decision_record.get("opportunity_status") or ("IDENTIFIED" if has_event else "NO_OPPORTUNITY")
+        evi_st = decision_record.get("evidence_status") or ("SUFFICIENT" if (has_event and pa.get("p_tp_first") is not None) else ("INSUFFICIENT" if has_event else "NOT_APPLICABLE"))
+        stage = decision_record.get("decision_stage") or ("EVENT_DETECTED" if has_event else "MONITORING")
 
         return {
             "header": {
@@ -483,8 +510,9 @@ class DecisionEnvelopeLedger:
                 "strategy_id": decision_record.get("strategy_id"),
                 "timestamp": decision_record.get("timestamps", {}).get("t_decision")
             },
-            "opportunity_status": "IDENTIFIED" if has_event else "NONE",
-            "evidence_status": "EVALUATED" if (has_event and pa.get("p_tp_first") is not None) else "NOT_APPLICABLE",
+            "decision_stage": stage,
+            "opportunity_status": opp_st,
+            "evidence_status": evi_st,
             "economics_status": "EVALUATED" if (has_event and ex.get("net_ev_bps") is not None) else "NOT_APPLICABLE",
             "risk_status": "EVALUATED" if has_event else "NOT_APPLICABLE",
             "layer1_market_event": {
@@ -526,8 +554,8 @@ class DecisionEnvelopeLedger:
                 "c2_model_health": rk.get("c2_model_health", "CALIBRATED"),
                 "trade_risk_check": ("AUTHORIZED" if rk.get("authorized", False) else "BLOCKED") if has_event else "NOT_APPLICABLE",
                 "risk_block_reason": (rk.get("risk_block_reason", "NONE" if rk.get("authorized", False) else "C2_RISK_EXCEEDED")) if has_event else "NO_OPPORTUNITY",
-                "daily_risk_budget_allocated_pct": rk.get("daily_budget_allocated_pct", 0.0),
-                "daily_risk_budget_limit_pct": rk.get("daily_budget_limit_pct", 0.50),
+                "daily_risk_budget_allocated_pct": rk.get("daily_budget_allocated_pct"),
+                "daily_risk_budget_limit_pct": rk.get("daily_budget_limit_pct"),
                 "latency_health": rk.get("latency_health", "PASS"),
                 "capacity_threshold": rk.get("capacity_threshold", "PASS"),
                 "authorized": bool(rk.get("authorized", False)) if has_event else False
@@ -545,3 +573,93 @@ class DecisionEnvelopeLedger:
 # Global Singleton Decision Ledger
 canonical_decision_ledger = DecisionEnvelopeLedger()
 
+# ---------------------------------------------------------------------------
+# Backward-compat type aliases
+# ---------------------------------------------------------------------------
+DecisionEnvelopeEngine = DecisionEnvelopeLedger
+DecisionLedger = DecisionEnvelopeLedger
+
+
+# ---------------------------------------------------------------------------
+# Module-level standalone helper used by tests and lightweight callers
+# ---------------------------------------------------------------------------
+def format_decision_anatomy_payload(
+    opportunity_status: str = "NO_OPPORTUNITY",
+    decision_stage: str = "MONITORING",
+    reason: str = "MONITORING — NO QUALIFYING EVENT",
+    event_type: Optional[str] = None,
+    evidence_status: str = "NOT_APPLICABLE",
+    sample_n: int = 0,
+    empirical_tp_pct: Optional[float] = None,
+    empirical_sl_pct: Optional[float] = None,
+    net_executable_ev_bps: Optional[float] = None,
+    daily_risk_budget_allocated_pct: Optional[float] = None,
+    action: str = "ABSTAIN",
+    **kwargs: Any,
+) -> Dict[str, Any]:
+    """
+    Standalone (non-mutating) module-level helper that constructs the canonical
+    4-layer Decision Anatomy payload from keyword arguments.
+
+    This is intentionally kept pure (no ledger I/O) and is suitable for tests,
+    read-only API responses, and lightweight callers that do not hold a
+    ``DecisionEnvelopeLedger`` instance.
+    """
+    has_event = opportunity_status == "IDENTIFIED" and event_type not in [None, "NONE"]
+
+    return {
+        "decision_stage": decision_stage,
+        "opportunity_status": opportunity_status,
+        "evidence_status": evidence_status,
+        "economics_status": "EVALUATED" if (has_event and net_executable_ev_bps is not None) else "NOT_APPLICABLE",
+        "risk_status": "EVALUATED" if has_event else "NOT_APPLICABLE",
+        "layer1_market_event": {
+            "event_type": event_type or "NONE",
+            "event_strength": None,
+            "elapsed_seconds": None,
+            "state_dynamics": {
+                "volatility": "NORMAL",
+                "liquidity": "NORMAL",
+                "flow": "BALANCED",
+                "positioning": "NEUTRAL",
+                "novelty": "LOW"
+            }
+        },
+        "layer2_conditional_path": {
+            "empirical_tp_first_pct": empirical_tp_pct if has_event else None,
+            "empirical_sl_first_pct": empirical_sl_pct if has_event else None,
+            "empirical_timeout_pct": None,
+            "sample_n": sample_n if has_event else 0,
+            "temporal_interval_95": None,
+            "evidence_quality": evidence_status if has_event else "NOT_APPLICABLE",
+            "expected_mfe_bps": None,
+            "expected_mae_bps": None
+        },
+        "layer3_execution_economics": {
+            "mode": "TAKER" if has_event else "NOT_APPLICABLE",
+            "gross_expected_ev_bps": None,
+            "friction_breakdown_bps": {
+                "fee": None, "spread": None, "slippage": None,
+                "impact": None, "adverse_selection": None
+            },
+            "total_execution_drag_bps": None,
+            "net_executable_ev_bps": net_executable_ev_bps if has_event else None
+        },
+        "layer4_risk_authorization": {
+            "c2_model_health": "CALIBRATED",
+            "trade_risk_check": "NOT_APPLICABLE" if not has_event else "BLOCKED",
+            "risk_block_reason": reason if not has_event else "NO_OPPORTUNITY",
+            "daily_risk_budget_allocated_pct": daily_risk_budget_allocated_pct,
+            "daily_risk_budget_limit_pct": None,
+            "latency_health": "PASS",
+            "capacity_threshold": "PASS",
+            "authorized": False
+        },
+        "final_action": action,
+        "primary_reason_code": reason,
+        "mechanism_diagnostics": {
+            "support_count": 0,
+            "block_count": 0,
+            "diagnostics": {}
+        }
+    }

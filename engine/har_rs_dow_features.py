@@ -19,7 +19,7 @@ Architectural Principles:
 """
 
 import os
-from typing import Optional
+from typing import Optional, Any, Union
 import numpy as np
 import pandas as pd
 
@@ -28,21 +28,31 @@ from config import DATA_RAW_DIR
 DEFAULT_OHLCV_PATH = os.path.join(DATA_RAW_DIR, "ohlcv.parquet")
 
 
-def prepare_har_rs_dow_dataset(ohlcv_path: Optional[str] = None) -> pd.DataFrame:
+def prepare_har_rs_dow_dataset(ohlcv_path: Optional[Any] = None, drop_target_na: bool = True) -> pd.DataFrame:
     """
     Loads raw OHLCV and constructs the causal dataset required for HAR-RS-DOW inference
     and C2 conformal risk envelope evaluation.
     
+    Accepts either a parquet path string or a pandas DataFrame.
     Strictly independent of research-only derivatives (e.g. iv7d.parquet).
+    If drop_target_na is False, retains the most recent closed rows for live inference
+    where future rv7d_var_ann has not yet materialized.
     """
-    path = ohlcv_path or DEFAULT_OHLCV_PATH
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"Required runtime dataset missing: {path}")
+    if isinstance(ohlcv_path, pd.DataFrame):
+        df_ohlcv = ohlcv_path.copy()
+    else:
+        path = ohlcv_path or DEFAULT_OHLCV_PATH
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Required runtime dataset missing: {path}")
+        df_ohlcv = pd.read_parquet(path)
 
-    df_ohlcv = pd.read_parquet(path)
-    df_ohlcv["timestamp"] = pd.to_datetime(df_ohlcv["timestamp"], utc=True)
-    df_ohlcv.sort_values("timestamp", inplace=True)
-    df_ohlcv.set_index("timestamp", inplace=True)
+    if "timestamp" in df_ohlcv.columns:
+        df_ohlcv["timestamp"] = pd.to_datetime(df_ohlcv["timestamp"], utc=True)
+        df_ohlcv.sort_values("timestamp", inplace=True)
+        df_ohlcv.set_index("timestamp", inplace=True)
+    else:
+        df_ohlcv.index = pd.to_datetime(df_ohlcv.index, utc=True)
+        df_ohlcv.sort_index(inplace=True)
     df = df_ohlcv.copy()
 
     # Hourly log returns
@@ -51,9 +61,15 @@ def prepare_har_rs_dow_dataset(ohlcv_path: Optional[str] = None) -> pd.DataFrame
     # Target: Forward 7-Day Realized Variance (rv7d_var_ann)
     # rv7d_var_ann(t) = (8760 / 168) * sum_{i=1}^{168} r_{t+i}^2
     sq_ret = df["r"] ** 2
-    fwd_sq_ret = sq_ret.shift(-1)
-    fwd_sum_sq = fwd_sq_ret.iloc[::-1].rolling(window=168, min_periods=168).sum().iloc[::-1]
-    df["rv7d_var_ann"] = (8760.0 / 168.0) * fwd_sum_sq
+    if drop_target_na:
+        sq_vals = sq_ret.values
+        cum = np.cumsum(np.insert(np.nan_to_num(sq_vals), 0, 0))
+        fwd_sum = np.full(len(df), np.nan)
+        if len(df) > 168:
+            fwd_sum[:-168] = cum[169:] - cum[1:-168]
+        df["rv7d_var_ann"] = (8760.0 / 168.0) * fwd_sum
+    else:
+        df["rv7d_var_ann"] = np.nan
 
     # Regressors: Trailing HAR-RV Realized Variances
     df["rv1d_var_ann"] = (8760.0 / 24.0) * sq_ret.rolling(24, min_periods=24).sum()
@@ -68,7 +84,9 @@ def prepare_har_rs_dow_dataset(ohlcv_path: Optional[str] = None) -> pd.DataFrame
     df["dow"] = df.index.dayofweek
 
     # Drop warm-up rows where trailing features or targets are unobserved
-    req_cols = ["rv7d_var_ann", "rv1d_var_ann", "rv7d_var_ann_lag", "rv30d_var_ann", "rv_down_1d", "rv_up_1d"]
+    req_cols = ["rv1d_var_ann", "rv7d_var_ann_lag", "rv30d_var_ann", "rv_down_1d", "rv_up_1d"]
+    if drop_target_na:
+        req_cols.append("rv7d_var_ann")
     clean_df = df.dropna(subset=req_cols).copy()
 
     return clean_df

@@ -360,12 +360,16 @@ class ForecastAccuracyObservatory:
             cursor = conn.cursor()
             rows = cursor.execute(query).fetchall()
             for row in rows:
+                lower_b = float(row["lower_bound"])
+                upper_b = float(row["upper_bound"])
+                w_val = float(row["interval_width"]) if row["interval_width"] is not None else max(0.0, upper_b - lower_b)
                 rec = VolatilityForecastRecord(
                     forecast_id=row["forecast_id"],
                     timestamp=row["origin_timestamp"],
                     point_forecast_har_rs_dow=float(row["point_forecast"]),
-                    risk_envelope_lower=float(row["lower_bound"]),
-                    risk_envelope_upper=float(row["upper_bound"]),
+                    risk_envelope_lower=lower_b,
+                    risk_envelope_upper=upper_b,
+                    interval_width=round(w_val, 5),
                     nominal_target_coverage=float(row["nominal_target_coverage"]),
                     point_model_version=row["model_version"],
                     risk_model_version=row["risk_model_version"],
@@ -539,6 +543,7 @@ class ForecastAccuracyObservatory:
         # Winkler proper scoring rule (alpha = 0.10)
         alpha = 1.0 - self.nominal_target
         w = rec.risk_envelope_upper - rec.risk_envelope_lower
+        rec.interval_width = round(float(w), 5)
         w_score = w
         if y > rec.risk_envelope_upper:
             w_score += (2.0 / alpha) * (y - rec.risk_envelope_upper)

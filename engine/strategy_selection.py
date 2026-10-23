@@ -105,13 +105,18 @@ class StrategySelectionEngine:
             active_set = set(k for k, v in SUPPORTED_INDICATORS.items() if v["default"])
 
         snap = market_snapshot or {}
-        # Microstructure feature values (either from live snapshot or defaults based on active evidence)
-        ofi_val = float(snap.get("ofi", 0.65 if "ofi" in active_set else 0.0))
-        hawkes_val = float(snap.get("hawkes", 2.2 if "hawkes" in active_set else 1.0))
-        vpin_val = float(snap.get("vpin", 0.28 if "vpin" in active_set else 0.35))
-        funding_val = float(snap.get("funding", -0.00015 if "funding" in active_set else 0.0001))
-        spread_bps = float(snap.get("spread_bps", 2.0))
-        depth_score = float(snap.get("depth_score", 0.75))
+        val_ofi = snap.get("ofi")
+        ofi_val = float(val_ofi) if val_ofi is not None else (0.65 if "ofi" in active_set else 0.0)
+        val_hwk = snap.get("hawkes")
+        hawkes_val = float(val_hwk) if val_hwk is not None else (2.2 if "hawkes" in active_set else 1.0)
+        val_vpin = snap.get("vpin")
+        vpin_val = float(val_vpin) if val_vpin is not None else (0.28 if "vpin" in active_set else 0.35)
+        val_fund = snap.get("funding")
+        funding_val = float(val_fund) if val_fund is not None else (-0.00015 if "funding" in active_set else 0.0001)
+        val_spread = snap.get("spread_bps")
+        spread_bps = float(val_spread) if val_spread is not None else 2.0
+        val_depth = snap.get("depth_score")
+        depth_score = float(val_depth) if val_depth is not None else 0.75
         is_expansion = bool(snap.get("is_expansion", True if "rv_5m" in active_set else False))
 
         # Archetype-specific evaluation
@@ -416,9 +421,11 @@ class StrategySelectionEngine:
         # 1. Dynamic Evidence Routing & VOI
         snap_copy = dict(market_snapshot or {})
         snap_copy["spot_price"] = live_price
-        if snap_copy.get("conformal_p90", 0) <= live_price:
+        p90 = snap_copy.get("conformal_p90")
+        if p90 is None or (isinstance(p90, (int, float)) and p90 <= live_price):
             snap_copy["conformal_p90"] = round(live_price * 1.008, 2)
-        if snap_copy.get("conformal_p10", 0) >= live_price or snap_copy.get("conformal_p10", 0) <= 0:
+        p10 = snap_copy.get("conformal_p10")
+        if p10 is None or (isinstance(p10, (int, float)) and (p10 >= live_price or p10 <= 0)):
             snap_copy["conformal_p10"] = round(live_price * 0.993, 2)
 
         evidence_routing = adaptive_evidence_router.route_evidence(
@@ -435,7 +442,8 @@ class StrategySelectionEngine:
             active_set = set(k for k, v in SUPPORTED_INDICATORS.items() if v["default"])
 
         # Determine if toxicity filter blocks passive absorption
-        vpin_in_snap = float((market_snapshot or {}).get("vpin", 0.28 if "vpin" in active_set else 0.35))
+        val_vpin_snap = (market_snapshot or {}).get("vpin")
+        vpin_in_snap = float(val_vpin_snap) if val_vpin_snap is not None else (0.28 if "vpin" in active_set else 0.35)
         toxicity_filter_state = "BLOCK" if vpin_in_snap > 0.65 else "PASS"
 
         # 2. Independent Evaluation of all 5 Candidates

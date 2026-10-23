@@ -344,7 +344,7 @@ def process_candle(candle: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                 import json
                 selected_archetype = event.event_type.value
                 selection_reason = f"Triggered by archetype {event.event_type.value} signal with EV_net={payoff.ev_net_bps:.1f}bps"
-                allocation_weight = float(weights.get("MEIE-COMBINED", 0.40)) if 'weights' in locals() else 0.40
+                allocation_weight = float(locals().get("weights", {}).get("MEIE-COMBINED", 0.40)) if isinstance(locals().get("weights"), dict) else 0.40
                 component_scores = json.dumps({
                     "selected_archetype": event.event_type.value,
                     "archetype_ev_bps": payoff.ev_net_bps,

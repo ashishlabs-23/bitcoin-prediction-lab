@@ -592,13 +592,21 @@ class AdaptiveEvidenceRouterV2:
             intensity = 1.0
         else:
             if ind == "ofi":
-                intensity = 1.2 if abs(float(snap.get("ofi", 0.65))) > 0.5 else 0.8
+                val = snap.get("ofi")
+                val_f = float(val) if val is not None else 0.65
+                intensity = 1.2 if abs(val_f) > 0.5 else 0.8
             elif ind == "hawkes":
-                intensity = 1.3 if float(snap.get("hawkes", 2.2)) > 2.0 else 0.8
+                val = snap.get("hawkes")
+                val_f = float(val) if val is not None else 2.2
+                intensity = 1.3 if val_f > 2.0 else 0.8
             elif ind == "vpin":
-                intensity = 1.4 if float(snap.get("vpin", 0.28)) > 0.5 else 0.9
+                val = snap.get("vpin")
+                val_f = float(val) if val is not None else 0.28
+                intensity = 1.4 if val_f > 0.5 else 0.9
             elif ind == "funding":
-                intensity = 1.25 if abs(float(snap.get("funding", 0.00015))) > 0.0002 else 0.85
+                val = snap.get("funding")
+                val_f = float(val) if val is not None else 0.00015
+                intensity = 1.25 if abs(val_f) > 0.0002 else 0.85
             elif ind == "sweep_candidate":
                 is_cand = bool(snap.get("sweep_candidate", False))
                 intensity = PROSPECTIVE_ROUTING_PRIORS["sweep_multiplier_active"] if is_cand else PROSPECTIVE_ROUTING_PRIORS["sweep_multiplier_inactive"]
@@ -720,10 +728,10 @@ class AdaptiveEvidenceRouterV2:
         Identifies signal conflict and emits first-class UNCERTAIN/ABSTAIN state.
         """
         snap = market_snapshot or {}
-        ofi_val = float(snap.get("ofi", 0.65))
-        hawkes_val = float(snap.get("hawkes", 2.2))
-        funding_val = float(snap.get("funding", -0.00015))
-        vpin_val = float(snap.get("vpin", 0.28))
+        ofi_val = float(snap.get("ofi") if snap.get("ofi") is not None else 0.65)
+        hawkes_val = float(snap.get("hawkes") if snap.get("hawkes") is not None else 2.2)
+        funding_val = float(snap.get("funding") if snap.get("funding") is not None else -0.00015)
+        vpin_val = float(snap.get("vpin") if snap.get("vpin") is not None else 0.28)
 
         long_support = []
         long_contradiction = []
@@ -975,8 +983,8 @@ class AdaptiveEvidenceRouterV2:
                 "status": "FAIL_CLOSED"
             }
 
-        u_p90 = float(snap.get("conformal_p90", s0 * 1.008))
-        l_p10 = float(snap.get("conformal_p10", s0 * 0.993))
+        u_p90 = float(snap.get("conformal_p90") if snap.get("conformal_p90") is not None else (s0 * 1.008))
+        l_p10 = float(snap.get("conformal_p10") if snap.get("conformal_p10") is not None else (s0 * 0.993))
 
         if u_p90 <= s0:
             u_p90 = s0 * 1.008
@@ -998,7 +1006,7 @@ class AdaptiveEvidenceRouterV2:
         # P_L(T) = ln(U/S_0)/H - (2/pi) * sum_{n=1}^N (1/n) * sin(n*pi*y0/H) * exp(-lambda_n * T)
         horizon_minutes_map = {"5m": 5, "15m": 15, "1h": 60, "4h": 240, "1d": 1440, "7d": 10080, "CYCLE": 43200}
         t_mins = horizon_minutes_map.get(h_clean, 15)
-        raw_rv = float(snap.get("rv_5m", 0.0024))
+        raw_rv = float(snap.get("rv_5m") if snap.get("rv_5m") is not None else 0.0024)
         rv_base = raw_rv * 0.1 if raw_rv > 0.01 else (raw_rv if raw_rv > 0.0001 else 0.0024)
         sigma_T = max(0.0005, rv_base * math.sqrt(t_mins / 5.0))
 
@@ -1260,13 +1268,16 @@ class AdaptiveEvidenceRouterV2:
             primary_q = answered_questions[0] if answered_questions else "Q1_DIRECTION"
 
             if ind == "ofi":
-                r_desc = f"Directional buyer/seller order book imbalance (+{snap.get('ofi', 0.65):+.2f})"
+                ofi_v = float(snap.get("ofi") if snap.get("ofi") is not None else 0.65)
+                r_desc = f"Directional buyer/seller order book imbalance (+{ofi_v:+.2f})"
             elif ind == "hawkes":
-                r_desc = f"Microstructure trade clustering & acceleration ({snap.get('hawkes', 2.2):.1f}σ)"
+                hwk_v = float(snap.get("hawkes") if snap.get("hawkes") is not None else 2.2)
+                r_desc = f"Microstructure trade clustering & acceleration ({hwk_v:.1f}σ)"
             elif ind == "liquidations":
                 r_desc = "Forced-liquidation cascade tail confirmation"
             elif ind == "vpin":
-                r_desc = f"Informed trading adverse-selection check ({snap.get('vpin', 0.22):.2f}) within threshold"
+                vpin_v = float(snap.get("vpin") if snap.get("vpin") is not None else 0.22)
+                r_desc = f"Informed trading adverse-selection check ({vpin_v:.2f}) within threshold"
             elif ind in ["rv_5m", "rv_1h"]:
                 r_desc = "Local intraday realized variance and volatility expansion boundary"
             elif ind == "jump_intensity":
@@ -1601,9 +1612,8 @@ class AdaptiveEvidenceRouterV2:
         4. Zero Optimization: No 'Optimal Horizon' score, no 'Sweet Spot', no automatic switching.
         """
         snap = market_snapshot or {}
-        sigma_base = snap.get("rv_5m", 0.0024)
-        if sigma_base <= 0:
-            sigma_base = 0.0024
+        val_rv = snap.get("rv_5m")
+        sigma_base = float(val_rv) if val_rv is not None and float(val_rv) > 0 else 0.0024
 
         horizons_order = ["5m", "15m", "1h", "4h", "1d"]
         

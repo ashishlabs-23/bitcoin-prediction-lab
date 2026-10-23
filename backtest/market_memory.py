@@ -411,6 +411,12 @@ def load_market_memory() -> pd.DataFrame:
                 df['was_correct'] = df['was_correct'].astype('boolean')
                 if 'outcome_resolved' in df.columns:
                     df.loc[~df['outcome_resolved'], 'was_correct'] = pd.NA
+                # Non-directional observations are not winning or losing trades
+                if 'direction' in df.columns:
+                    non_trades = df['direction'].fillna('').astype(str).str.upper().isin(['NONE', 'NEUTRAL', '', 'HOLD', 'ABSTAIN', 'SKIP'])
+                    if 'decision' in df.columns:
+                        non_trades = non_trades | df['decision'].fillna('').astype(str).str.upper().isin(['HOLD', 'SKIP', 'NEUTRAL'])
+                    df.loc[non_trades, 'was_correct'] = pd.NA
             return df
         except Exception:
             pass
@@ -425,6 +431,11 @@ def load_market_memory() -> pd.DataFrame:
             df['was_correct'] = df['was_correct'].astype('boolean')
             if 'outcome_resolved' in df.columns:
                 df.loc[~df['outcome_resolved'], 'was_correct'] = pd.NA
+            if 'direction' in df.columns:
+                non_trades = df['direction'].fillna('').astype(str).str.upper().isin(['NONE', 'NEUTRAL', '', 'HOLD', 'ABSTAIN', 'SKIP'])
+                if 'decision' in df.columns:
+                    non_trades = non_trades | df['decision'].fillna('').astype(str).str.upper().isin(['HOLD', 'SKIP', 'NEUTRAL'])
+                df.loc[non_trades, 'was_correct'] = pd.NA
         return df
     except Exception as e:
         logger.error(f"Error loading market memory from SQLite: {e}")
@@ -552,7 +563,7 @@ def resolve_pending_outcomes(current_price: float, current_time_str: str, horizo
                     was_corr = 1 if raw_ret < 0 else 0
                 else:
                     strat_ret = 0.0
-                    was_corr = 1 if abs(raw_ret) < 0.005 else 0
+                    was_corr = None
 
                 pnl = round(strat_ret * 10000.0, 2)
                 updates.append((round(raw_ret, 6), was_corr, pnl, current_time_str, p_id))

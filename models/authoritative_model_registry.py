@@ -30,6 +30,8 @@ class ModelClassification(str, Enum):
     DIRECTIONAL_RESEARCH_BENCHMARK = "DIRECTIONAL_RESEARCH_BENCHMARK"
     ARCHIVED_RESEARCH_CANDIDATE = "ARCHIVED_RESEARCH_CANDIDATE"
     FOUNDATION_RESEARCH = "FOUNDATION_RESEARCH"
+    EXPERIMENTAL_CHALLENGER = "EXPERIMENTAL_CHALLENGER"
+    PRICE_FORECAST_RESEARCH = "PRICE_FORECAST_RESEARCH"
 
 
 class AuthorizationStatus(str, Enum):
@@ -105,7 +107,7 @@ ACTIVE_PRODUCTION_MODEL = ModelIdentityRecord(
     data_source_dependencies=["data/raw/ohlcv.parquet"],
     uncertainty_engine="C2 Dependence-Aware Conformal Prediction (alpha=0.10, 90% nominal envelope, strictly causal delayed resolution)",
     empirical_validation_summary="84.89% causal holdout containment (95% CI: [73.14%, 93.14%]) | 92.84% pre-2026 calibration (QLIKE: 0.19300). Validated in VOL-EDGE-01 & Stage 12 audit.",
-    applicable_limitations="Not a directional alpha model; does not recommend buy/sell positions; requires hourly OHLCV.",
+    applicable_limitations="Not a directional alpha model; does not recommend buy/sell positions; requires hourly OHLCV. Serves 168h realized variance volatility intelligence only. Live trading is strictly disabled.",
     production_endpoints=["/api/terminal/live", "/api/terminal/model-identity"]
 )
 
@@ -165,6 +167,178 @@ ARCHIVED_EXCURSION_CANDIDATE = ModelIdentityRecord(
     production_endpoints=["/prediction/range (BLOCKED)"]
 )
 
+CHALLENGER_HAR_QLIKE = ModelIdentityRecord(
+    canonical_id="HAR-QLIKE-v1.0",
+    version="1.0.0",
+    display_name="HAR-RS-DOW Loss-Coherent QLIKE Challenger (Puke & Schweikert 2026)",
+    classification=ModelClassification.EXPERIMENTAL_CHALLENGER,
+    authorization_status=AuthorizationStatus.OFFLINE_RESEARCH_ONLY,
+    model_architecture="Heterogeneous Autoregressive Loss-Coherent QLIKE Minimizer with L2 Regularization",
+    artifact_rel_path="experiments/results/research_improvement/har_qlike_v1.joblib",
+    artifact_sha256="experiments/results/research_improvement/har_qlike_v1.joblib",
+    scientific_contract_hash="experiments/results/research_improvement/preregistered_evaluation_manifest.json",
+    forecast_target="Annualized 7-Day Realized Variance (rv7d_var_ann)",
+    forecast_horizon="168h (7 calendar days)",
+    output_units="Annualized Realized Variance (decimal)",
+    output_interpretation=(
+        "Loss-coherent point forecast of 7-day realized variance estimated by direct sample QLIKE minimization. "
+        "Evaluated against HAR-RS-DOW-v1.0. Achieves 8.77% raw QLIKE reduction, but Diebold-Mariano test "
+        "indicates difference is statistically equal (DM = +0.5132, p = 0.3039). Preserved in research register."
+    ),
+    directional_prediction_capability=False,
+    feature_schema=[
+        "log_rv_down_1d",
+        "log_rv_up_1d",
+        "log_rv7d_var_ann_lag",
+        "log_rv30d_var_ann",
+        "dow_1",
+        "dow_2",
+        "dow_3",
+        "dow_4",
+        "dow_5",
+        "dow_6",
+    ],
+    data_source_dependencies=["data/raw/ohlcv.parquet"],
+    uncertainty_engine="C2 Dependence-Aware Conformal Prediction (alpha=0.10, strictly causal delayed resolution)",
+    empirical_validation_summary="84.22% causal holdout containment | Out-of-sample QLIKE: 0.19598 vs Baseline 0.21483 (p=0.304).",
+    applicable_limitations="Research challenger; failed DM statistical significance gate (p >= 0.05); offline research only; not authorized for production.",
+    production_endpoints=["/api/research/experiments (OFFLINE_RESEARCH)"]
+)
+
+BASELINE_HAR_24H = ModelIdentityRecord(
+    canonical_id="HAR-RS-DOW-24H",
+    version="1.0.0",
+    display_name="HAR-24H Conventional Log-Variance OLS Benchmark",
+    classification=ModelClassification.EXPERIMENTAL_CHALLENGER,
+    authorization_status=AuthorizationStatus.OFFLINE_RESEARCH_ONLY,
+    model_architecture="Conventional Heterogeneous Autoregressive OLS on ln(rv24h_var_ann)",
+    artifact_rel_path="experiments/results/research_improvement/har_ols_24h_v1.joblib",
+    artifact_sha256="7a247cf1c0a9639ada911111d57bd58db1794f09a8ca749112b33fa848f10ac1",
+    scientific_contract_hash="7ea814579b7297430a87e0bf142ed4ae5c30ff5554da907de2cb71fda295d6f4",
+    forecast_target="Annualized 24-Hour Realized Variance (rv24h_var_ann)",
+    forecast_horizon="24h (1 calendar day)",
+    output_units="Annualized Realized Variance (decimal, hourly-sampled proxy)",
+    output_interpretation=(
+        "Standard OLS HAR benchmark on 24-hour annualized realized variance proxy. "
+        "Evaluated on daily non-overlapping origins (QLIKE = 0.37259, RMSE = 0.20327). "
+        "Strictly offline research model."
+    ),
+    directional_prediction_capability=False,
+    feature_schema=["log_rv_1d", "log_rv_7d", "log_rv_30d"],
+    data_source_dependencies=["data/raw/ohlcv.parquet"],
+    uncertainty_engine="Standard OLS residuals",
+    empirical_validation_summary="Daily non-overlapping QLIKE: 0.37259, RMSE: 0.20327 (N=243, 00:00 UTC).",
+    applicable_limitations="Hourly-sampled proxy; does not predict directional price sign; offline research only.",
+    production_endpoints=["/api/research/experiments (OFFLINE_RESEARCH)"]
+)
+
+CHALLENGER_HAR_QLIKE_24H = ModelIdentityRecord(
+    canonical_id="HAR-QLIKE-24H",
+    version="1.0.0",
+    display_name="HAR-QLIKE-24H Coherent Volatility Challenger (Puke & Schweikert 2026)",
+    classification=ModelClassification.EXPERIMENTAL_CHALLENGER,
+    authorization_status=AuthorizationStatus.OFFLINE_RESEARCH_ONLY,
+    model_architecture="Heterogeneous Autoregressive QLIKE Loss-Coherent Minimizer with L2 Regularization",
+    artifact_rel_path="experiments/results/research_improvement/har_qlike_24h_v1.joblib",
+    artifact_sha256="fbc8818da9cfc378ce3ab32e3ce6781b9e59815c38515302fe4128b0eeefc5f2",
+    scientific_contract_hash="7ea814579b7297430a87e0bf142ed4ae5c30ff5554da907de2cb71fda295d6f4",
+    forecast_target="Annualized 24-Hour Realized Variance (rv24h_var_ann)",
+    forecast_horizon="24h (1 calendar day)",
+    output_units="Annualized Realized Variance (decimal, hourly-sampled proxy)",
+    output_interpretation=(
+        "Loss-coherent point forecast of next 24-hour realized variance directly minimizing sample QLIKE. "
+        "Evaluated on daily non-overlapping origins (QLIKE = 0.31729 vs OLS 0.37259, +14.84% gain). "
+        "Diebold-Mariano test with HLN correction yields DM = +0.9874, p = 0.1622 (p >= 0.05). "
+        "Retained in research register; NOT authorized for production."
+    ),
+    directional_prediction_capability=False,
+    feature_schema=["log_rv_1d", "log_rv_7d", "log_rv_30d"],
+    data_source_dependencies=["data/raw/ohlcv.parquet"],
+    uncertainty_engine="Empirical residual dispersion",
+    empirical_validation_summary="Daily non-overlapping QLIKE: 0.31729 (+14.84% gain vs OLS, HLN p=0.1622); Hourly rolling QLIKE: 0.32419 (p=0.0735).",
+    applicable_limitations="Research challenger; failed DM statistical significance hurdle (p >= 0.05); offline research only; not authorized for live production.",
+    production_endpoints=["/api/research/experiments (OFFLINE_RESEARCH)"]
+)
+
+PRICE_FORECAST_PERSISTENCE = ModelIdentityRecord(
+    canonical_id="price-forecast-persistence-rw",
+    version="1.0.0",
+    display_name="BTCUSD Future-Price Persistence / Random-Walk Benchmark",
+    classification=ModelClassification.PRICE_FORECAST_RESEARCH,
+    authorization_status=AuthorizationStatus.OFFLINE_RESEARCH_ONLY,
+    model_architecture="Zero-drift Persistence Random Walk (P_{t+h} = P_t)",
+    artifact_rel_path="engine/price_forecast_engine.py",
+    artifact_sha256="engine/price_forecast_engine.py",
+    scientific_contract_hash=None,
+    forecast_target="Future BTCUSD Closing Price at 1h, 4h, and 24h horizons",
+    forecast_horizon="1h, 4h, 24h",
+    output_units="USD (Future Spot Closing Price)",
+    output_interpretation=(
+        "Standard statistical random-walk persistence benchmark. "
+        "Assumes expected forward log return is 0.0. "
+        "Serves as the primary null hypothesis benchmark for all price prediction models."
+    ),
+    directional_prediction_capability=False,
+    feature_schema=["spot_price"],
+    data_source_dependencies=["data/raw/ohlcv.parquet"],
+    uncertainty_engine="Rolling historical return quantiles (30d empirical)",
+    empirical_validation_summary="Out-of-sample benchmark across 41,273 hourly candles. Primary hurdle model in walk-forward tournament.",
+    applicable_limitations="Non-directional persistence benchmark; does not guarantee zero future variance; offline research only.",
+    production_endpoints=["/api/prediction/price/forecast"]
+)
+
+PRICE_FORECAST_RIDGE = ModelIdentityRecord(
+    canonical_id="price-forecast-ridge-lagged",
+    version="1.0.0",
+    display_name="BTCUSD Future-Price Regularized Ridge Regressor",
+    classification=ModelClassification.PRICE_FORECAST_RESEARCH,
+    authorization_status=AuthorizationStatus.OFFLINE_RESEARCH_ONLY,
+    model_architecture="L2-Regularized Ridge Regression on Causal Lagged Returns and Volatility",
+    artifact_rel_path="engine/price_forecast_engine.py",
+    artifact_sha256="engine/price_forecast_engine.py",
+    scientific_contract_hash=None,
+    forecast_target="Future BTCUSD Closing Price at 1h, 4h, and 24h horizons",
+    forecast_horizon="1h, 4h, 24h",
+    output_units="USD (Future Spot Closing Price)",
+    output_interpretation=(
+        "Regularized linear regression using strictly point-in-time lagged returns (1h, 4h, 24h, 168h) "
+        "and realized volatility proxies. Evaluated against persistence baseline via HLN test."
+    ),
+    directional_prediction_capability=True,
+    feature_schema=["ret_1h", "ret_4h", "ret_24h", "ret_168h", "vol_24h", "vol_168h"],
+    data_source_dependencies=["data/raw/ohlcv.parquet"],
+    uncertainty_engine="Rolling empirical return distribution quantiles (P10, P50, P90)",
+    empirical_validation_summary="Walk-forward OOS evaluation: Does not demonstrate statistically significant edge over random walk after HLN correction (p >= 0.05).",
+    applicable_limitations="Experimental research candidate; does not beat random walk with statistical significance; offline research only; live trading disabled.",
+    production_endpoints=["/api/prediction/price/forecast"]
+)
+
+PRICE_FORECAST_DRIFT = ModelIdentityRecord(
+    canonical_id="price-forecast-rolling-drift",
+    version="1.0.0",
+    display_name="BTCUSD Future-Price Rolling Historical Drift Benchmark",
+    classification=ModelClassification.PRICE_FORECAST_RESEARCH,
+    authorization_status=AuthorizationStatus.OFFLINE_RESEARCH_ONLY,
+    model_architecture="Rolling Historical Average Drift (168h window)",
+    artifact_rel_path="engine/price_forecast_engine.py",
+    artifact_sha256="engine/price_forecast_engine.py",
+    scientific_contract_hash=None,
+    forecast_target="Future BTCUSD Closing Price at 1h, 4h, and 24h horizons",
+    forecast_horizon="1h, 4h, 24h",
+    output_units="USD (Future Spot Closing Price)",
+    output_interpretation=(
+        "Extrapolates recent 7-day average hourly price drift. "
+        "Evaluated against zero-drift random-walk persistence baseline."
+    ),
+    directional_prediction_capability=True,
+    feature_schema=["rolling_drift_168h"],
+    data_source_dependencies=["data/raw/ohlcv.parquet"],
+    uncertainty_engine="Rolling empirical return distribution quantiles (P10, P50, P90)",
+    empirical_validation_summary="Walk-forward OOS evaluation: Does not demonstrate statistically significant edge over random walk after HLN correction (p >= 0.05).",
+    applicable_limitations="Experimental research baseline; offline research only; live trading disabled.",
+    production_endpoints=["/api/prediction/price/forecast"]
+)
+
 # Registry dictionary
 _REGISTRY: Dict[str, ModelIdentityRecord] = {
     ACTIVE_PRODUCTION_MODEL.canonical_id: ACTIVE_PRODUCTION_MODEL,
@@ -173,11 +347,40 @@ _REGISTRY: Dict[str, ModelIdentityRecord] = {
     DIRECTIONAL_RESEARCH_BASELINE.version: DIRECTIONAL_RESEARCH_BASELINE,
     ARCHIVED_EXCURSION_CANDIDATE.canonical_id: ARCHIVED_EXCURSION_CANDIDATE,
     ARCHIVED_EXCURSION_CANDIDATE.version: ARCHIVED_EXCURSION_CANDIDATE,
+    CHALLENGER_HAR_QLIKE.canonical_id: CHALLENGER_HAR_QLIKE,
+    CHALLENGER_HAR_QLIKE.version: CHALLENGER_HAR_QLIKE,
+    BASELINE_HAR_24H.canonical_id: BASELINE_HAR_24H,
+    BASELINE_HAR_24H.version: BASELINE_HAR_24H,
+    CHALLENGER_HAR_QLIKE_24H.canonical_id: CHALLENGER_HAR_QLIKE_24H,
+    CHALLENGER_HAR_QLIKE_24H.version: CHALLENGER_HAR_QLIKE_24H,
+    PRICE_FORECAST_PERSISTENCE.canonical_id: PRICE_FORECAST_PERSISTENCE,
+    PRICE_FORECAST_PERSISTENCE.version: PRICE_FORECAST_PERSISTENCE,
+    PRICE_FORECAST_DRIFT.canonical_id: PRICE_FORECAST_DRIFT,
+    PRICE_FORECAST_DRIFT.version: PRICE_FORECAST_DRIFT,
+    PRICE_FORECAST_RIDGE.canonical_id: PRICE_FORECAST_RIDGE,
+    PRICE_FORECAST_RIDGE.version: PRICE_FORECAST_RIDGE,
 }
 
 
-def get_active_production_model() -> ModelIdentityRecord:
-    """Returns the single authoritative production model identity."""
+def get_active_production_model(runtime_readiness: Optional[Dict[str, Any]] = None) -> ModelIdentityRecord:
+    """
+    Returns the single authoritative production model identity.
+    Enforces the invariant that the static registry CANNOT independently override
+    a failed runtime gate. If runtime_readiness indicates unverified or blocked status,
+    the model status fails closed.
+    """
+    if runtime_readiness is not None and not runtime_readiness.get("authorized", False):
+        from dataclasses import replace
+        reason = runtime_readiness.get("reason", "Runtime gate verification failed.")
+        code = runtime_readiness.get("reason_code", "BLOCKED_AUDIT_FAILURE")
+        status = AuthorizationStatus.BLOCKED_AUDIT_FAILURE
+        if "PROVENANCE" in code:
+            status = AuthorizationStatus.BLOCKED_PROVENANCE_UNVERIFIED
+        return replace(
+            ACTIVE_PRODUCTION_MODEL,
+            authorization_status=status,
+            applicable_limitations=f"Production inference gated ({code}): {reason}"
+        )
     return ACTIVE_PRODUCTION_MODEL
 
 
@@ -195,7 +398,14 @@ def list_authoritative_models() -> List[Dict[str, Any]]:
     """Returns all distinct authoritative model records as dictionaries."""
     seen = set()
     records = []
-    for m in [ACTIVE_PRODUCTION_MODEL, DIRECTIONAL_RESEARCH_BASELINE, ARCHIVED_EXCURSION_CANDIDATE]:
+    for m in [
+        ACTIVE_PRODUCTION_MODEL,
+        DIRECTIONAL_RESEARCH_BASELINE,
+        ARCHIVED_EXCURSION_CANDIDATE,
+        CHALLENGER_HAR_QLIKE,
+        BASELINE_HAR_24H,
+        CHALLENGER_HAR_QLIKE_24H,
+    ]:
         if m.canonical_id not in seen:
             seen.add(m.canonical_id)
             records.append(m.to_dict())
@@ -211,3 +421,23 @@ def verify_production_model_alignment(endpoint: str, requested_model_id: str) ->
     if requested_model_id in [prod.canonical_id, prod.version]:
         return True
     return False
+
+
+def get_active_model_registry() -> Dict[str, Dict[str, Any]]:
+    """Returns authoritative registry dictionary keyed by canonical ID with standardized attributes."""
+    reg = {}
+    for m in [
+        ACTIVE_PRODUCTION_MODEL,
+        DIRECTIONAL_RESEARCH_BASELINE,
+        ARCHIVED_EXCURSION_CANDIDATE,
+        CHALLENGER_HAR_QLIKE,
+        BASELINE_HAR_24H,
+        CHALLENGER_HAR_QLIKE_24H,
+    ]:
+        d = m.to_dict()
+        d["forecast_horizon"] = "168h" if m.canonical_id == ACTIVE_PRODUCTION_MODEL.canonical_id else ("24h" if "24H" in m.canonical_id else ("1h" if "gbm" in m.canonical_id else m.forecast_horizon))
+        d["target_variable"] = "rv7d_var_ann" if m.canonical_id == ACTIVE_PRODUCTION_MODEL.canonical_id else ("rv24h_var_ann" if "24H" in m.canonical_id else m.forecast_target)
+        d["directional_trading_authorized"] = False
+        reg[m.canonical_id] = d
+    return reg
+

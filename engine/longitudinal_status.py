@@ -10,6 +10,7 @@ Strictly separates:
 
 from dataclasses import dataclass, asdict
 from typing import Dict, List, Optional, Any
+import os
 import sqlite3
 import pandas as pd
 import numpy as np
@@ -22,6 +23,67 @@ from research.post_repair_longitudinal_monitor import (
     CONTEXT_HASH,
     REPAIR_VERSION
 )
+
+
+def compute_dynamic_observed_metrics(
+    db_path: str = MARKET_MEMORY_DB_PATH,
+    boundary_dt: str = POST_REPAIR_EVIDENCE_START,
+    min_blocks: int = 5
+) -> Dict[str, Optional[float]]:
+    """
+    Computes genuine empirical metrics from resolved post-repair outcomes in the SQLite ledger.
+    Scientific integrity rules:
+    - No hardcoded performance constants.
+    - Only resolved outcomes (resolution_timestamp IS NOT NULL) are counted.
+    - Excludes degraded records (degraded = 0).
+    - Returns None for all performance metrics if fewer than min_blocks valid records exist.
+    """
+    default_empty: Dict[str, Optional[float]] = {
+        "mfe_error_pct": None,
+        "mae_error_pct": None,
+        "p90_coverage_pct": None,
+        "winkler_score": None,
+        "conformal_interval_width_pct": None,
+        "baseline_delta_bps": None,
+    }
+
+    if not os.path.isfile(db_path):
+        return default_empty
+
+    try:
+        conn = sqlite3.connect(db_path)
+        query = """
+            SELECT 
+                rf.forecast_id,
+                rf.timestamp,
+                rf.current_price,
+                rf.upper_p90,
+                rf.lower_p90,
+                fo.actual_high,
+                fo.actual_low,
+                fo.actual_close,
+                fo.actual_mfe,
+                fo.actual_mae,
+                fo.mfe_error,
+                fo.mae_error,
+                fo.upper_covered,
+                fo.lower_covered,
+                fo.path_contained
+            FROM range_forecasts rf
+            JOIN forecast_outcomes fo ON rf.forecast_id = fo.forecast_id
+            WHERE rf.timestamp >= ?
+              AND (rf.degraded = 0 OR rf.degraded = '0' OR rf.degraded IS NULL)
+              AND (fo.data_quality = 'VALID' OR fo.data_quality IS NULL)
+              AND fo.resolution_timestamp IS NOT NULL
+            ORDER BY rf.timestamp ASC
+        """
+        df = pd.read_sql_query(query, conn, params=(boundary_dt,))
+        conn.close()
+    except Exception:
+        return default_empty
+
+    from engine.metric_contracts import evaluate_canonical_metrics
+    return evaluate_canonical_metrics(df, min_observations=min_blocks)
 
 
 @dataclass
@@ -92,6 +154,12 @@ class LongitudinalStatusService:
         else:
             cal_status = "STATISTICALLY_VALIDATED_CALIBRATION (N_eff >= 150; SE < 2.5%, formal verdict verified)"
 
+        dynamic_metrics = compute_dynamic_observed_metrics(
+            db_path=MARKET_MEMORY_DB_PATH,
+            boundary_dt=POST_REPAIR_EVIDENCE_START,
+            min_blocks=5
+        )
+
         obs = ObservedMetrics(
             independent_valid_blocks=obs_valid_blocks,
             independent_mixed_blocks=obs_mixed_blocks,
@@ -99,12 +167,12 @@ class LongitudinalStatusService:
             invalid_forecasts_count=invalid_count,
             calendar_hours=obs_valid_blocks * 24,
             effective_sample_size=n_eff,
-            mfe_error_pct=None if obs_valid_blocks < 5 else 0.3980,
-            mae_error_pct=None if obs_valid_blocks < 5 else 0.5620,
-            p90_coverage_pct=None if obs_valid_blocks < 5 else 91.10,
-            winkler_score=None if obs_valid_blocks < 5 else 6.1420,
-            conformal_interval_width_pct=None if obs_valid_blocks < 5 else 5.28,
-            baseline_delta_bps=None if obs_valid_blocks < 5 else -14.0,
+            mfe_error_pct=dynamic_metrics["mfe_error_pct"],
+            mae_error_pct=dynamic_metrics["mae_error_pct"],
+            p90_coverage_pct=dynamic_metrics["p90_coverage_pct"],
+            winkler_score=dynamic_metrics["winkler_score"],
+            conformal_interval_width_pct=dynamic_metrics["conformal_interval_width_pct"],
+            baseline_delta_bps=dynamic_metrics["baseline_delta_bps"],
             drift_psi=0.0,
             calibration_status=cal_status,
             model_status="MODEL_FROZEN"
