@@ -9,8 +9,12 @@ primary_region = "sin"        # Singapore — closest to India for low latency
 [env]
   PORT            = "8000"
   PYTHONUNBUFFERED = "1"
-  # Secrets (SMTP_PASSWORD, WEBHOOK_URL, etc.) are set via:
-  #   fly secrets set SMTP_PASSWORD="..." WEBHOOK_URL="..."
+  BTC_ENVIRONMENT = "production"
+  ENVIRONMENT     = "production"
+  SQLITE_DB_PATH  = "/app/data/market_memory.db"
+  MEIE_DB_PATH    = "/app/data/meie_memory.db"
+  # Secrets (BTCOGNITIVE_ADMIN_KEY, SMTP_PASSWORD, etc.) are set via:
+  #   fly secrets set BTCOGNITIVE_ADMIN_KEY="..."
   # NEVER put real secrets in this file.
 
 [http_service]
@@ -39,3 +43,11 @@ primary_region = "sin"        # Singapore — closest to India for low latency
     port         = 8000
     timeout      = "5s"
     type         = "http"
+
+# Persistent Volume Storage:
+# Mounts the persistent disk to /app/data where SQLITE_DB_PATH and ledgers reside.
+# Must be created before initial deploy via:
+#   fly volumes create btcognitive_data --region sin --size 1
+[mounts]
+  source = "btcognitive_data"
+  destination = "/app/data"

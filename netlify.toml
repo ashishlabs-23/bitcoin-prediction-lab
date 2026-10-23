@@ -1,14 +1,51 @@
 # Netlify Build & Deployment Configuration for BTCognitive Prediction Lab
+# ==============================================================================
+# Split Frontend / Backend Architecture
+# Static Frontend hosted on Netlify; FastAPI Backend hosted on Fly.io / Render / VPS.
 
 [build]
   publish = "web"
   command = ""
 
+# ------------------------------------------------------------------------------
+# Backend API Proxy (Optional - Alternative to setting backend URL in UI)
+# ------------------------------------------------------------------------------
+# To forward frontend API calls through Netlify to your remote backend,
+# uncomment and set your backend domain. Note: Specific proxy redirects MUST
+# appear before the catch-all SPA redirect rule.
+#
+# IMPORTANT: Netlify HTTP redirects DO NOT support proxying raw WebSockets (wss://).
+# WebSocket connections will connect directly to the backend URL via getWsBaseUrl().
+
+# [[redirects]]
+#   from = "/api/*"
+#   to = "https://btcognitive-engine.fly.dev/api/:splat"
+#   status = 200
+#   force = true
+
+# [[redirects]]
+#   from = "/health"
+#   to = "https://btcognitive-engine.fly.dev/health"
+#   status = 200
+#   force = true
+
+# [[redirects]]
+#   from = "/ping"
+#   to = "https://btcognitive-engine.fly.dev/ping"
+#   status = 200
+#   force = true
+
+# ------------------------------------------------------------------------------
+# Single-Page Application (SPA) Client-Side Route Fallback
+# ------------------------------------------------------------------------------
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
+# ------------------------------------------------------------------------------
+# Security & Cache Headers
+# ------------------------------------------------------------------------------
 [[headers]]
   for = "/*"
   [headers.values]

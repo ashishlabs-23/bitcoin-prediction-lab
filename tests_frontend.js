@@ -83,18 +83,83 @@ async function runTests() {
 
   // 5. Polling Request Budget Analysis
   console.log("Verifying UI Polling Budget against 60 req/min limit...");
-  // Normal mode active tab polling rates:
-  // App active position: every 5s -> 12 req/min
-  // Terminal markers: every 8s -> 7.5 req/min
-  // Laboratory data: every 15s -> 4 req/min
-  // Health: every 15s -> 4 req/min
-  // AI data: every 30s -> 2 req/min
   const totalReqPerMin = (60 / 5) + (60 / 8) + (60 / 15) + (60 / 15) + (60 / 30);
   assert(
     totalReqPerMin < 60,
     `Total UI steady-state polling (${totalReqPerMin} req/min) exceeds server rate limit (60 req/min)`
   );
   console.log(`Steady-state polling budget: ${totalReqPerMin} req/min (server limiter: 60 req/min). PASSED.`);
+
+  // 6. Endpoint & WebSocket Resolution (Same-Origin, Custom Origin, Netlify, WSS)
+  console.log("Testing API and WebSocket endpoint resolution...");
+  function resolveApi(mockStorage, mockWindow) {
+    const custom = mockStorage?.getItem?.("btcognitive_api_url");
+    if (custom) return custom;
+    if (mockWindow?.BTCOGNITIVE_API_URL) return mockWindow.BTCOGNITIVE_API_URL;
+    if (mockWindow?.__BTCOGNITIVE_CONFIG__?.apiUrl) return mockWindow.__BTCOGNITIVE_CONFIG__.apiUrl;
+    if (mockWindow?.NEXT_PUBLIC_API_URL) return mockWindow.NEXT_PUBLIC_API_URL;
+    if (mockWindow?.location?.origin && mockWindow.location.origin !== "null") {
+      return mockWindow.location.origin;
+    }
+    return "http://localhost:8000";
+  }
+
+  function resolveWs(mockStorage, mockWindow) {
+    const customWs = mockStorage?.getItem?.("btcognitive_ws_url");
+    if (customWs) return customWs;
+    if (mockWindow?.BTCOGNITIVE_WS_URL) return mockWindow.BTCOGNITIVE_WS_URL;
+    if (mockWindow?.__BTCOGNITIVE_CONFIG__?.wsUrl) return mockWindow.__BTCOGNITIVE_CONFIG__.wsUrl;
+
+    const apiUrl = resolveApi(mockStorage, mockWindow);
+    try {
+      const parsed = new URL(apiUrl);
+      const wsProto = parsed.protocol === "https:" ? "wss:" : "ws:";
+      return `${wsProto}//${parsed.host}/ws`;
+    } catch {
+      const host = (mockWindow?.location?.hostname) || "localhost";
+      return `ws://${host}:8000/ws`;
+    }
+  }
+
+  // Case A: Default localhost fallback
+  assert.strictEqual(resolveApi({}, {}), "http://localhost:8000");
+  assert.strictEqual(resolveWs({}, {}), "ws://localhost:8000/ws");
+
+  // Case B: Same-origin production (e.g. Docker / Fly.io container serving web/)
+  assert.strictEqual(
+    resolveApi({}, { location: { origin: "https://btcognitive-engine.fly.dev" } }),
+    "https://btcognitive-engine.fly.dev"
+  );
+  assert.strictEqual(
+    resolveWs({}, { location: { origin: "https://btcognitive-engine.fly.dev" } }),
+    "wss://btcognitive-engine.fly.dev/ws"
+  );
+
+  // Case C: Separately hosted frontend on Netlify with custom backend in localStorage
+  const netlifyStorage = {
+    data: { btcognitive_api_url: "https://btcognitive-api.fly.dev" },
+    getItem(k) { return this.data[k]; }
+  };
+  assert.strictEqual(
+    resolveApi(netlifyStorage, { location: { origin: "https://btcognitive.netlify.app" } }),
+    "https://btcognitive-api.fly.dev"
+  );
+  assert.strictEqual(
+    resolveWs(netlifyStorage, { location: { origin: "https://btcognitive.netlify.app" } }),
+    "wss://btcognitive-api.fly.dev/ws"
+  );
+
+  // Case D: Window global injection (BTCOGNITIVE_API_URL / BTCOGNITIVE_WS_URL)
+  assert.strictEqual(
+    resolveApi({}, { BTCOGNITIVE_API_URL: "https://custom-domain.com", location: { origin: "https://btcognitive.netlify.app" } }),
+    "https://custom-domain.com"
+  );
+  assert.strictEqual(
+    resolveWs({}, { BTCOGNITIVE_API_URL: "https://custom-domain.com", BTCOGNITIVE_WS_URL: "wss://custom-ws.com/ws" }),
+    "wss://custom-ws.com/ws"
+  );
+
+  console.log("All API and WebSocket endpoint resolution tests PASSED.");
 
   console.log("All Frontend Unit Tests Passed Successfully!");
 }

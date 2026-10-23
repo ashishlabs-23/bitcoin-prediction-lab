@@ -239,6 +239,9 @@ pytest tests/test_v29_status_contract_and_decision_anatomy.py -v
 
 # 5. Entry/TP/SL contract freeze, PIT invariants, and barrier resolver tests
 pytest tests/entry_tp_sl/ -v
+
+# 6. V29.1 Deployment integrity, storage persistence, and environment tests
+pytest tests/test_v29_1_deployment_integrity.py -v
 ```
 
 ---

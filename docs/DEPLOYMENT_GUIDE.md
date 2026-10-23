@@ -270,13 +270,25 @@ docker run -d \
 
 ### Docker Compose
 
+Modern Compose v2 / v5 configuration:
+
 ```bash
 docker compose up -d
 docker compose logs -f
 docker compose down
 ```
 
-The `docker-compose.yml` mounts `./data` for SQLite persistence across restarts.
+The updated `docker-compose.yml` mounts both state directories for complete persistence across container lifecycle events:
+- `./data:/app/data` — paper trade ledger (`paper_trade_ledger.jsonl`), research alert state (`research_alert_state.json`), and processed cache.
+- `./experiments/results:/app/experiments/results` — authoritative market memory (`market_memory.db`), arena accounts (`meie_memory.db`), and observatory records (`observatory.db`).
+
+Environment variables are passed directly:
+- `BTC_ENVIRONMENT=production`
+- `ENVIRONMENT=production`
+- `SQLITE_DB_PATH=/app/experiments/results/market_memory.db`
+- `MEIE_DB_PATH=/app/experiments/results/meie_memory.db`
+
+> **Windows Local Note:** Running Docker on Windows requires Docker Desktop. If running from a non-elevated terminal, ensure the `com.docker.service` background service is started before running container builds. Configuration can be validated at any time without a running daemon via `docker compose config`.
 
 ---
 
@@ -293,17 +305,21 @@ curl -L https://fly.io/install.sh | sh
 # 2. Authenticate
 flyctl auth login
 
-# 3. Set mandatory production secrets (never put keys in fly.toml)
+# 3. Provision persistent volume (CRITICAL: without this, container filesystem is ephemeral)
+flyctl volumes create btcognitive_data --region sin --size 1
+
+# 4. Set mandatory production secrets (never put keys in fly.toml)
 flyctl secrets set \
   BTC_ENVIRONMENT=production \
   BTCOGNITIVE_ADMIN_KEY="<32-byte-hex-key>" \
   BTCOGNITIVE_ALLOWED_ORIGINS="https://btcognitive-engine.fly.dev" \
   BTCOGNITIVE_ALLOWED_HOSTS="btcognitive-engine.fly.dev"
 
-# 4. Deploy using the multi-stage Dockerfile
+# 5. Deploy using the multi-stage Dockerfile
 flyctl deploy
 ```
 
+- **Storage Persistence:** Mounted at `/app/data` via `[mounts]`. In `fly.toml`, `SQLITE_DB_PATH = "/app/data/market_memory.db"` and `MEIE_DB_PATH = "/app/data/meie_memory.db"` guarantee market memory and trade ledgers survive machine rescheduling and container deployments.
 - **Health probe:** Configured at `GET /health` on port 8000 (grace period 15s, interval 30s).
 - **Resource sizing:** 512MB RAM (`shared-cpu-1x`), 1 machine minimum (`min_machines_running = 1` prevents cold starts).
 
@@ -323,7 +339,7 @@ BTCOGNITIVE_ALLOWED_ORIGINS=https://your-app.onrender.com
 BTCOGNITIVE_ALLOWED_HOSTS=your-app.onrender.com
 ```
 
-> **NOTE:** Render free tier spins down after 15 minutes of inactivity. For continuous market monitoring and persistent SQLite audit ledgers, Fly.io or a dedicated VPS is strongly recommended.
+> **NOTE:** Render free tier spins down after 15 minutes of inactivity and uses an ephemeral disk. For continuous market monitoring and persistent SQLite audit ledgers, Fly.io with a persistent volume or Turso LibSQL cloud database (`TURSO_DATABASE_URL`) is required.
 
 ### 9.3 Railway.app
 
@@ -333,17 +349,25 @@ railway login
 railway up
 ```
 
-Uses `Dockerfile` automatically.
+Uses `Dockerfile` automatically. Set environment variables in the Railway web dashboard.
 
-### 9.4 Netlify (frontend only)
+### 9.4 Netlify (Separately Hosted Frontend)
+
+You can host the static frontend on Netlify CDN while running the FastAPI backend on Fly.io, Render, or a VPS:
 
 ```bash
 netlify deploy --dir=web --prod
 ```
 
-The `netlify.toml` proxies `/api/*` to your backend. Set the backend URL in the redirect rule.
+#### Option A: Direct Backend Origin (Recommended)
+1. In the Web Terminal, open the **Institutional Settings** modal and set your backend URL (e.g. `https://btcognitive-engine.fly.dev`).
+2. Alternatively, set `window.BTCOGNITIVE_API_URL = "https://btcognitive-engine.fly.dev"` in `web/index.html`.
+3. `getApiBaseUrl()` routes REST requests to the backend, and `getWsBaseUrl()` automatically converts the origin to `wss://btcognitive-engine.fly.dev/ws` for real-time WebSocket telemetry.
+4. Add your Netlify domain (`https://your-site.netlify.app`) to the backend's `BTCOGNITIVE_ALLOWED_ORIGINS` environment variable.
 
-**IMPORTANT:** WebSocket connections must use `wss://` in production.
+#### Option B: Netlify HTTP Proxy (`netlify.toml`)
+Uncomment the proxy redirects in `netlify.toml` to route `/api/*`, `/health`, and `/ping` to your backend.
+- **WebSocket Caveat:** Netlify HTTP redirects **DO NOT** support raw WebSocket upgrades (`ws://` / `wss://`). WebSocket connections will always connect directly to the backend URL via `getWsBaseUrl()`. Ensure your backend host is accessible for WebSocket traffic.
 
 ### 9.5 Ubuntu/Debian VPS (systemd)
 

@@ -15,12 +15,14 @@ import os
 import sys
 import json
 import time
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from typing import List, Dict
 from collections import defaultdict
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, status
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, status, HTTPException
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -55,6 +57,7 @@ from api.routes_analogs import router as analogs_router
 from api.routes_terminal import router as terminal_router
 from api.market_monitor_routes import router as market_monitor_router
 from api.routes_research import router as research_router
+from api.routes_tournament import router as tournament_router
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -113,7 +116,7 @@ class HardenedConnectionManager:
 ws_manager = HardenedConnectionManager()
 
 
-from validation.startup_gate import verify_full_freeze_integrity, verify_scientific_contract
+from validation.startup_gate import evaluate_runtime_readiness, verify_scientific_contract
 
 # ---------------------------------------------------------------------------
 # Application Lifespan Context Manager
@@ -121,39 +124,74 @@ from validation.startup_gate import verify_full_freeze_integrity, verify_scienti
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Start read-only market monitoring even when frozen research cannot be authorized."""
+    """Authoritative lifecycle initializing market monitoring and verified production models."""
+    logger.info("Verifying scientific freeze contract before startup...")
+    # Priority 1 Scientific Startup Gate: refuses startup on tampered artifact or invalid contract
     verify_scientific_contract()
 
-    # A hash pass alone does not authorize inference. Until evaluation evidence
-    # and formal authorization are authenticated, this app serves the baseline only.
-    app.state.research_gate = {
-        "status": "BLOCKED_AUDIT_FAILURE",
-        "authorized": False,
-        "reason": (
-            "Freeze checks alone do not authorize production inference; "
-            "evaluation evidence and formal research authorization remain required."
-        ),
-    }
+    readiness = evaluate_runtime_readiness(force_refresh=True)
+    app.state.research_gate = readiness
 
-    logger.info("Initializing BTCognitive read-only market monitor...")
+    if readiness.get("authorized", False):
+        logger.info(
+            "Authoritative research gate AUTHORIZED [model=%s, target=%s]. Pre-warming canonical terminal...",
+            readiness.get("canonical_model_id"),
+            readiness.get("forecast_target")
+        )
+        try:
+            from api.routes_terminal import _init_live_terminal
+            _init_live_terminal()
+        except Exception as exc:
+            logger.warning("Terminal pre-initialization notice: %s", exc)
+    else:
+        logger.warning(
+            "Authoritative research gate BLOCKED [%s]: %s",
+            readiness.get("reason_code"),
+            readiness.get("reason")
+        )
+
+    logger.info("Initializing BTCognitive market data client and feature cache...")
     app.state.http = get_shared_client()
+    app.state.ws_manager = ws_manager
     feature_cache.initialize()
-    # Do not start live_engine in monitor-only mode.
+    # Live execution and background auto-retraining remain strictly disabled for security.
     live_engine.is_running = False
-    logger.warning("Production model inference and trading remain disabled; market monitor is available.")
+
+    # Start bounded periodic research-condition evaluation worker (interval=60s)
+    from api.notifications import notification_manager
+    async def _research_alert_worker():
+        logger.info("Started background research-condition alert evaluator (interval=60s).")
+        while True:
+            try:
+                await asyncio.sleep(60.0)
+                await notification_manager.evaluate_research_conditions(ws_manager=ws_manager)
+            except asyncio.CancelledError:
+                break
+            except Exception as exc:
+                logger.debug("Background research alert evaluator notice: %s", exc)
+
+    alert_worker_task = asyncio.create_task(_research_alert_worker())
+
     yield
 
-    logger.info("Shutting down BTCognitive market monitor...")
+    logger.info("Shutting down BTCognitive market monitor and alert worker...")
+    alert_worker_task.cancel()
+    try:
+        await alert_worker_task
+    except asyncio.CancelledError:
+        pass
     live_engine.is_running = False
     await close_shared_client()
     logger.info("Shutdown complete.")
+
 
 # ---------------------------------------------------------------------------
 # FastAPI App Initialization & Security Hardening
 # ---------------------------------------------------------------------------
 
-# Disable docs in production environment if set
-env_mode = os.getenv("BTC_ENVIRONMENT", "development").lower()
+# Disable interactive docs in production environment
+# BTC_ENVIRONMENT is canonical; ENVIRONMENT supported as legacy fallback
+env_mode = (os.getenv("BTC_ENVIRONMENT") or os.getenv("ENVIRONMENT") or "development").strip().lower()
 docs_url = "/docs" if env_mode != "production" else None
 redoc_url = "/redoc" if env_mode != "production" else None
 openapi_url = "/openapi.json" if env_mode != "production" else None
@@ -170,6 +208,8 @@ app = FastAPI(
 
 # 1. Global Exception Handler (Zero Information Leakage)
 app.add_exception_handler(Exception, sanitized_exception_handler)
+app.add_exception_handler(HTTPException, sanitized_exception_handler)
+app.add_exception_handler(StarletteHTTPException, sanitized_exception_handler)
 
 # 2. Security Headers Middleware (OWASP ASVS)
 app.add_middleware(SecurityHeadersMiddleware)
@@ -203,6 +243,7 @@ app.include_router(genome_router)
 app.include_router(analogs_router)
 app.include_router(terminal_router)
 app.include_router(research_router)
+app.include_router(tournament_router)
 
 
 

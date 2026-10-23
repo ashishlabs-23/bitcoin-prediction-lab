@@ -18,6 +18,8 @@ const abs = Math.abs;
 function getApiBaseUrl() {
   const custom = localStorage.getItem("btcognitive_api_url");
   if (custom) return custom;
+  if (typeof window !== "undefined" && window.BTCOGNITIVE_API_URL) return window.BTCOGNITIVE_API_URL;
+  if (typeof window !== "undefined" && window.__BTCOGNITIVE_CONFIG__?.apiUrl) return window.__BTCOGNITIVE_CONFIG__.apiUrl;
   if (typeof window !== "undefined" && window.NEXT_PUBLIC_API_URL) return window.NEXT_PUBLIC_API_URL;
   if (typeof window !== "undefined" && window.location && window.location.origin && window.location.origin !== "null") {
     return window.location.origin;
@@ -47,6 +49,11 @@ function setApiBaseUrl(url) {
 }
 
 function getWsBaseUrl() {
+  const customWs = localStorage.getItem("btcognitive_ws_url");
+  if (customWs) return customWs;
+  if (typeof window !== "undefined" && window.BTCOGNITIVE_WS_URL) return window.BTCOGNITIVE_WS_URL;
+  if (typeof window !== "undefined" && window.__BTCOGNITIVE_CONFIG__?.wsUrl) return window.__BTCOGNITIVE_CONFIG__.wsUrl;
+
   const apiUrl = getApiBaseUrl();
   try {
     const parsed = new URL(apiUrl);

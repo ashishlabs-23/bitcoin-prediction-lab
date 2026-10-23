@@ -28,7 +28,7 @@ from backtest.execution_simulator import ExecutionSimulator
 
 logger = logging.getLogger("btcognitive.arena_accounts")
 
-MEIE_DB_PATH = os.path.join(RESULTS_DIR, "meie_memory.db")
+MEIE_DB_PATH = os.getenv("MEIE_DB_PATH") or os.path.join(RESULTS_DIR, "meie_memory.db")
 
 # Locked constants (per implementation plan defaults)
 INITIAL_NAV     = 10_000.0   # Virtual USD per account
