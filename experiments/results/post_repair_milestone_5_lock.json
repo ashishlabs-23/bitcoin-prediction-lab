@@ -1,10 +1,10 @@
 {
   "milestone": "MILESTONE_5_POST_REPAIR_VALID",
-  "milestone_timestamp": "2026-10-14T03:10:15.799606+00:00",
+  "milestone_timestamp": "2026-10-21T08:12:54.250058+00:00",
   "evidence_boundary": "2026-08-21T12:15:00Z",
   "observed_valid_blocks": 5,
-  "production_model_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-  "context_hash": "8f48b11c990b7987a04918e6ec29a67a989f71eaf8e544ebdf8edf60c20b0c89",
+  "production_model_hash": "750b5d15ed84c3cf24b8484ae928ff7c8098cab0c35eafe310ab28bf57ed285b",
+  "context_hash": "841deba5fb30118bea849f93ebc9fb7d1984d74fd2d709013544c6d5db94cf07",
   "repair_version": "v1.0.0-production-data-consistency-repair",
   "status": "LOCKED"
 }

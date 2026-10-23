@@ -1,0 +1,82 @@
+{
+  "experiment_id": "EXP-RESEARCH-TO-SIGNAL-V3-SELECTIVE",
+  "timestamp_utc": "2026-10-17T07:44:31.395713+00:00",
+  "dataset": "data/raw/ohlcv.parquet",
+  "total_bars": 41261,
+  "split_counts": {
+    "train_bars": 26089,
+    "val_bars": 8737,
+    "test_bars": 6175
+  },
+  "purging_embargo_bars": 24,
+  "barrier_parameters": {
+    "horizon_hours": 24,
+    "tp_multiplier": 1.5,
+    "sl_multiplier": 1.0,
+    "collision_policy": "SL_FIRST_CONSERVATIVE"
+  },
+  "execution_cost_schedule": {
+    "binance_futures_roundtrip_bps": 15.25,
+    "coinbase_spot_tier1_roundtrip_bps": 87.0
+  },
+  "portfolio_policy": "SINGLE_POSITION_AT_A_TIME",
+  "candidates": {
+    "Candidate_0_No_Trade_Baseline": {
+      "candidate_id": "CAND-0-NO-TRADE",
+      "description": "Zero directional exposure reference baseline",
+      "trades": 0,
+      "gross_expectancy_bps": 0.0,
+      "net_expectancy_binance_bps": 0.0,
+      "net_expectancy_coinbase_bps": 0.0,
+      "tp_first_pct": 0.0,
+      "sl_first_pct": 0.0,
+      "timeout_pct": 0.0,
+      "economic_verdict": "ABSTAIN_NEUTRAL"
+    },
+    "Candidate_1_Momentum_24h_Baseline": {
+      "trades": 128,
+      "gross_expectancy_bps": -7.15,
+      "net_expectancy_binance_bps": -22.4,
+      "net_expectancy_coinbase_bps": -94.15,
+      "tp_first_pct": 13.28,
+      "sl_first_pct": 29.69,
+      "timeout_pct": 46.09,
+      "mean_holding_hours": 16.3,
+      "economic_verdict": "FAIL_NEGATIVE_AFTER_COSTS",
+      "candidate_id": "CAND-1-MOMENTUM-24H-CORRECTED",
+      "description": "Causal 24h momentum evaluated under single-position portfolio and two-sided costs"
+    },
+    "Candidate_2_Cost_Aware_Filter": {
+      "trades": 0,
+      "gross_expectancy_bps": 0.0,
+      "net_expectancy_binance_bps": 0.0,
+      "net_expectancy_coinbase_bps": 0.0,
+      "tp_first_pct": 0.0,
+      "sl_first_pct": 0.0,
+      "timeout_pct": 0.0,
+      "mean_holding_hours": 0.0,
+      "economic_verdict": "ABSTAIN_NEUTRAL",
+      "candidate_id": "CAND-2-COST-AWARE-FILTER",
+      "description": "Selective entry requiring predicted return to exceed roundtrip cost hurdle",
+      "hurdle_bps": 15.25
+    },
+    "Candidate_3_Meta_Label_Filter": {
+      "trades": 108,
+      "gross_expectancy_bps": 10.32,
+      "net_expectancy_binance_bps": -4.93,
+      "net_expectancy_coinbase_bps": -76.68,
+      "tp_first_pct": 14.81,
+      "sl_first_pct": 24.07,
+      "timeout_pct": 48.15,
+      "mean_holding_hours": 16.7,
+      "economic_verdict": "FAIL_NEGATIVE_AFTER_COSTS",
+      "candidate_id": "CAND-3-META-LABEL-FILTER",
+      "description": "24h Momentum primary side filtered by secondary logistic probability model",
+      "brier_score": 0.2439,
+      "log_loss": 0.6809,
+      "decision_threshold": 0.45
+    }
+  },
+  "governed_conclusion": "NO_CANDIDATE_PASSED_PREREGISTERED_GATE",
+  "execution_authorization": "DISABLED"
+}

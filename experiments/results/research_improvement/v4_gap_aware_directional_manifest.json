@@ -1,0 +1,117 @@
+{
+  "experiment_id": "EXP-RESEARCH-TO-SIGNAL-V4-GAP-AWARE",
+  "timestamp_utc": "2026-10-17T08:05:58.061694+00:00",
+  "dataset": "data/raw/ohlcv.parquet",
+  "market_provenance": {
+    "source_exchange": "Coinbase Advanced",
+    "instrument": "BTC-USD",
+    "market_type": "SPOT",
+    "primary_empirical_backtest": "Coinbase Spot Tier 1 (87.0 bps)",
+    "hypothetical_sensitivity_scenario": "Hypothetical Binance USDT-M Futures Perpetual Sensitivity (15.25 bps)"
+  },
+  "time_series_continuity": {
+    "total_input_bars": 41261,
+    "continuous_segments_count": 3,
+    "identified_gaps": [
+      {
+        "gap_id": 1,
+        "gap_start_index": 10740,
+        "gap_end_index": 10741,
+        "gap_start_timestamp": "2023-03-24T12:00:00+00:00",
+        "gap_end_timestamp": "2023-03-24T14:00:00+00:00",
+        "elapsed_hours": 2.0,
+        "missing_hours": 1.0
+      },
+      {
+        "gap_id": 2,
+        "gap_start_index": 40901,
+        "gap_end_index": 40902,
+        "gap_start_timestamp": "2026-09-01T06:00:00+00:00",
+        "gap_end_timestamp": "2026-10-02T05:00:00+00:00",
+        "elapsed_hours": 743.0,
+        "missing_hours": 742.0
+      }
+    ],
+    "purging_embargo_hours": 24
+  },
+  "sample_split_bars": {
+    "train_bars": 25873,
+    "val_bars": 8736,
+    "test_bars": 5959
+  },
+  "barrier_parameters": {
+    "horizon_hours": 24,
+    "tp_multiplier": 1.5,
+    "sl_multiplier": 1.0,
+    "collision_policy": "SL_FIRST_CONSERVATIVE"
+  },
+  "execution_costs": {
+    "coinbase_spot_tier1_roundtrip_bps": 87.0,
+    "binance_futures_hypothetical_bps": 15.0
+  },
+  "portfolio_policy": "SINGLE_POSITION_AT_A_TIME",
+  "candidates": {
+    "Candidate_0_No_Trade_Baseline": {
+      "candidate_id": "CAND-0-NO-TRADE",
+      "description": "Zero directional exposure benchmark",
+      "trades": 0,
+      "gross_expectancy_bps": 0.0,
+      "net_expectancy_coinbase_bps": 0.0,
+      "net_expectancy_binance_hypothetical_bps": 0.0,
+      "tp_first_pct": 0.0,
+      "sl_first_pct": 0.0,
+      "timeout_pct": 0.0,
+      "economic_verdict": "ABSTAIN_NEUTRAL"
+    },
+    "Candidate_1_Momentum_24h_Baseline": {
+      "trades": 227,
+      "gross_expectancy_bps": 8.91,
+      "net_expectancy_coinbase_bps": -78.09,
+      "net_expectancy_binance_hypothetical_bps": -6.09,
+      "tp_first_pct": 18.5,
+      "sl_first_pct": 34.36,
+      "timeout_pct": 47.14,
+      "mean_holding_hours": 17.1,
+      "economic_verdict": "FAIL_NEGATIVE_AFTER_COSTS",
+      "candidate_id": "CAND-1-MOMENTUM-24H-GAP-SAFE",
+      "description": "Causal 24h momentum evaluated under gap-safe single-position portfolio accounting"
+    },
+    "Candidate_2_Cost_Aware_Filter": {
+      "trades": 0,
+      "gross_expectancy_bps": 0.0,
+      "net_expectancy_coinbase_bps": 0.0,
+      "net_expectancy_binance_hypothetical_bps": 0.0,
+      "tp_first_pct": 0.0,
+      "sl_first_pct": 0.0,
+      "timeout_pct": 0.0,
+      "mean_holding_hours": 0.0,
+      "economic_verdict": "ABSTAIN_NEUTRAL",
+      "candidate_id": "CAND-2-COST-AWARE-FILTER",
+      "description": "Selective entry requiring predicted return to exceed roundtrip friction hurdle",
+      "hurdle_bps": 15.0
+    },
+    "Candidate_3_Meta_Label_Filter": {
+      "trades": 1,
+      "gross_expectancy_bps": -221.15,
+      "net_expectancy_coinbase_bps": -308.15,
+      "net_expectancy_binance_hypothetical_bps": -236.15,
+      "tp_first_pct": 0.0,
+      "sl_first_pct": 0.0,
+      "timeout_pct": 100.0,
+      "mean_holding_hours": 24.0,
+      "economic_verdict": "FAIL_NEGATIVE_AFTER_COSTS",
+      "candidate_id": "CAND-3-META-LABEL-FILTER",
+      "description": "24h Momentum filtered by secondary logistic probability model",
+      "brier_score_model": 0.2485,
+      "brier_score_constant_prevalence_baseline": 0.248,
+      "brier_score_naive_50_baseline": 0.25,
+      "log_loss_model": 0.6901,
+      "log_loss_constant_prevalence_baseline": 0.6892,
+      "train_positive_class_prevalence": 0.4224,
+      "test_positive_class_prevalence": 0.4485,
+      "decision_threshold": 0.45
+    }
+  },
+  "governed_conclusion": "NO_CANDIDATE_PASSED_PREREGISTERED_GATE",
+  "execution_authorization": "DISABLED"
+}

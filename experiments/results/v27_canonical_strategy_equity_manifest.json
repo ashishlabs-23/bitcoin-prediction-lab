@@ -1,0 +1,256 @@
+{
+  "manifest_version": "27.0.0",
+  "created_at_utc": "2026-10-19T22:42:00Z",
+  "dataset_provenance": {
+    "path": "data/raw/ohlcv.parquet",
+    "sha256": "43c8881b57431759f68fcb7036d78432449d079b11bcaea45f0d0ecfa287e2f6",
+    "evaluation_bars": 9975,
+    "calendar_days": 415.625
+  },
+  "transition_accounting_contract": {
+    "initial_state": "Portfolio starts FLAT (0 exposure) at index 0",
+    "entry_cost": "Initial position s_0 incurs turnover = |s_0 - 0| = 1 unit (half RT fee)",
+    "reversal_cost": "Position flip (+1 to -1 or -1 to +1) incurs turnover = 2 units (full RT fee)",
+    "exit_cost": "Position close (s_t to 0) incurs turnover = 1 unit (half RT fee)",
+    "turnover_formula": "sum(|s_t - s_{t-1}|) with prepend=0",
+    "completed_round_trips": "Turnover Units / 2.0"
+  },
+  "return_accounting_contract": {
+    "additive_log_bps": "sum(s_t * ln(C_{t+1}/C_t)) * 10000 - Turnover * half_cost_bps (NOT a simple percentage!)",
+    "compounded_simple_equity": "E_t = E_{t-1} * (1 - change_t * half_fee_rate) * (1 + s_t * (C_{t+1}-C_t)/C_t)",
+    "cumulative_simple_return_pct": "(E_final - 1.0) * 100",
+    "max_drawdown_pct": "max_t((peak_t - E_t) / peak_t) * 100"
+  },
+  "strategies": {
+    "NO_TRADE_BENCHMARK": {
+      "strategy_id": "NO_TRADE_BENCHMARK",
+      "events_count": 0,
+      "reversals_count": 0,
+      "one_step_transitions": 0,
+      "turnover_units": 0.0,
+      "completed_round_trips": 0.0,
+      "gross_log_return_bps": 0.0,
+      "scenarios": {
+        "COINBASE_RETAIL": {
+          "round_trip_bps": 87.0,
+          "total_friction_bps": 0.0,
+          "net_log_return_bps": 0.0,
+          "implied_simple_return_from_log_pct": 0.0,
+          "compounded_equity_cumulative_return_pct": 0.0,
+          "compounded_equity_max_drawdown_pct": 0.0,
+          "verdict": "DECISIVE_WINNER"
+        },
+        "BINANCE_SPOT_VIP0": {
+          "round_trip_bps": 24.0,
+          "total_friction_bps": 0.0,
+          "net_log_return_bps": 0.0,
+          "implied_simple_return_from_log_pct": 0.0,
+          "compounded_equity_cumulative_return_pct": 0.0,
+          "compounded_equity_max_drawdown_pct": 0.0,
+          "verdict": "DECISIVE_WINNER"
+        },
+        "INSTITUTIONAL_LOW_COST": {
+          "round_trip_bps": 14.0,
+          "total_friction_bps": 0.0,
+          "net_log_return_bps": 0.0,
+          "implied_simple_return_from_log_pct": 0.0,
+          "compounded_equity_cumulative_return_pct": 0.0,
+          "compounded_equity_max_drawdown_pct": 0.0,
+          "verdict": "DECISIVE_WINNER"
+        }
+      }
+    },
+    "TS_MOM_DUAL_EMA": {
+      "strategy_id": "TS_MOM_DUAL_EMA",
+      "events_count": 100,
+      "reversals_count": 99,
+      "one_step_transitions": 1,
+      "turnover_units": 199.0,
+      "completed_round_trips": 99.5,
+      "gross_log_return_bps": 1570.6,
+      "scenarios": {
+        "COINBASE_RETAIL": {
+          "round_trip_bps": 87.0,
+          "total_friction_bps": 8656.5,
+          "net_log_return_bps": -7085.9,
+          "implied_simple_return_from_log_pct": -50.77,
+          "compounded_equity_cumulative_return_pct": -56.97,
+          "compounded_equity_max_drawdown_pct": 68.76,
+          "verdict": "REJECTED_UNPROFITABLE"
+        },
+        "BINANCE_SPOT_VIP0": {
+          "round_trip_bps": 24.0,
+          "total_friction_bps": 2388.0,
+          "net_log_return_bps": -817.4,
+          "implied_simple_return_from_log_pct": -7.85,
+          "compounded_equity_cumulative_return_pct": -19.17,
+          "compounded_equity_max_drawdown_pct": 49.43,
+          "verdict": "REJECTED_UNPROFITABLE"
+        },
+        "INSTITUTIONAL_LOW_COST": {
+          "round_trip_bps": 14.0,
+          "total_friction_bps": 1393.0,
+          "net_log_return_bps": 177.6,
+          "implied_simple_return_from_log_pct": 1.79,
+          "compounded_equity_cumulative_return_pct": -10.7,
+          "compounded_equity_max_drawdown_pct": 46.42,
+          "verdict": "REJECTED_UNPROFITABLE"
+        }
+      }
+    },
+    "TRUE_DUAL_SMA_REFERENCE": {
+      "strategy_id": "TRUE_DUAL_SMA_REFERENCE",
+      "events_count": 105,
+      "reversals_count": 104,
+      "one_step_transitions": 1,
+      "turnover_units": 209.0,
+      "completed_round_trips": 104.5,
+      "gross_log_return_bps": -438.7,
+      "scenarios": {
+        "COINBASE_RETAIL": {
+          "round_trip_bps": 87.0,
+          "total_friction_bps": 9091.5,
+          "net_log_return_bps": -9530.2,
+          "implied_simple_return_from_log_pct": -61.44,
+          "compounded_equity_cumulative_return_pct": -66.38,
+          "compounded_equity_max_drawdown_pct": 73.21,
+          "verdict": "REJECTED_UNPROFITABLE"
+        },
+        "BINANCE_SPOT_VIP0": {
+          "round_trip_bps": 24.0,
+          "total_friction_bps": 2508.0,
+          "net_log_return_bps": -2946.7,
+          "implied_simple_return_from_log_pct": -25.52,
+          "compounded_equity_cumulative_return_pct": -34.83,
+          "compounded_equity_max_drawdown_pct": 54.38,
+          "verdict": "REJECTED_UNPROFITABLE"
+        },
+        "INSTITUTIONAL_LOW_COST": {
+          "round_trip_bps": 14.0,
+          "total_friction_bps": 1463.0,
+          "net_log_return_bps": -1901.7,
+          "implied_simple_return_from_log_pct": -17.32,
+          "compounded_equity_cumulative_return_pct": -27.63,
+          "compounded_equity_max_drawdown_pct": 50.38,
+          "verdict": "REJECTED_UNPROFITABLE"
+        }
+      }
+    },
+    "SHORT_HORIZON_MR": {
+      "strategy_id": "SHORT_HORIZON_MR",
+      "events_count": 642,
+      "reversals_count": 0,
+      "one_step_transitions": 642,
+      "turnover_units": 642.0,
+      "completed_round_trips": 321.0,
+      "gross_log_return_bps": -370.5,
+      "scenarios": {
+        "COINBASE_RETAIL": {
+          "round_trip_bps": 87.0,
+          "total_friction_bps": 27927.0,
+          "net_log_return_bps": -28297.5,
+          "implied_simple_return_from_log_pct": -94.1,
+          "compounded_equity_cumulative_return_pct": -94.22,
+          "compounded_equity_max_drawdown_pct": 94.22,
+          "verdict": "REJECTED_UNPROFITABLE"
+        },
+        "BINANCE_SPOT_VIP0": {
+          "round_trip_bps": 24.0,
+          "total_friction_bps": 7704.0,
+          "net_log_return_bps": -8074.5,
+          "implied_simple_return_from_log_pct": -55.4,
+          "compounded_equity_cumulative_return_pct": -56.1,
+          "compounded_equity_max_drawdown_pct": 57.82,
+          "verdict": "REJECTED_UNPROFITABLE"
+        },
+        "INSTITUTIONAL_LOW_COST": {
+          "round_trip_bps": 14.0,
+          "total_friction_bps": 4494.0,
+          "net_log_return_bps": -4864.5,
+          "implied_simple_return_from_log_pct": -38.52,
+          "compounded_equity_cumulative_return_pct": -39.46,
+          "compounded_equity_max_drawdown_pct": 43.0,
+          "verdict": "REJECTED_UNPROFITABLE"
+        }
+      }
+    },
+    "VOL_COMPRESSION": {
+      "strategy_id": "VOL_COMPRESSION",
+      "events_count": 893,
+      "reversals_count": 3,
+      "one_step_transitions": 890,
+      "turnover_units": 896.0,
+      "completed_round_trips": 448.0,
+      "gross_log_return_bps": 2686.0,
+      "scenarios": {
+        "COINBASE_RETAIL": {
+          "round_trip_bps": 87.0,
+          "total_friction_bps": 38976.0,
+          "net_log_return_bps": -36290.0,
+          "implied_simple_return_from_log_pct": -97.35,
+          "compounded_equity_cumulative_return_pct": -97.4,
+          "compounded_equity_max_drawdown_pct": 97.4,
+          "verdict": "REJECTED_UNPROFITABLE"
+        },
+        "BINANCE_SPOT_VIP0": {
+          "round_trip_bps": 24.0,
+          "total_friction_bps": 10752.0,
+          "net_log_return_bps": -8066.0,
+          "implied_simple_return_from_log_pct": -55.36,
+          "compounded_equity_cumulative_return_pct": -55.92,
+          "compounded_equity_max_drawdown_pct": 56.23,
+          "verdict": "REJECTED_UNPROFITABLE"
+        },
+        "INSTITUTIONAL_LOW_COST": {
+          "round_trip_bps": 14.0,
+          "total_friction_bps": 6272.0,
+          "net_log_return_bps": -3586.0,
+          "implied_simple_return_from_log_pct": -30.13,
+          "compounded_equity_cumulative_return_pct": -30.97,
+          "compounded_equity_max_drawdown_pct": 32.92,
+          "verdict": "REJECTED_UNPROFITABLE"
+        }
+      }
+    },
+    "REGIME_ROUTER": {
+      "strategy_id": "REGIME_ROUTER",
+      "events_count": 1011,
+      "reversals_count": 105,
+      "one_step_transitions": 906,
+      "turnover_units": 1116.0,
+      "completed_round_trips": 558.0,
+      "gross_log_return_bps": -3561.3,
+      "scenarios": {
+        "COINBASE_RETAIL": {
+          "round_trip_bps": 87.0,
+          "total_friction_bps": 48546.0,
+          "net_log_return_bps": -52107.3,
+          "implied_simple_return_from_log_pct": -99.45,
+          "compounded_equity_cumulative_return_pct": -99.5,
+          "compounded_equity_max_drawdown_pct": 99.51,
+          "verdict": "REJECTED_UNPROFITABLE"
+        },
+        "BINANCE_SPOT_VIP0": {
+          "round_trip_bps": 24.0,
+          "total_friction_bps": 13392.0,
+          "net_log_return_bps": -16953.3,
+          "implied_simple_return_from_log_pct": -81.65,
+          "compounded_equity_cumulative_return_pct": -82.92,
+          "compounded_equity_max_drawdown_pct": 84.3,
+          "verdict": "REJECTED_UNPROFITABLE"
+        },
+        "INSTITUTIONAL_LOW_COST": {
+          "round_trip_bps": 14.0,
+          "total_friction_bps": 7812.0,
+          "net_log_return_bps": -11373.3,
+          "implied_simple_return_from_log_pct": -67.93,
+          "compounded_equity_cumulative_return_pct": -70.14,
+          "compounded_equity_max_drawdown_pct": 73.49,
+          "verdict": "REJECTED_UNPROFITABLE"
+        }
+      }
+    }
+  },
+  "governance_verdict": "NO_STRATEGY_WINNER_ESTABLISHED",
+  "execution_authorization": "DISABLED \u2014 ANALYSIS ONLY"
+}

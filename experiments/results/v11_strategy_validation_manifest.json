@@ -1,0 +1,1199 @@
+{
+  "document_title": "BTCognitive V11 Strategy Discovery & Cost-Aware Validation Manifest",
+  "generation_utc": "2026-10-17T17:22:07.482488+00:00",
+  "release_verdict": "V11_NO_CANDIDATE_SURVIVES_VALIDATION",
+  "governance_invariants": {
+    "live_trading": "DISABLED",
+    "directional_recommendation": "ABSTAIN",
+    "model_readiness": "OFFLINE_RESEARCH_ONLY"
+  },
+  "data_lineage": {
+    "file_path": "C:\\Projects\\BTCognitive\\BTCognitive\\data\\raw\\coinbase_15m.parquet",
+    "file_sha256": "c92372421a5d4d27ef14fdb25af4f4203b338ad071e39ba40ab6bdf54f27d50d",
+    "manifest_sha256": "c92372421a5d4d27ef14fdb25af4f4203b338ad071e39ba40ab6bdf54f27d50d",
+    "hash_matched": true,
+    "row_count": 600,
+    "first_candle_utc": "2026-10-11 11:15:00+00:00",
+    "last_candle_utc": "2026-10-17 17:00:00+00:00",
+    "first_epoch": 1791717300,
+    "last_epoch": 1792256400,
+    "gap_count": 0,
+    "non_increasing_violations": 0,
+    "is_continuous": true,
+    "example_timestamp_audit": {
+      "v10_audit_example_epoch": 1760700600,
+      "v10_audit_example_utc": "2025-10-17T11:30:00Z",
+      "classification": "HISTORICAL_STATIC_TEST_FIXTURE_SNAPSHOT",
+      "is_runtime_origin": false,
+      "runtime_latest_epoch": 1792256400,
+      "runtime_latest_utc": "2026-10-17 17:00:00+00:00"
+    }
+  },
+  "split_chronology": {
+    "total_15m_bars": 600,
+    "warmup_bars": 64,
+    "train_bars": 321,
+    "validation_bars": 106,
+    "holdout_bars": 107,
+    "train_interval_utc": [
+      "2026-10-12 03:15:00+00:00",
+      "2026-10-15 11:15:00+00:00"
+    ],
+    "validation_interval_utc": [
+      "2026-10-15 11:45:00+00:00",
+      "2026-10-16 14:00:00+00:00"
+    ],
+    "holdout_interval_utc": [
+      "2026-10-16 14:30:00+00:00",
+      "2026-10-17 17:00:00+00:00"
+    ]
+  },
+  "cost_scenarios": {
+    "COINBASE_RETAIL_87BPS": {
+      "name": "Coinbase Advanced Retail Tier 1",
+      "market_type": "SPOT",
+      "round_trip_bps": 87.0,
+      "two_sided_commission_bps": 80.0,
+      "two_sided_spread_bps": 3.0,
+      "two_sided_slippage_bps": 4.0,
+      "funding_bps": 0.0,
+      "is_hypothetical": false,
+      "description": "Empirical retail spot tier (<$10k volume) taker entry and exit"
+    },
+    "COINBASE_INSTITUTIONAL_18BPS": {
+      "name": "Coinbase Institutional High-Volume Tier 5+",
+      "market_type": "SPOT",
+      "round_trip_bps": 18.6,
+      "two_sided_commission_bps": 11.6,
+      "two_sided_spread_bps": 3.0,
+      "two_sided_slippage_bps": 4.0,
+      "funding_bps": 0.0,
+      "is_hypothetical": false,
+      "description": "Empirical institutional spot tier (9.3 bps per leg) taker entry and exit"
+    },
+    "BINANCE_PERP_15BPS": {
+      "name": "Binance USDT-M Perpetual",
+      "market_type": "PERPETUAL",
+      "round_trip_bps": 15.0,
+      "two_sided_commission_bps": 10.0,
+      "two_sided_spread_bps": 1.0,
+      "two_sided_slippage_bps": 2.0,
+      "funding_bps": 2.0,
+      "is_hypothetical": true,
+      "description": "Hypothetical derivative venue standard VIP 0 schedule with 16h funding hold"
+    }
+  },
+  "holdout_survivors": [],
+  "evaluation_results": {
+    "TRAIN": {
+      "NO_TRADE": {
+        "COINBASE_RETAIL_87BPS": {
+          "strategy_id": "NO_TRADE",
+          "cost_scenario": "COINBASE_RETAIL_87BPS",
+          "trades_count": 0,
+          "win_count": 0,
+          "loss_count": 0,
+          "win_rate": 0.0,
+          "win_rate_ci_95": [
+            0.0,
+            0.0
+          ],
+          "avg_win_bps": 0.0,
+          "avg_loss_bps": 0.0,
+          "net_expectancy_bps": 0.0,
+          "net_expectancy_ci_95": [
+            0.0,
+            0.0
+          ],
+          "profit_factor": 0.0,
+          "cumulative_return_pct": 0.0,
+          "max_drawdown_pct": 0.0,
+          "longest_loss_streak": 0,
+          "sharpe_ratio": 0.0,
+          "calmar_ratio": 0.0,
+          "avg_holding_bars": 0.0,
+          "worst_trade_bps": 0.0,
+          "cvar_95_bps": 0.0,
+          "stop_frequency": 0.0,
+          "timeout_frequency": 0.0
+        },
+        "COINBASE_INSTITUTIONAL_18BPS": {
+          "strategy_id": "NO_TRADE",
+          "cost_scenario": "COINBASE_INSTITUTIONAL_18BPS",
+          "trades_count": 0,
+          "win_count": 0,
+          "loss_count": 0,
+          "win_rate": 0.0,
+          "win_rate_ci_95": [
+            0.0,
+            0.0
+          ],
+          "avg_win_bps": 0.0,
+          "avg_loss_bps": 0.0,
+          "net_expectancy_bps": 0.0,
+          "net_expectancy_ci_95": [
+            0.0,
+            0.0
+          ],
+          "profit_factor": 0.0,
+          "cumulative_return_pct": 0.0,
+          "max_drawdown_pct": 0.0,
+          "longest_loss_streak": 0,
+          "sharpe_ratio": 0.0,
+          "calmar_ratio": 0.0,
+          "avg_holding_bars": 0.0,
+          "worst_trade_bps": 0.0,
+          "cvar_95_bps": 0.0,
+          "stop_frequency": 0.0,
+          "timeout_frequency": 0.0
+        },
+        "BINANCE_PERP_15BPS": {
+          "strategy_id": "NO_TRADE",
+          "cost_scenario": "BINANCE_PERP_15BPS",
+          "trades_count": 0,
+          "win_count": 0,
+          "loss_count": 0,
+          "win_rate": 0.0,
+          "win_rate_ci_95": [
+            0.0,
+            0.0
+          ],
+          "avg_win_bps": 0.0,
+          "avg_loss_bps": 0.0,
+          "net_expectancy_bps": 0.0,
+          "net_expectancy_ci_95": [
+            0.0,
+            0.0
+          ],
+          "profit_factor": 0.0,
+          "cumulative_return_pct": 0.0,
+          "max_drawdown_pct": 0.0,
+          "longest_loss_streak": 0,
+          "sharpe_ratio": 0.0,
+          "calmar_ratio": 0.0,
+          "avg_holding_bars": 0.0,
+          "worst_trade_bps": 0.0,
+          "cvar_95_bps": 0.0,
+          "stop_frequency": 0.0,
+          "timeout_frequency": 0.0
+        }
+      },
+      "TS_MOM_TREND": {
+        "COINBASE_RETAIL_87BPS": {
+          "strategy_id": "TS_MOM_TREND",
+          "cost_scenario": "COINBASE_RETAIL_87BPS",
+          "trades_count": 0,
+          "win_count": 0,
+          "loss_count": 0,
+          "win_rate": 0.0,
+          "win_rate_ci_95": [
+            0.0,
+            0.0
+          ],
+          "avg_win_bps": 0.0,
+          "avg_loss_bps": 0.0,
+          "net_expectancy_bps": 0.0,
+          "net_expectancy_ci_95": [
+            0.0,
+            0.0
+          ],
+          "profit_factor": 0.0,
+          "cumulative_return_pct": 0.0,
+          "max_drawdown_pct": 0.0,
+          "longest_loss_streak": 0,
+          "sharpe_ratio": 0.0,
+          "calmar_ratio": 0.0,
+          "avg_holding_bars": 0.0,
+          "worst_trade_bps": 0.0,
+          "cvar_95_bps": 0.0,
+          "stop_frequency": 0.0,
+          "timeout_frequency": 0.0
+        },
+        "COINBASE_INSTITUTIONAL_18BPS": {
+          "strategy_id": "TS_MOM_TREND",
+          "cost_scenario": "COINBASE_INSTITUTIONAL_18BPS",
+          "trades_count": 40,
+          "win_count": 15,
+          "loss_count": 25,
+          "win_rate": 0.375,
+          "win_rate_ci_95": [
+            0.2422,
+            0.5297
+          ],
+          "avg_win_bps": 31.43,
+          "avg_loss_bps": -45.91,
+          "net_expectancy_bps": -16.91,
+          "net_expectancy_ci_95": [
+            -24.08,
+            -9.22
+          ],
+          "profit_factor": 0.411,
+          "cumulative_return_pct": -6.57,
+          "max_drawdown_pct": 6.53,
+          "longest_loss_streak": 3,
+          "sharpe_ratio": -44.211,
+          "calmar_ratio": -1.007,
+          "avg_holding_bars": 3.4,
+          "worst_trade_bps": -66.39,
+          "cvar_95_bps": -64.72,
+          "stop_frequency": 0.6,
+          "timeout_frequency": 0.05
+        },
+        "BINANCE_PERP_15BPS": {
+          "strategy_id": "TS_MOM_TREND",
+          "cost_scenario": "BINANCE_PERP_15BPS",
+          "trades_count": 47,
+          "win_count": 17,
+          "loss_count": 30,
+          "win_rate": 0.3617,
+          "win_rate_ci_95": [
+            0.2397,
+            0.5046
+          ],
+          "avg_win_bps": 32.8,
+          "avg_loss_bps": -40.94,
+          "net_expectancy_bps": -14.27,
+          "net_expectancy_ci_95": [
+            -22.31,
+            -6.28
+          ],
+          "profit_factor": 0.454,
+          "cumulative_return_pct": -6.52,
+          "max_drawdown_pct": 7.18,
+          "longest_loss_streak": 3,
+          "sharpe_ratio": -40.458,
+          "calmar_ratio": -0.909,
+          "avg_holding_bars": 3.2,
+          "worst_trade_bps": -62.79,
+          "cvar_95_bps": -61.11,
+          "stop_frequency": 0.617,
+          "timeout_frequency": 0.0426
+        }
+      },
+      "VOL_BREAKOUT_REGIME": {
+        "COINBASE_RETAIL_87BPS": {
+          "strategy_id": "VOL_BREAKOUT_REGIME",
+          "cost_scenario": "COINBASE_RETAIL_87BPS",
+          "trades_count": 12,
+          "win_count": 0,
+          "loss_count": 12,
+          "win_rate": 0.0,
+          "win_rate_ci_95": [
+            0.0,
+            0.2425
+          ],
+          "avg_win_bps": 0.0,
+          "avg_loss_bps": -88.7,
+          "net_expectancy_bps": -88.7,
+          "net_expectancy_ci_95": [
+            -104.57,
+            -72.1
+          ],
+          "profit_factor": 0.0,
+          "cumulative_return_pct": -10.15,
+          "max_drawdown_pct": 9.19,
+          "longest_loss_streak": 3,
+          "sharpe_ratio": -165.269,
+          "calmar_ratio": -1.105,
+          "avg_holding_bars": 5.2,
+          "worst_trade_bps": -130.8,
+          "cvar_95_bps": -130.8,
+          "stop_frequency": 0.6667,
+          "timeout_frequency": 0.0
+        },
+        "COINBASE_INSTITUTIONAL_18BPS": {
+          "strategy_id": "VOL_BREAKOUT_REGIME",
+          "cost_scenario": "COINBASE_INSTITUTIONAL_18BPS",
+          "trades_count": 11,
+          "win_count": 4,
+          "loss_count": 7,
+          "win_rate": 0.3636,
+          "win_rate_ci_95": [
+            0.1517,
+            0.6462
+          ],
+          "avg_win_bps": 40.14,
+          "avg_loss_bps": -41.46,
+          "net_expectancy_bps": -11.79,
+          "net_expectancy_ci_95": [
+            -24.49,
+            1.25
+          ],
+          "profit_factor": 0.553,
+          "cumulative_return_pct": -1.3,
+          "max_drawdown_pct": 1.19,
+          "longest_loss_streak": 2,
+          "sharpe_ratio": -20.215,
+          "calmar_ratio": -1.091,
+          "avg_holding_bars": 6.9,
+          "worst_trade_bps": -57.57,
+          "cvar_95_bps": -57.57,
+          "stop_frequency": 0.5455,
+          "timeout_frequency": 0.0909
+        },
+        "BINANCE_PERP_15BPS": {
+          "strategy_id": "VOL_BREAKOUT_REGIME",
+          "cost_scenario": "BINANCE_PERP_15BPS",
+          "trades_count": 11,
+          "win_count": 4,
+          "loss_count": 7,
+          "win_rate": 0.3636,
+          "win_rate_ci_95": [
+            0.1517,
+            0.6462
+          ],
+          "avg_win_bps": 43.74,
+          "avg_loss_bps": -37.86,
+          "net_expectancy_bps": -8.19,
+          "net_expectancy_ci_95": [
+            -20.89,
+            4.85
+          ],
+          "profit_factor": 0.66,
+          "cumulative_return_pct": -0.91,
+          "max_drawdown_pct": 0.94,
+          "longest_loss_streak": 2,
+          "sharpe_ratio": -14.042,
+          "calmar_ratio": -0.967,
+          "avg_holding_bars": 6.9,
+          "worst_trade_bps": -53.97,
+          "cvar_95_bps": -53.97,
+          "stop_frequency": 0.5455,
+          "timeout_frequency": 0.0909
+        }
+      },
+      "MEAN_REVERT_FLOW_BLOCKED": {
+        "COINBASE_RETAIL_87BPS": {
+          "strategy_id": "MEAN_REVERT_FLOW_BLOCKED",
+          "cost_scenario": "COINBASE_RETAIL_87BPS",
+          "trades_count": 10,
+          "win_count": 0,
+          "loss_count": 10,
+          "win_rate": 0.0,
+          "win_rate_ci_95": [
+            0.0,
+            0.2775
+          ],
+          "avg_win_bps": 0.0,
+          "avg_loss_bps": -77.15,
+          "net_expectancy_bps": -77.15,
+          "net_expectancy_ci_95": [
+            -87.94,
+            -65.76
+          ],
+          "profit_factor": 0.0,
+          "cumulative_return_pct": -7.45,
+          "max_drawdown_pct": 6.8,
+          "longest_loss_streak": 3,
+          "sharpe_ratio": -413.277,
+          "calmar_ratio": -1.096,
+          "avg_holding_bars": 2.7,
+          "worst_trade_bps": -110.9,
+          "cvar_95_bps": -110.9,
+          "stop_frequency": 0.3,
+          "timeout_frequency": 0.0
+        },
+        "COINBASE_INSTITUTIONAL_18BPS": {
+          "strategy_id": "MEAN_REVERT_FLOW_BLOCKED",
+          "cost_scenario": "COINBASE_INSTITUTIONAL_18BPS",
+          "trades_count": 10,
+          "win_count": 5,
+          "loss_count": 5,
+          "win_rate": 0.5,
+          "win_rate_ci_95": [
+            0.2366,
+            0.7634
+          ],
+          "avg_win_bps": 7.25,
+          "avg_loss_bps": -24.75,
+          "net_expectancy_bps": -8.75,
+          "net_expectancy_ci_95": [
+            -19.54,
+            2.64
+          ],
+          "profit_factor": 0.293,
+          "cumulative_return_pct": -0.87,
+          "max_drawdown_pct": 0.86,
+          "longest_loss_streak": 2,
+          "sharpe_ratio": -46.877,
+          "calmar_ratio": -1.022,
+          "avg_holding_bars": 2.7,
+          "worst_trade_bps": -42.5,
+          "cvar_95_bps": -42.5,
+          "stop_frequency": 0.3,
+          "timeout_frequency": 0.0
+        },
+        "BINANCE_PERP_15BPS": {
+          "strategy_id": "MEAN_REVERT_FLOW_BLOCKED",
+          "cost_scenario": "BINANCE_PERP_15BPS",
+          "trades_count": 10,
+          "win_count": 7,
+          "loss_count": 3,
+          "win_rate": 0.7,
+          "win_rate_ci_95": [
+            0.3968,
+            0.8922
+          ],
+          "avg_win_bps": 8.46,
+          "avg_loss_bps": -36.92,
+          "net_expectancy_bps": -5.15,
+          "net_expectancy_ci_95": [
+            -15.94,
+            6.24
+          ],
+          "profit_factor": 0.535,
+          "cumulative_return_pct": -0.52,
+          "max_drawdown_pct": 0.69,
+          "longest_loss_streak": 1,
+          "sharpe_ratio": -27.593,
+          "calmar_ratio": -0.751,
+          "avg_holding_bars": 2.7,
+          "worst_trade_bps": -38.9,
+          "cvar_95_bps": -38.9,
+          "stop_frequency": 0.3,
+          "timeout_frequency": 0.0
+        }
+      }
+    },
+    "VALIDATION": {
+      "NO_TRADE": {
+        "COINBASE_RETAIL_87BPS": {
+          "strategy_id": "NO_TRADE",
+          "cost_scenario": "COINBASE_RETAIL_87BPS",
+          "trades_count": 0,
+          "win_count": 0,
+          "loss_count": 0,
+          "win_rate": 0.0,
+          "win_rate_ci_95": [
+            0.0,
+            0.0
+          ],
+          "avg_win_bps": 0.0,
+          "avg_loss_bps": 0.0,
+          "net_expectancy_bps": 0.0,
+          "net_expectancy_ci_95": [
+            0.0,
+            0.0
+          ],
+          "profit_factor": 0.0,
+          "cumulative_return_pct": 0.0,
+          "max_drawdown_pct": 0.0,
+          "longest_loss_streak": 0,
+          "sharpe_ratio": 0.0,
+          "calmar_ratio": 0.0,
+          "avg_holding_bars": 0.0,
+          "worst_trade_bps": 0.0,
+          "cvar_95_bps": 0.0,
+          "stop_frequency": 0.0,
+          "timeout_frequency": 0.0
+        },
+        "COINBASE_INSTITUTIONAL_18BPS": {
+          "strategy_id": "NO_TRADE",
+          "cost_scenario": "COINBASE_INSTITUTIONAL_18BPS",
+          "trades_count": 0,
+          "win_count": 0,
+          "loss_count": 0,
+          "win_rate": 0.0,
+          "win_rate_ci_95": [
+            0.0,
+            0.0
+          ],
+          "avg_win_bps": 0.0,
+          "avg_loss_bps": 0.0,
+          "net_expectancy_bps": 0.0,
+          "net_expectancy_ci_95": [
+            0.0,
+            0.0
+          ],
+          "profit_factor": 0.0,
+          "cumulative_return_pct": 0.0,
+          "max_drawdown_pct": 0.0,
+          "longest_loss_streak": 0,
+          "sharpe_ratio": 0.0,
+          "calmar_ratio": 0.0,
+          "avg_holding_bars": 0.0,
+          "worst_trade_bps": 0.0,
+          "cvar_95_bps": 0.0,
+          "stop_frequency": 0.0,
+          "timeout_frequency": 0.0
+        },
+        "BINANCE_PERP_15BPS": {
+          "strategy_id": "NO_TRADE",
+          "cost_scenario": "BINANCE_PERP_15BPS",
+          "trades_count": 0,
+          "win_count": 0,
+          "loss_count": 0,
+          "win_rate": 0.0,
+          "win_rate_ci_95": [
+            0.0,
+            0.0
+          ],
+          "avg_win_bps": 0.0,
+          "avg_loss_bps": 0.0,
+          "net_expectancy_bps": 0.0,
+          "net_expectancy_ci_95": [
+            0.0,
+            0.0
+          ],
+          "profit_factor": 0.0,
+          "cumulative_return_pct": 0.0,
+          "max_drawdown_pct": 0.0,
+          "longest_loss_streak": 0,
+          "sharpe_ratio": 0.0,
+          "calmar_ratio": 0.0,
+          "avg_holding_bars": 0.0,
+          "worst_trade_bps": 0.0,
+          "cvar_95_bps": 0.0,
+          "stop_frequency": 0.0,
+          "timeout_frequency": 0.0
+        }
+      },
+      "TS_MOM_TREND": {
+        "COINBASE_RETAIL_87BPS": {
+          "strategy_id": "TS_MOM_TREND",
+          "cost_scenario": "COINBASE_RETAIL_87BPS",
+          "trades_count": 0,
+          "win_count": 0,
+          "loss_count": 0,
+          "win_rate": 0.0,
+          "win_rate_ci_95": [
+            0.0,
+            0.0
+          ],
+          "avg_win_bps": 0.0,
+          "avg_loss_bps": 0.0,
+          "net_expectancy_bps": 0.0,
+          "net_expectancy_ci_95": [
+            0.0,
+            0.0
+          ],
+          "profit_factor": 0.0,
+          "cumulative_return_pct": 0.0,
+          "max_drawdown_pct": 0.0,
+          "longest_loss_streak": 0,
+          "sharpe_ratio": 0.0,
+          "calmar_ratio": 0.0,
+          "avg_holding_bars": 0.0,
+          "worst_trade_bps": 0.0,
+          "cvar_95_bps": 0.0,
+          "stop_frequency": 0.0,
+          "timeout_frequency": 0.0
+        },
+        "COINBASE_INSTITUTIONAL_18BPS": {
+          "strategy_id": "TS_MOM_TREND",
+          "cost_scenario": "COINBASE_INSTITUTIONAL_18BPS",
+          "trades_count": 10,
+          "win_count": 2,
+          "loss_count": 8,
+          "win_rate": 0.2,
+          "win_rate_ci_95": [
+            0.0567,
+            0.5098
+          ],
+          "avg_win_bps": 31.19,
+          "avg_loss_bps": -49.7,
+          "net_expectancy_bps": -33.52,
+          "net_expectancy_ci_95": [
+            -52.86,
+            -15.07
+          ],
+          "profit_factor": 0.157,
+          "cumulative_return_pct": -3.31,
+          "max_drawdown_pct": 3.91,
+          "longest_loss_streak": 3,
+          "sharpe_ratio": -86.78,
+          "calmar_ratio": -0.846,
+          "avg_holding_bars": 4.1,
+          "worst_trade_bps": -69.15,
+          "cvar_95_bps": -69.15,
+          "stop_frequency": 0.7,
+          "timeout_frequency": 0.1
+        },
+        "BINANCE_PERP_15BPS": {
+          "strategy_id": "TS_MOM_TREND",
+          "cost_scenario": "BINANCE_PERP_15BPS",
+          "trades_count": 11,
+          "win_count": 2,
+          "loss_count": 9,
+          "win_rate": 0.1818,
+          "win_rate_ci_95": [
+            0.0514,
+            0.477
+          ],
+          "avg_win_bps": 34.78,
+          "avg_loss_bps": -44.96,
+          "net_expectancy_bps": -30.46,
+          "net_expectancy_ci_95": [
+            -46.66,
+            -13.68
+          ],
+          "profit_factor": 0.172,
+          "cumulative_return_pct": -3.31,
+          "max_drawdown_pct": 3.98,
+          "longest_loss_streak": 3,
+          "sharpe_ratio": -84.588,
+          "calmar_ratio": -0.832,
+          "avg_holding_bars": 3.9,
+          "worst_trade_bps": -65.55,
+          "cvar_95_bps": -65.55,
+          "stop_frequency": 0.7273,
+          "timeout_frequency": 0.0909
+        }
+      },
+      "VOL_BREAKOUT_REGIME": {
+        "COINBASE_RETAIL_87BPS": {
+          "strategy_id": "VOL_BREAKOUT_REGIME",
+          "cost_scenario": "COINBASE_RETAIL_87BPS",
+          "trades_count": 2,
+          "win_count": 1,
+          "loss_count": 1,
+          "win_rate": 0.5,
+          "win_rate_ci_95": [
+            0.0945,
+            0.9055
+          ],
+          "avg_win_bps": 6.14,
+          "avg_loss_bps": -109.25,
+          "net_expectancy_bps": -51.55,
+          "net_expectancy_ci_95": [
+            -51.55,
+            -51.55
+          ],
+          "profit_factor": 0.056,
+          "cumulative_return_pct": -1.03,
+          "max_drawdown_pct": 1.09,
+          "longest_loss_streak": 1,
+          "sharpe_ratio": -118.277,
+          "calmar_ratio": -0.944,
+          "avg_holding_bars": 2.0,
+          "worst_trade_bps": -109.25,
+          "cvar_95_bps": -109.25,
+          "stop_frequency": 0.5,
+          "timeout_frequency": 0.0
+        },
+        "COINBASE_INSTITUTIONAL_18BPS": {
+          "strategy_id": "VOL_BREAKOUT_REGIME",
+          "cost_scenario": "COINBASE_INSTITUTIONAL_18BPS",
+          "trades_count": 2,
+          "win_count": 1,
+          "loss_count": 1,
+          "win_rate": 0.5,
+          "win_rate_ci_95": [
+            0.0945,
+            0.9055
+          ],
+          "avg_win_bps": 74.54,
+          "avg_loss_bps": -40.85,
+          "net_expectancy_bps": 16.85,
+          "net_expectancy_ci_95": [
+            16.85,
+            16.85
+          ],
+          "profit_factor": 1.825,
+          "cumulative_return_pct": 0.33,
+          "max_drawdown_pct": 0.41,
+          "longest_loss_streak": 1,
+          "sharpe_ratio": 38.646,
+          "calmar_ratio": 0.817,
+          "avg_holding_bars": 2.0,
+          "worst_trade_bps": -40.85,
+          "cvar_95_bps": -40.85,
+          "stop_frequency": 0.5,
+          "timeout_frequency": 0.0
+        },
+        "BINANCE_PERP_15BPS": {
+          "strategy_id": "VOL_BREAKOUT_REGIME",
+          "cost_scenario": "BINANCE_PERP_15BPS",
+          "trades_count": 2,
+          "win_count": 1,
+          "loss_count": 1,
+          "win_rate": 0.5,
+          "win_rate_ci_95": [
+            0.0945,
+            0.9055
+          ],
+          "avg_win_bps": 78.14,
+          "avg_loss_bps": -37.25,
+          "net_expectancy_bps": 20.45,
+          "net_expectancy_ci_95": [
+            20.45,
+            20.45
+          ],
+          "profit_factor": 2.098,
+          "cumulative_return_pct": 0.41,
+          "max_drawdown_pct": 0.37,
+          "longest_loss_streak": 1,
+          "sharpe_ratio": 46.905,
+          "calmar_ratio": 1.09,
+          "avg_holding_bars": 2.0,
+          "worst_trade_bps": -37.25,
+          "cvar_95_bps": -37.25,
+          "stop_frequency": 0.5,
+          "timeout_frequency": 0.0
+        }
+      },
+      "MEAN_REVERT_FLOW_BLOCKED": {
+        "COINBASE_RETAIL_87BPS": {
+          "strategy_id": "MEAN_REVERT_FLOW_BLOCKED",
+          "cost_scenario": "COINBASE_RETAIL_87BPS",
+          "trades_count": 4,
+          "win_count": 0,
+          "loss_count": 4,
+          "win_rate": 0.0,
+          "win_rate_ci_95": [
+            0.0,
+            0.4899
+          ],
+          "avg_win_bps": 0.0,
+          "avg_loss_bps": -74.69,
+          "net_expectancy_bps": -74.69,
+          "net_expectancy_ci_95": [
+            -74.69,
+            -74.69
+          ],
+          "profit_factor": 0.0,
+          "cumulative_return_pct": -2.96,
+          "max_drawdown_pct": 1.81,
+          "longest_loss_streak": 3,
+          "sharpe_ratio": -561.487,
+          "calmar_ratio": -1.63,
+          "avg_holding_bars": 1.0,
+          "worst_trade_bps": -116.32,
+          "cvar_95_bps": -116.32,
+          "stop_frequency": 0.25,
+          "timeout_frequency": 0.0
+        },
+        "COINBASE_INSTITUTIONAL_18BPS": {
+          "strategy_id": "MEAN_REVERT_FLOW_BLOCKED",
+          "cost_scenario": "COINBASE_INSTITUTIONAL_18BPS",
+          "trades_count": 4,
+          "win_count": 3,
+          "loss_count": 1,
+          "win_rate": 0.75,
+          "win_rate_ci_95": [
+            0.3006,
+            0.9544
+          ],
+          "avg_win_bps": 7.59,
+          "avg_loss_bps": -47.92,
+          "net_expectancy_bps": -6.29,
+          "net_expectancy_ci_95": [
+            -6.29,
+            -6.29
+          ],
+          "profit_factor": 0.475,
+          "cumulative_return_pct": -0.25,
+          "max_drawdown_pct": 0.0,
+          "longest_loss_streak": 1,
+          "sharpe_ratio": -47.286,
+          "calmar_ratio": 0.0,
+          "avg_holding_bars": 1.0,
+          "worst_trade_bps": -47.92,
+          "cvar_95_bps": -47.92,
+          "stop_frequency": 0.25,
+          "timeout_frequency": 0.0
+        },
+        "BINANCE_PERP_15BPS": {
+          "strategy_id": "MEAN_REVERT_FLOW_BLOCKED",
+          "cost_scenario": "BINANCE_PERP_15BPS",
+          "trades_count": 4,
+          "win_count": 3,
+          "loss_count": 1,
+          "win_rate": 0.75,
+          "win_rate_ci_95": [
+            0.3006,
+            0.9544
+          ],
+          "avg_win_bps": 11.19,
+          "avg_loss_bps": -44.32,
+          "net_expectancy_bps": -2.69,
+          "net_expectancy_ci_95": [
+            -2.69,
+            -2.69
+          ],
+          "profit_factor": 0.757,
+          "cumulative_return_pct": -0.11,
+          "max_drawdown_pct": 0.0,
+          "longest_loss_streak": 1,
+          "sharpe_ratio": -20.222,
+          "calmar_ratio": 0.0,
+          "avg_holding_bars": 1.0,
+          "worst_trade_bps": -44.32,
+          "cvar_95_bps": -44.32,
+          "stop_frequency": 0.25,
+          "timeout_frequency": 0.0
+        }
+      }
+    },
+    "HOLDOUT": {
+      "NO_TRADE": {
+        "COINBASE_RETAIL_87BPS": {
+          "strategy_id": "NO_TRADE",
+          "cost_scenario": "COINBASE_RETAIL_87BPS",
+          "trades_count": 0,
+          "win_count": 0,
+          "loss_count": 0,
+          "win_rate": 0.0,
+          "win_rate_ci_95": [
+            0.0,
+            0.0
+          ],
+          "avg_win_bps": 0.0,
+          "avg_loss_bps": 0.0,
+          "net_expectancy_bps": 0.0,
+          "net_expectancy_ci_95": [
+            0.0,
+            0.0
+          ],
+          "profit_factor": 0.0,
+          "cumulative_return_pct": 0.0,
+          "max_drawdown_pct": 0.0,
+          "longest_loss_streak": 0,
+          "sharpe_ratio": 0.0,
+          "calmar_ratio": 0.0,
+          "avg_holding_bars": 0.0,
+          "worst_trade_bps": 0.0,
+          "cvar_95_bps": 0.0,
+          "stop_frequency": 0.0,
+          "timeout_frequency": 0.0
+        },
+        "COINBASE_INSTITUTIONAL_18BPS": {
+          "strategy_id": "NO_TRADE",
+          "cost_scenario": "COINBASE_INSTITUTIONAL_18BPS",
+          "trades_count": 0,
+          "win_count": 0,
+          "loss_count": 0,
+          "win_rate": 0.0,
+          "win_rate_ci_95": [
+            0.0,
+            0.0
+          ],
+          "avg_win_bps": 0.0,
+          "avg_loss_bps": 0.0,
+          "net_expectancy_bps": 0.0,
+          "net_expectancy_ci_95": [
+            0.0,
+            0.0
+          ],
+          "profit_factor": 0.0,
+          "cumulative_return_pct": 0.0,
+          "max_drawdown_pct": 0.0,
+          "longest_loss_streak": 0,
+          "sharpe_ratio": 0.0,
+          "calmar_ratio": 0.0,
+          "avg_holding_bars": 0.0,
+          "worst_trade_bps": 0.0,
+          "cvar_95_bps": 0.0,
+          "stop_frequency": 0.0,
+          "timeout_frequency": 0.0
+        },
+        "BINANCE_PERP_15BPS": {
+          "strategy_id": "NO_TRADE",
+          "cost_scenario": "BINANCE_PERP_15BPS",
+          "trades_count": 0,
+          "win_count": 0,
+          "loss_count": 0,
+          "win_rate": 0.0,
+          "win_rate_ci_95": [
+            0.0,
+            0.0
+          ],
+          "avg_win_bps": 0.0,
+          "avg_loss_bps": 0.0,
+          "net_expectancy_bps": 0.0,
+          "net_expectancy_ci_95": [
+            0.0,
+            0.0
+          ],
+          "profit_factor": 0.0,
+          "cumulative_return_pct": 0.0,
+          "max_drawdown_pct": 0.0,
+          "longest_loss_streak": 0,
+          "sharpe_ratio": 0.0,
+          "calmar_ratio": 0.0,
+          "avg_holding_bars": 0.0,
+          "worst_trade_bps": 0.0,
+          "cvar_95_bps": 0.0,
+          "stop_frequency": 0.0,
+          "timeout_frequency": 0.0
+        }
+      },
+      "TS_MOM_TREND": {
+        "COINBASE_RETAIL_87BPS": {
+          "strategy_id": "TS_MOM_TREND",
+          "cost_scenario": "COINBASE_RETAIL_87BPS",
+          "trades_count": 0,
+          "win_count": 0,
+          "loss_count": 0,
+          "win_rate": 0.0,
+          "win_rate_ci_95": [
+            0.0,
+            0.0
+          ],
+          "avg_win_bps": 0.0,
+          "avg_loss_bps": 0.0,
+          "net_expectancy_bps": 0.0,
+          "net_expectancy_ci_95": [
+            0.0,
+            0.0
+          ],
+          "profit_factor": 0.0,
+          "cumulative_return_pct": 0.0,
+          "max_drawdown_pct": 0.0,
+          "longest_loss_streak": 0,
+          "sharpe_ratio": 0.0,
+          "calmar_ratio": 0.0,
+          "avg_holding_bars": 0.0,
+          "worst_trade_bps": 0.0,
+          "cvar_95_bps": 0.0,
+          "stop_frequency": 0.0,
+          "timeout_frequency": 0.0
+        },
+        "COINBASE_INSTITUTIONAL_18BPS": {
+          "strategy_id": "TS_MOM_TREND",
+          "cost_scenario": "COINBASE_INSTITUTIONAL_18BPS",
+          "trades_count": 7,
+          "win_count": 2,
+          "loss_count": 5,
+          "win_rate": 0.2857,
+          "win_rate_ci_95": [
+            0.0822,
+            0.6411
+          ],
+          "avg_win_bps": 21.07,
+          "avg_loss_bps": -49.74,
+          "net_expectancy_bps": -29.51,
+          "net_expectancy_ci_95": [
+            -43.05,
+            -15.96
+          ],
+          "profit_factor": 0.169,
+          "cumulative_return_pct": -2.05,
+          "max_drawdown_pct": 1.91,
+          "longest_loss_streak": 3,
+          "sharpe_ratio": -67.632,
+          "calmar_ratio": -1.077,
+          "avg_holding_bars": 5.7,
+          "worst_trade_bps": -59.35,
+          "cvar_95_bps": -59.35,
+          "stop_frequency": 0.5714,
+          "timeout_frequency": 0.2857
+        },
+        "BINANCE_PERP_15BPS": {
+          "strategy_id": "TS_MOM_TREND",
+          "cost_scenario": "BINANCE_PERP_15BPS",
+          "trades_count": 7,
+          "win_count": 2,
+          "loss_count": 5,
+          "win_rate": 0.2857,
+          "win_rate_ci_95": [
+            0.0822,
+            0.6411
+          ],
+          "avg_win_bps": 24.67,
+          "avg_loss_bps": -46.14,
+          "net_expectancy_bps": -25.91,
+          "net_expectancy_ci_95": [
+            -39.45,
+            -12.36
+          ],
+          "profit_factor": 0.214,
+          "cumulative_return_pct": -1.8,
+          "max_drawdown_pct": 1.73,
+          "longest_loss_streak": 3,
+          "sharpe_ratio": -59.381,
+          "calmar_ratio": -1.044,
+          "avg_holding_bars": 5.7,
+          "worst_trade_bps": -55.75,
+          "cvar_95_bps": -55.75,
+          "stop_frequency": 0.5714,
+          "timeout_frequency": 0.2857
+        }
+      },
+      "VOL_BREAKOUT_REGIME": {
+        "COINBASE_RETAIL_87BPS": {
+          "strategy_id": "VOL_BREAKOUT_REGIME",
+          "cost_scenario": "COINBASE_RETAIL_87BPS",
+          "trades_count": 2,
+          "win_count": 0,
+          "loss_count": 2,
+          "win_rate": 0.0,
+          "win_rate_ci_95": [
+            0.0,
+            0.6576
+          ],
+          "avg_win_bps": 0.0,
+          "avg_loss_bps": -119.45,
+          "net_expectancy_bps": -119.45,
+          "net_expectancy_ci_95": [
+            -119.45,
+            -119.45
+          ],
+          "profit_factor": 0.0,
+          "cumulative_return_pct": -2.37,
+          "max_drawdown_pct": 1.2,
+          "longest_loss_streak": 2,
+          "sharpe_ratio": -24042.812,
+          "calmar_ratio": -1.973,
+          "avg_holding_bars": 1.0,
+          "worst_trade_bps": -120.38,
+          "cvar_95_bps": -120.38,
+          "stop_frequency": 1.0,
+          "timeout_frequency": 0.0
+        },
+        "COINBASE_INSTITUTIONAL_18BPS": {
+          "strategy_id": "VOL_BREAKOUT_REGIME",
+          "cost_scenario": "COINBASE_INSTITUTIONAL_18BPS",
+          "trades_count": 2,
+          "win_count": 0,
+          "loss_count": 2,
+          "win_rate": 0.0,
+          "win_rate_ci_95": [
+            0.0,
+            0.6576
+          ],
+          "avg_win_bps": 0.0,
+          "avg_loss_bps": -51.05,
+          "net_expectancy_bps": -51.05,
+          "net_expectancy_ci_95": [
+            -51.05,
+            -51.05
+          ],
+          "profit_factor": 0.0,
+          "cumulative_return_pct": -1.02,
+          "max_drawdown_pct": 0.52,
+          "longest_loss_streak": 2,
+          "sharpe_ratio": -10275.308,
+          "calmar_ratio": -1.959,
+          "avg_holding_bars": 1.0,
+          "worst_trade_bps": -51.98,
+          "cvar_95_bps": -51.98,
+          "stop_frequency": 1.0,
+          "timeout_frequency": 0.0
+        },
+        "BINANCE_PERP_15BPS": {
+          "strategy_id": "VOL_BREAKOUT_REGIME",
+          "cost_scenario": "BINANCE_PERP_15BPS",
+          "trades_count": 2,
+          "win_count": 0,
+          "loss_count": 2,
+          "win_rate": 0.0,
+          "win_rate_ci_95": [
+            0.0,
+            0.6576
+          ],
+          "avg_win_bps": 0.0,
+          "avg_loss_bps": -47.45,
+          "net_expectancy_bps": -47.45,
+          "net_expectancy_ci_95": [
+            -47.45,
+            -47.45
+          ],
+          "profit_factor": 0.0,
+          "cumulative_return_pct": -0.95,
+          "max_drawdown_pct": 0.48,
+          "longest_loss_streak": 2,
+          "sharpe_ratio": -9550.702,
+          "calmar_ratio": -1.957,
+          "avg_holding_bars": 1.0,
+          "worst_trade_bps": -48.38,
+          "cvar_95_bps": -48.38,
+          "stop_frequency": 1.0,
+          "timeout_frequency": 0.0
+        }
+      },
+      "MEAN_REVERT_FLOW_BLOCKED": {
+        "COINBASE_RETAIL_87BPS": {
+          "strategy_id": "MEAN_REVERT_FLOW_BLOCKED",
+          "cost_scenario": "COINBASE_RETAIL_87BPS",
+          "trades_count": 4,
+          "win_count": 0,
+          "loss_count": 4,
+          "win_rate": 0.0,
+          "win_rate_ci_95": [
+            0.0,
+            0.4899
+          ],
+          "avg_win_bps": 0.0,
+          "avg_loss_bps": -79.02,
+          "net_expectancy_bps": -79.02,
+          "net_expectancy_ci_95": [
+            -79.02,
+            -79.02
+          ],
+          "profit_factor": 0.0,
+          "cumulative_return_pct": -3.12,
+          "max_drawdown_pct": 2.5,
+          "longest_loss_streak": 3,
+          "sharpe_ratio": -817.846,
+          "calmar_ratio": -1.251,
+          "avg_holding_bars": 2.5,
+          "worst_trade_bps": -96.39,
+          "cvar_95_bps": -96.39,
+          "stop_frequency": 0.25,
+          "timeout_frequency": 0.0
+        },
+        "COINBASE_INSTITUTIONAL_18BPS": {
+          "strategy_id": "MEAN_REVERT_FLOW_BLOCKED",
+          "cost_scenario": "COINBASE_INSTITUTIONAL_18BPS",
+          "trades_count": 4,
+          "win_count": 1,
+          "loss_count": 3,
+          "win_rate": 0.25,
+          "win_rate_ci_95": [
+            0.0456,
+            0.6994
+          ],
+          "avg_win_bps": 4.1,
+          "avg_loss_bps": -15.52,
+          "net_expectancy_bps": -10.62,
+          "net_expectancy_ci_95": [
+            -10.62,
+            -10.62
+          ],
+          "profit_factor": 0.088,
+          "cumulative_return_pct": -0.42,
+          "max_drawdown_pct": 0.47,
+          "longest_loss_streak": 3,
+          "sharpe_ratio": -109.893,
+          "calmar_ratio": -0.912,
+          "avg_holding_bars": 2.5,
+          "worst_trade_bps": -27.99,
+          "cvar_95_bps": -27.99,
+          "stop_frequency": 0.25,
+          "timeout_frequency": 0.0
+        },
+        "BINANCE_PERP_15BPS": {
+          "strategy_id": "MEAN_REVERT_FLOW_BLOCKED",
+          "cost_scenario": "BINANCE_PERP_15BPS",
+          "trades_count": 4,
+          "win_count": 1,
+          "loss_count": 3,
+          "win_rate": 0.25,
+          "win_rate_ci_95": [
+            0.0456,
+            0.6994
+          ],
+          "avg_win_bps": 7.7,
+          "avg_loss_bps": -11.92,
+          "net_expectancy_bps": -7.02,
+          "net_expectancy_ci_95": [
+            -7.02,
+            -7.02
+          ],
+          "profit_factor": 0.215,
+          "cumulative_return_pct": -0.28,
+          "max_drawdown_pct": 0.36,
+          "longest_loss_streak": 3,
+          "sharpe_ratio": -72.632,
+          "calmar_ratio": -0.785,
+          "avg_holding_bars": 2.5,
+          "worst_trade_bps": -24.39,
+          "cvar_95_bps": -24.39,
+          "stop_frequency": 0.25,
+          "timeout_frequency": 0.0
+        }
+      }
+    }
+  }
+}

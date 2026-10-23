@@ -1,0 +1,41 @@
+{
+  "candidate_id": "HAR-QLIKE-v1.0",
+  "literature_source": "Puke & Schweikert (2026), Journal of Forecasting, DOI: 10.1002/for.70114",
+  "artifact_path": "experiments\\results\\research_improvement\\har_qlike_v1.joblib",
+  "artifact_sha256": "34ad1d036fd31e50aed9f426bded23fd561b57b4306e331fa8a0000b361c4da0",
+  "evaluation_summary": {
+    "sample_size_holdout": 5671,
+    "sample_size_train": 34343,
+    "baseline_oos_qlike": 0.21483,
+    "challenger_oos_qlike": 0.19598,
+    "qlike_raw_reduction": 0.018846,
+    "qlike_relative_reduction_pct": 8.77,
+    "baseline_oos_rmse": 0.14045,
+    "challenger_oos_rmse": 0.14032,
+    "baseline_causal_conformal_coverage_pct": 84.89,
+    "challenger_causal_conformal_coverage_pct": 84.22,
+    "baseline_mean_winkler_score": 1.0444,
+    "challenger_mean_winkler_score": 0.9745,
+    "diebold_mariano_statistic": 0.5132,
+    "hln_corrected_statistic": 0.498,
+    "p_value_one_sided": 0.30391,
+    "statistically_significant_at_alpha_005": false,
+    "acceptance_verdict": "RETAIN_BASELINE_CHALLENGER_RESEARCH_ONLY"
+  },
+  "coefficients": {
+    "intercept": -0.43141663849855777,
+    "slopes": {
+      "log_rv_down_1d": 0.13724963364027734,
+      "log_rv_up_1d": 0.05736334142786148,
+      "log_rv7d_lag": 0.18231153089009725,
+      "log_rv30d": 0.11186659507943242,
+      "dow_1": -0.026717162358419307,
+      "dow_2": -0.021197073193196414,
+      "dow_3": -0.02514590003531521,
+      "dow_4": -0.025932267571521988,
+      "dow_5": 0.02368939246660532,
+      "dow_6": 0.07616959868582755
+    }
+  },
+  "scientific_interpretation": "HAR-QLIKE-v1.0 achieves an 8.77% raw reduction in sample mean QLIKE loss (0.19598 vs 0.21483) and lowers the Winkler interval score from 1.0444 to 0.9745. However, after adjusting for 168-hour serial dependence using the Newey-West long-run variance kernel, the Diebold-Mariano statistic is +0.5132 (HLN = 0.4980, p = 0.3039). The candidate does not achieve statistical significance at alpha = 0.05. In accordance with preregistered gate rules, the baseline HAR-RS-DOW-v1.0 is retained and the challenger is placed in the research register."
+}

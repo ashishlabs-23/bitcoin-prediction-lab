@@ -1,0 +1,54 @@
+{
+  "manifest_version": "PHASE-24H-QLIKE-MANIFEST-v1.0",
+  "created_at_utc": "2026-10-16T15:31:45.460660+00:00",
+  "experiment_id": "EXP-2026-04-QLIKE-24H",
+  "research_question": "Does loss-coherent QLIKE estimation on 24-hour realized variance improve over same-target volatility benchmarks under causal non-overlapping evaluation?",
+  "target_contract": {
+    "name": "rv24h_var_ann",
+    "horizon_hours": 24,
+    "annualization_factor": 365.0,
+    "formula": "365.0 * sum_{j=1}^{24} r_{t+jh}^2",
+    "proxy_type": "hourly_sampled_realized_variance_proxy",
+    "units": "annualized_variance_decimal"
+  },
+  "feature_schema": [
+    "log_rv_down_1d",
+    "log_rv_up_1d",
+    "log_rv1d",
+    "log_rv7d",
+    "log_rv30d",
+    "dow_1",
+    "dow_2",
+    "dow_3",
+    "dow_4",
+    "dow_5",
+    "dow_6"
+  ],
+  "evaluation_boundaries": {
+    "training_period": "2022-01-31T00:00:00Z to 2025-12-24T23:00:00Z",
+    "holdout_period": "2026-01-01T00:00:00Z to 2026-09-01T05:00:00Z",
+    "epistemic_status": "VALID_HISTORICAL_OUT_OF_SAMPLE_REPLAY",
+    "exposure_history": "Retrospective diagnostic replay on previously exposed 2026 dataset; not a blind prospective test."
+  },
+  "models": {
+    "challenger": {
+      "name": "HAR-QLIKE-24H",
+      "artifact_path": "experiments\\results\\research_improvement\\har_qlike_24h_v1.joblib",
+      "artifact_sha256": "fbc8818da9cfc378ce3ab32e3ce6781b9e59815c38515302fe4128b0eeefc5f2",
+      "estimation": "Sample QLIKE loss minimization + L2 shrinkage (lambda=0.05)"
+    },
+    "benchmark_har": {
+      "name": "HAR-RS-DOW-24H",
+      "artifact_path": "experiments\\results\\research_improvement\\har_ols_24h_v1.joblib",
+      "artifact_sha256": "7a247cf1c0a9639ada911111d57bd58db1794f09a8ca749112b33fa848f10ac1",
+      "estimation": "OLS on log(rv24h_var_ann)"
+    },
+    "benchmark_persistence": "Trailing 24h Realized Variance (rv1d_var_ann)",
+    "benchmark_rolling_mean": "Trailing 30d Mean Realized Variance (rv30d_var_ann)"
+  },
+  "preregistered_decision_rules": {
+    "pass_criteria": "Diebold-Mariano HLN p-value < 0.05 on daily non-overlapping origins (H1: QLIKE < HAR-OLS)",
+    "rejection_criteria": "p >= 0.05 or raw loss degradation",
+    "action_on_rejection": "Retain baseline; classify candidate as OFFLINE_RESEARCH_ONLY"
+  }
+}

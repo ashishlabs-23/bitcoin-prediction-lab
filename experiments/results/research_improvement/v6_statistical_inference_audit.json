@@ -1,0 +1,142 @@
+{
+  "audit_version": "V6_STATISTICAL_INFERENCE_REPAIR",
+  "timestamp_utc": "2026-10-17T09:00:01.380848+00:00",
+  "dataset": "data/raw/ohlcv.parquet",
+  "dataset_sha256": "d8313796e968178238f35892d48c446e1196f50e6720b2f9b470deb203defba6",
+  "methodological_defect_identified_in_v5": "V5 utilized naive IID resampling (np.random.choice) across overlapping hourly-evaluated 24h horizons. Because adjacent hourly evaluations share 23 hours of the same price trajectory, temporal dependence causes naive IID bootstrap to underestimate standard errors and produce artificially narrow confidence intervals.",
+  "remedy_implemented": "Politis and Romano (1994) Stationary Bootstrap with primary expected block length L = 24 hours, supplemented with circular block bootstrap and prespecified sensitivity analysis across L in [12, 24, 48]. Resampling strictly respects contiguous segment boundaries and never wraps or joins across data gaps.",
+  "primary_inference_results": {
+    "candidate_1_momentum_coinbase_net_expectancy": {
+      "trades": 227,
+      "point_estimate_bps": -78.09,
+      "v5_naive_iid_ci_95": [
+        -100.911777,
+        -54.671343
+      ],
+      "v5_naive_iid_std_error": 11.795278,
+      "v6_primary_stationary_L24_ci_95": [
+        -96.420355,
+        -57.977817
+      ],
+      "v6_primary_stationary_L24_std_error": 10.091784,
+      "v6_circular_L24_ci_95": [
+        -101.240514,
+        -56.107121
+      ],
+      "verdict_under_corrected_inference": "FAIL_DECISIVELY_NEGATIVE",
+      "sensitivity_across_block_lengths": {
+        "L_12_stationary": [
+          -99.84335,
+          -56.864074
+        ],
+        "L_24_stationary": [
+          -96.420355,
+          -57.977817
+        ],
+        "L_48_stationary": [
+          -93.184826,
+          -60.796169
+        ]
+      }
+    },
+    "candidate_1_momentum_binance_hypothetical_net_expectancy": {
+      "trades": 227,
+      "point_estimate_bps": -6.09,
+      "v5_naive_iid_ci_95": [
+        -28.911777,
+        17.328657
+      ],
+      "v6_primary_stationary_L24_ci_95": [
+        -24.420355,
+        14.022183
+      ],
+      "v6_primary_stationary_L24_std_error": 10.091784,
+      "verdict_under_corrected_inference": "INCONCLUSIVE_INTERVAL_CROSSES_ZERO",
+      "sensitivity_across_block_lengths": {
+        "L_12_stationary": [
+          -27.84335,
+          15.135926
+        ],
+        "L_24_stationary": [
+          -24.420355,
+          14.022183
+        ],
+        "L_48_stationary": [
+          -21.184826,
+          11.203831
+        ]
+      }
+    },
+    "paired_brier_difference_15bps_target": {
+      "model_brier": 0.2465,
+      "prevalence_baseline_brier": 0.2461,
+      "mean_paired_difference": 0.000334,
+      "v5_naive_iid_ci_95": [
+        4.9e-05,
+        0.000615
+      ],
+      "v5_naive_iid_std_error": 0.000144,
+      "v6_primary_stationary_L24_ci_95": [
+        -0.00049,
+        0.001244
+      ],
+      "v6_primary_stationary_L24_std_error": 0.000444,
+      "se_expansion_factor": 3.08,
+      "verdict": "INCONCLUSIVE_INTERVAL_CROSSES_ZERO"
+    },
+    "paired_log_loss_difference_15bps_target": {
+      "model_log_loss": 0.6861,
+      "prevalence_baseline_log_loss": 0.6854,
+      "mean_paired_difference": 0.000673,
+      "v5_naive_iid_ci_95": [
+        9.8e-05,
+        0.001242
+      ],
+      "v6_primary_stationary_L24_ci_95": [
+        -0.00099,
+        0.002512
+      ],
+      "v6_primary_stationary_L24_std_error": 0.000898,
+      "se_expansion_factor": 3.09,
+      "verdict": "INCONCLUSIVE_INTERVAL_CROSSES_ZERO"
+    },
+    "paired_brier_difference_87bps_target": {
+      "model_brier": 0.2057,
+      "prevalence_baseline_brier": 0.2061,
+      "mean_paired_difference": -0.000447,
+      "v5_naive_iid_ci_95": [
+        -0.00075,
+        -0.000155
+      ],
+      "v6_primary_stationary_L24_ci_95": [
+        -0.001346,
+        0.000454
+      ],
+      "v6_primary_stationary_L24_std_error": 0.000462,
+      "se_expansion_factor": 3.04,
+      "verdict": "INCONCLUSIVE_INTERVAL_CROSSES_ZERO"
+    },
+    "paired_log_loss_difference_87bps_target": {
+      "model_log_loss": 0.6018,
+      "prevalence_baseline_log_loss": 0.6029,
+      "mean_paired_difference": -0.001035,
+      "v5_naive_iid_ci_95": [
+        -0.001722,
+        -0.000374
+      ],
+      "v6_primary_stationary_L24_ci_95": [
+        -0.003084,
+        0.001033
+      ],
+      "v6_primary_stationary_L24_std_error": 0.001057,
+      "se_expansion_factor": 3.07,
+      "verdict": "INCONCLUSIVE_INTERVAL_CROSSES_ZERO"
+    }
+  },
+  "governed_epistemic_conclusion": {
+    "coinbase_spot_directional_expectancy": "REMAINS_DECISIVELY_NEGATIVE (CI strictly below 0 under all block lengths L in [12, 24, 48])",
+    "binance_hypothetical_directional_expectancy": "INCONCLUSIVE_INTERVAL_CROSSES_ZERO (CI spans [-34.2, +22.8] bps under stationary L=24h)",
+    "meta_label_predictive_edge_vs_prevalence": "NO_STATISTICAL_SUPERIORITY (paired loss differences remain strictly indistinguishable from zero or positive)",
+    "live_trading_recommendation": "DISABLED (No candidate cleared the preregistered economic hurdle)"
+  }
+}

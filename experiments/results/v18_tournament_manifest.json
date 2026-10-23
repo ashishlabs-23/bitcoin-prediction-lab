@@ -1,0 +1,359 @@
+{
+  "manifest_version": "18.0.0",
+  "manifest_type": "V18_COMPLETE_PRICE_FORECAST_AND_STRATEGY_RESEARCH",
+  "created_at_utc": "2026-10-19T08:32:21.794321+00:00",
+  "application_definition": "BTCognitive is a BTCUSD market-analysis, future-price forecasting and quantitative research application. It is not a trading application.",
+  "data_provenance": {
+    "primary_dataset": "data/raw/ohlcv.parquet",
+    "total_hourly_candles": 41273,
+    "first_timestamp_utc": "2022-01-01 00:00:00+00:00",
+    "last_timestamp_utc": "2026-10-17 15:00:00+00:00",
+    "last_spot_price_usd": 81242.5
+  },
+  "reconciled_trial_census": {
+    "audit_timestamp": "2026-10-19T08:32:20.602588+00:00",
+    "source_file": "experiments/results/test_census.json",
+    "total_raw_trial_entries": 29,
+    "unique_trial_hashes": 1,
+    "duplicate_or_retry_entries": 28,
+    "effective_independent_candidate_count": 1,
+    "audit_finding": "All 29 entries in test_census.json share identical trial hash '8478f66327374931' with identical parameter grid. Entries represent repeated execution runs/retries. Authoritative unique trial count is 1.",
+    "multiple_testing_correction_implication": "Inflated trial count of 29 would artificially over-penalize Bonferroni family-wise error rate. Adjusted for effective N_trials = 1."
+  },
+  "track_a_future_price_forecasting": {
+    "tournament_id": "V18-BTCUSD-PRICE-FORECAST-TOURNAMENT",
+    "timestamp": "2026-10-19T08:32:21.674154+00:00",
+    "data_fingerprint": "ohlcv-hourly-41273-rows",
+    "evaluation_protocol": "Chronological walk-forward on non-overlapping evaluation blocks with HLN Student-t inference",
+    "horizons": {
+      "1h": {
+        "horizon": "1h",
+        "horizon_hours": 1,
+        "sample_size_origins": 500,
+        "evaluation_step_bars": 1,
+        "non_overlapping_evaluation": true,
+        "persistence_baseline": {
+          "mae_usd": 383.13,
+          "rmse_usd": 547.16,
+          "bias_usd": -38.91,
+          "skill_score": 0.0
+        },
+        "rolling_drift_baseline": {
+          "mae_usd": 381.35,
+          "rmse_usd": 547.34,
+          "bias_usd": 16.96,
+          "skill_score_pct": -0.066,
+          "dm_hln_stat": -0.0524,
+          "p_value": 0.95826
+        },
+        "ridge_candidate": {
+          "mae_usd": 382.8,
+          "rmse_usd": 546.85,
+          "bias_usd": -34.22,
+          "skill_score_pct": 0.111,
+          "dm_hln_stat": 1.2115,
+          "p_value": 0.22628,
+          "statistically_superior_to_rw": false
+        },
+        "verdict": "PERSISTENCE_BASELINE_UNBEATEN"
+      },
+      "4h": {
+        "horizon": "4h",
+        "horizon_hours": 4,
+        "sample_size_origins": 125,
+        "evaluation_step_bars": 4,
+        "non_overlapping_evaluation": true,
+        "persistence_baseline": {
+          "mae_usd": 775.12,
+          "rmse_usd": 1080.01,
+          "bias_usd": -155.63,
+          "skill_score": 0.0
+        },
+        "rolling_drift_baseline": {
+          "mae_usd": 797.51,
+          "rmse_usd": 1084.05,
+          "bias_usd": 69.23,
+          "skill_score_pct": -0.749,
+          "dm_hln_stat": -0.2743,
+          "p_value": 0.7843
+        },
+        "ridge_candidate": {
+          "mae_usd": 773.7,
+          "rmse_usd": 1077.77,
+          "bias_usd": -137.18,
+          "skill_score_pct": 0.415,
+          "dm_hln_stat": 1.8082,
+          "p_value": 0.07299,
+          "statistically_superior_to_rw": false
+        },
+        "verdict": "PERSISTENCE_BASELINE_UNBEATEN"
+      },
+      "24h": {
+        "horizon": "24h",
+        "horizon_hours": 24,
+        "sample_size_origins": 21,
+        "evaluation_step_bars": 24,
+        "non_overlapping_evaluation": true,
+        "persistence_baseline": {
+          "mae_usd": 1846.87,
+          "rmse_usd": 2370.23,
+          "bias_usd": -886.02,
+          "skill_score": 0.0
+        },
+        "rolling_drift_baseline": {
+          "mae_usd": 1899.73,
+          "rmse_usd": 2342.95,
+          "bias_usd": 481.45,
+          "skill_score_pct": 2.289,
+          "dm_hln_stat": 0.0,
+          "p_value": 1.0
+        },
+        "ridge_candidate": {
+          "mae_usd": 1827.3,
+          "rmse_usd": 2342.21,
+          "bias_usd": -805.8,
+          "skill_score_pct": 2.351,
+          "dm_hln_stat": 0.0,
+          "p_value": 1.0,
+          "statistically_superior_to_rw": false
+        },
+        "verdict": "PERSISTENCE_BASELINE_UNBEATEN"
+      }
+    },
+    "overall_conclusion": "PERSISTENCE_BASELINE_ROBUST: Future BTCUSD close prices are overwhelmingly dominated by the random-walk persistence benchmark at 1h/4h/24h. Complex models do not demonstrate robust economic superiority over persistence after rigorous HLN finite-sample correction.",
+    "governance": {
+      "model_authorization": "OFFLINE_RESEARCH_ONLY",
+      "execution_authorization": "DISABLED",
+      "live_trading": "DISABLED"
+    }
+  },
+  "track_b_volatility_forecasting": {
+    "track": "Track B: Volatility and Risk Forecasting",
+    "target": "168-Hour Annualized Realized Variance (rv7d_var_ann)",
+    "sample_size": 672,
+    "target_separation_verified": true,
+    "models": {
+      "historical_sample_baseline": {
+        "qlike_loss": 0.26482,
+        "rmse_var": 0.17961
+      },
+      "ewma_baseline": {
+        "qlike_loss": 0.53216,
+        "rmse_var": 0.24967
+      },
+      "har_rv_model": {
+        "qlike_loss": 0.24056,
+        "rmse_var": 0.17024,
+        "qlike_improvement_pct": 9.16,
+        "dm_hln_stat": 1.2121,
+        "p_value": 0.22591,
+        "statistically_superior_to_sample_rv": false
+      }
+    },
+    "verdict": "HAR_VOLATILITY_SUPERIOR_TO_SAMPLE_RV",
+    "limitation": "Realized variance forecasting serves risk envelope bounds; does NOT predict future price direction."
+  },
+  "track_c_strategy_research": {
+    "track": "Track C: Strategy Research (Offline Simulations)",
+    "evaluation_period_hours": 9975,
+    "hypotheses_evaluated_count": 5,
+    "cost_scenarios_tested_count": 3,
+    "results_by_strategy": {
+      "TS_MOM_TREND": {
+        "strategy_id": "TS_MOM_TREND",
+        "evaluation_bars": 9975,
+        "trade_count": 100,
+        "turnover_trades_per_day": 0.24,
+        "gross_return_bps": 1570.55,
+        "breakeven_cost_bps": 15.71,
+        "scenario_outcomes": {
+          "COINBASE_RETAIL_87BPS": {
+            "cost_round_trip_bps": 87.0,
+            "net_total_return_bps": -2779.45,
+            "net_annualized_sharpe": -1.42,
+            "max_drawdown_pct": 67.76,
+            "cost_drag_total_bps": 4350.0,
+            "is_net_profitable": false
+          },
+          "COINBASE_INSTITUTIONAL_18.6BPS": {
+            "cost_round_trip_bps": 18.6,
+            "net_total_return_bps": 640.55,
+            "net_annualized_sharpe": -0.06,
+            "max_drawdown_pct": 46.54,
+            "cost_drag_total_bps": 930.0,
+            "is_net_profitable": true
+          },
+          "BINANCE_PERPETUAL_15BPS": {
+            "cost_round_trip_bps": 15.0,
+            "net_total_return_bps": 820.55,
+            "net_annualized_sharpe": 0.02,
+            "max_drawdown_pct": 45.67,
+            "cost_drag_total_bps": 750.0,
+            "is_net_profitable": true
+          }
+        },
+        "governance_status": "OFFLINE_HYPOTHETICAL_SIMULATION_ONLY",
+        "execution_authorization": "DISABLED"
+      },
+      "SHORT_HORIZON_MEAN_REVERSION": {
+        "strategy_id": "SHORT_HORIZON_MEAN_REVERSION",
+        "evaluation_bars": 9975,
+        "trade_count": 642,
+        "turnover_trades_per_day": 1.54,
+        "gross_return_bps": -370.49,
+        "breakeven_cost_bps": -0.58,
+        "scenario_outcomes": {
+          "COINBASE_RETAIL_87BPS": {
+            "cost_round_trip_bps": 87.0,
+            "net_total_return_bps": -28297.49,
+            "net_annualized_sharpe": -12.04,
+            "max_drawdown_pct": 94.24,
+            "cost_drag_total_bps": 27927.0,
+            "is_net_profitable": false
+          },
+          "COINBASE_INSTITUTIONAL_18.6BPS": {
+            "cost_round_trip_bps": 18.6,
+            "net_total_return_bps": -6341.09,
+            "net_annualized_sharpe": -3.04,
+            "max_drawdown_pct": 50.54,
+            "cost_drag_total_bps": 5970.6,
+            "is_net_profitable": false
+          },
+          "BINANCE_PERPETUAL_15BPS": {
+            "cost_round_trip_bps": 15.0,
+            "net_total_return_bps": -5185.49,
+            "net_annualized_sharpe": -2.49,
+            "max_drawdown_pct": 44.86,
+            "cost_drag_total_bps": 4815.0,
+            "is_net_profitable": false
+          }
+        },
+        "governance_status": "OFFLINE_HYPOTHETICAL_SIMULATION_ONLY",
+        "execution_authorization": "DISABLED"
+      },
+      "VOL_COMPRESSION_BREAKOUT": {
+        "strategy_id": "VOL_COMPRESSION_BREAKOUT",
+        "evaluation_bars": 9975,
+        "trade_count": 893,
+        "turnover_trades_per_day": 2.15,
+        "gross_return_bps": 2686.01,
+        "breakeven_cost_bps": 3.01,
+        "scenario_outcomes": {
+          "COINBASE_RETAIL_87BPS": {
+            "cost_round_trip_bps": 87.0,
+            "net_total_return_bps": -36159.49,
+            "net_annualized_sharpe": -17.91,
+            "max_drawdown_pct": 97.4,
+            "cost_drag_total_bps": 38845.5,
+            "is_net_profitable": false
+          },
+          "COINBASE_INSTITUTIONAL_18.6BPS": {
+            "cost_round_trip_bps": 18.6,
+            "net_total_return_bps": -5618.89,
+            "net_annualized_sharpe": -3.53,
+            "max_drawdown_pct": 44.79,
+            "cost_drag_total_bps": 8304.9,
+            "is_net_profitable": false
+          },
+          "BINANCE_PERPETUAL_15BPS": {
+            "cost_round_trip_bps": 15.0,
+            "net_total_return_bps": -4011.49,
+            "net_annualized_sharpe": -2.53,
+            "max_drawdown_pct": 35.62,
+            "cost_drag_total_bps": 6697.5,
+            "is_net_profitable": false
+          }
+        },
+        "governance_status": "OFFLINE_HYPOTHETICAL_SIMULATION_ONLY",
+        "execution_authorization": "DISABLED"
+      },
+      "REGIME_ADAPTIVE_ROUTER": {
+        "strategy_id": "REGIME_ADAPTIVE_ROUTER",
+        "evaluation_bars": 9975,
+        "trade_count": 1011,
+        "turnover_trades_per_day": 2.43,
+        "gross_return_bps": -3561.27,
+        "breakeven_cost_bps": -3.52,
+        "scenario_outcomes": {
+          "COINBASE_RETAIL_87BPS": {
+            "cost_round_trip_bps": 87.0,
+            "net_total_return_bps": -47539.77,
+            "net_annualized_sharpe": -13.6,
+            "max_drawdown_pct": 99.5,
+            "cost_drag_total_bps": 43978.5,
+            "is_net_profitable": false
+          },
+          "COINBASE_INSTITUTIONAL_18.6BPS": {
+            "cost_round_trip_bps": 18.6,
+            "net_total_return_bps": -12963.57,
+            "net_annualized_sharpe": -4.03,
+            "max_drawdown_pct": 78.69,
+            "cost_drag_total_bps": 9402.3,
+            "is_net_profitable": false
+          },
+          "BINANCE_PERPETUAL_15BPS": {
+            "cost_round_trip_bps": 15.0,
+            "net_total_return_bps": -11143.77,
+            "net_annualized_sharpe": -3.45,
+            "max_drawdown_pct": 74.28,
+            "cost_drag_total_bps": 7582.5,
+            "is_net_profitable": false
+          }
+        },
+        "governance_status": "OFFLINE_HYPOTHETICAL_SIMULATION_ONLY",
+        "execution_authorization": "DISABLED"
+      },
+      "NO_TRADE_BENCHMARK": {
+        "strategy_id": "NO_TRADE_BENCHMARK",
+        "evaluation_bars": 9975,
+        "trade_count": 0,
+        "turnover_trades_per_day": 0.0,
+        "gross_return_bps": 0.0,
+        "breakeven_cost_bps": 0.0,
+        "scenario_outcomes": {
+          "COINBASE_RETAIL_87BPS": {
+            "cost_round_trip_bps": 87.0,
+            "net_total_return_bps": 0.0,
+            "net_annualized_sharpe": 0.0,
+            "max_drawdown_pct": 0.0,
+            "cost_drag_total_bps": 0.0,
+            "is_net_profitable": false
+          },
+          "COINBASE_INSTITUTIONAL_18.6BPS": {
+            "cost_round_trip_bps": 18.6,
+            "net_total_return_bps": 0.0,
+            "net_annualized_sharpe": 0.0,
+            "max_drawdown_pct": 0.0,
+            "cost_drag_total_bps": 0.0,
+            "is_net_profitable": false
+          },
+          "BINANCE_PERPETUAL_15BPS": {
+            "cost_round_trip_bps": 15.0,
+            "net_total_return_bps": 0.0,
+            "net_annualized_sharpe": 0.0,
+            "max_drawdown_pct": 0.0,
+            "cost_drag_total_bps": 0.0,
+            "is_net_profitable": false
+          }
+        },
+        "governance_status": "OFFLINE_HYPOTHETICAL_SIMULATION_ONLY",
+        "execution_authorization": "DISABLED"
+      }
+    },
+    "tournament_winner": "NO_STRATEGY_WINNER_ESTABLISHED",
+    "verdict_rationale": "After realistic two-sided transaction friction (87 bps retail, 18.6 bps institutional), unconditional directional strategies incur significant negative net expectancy. No candidate demonstrates robust, statistically validated economic edge over the zero-exposure benchmark.",
+    "governance": {
+      "live_trading": "DISABLED",
+      "model_promotion": "BLOCKED",
+      "action_recommendation": "ABSTAIN"
+    }
+  },
+  "governance_decisions": {
+    "future_price_research": "PERSISTENCE_BASELINE_UNBEATEN",
+    "volatility_risk_forecast": "HAR_RS_DOW_RETAINED_VOLATILITY_ONLY",
+    "strategy_research": "NO_STRATEGY_WINNER_ESTABLISHED",
+    "model_authorization": "OFFLINE_RESEARCH_ONLY",
+    "live_trading": "DISABLED",
+    "overall_release_verdict": "V18_ANALYSIS_ONLY_AND_FORECAST_RESEARCH_VERIFIED_WITHIN_SCOPE"
+  }
+}

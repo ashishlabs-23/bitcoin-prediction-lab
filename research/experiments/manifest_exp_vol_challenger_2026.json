@@ -1,0 +1,54 @@
+{
+  "experiment_id": "EXP-VOL-CHALLENGER-2026-01",
+  "title": "Bitcoin Realized Volatility Challenger & Model Confidence Set Benchmark (24H vs 168H)",
+  "preregistration_timestamp_utc": "2026-10-17T04:30:00+00:00",
+  "epistemic_classification": "DEVELOPMENT_REPLAY_AND_PROSPECTIVE_CHALLENGER",
+  "primary_loss_function": {
+    "name": "QLIKE",
+    "formula": "L(y, y_hat) = y / y_hat - ln(y / y_hat) - 1",
+    "literature_source": "Patton (2011) - Volatility forecast comparison using imperfect volatility proxies (DOI: 10.1016/j.jeconom.2010.03.034)"
+  },
+  "secondary_metrics": ["RMSE", "MAE", "MAPE"],
+  "evaluation_protocols": {
+    "pairwise_test": "Diebold-Mariano (1995) with Harvey-Leybourne-Newbold (1997) finite-sample correction and Student's t_{T-1} reference distribution",
+    "multi_model_test": "Hansen, Lunde, Nason (2011) Model Confidence Set (MCS) at alpha = 0.05"
+  },
+  "target_specifications": {
+    "target_168h": {
+      "name": "rv7d_var_ann",
+      "horizon_hours": 168,
+      "formula": "(8760 / 168) * sum_{i=1}^{168} r_{t+i}^2",
+      "baseline_model": "HAR-RS-DOW-v1.0 (Frozen)",
+      "candidates": [
+        "persistence_168h",
+        "rolling_30d_168h",
+        "HAR-RS-DOW-v1.0 (Canonical Baseline)",
+        "HAR-RS-Rolling-720h (Challenger)"
+      ]
+    },
+    "target_24h": {
+      "name": "rv24h_var_ann",
+      "horizon_hours": 24,
+      "formula": "365 * sum_{i=1}^{24} r_{t+i}^2",
+      "baseline_model": "HAR-OLS-24H (Conventional)",
+      "candidates": [
+        "persistence_24h",
+        "rolling_30d_24h",
+        "HAR-OLS-24H (Conventional Baseline)",
+        "HAR-QLIKE-24H-v1.0 (Challenger)",
+        "HAR-24H-Rolling-720h (Challenger)"
+      ]
+    }
+  },
+  "data_split_policy": {
+    "in_sample_training_end_utc": "2026-01-01T00:00:00Z",
+    "retrospective_replay_holdout_range": ["2026-01-01T00:00:00Z", "2026-10-16T17:00:00Z"],
+    "confirmatory_prospective_gate_requirement": ">= 100 clean non-overlapping blocks in data/prospective_forecast_ledger.jsonl"
+  },
+  "acceptance_criteria": {
+    "significance_threshold_alpha": 0.05,
+    "model_confidence_set_inclusion": true,
+    "non_overlapping_evaluation": true,
+    "production_lock": "Challengers remain OFFLINE_RESEARCH_ONLY until >= 100 clean prospective blocks accumulate"
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "manifest_version": "25.0.0",
+  "created_at_utc": "2026-10-19T21:30:00Z",
+  "dataset_provenance": {
+    "path": "data/raw/ohlcv.parquet",
+    "sha256": "43c8881b57431759f68fcb7036d78432449d079b11bcaea45f0d0ecfa287e2f6",
+    "total_rows": 41273,
+    "instrument": "BTC-USD",
+    "frequency": "1h",
+    "provider": "Coinbase Spot Exchange"
+  },
+  "evaluation_window": {
+    "oos_start_idx": 31273,
+    "oos_end_idx": 41248,
+    "total_bars": 9975,
+    "calendar_days": 415.625
+  },
+  "cost_scenario": {
+    "name": "COINBASE_RETAIL_87BPS",
+    "round_trip_bps": 87.0,
+    "per_turnover_unit_bps": 43.5,
+    "accounting_model": "Turnover Units = sum(|s_t - s_{t-1}|), where entries/exits = 1 unit, reversals = 2 units."
+  },
+  "standardized_performance_matrix": {
+    "NO_TRADE_BENCHMARK": {
+      "strategy_family": "Zero Exposure Cash Benchmark",
+      "signal_events": 0,
+      "reversals": 0,
+      "turnover_units": 0.0,
+      "completed_round_trips": 0.0,
+      "gross_return_bps": 0.0,
+      "total_friction_bps": 0.0,
+      "net_return_bps": 0.0,
+      "max_drawdown_pct": 0.0,
+      "verdict": "DECISIVE_WINNER"
+    },
+    "TS_MOM_TREND": {
+      "strategy_family": "Dual-EMA Crossover (24h / 168h)",
+      "signal_events": 100,
+      "reversals": 99,
+      "turnover_units": 199.0,
+      "completed_round_trips": 99.5,
+      "gross_return_bps": 1570.6,
+      "total_friction_bps": 8656.5,
+      "net_return_bps": -7085.9,
+      "max_drawdown_pct": 79.4,
+      "verdict": "REJECTED_UNPROFITABLE_AFTER_COSTS"
+    },
+    "SHORT_HORIZON_MEAN_REVERSION": {
+      "strategy_family": "RSI(14) Mean Reversion (<30 / >70)",
+      "signal_events": 642,
+      "reversals": 0,
+      "turnover_units": 642.0,
+      "completed_round_trips": 321.0,
+      "gross_return_bps": -370.5,
+      "total_friction_bps": 27927.0,
+      "net_return_bps": -28297.5,
+      "max_drawdown_pct": 94.2,
+      "verdict": "REJECTED_UNPROFITABLE_AFTER_COSTS"
+    },
+    "VOL_COMPRESSION_BREAKOUT": {
+      "strategy_family": "Bollinger Bandwidth Squeeze Breakout",
+      "signal_events": 893,
+      "reversals": 3,
+      "turnover_units": 896.0,
+      "completed_round_trips": 448.0,
+      "gross_return_bps": 2686.0,
+      "total_friction_bps": 38976.0,
+      "net_return_bps": -36290.0,
+      "max_drawdown_pct": 97.4,
+      "verdict": "REJECTED_UNPROFITABLE_AFTER_COSTS"
+    },
+    "REGIME_ADAPTIVE_ROUTER": {
+      "strategy_family": "Volatility-Gated Trend/Mean-Reversion Router",
+      "signal_events": 1011,
+      "reversals": 105,
+      "turnover_units": 1116.0,
+      "completed_round_trips": 558.0,
+      "gross_return_bps": -3561.3,
+      "total_friction_bps": 48546.0,
+      "net_return_bps": -52107.3,
+      "max_drawdown_pct": 99.6,
+      "verdict": "REJECTED_UNPROFITABLE_AFTER_COSTS"
+    }
+  },
+  "governance_verdict": "NO_STRATEGY_WINNER_ESTABLISHED",
+  "execution_authorization": "DISABLED"
+}

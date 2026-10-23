@@ -1,0 +1,52 @@
+{
+  "manifest_version": "28.0.0",
+  "contract_name": "BTCognitive V28 — Probabilistic Entry Quality Engine and Selective Trade Research",
+  "generated_at_utc": "2026-10-19T17:50:00Z",
+  "research_phase": "V28_SELECTIVE_ENTRY_RESEARCH",
+  "epistemic_verdict": "COST_ERASED_UNDER_CONSERVATIVE_FRICTION",
+  "model_authorization_status": "OFFLINE_RESEARCH_ONLY",
+  "live_trading_status": "DISABLED — ANALYSIS ONLY",
+  "data_lineage": {
+    "source_dataset_1h": "data/raw/ohlcv.parquet",
+    "sha256_1h": "43c8881b896ec4a9eef11fc83dbf2ddad5e24ee90f42557e10e408ec210214a1",
+    "total_bars_1h": 41273,
+    "source_dataset_1m": "data/raw/btcusd_1-min_data.csv",
+    "sha256_1m": "1bf91f2780e920d3eb895782787836371ef390632b4b455b7a0fbeadcc6f0761",
+    "total_bars_1m": 7766111
+  },
+  "execution_fill_model": {
+    "fill_timing": "t0 + delta_t (Next Open O_{t+1})",
+    "close_fill_assumption": "STRICTLY_REJECTED",
+    "base_slippage_bps": 2.0,
+    "base_fee_one_way_bps": 43.5,
+    "round_trip_friction_bps": 87.0,
+    "conservative_friction_bps": 130.5
+  },
+  "triple_barrier_contract": {
+    "resolver_version": "ENTRY_TP_SL_RESOLVER_V1",
+    "intrabar_collision_rule": "SL_FIRST (Conservative — zero optimistic tie-breaking)",
+    "holding_horizon_max": "24h (24 closed hourly bars)",
+    "volatility_metric": "ATR_24h / Sigma_t0",
+    "target_multipliers": {
+      "k_tp": 1.5,
+      "k_sl": 1.0
+    }
+  },
+  "walk_forward_evaluation_summary": {
+    "oos_trade_count_unfiltered": 20244,
+    "unfiltered_win_rate": 0.259,
+    "unfiltered_mean_net_r": -1.2005,
+    "filtered_candidate_count": 2916,
+    "meta_model_calibrated_win_rate": 0.469,
+    "meta_model_mean_net_r": -0.4673,
+    "aspirational_win_rate_hypothesis": "70-80% (UNSUPPORTED ON UNTOUCHED OUT-OF-SAMPLE DATA)",
+    "net_expectancy_positive_fraction": 0.0
+  },
+  "regression_test_census": {
+    "total_collected": 161,
+    "total_passed": 161,
+    "total_failed": 0,
+    "v28_suite_passed": 8,
+    "entry_tp_sl_suite_passed": 88
+  }
+}

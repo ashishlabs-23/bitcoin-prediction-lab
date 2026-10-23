@@ -32,10 +32,116 @@ from models.forecast_quality_contract import ForecastQuality, BlockQuality
 
 POST_REPAIR_EVIDENCE_START = "2026-08-21T12:15:00Z"
 REPAIR_VERSION = "v1.0.0-production-data-consistency-repair"
-MODEL_HASH = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-CONTEXT_HASH = "8f48b11c990b7987a04918e6ec29a67a989f71eaf8e544ebdf8edf60c20b0c89"
-FEATURE_SCHEMA_HASH = "d41d8cd98f00b204e9800998ecf8427e989f71eaf8e544ebdf8edf60c20b0c89"
-TARGET_HASH = "7a35e7513b29c54e3d74a0558b8f2d5e7a35e7513b29c54e3d74a0558b8f2d5e"
+
+FREEZE_DIR = os.path.join(RESULTS_DIR, "freeze")
+MODEL_ARTIFACT_PATH = os.path.join(FREEZE_DIR, "har_rs_dow_v1.joblib")
+REPAIRED_MANIFEST_PATH = os.path.join(FREEZE_DIR, "repaired_scientific_contract_manifest.json")
+
+CANONICAL_FEATURE_SCHEMA = [
+    "log_rv_down_1d",
+    "log_rv_up_1d",
+    "log_rv7d_var_ann_lag",
+    "log_rv30d_var_ann",
+    "dow_1",
+    "dow_2",
+    "dow_3",
+    "dow_4",
+    "dow_5",
+    "dow_6"
+]
+
+CANONICAL_TARGET_CONTRACT = {
+    "target_variable": "rv7d_var_ann",
+    "horizon_hours": 168,
+    "annualization_factor": 8760.0 / 168.0,
+    "strict_maturity_rule": "max(training_origin + 168h) < holdout_start",
+    "mathematical_formula": "RV_{7d,t}^2 = (8760 / 168) * sum_{i=1}^{168} r_{t+i}^2"
+}
+
+def derive_model_artifact_sha256(artifact_path: str = MODEL_ARTIFACT_PATH) -> Optional[str]:
+    """Computes SHA-256 digest directly from actual physical model artifact bytes."""
+    if not os.path.isfile(artifact_path):
+        return None
+    h = hashlib.sha256()
+    with open(artifact_path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+def derive_feature_schema_hash(schema: Optional[List[str]] = None) -> str:
+    """Computes deterministic SHA-256 hash of canonical feature schema."""
+    s = schema if schema is not None else CANONICAL_FEATURE_SCHEMA
+    canonical_repr = json.dumps(s, separators=(",", ":"))
+    return hashlib.sha256(canonical_repr.encode("utf-8")).hexdigest()
+
+def derive_target_contract_hash(contract: Optional[Dict[str, Any]] = None) -> str:
+    """Computes deterministic SHA-256 hash of canonical target contract."""
+    c = contract if contract is not None else CANONICAL_TARGET_CONTRACT
+    canonical_repr = json.dumps(c, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(canonical_repr.encode("utf-8")).hexdigest()
+
+def get_authoritative_provenance(
+    artifact_path: str = MODEL_ARTIFACT_PATH,
+    manifest_path: str = REPAIRED_MANIFEST_PATH,
+    feature_schema: Optional[List[str]] = None,
+    target_contract: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Derives genuine hashes from authoritative artifact bytes and canonical schemas,
+    and cross-verifies against the authoritative freeze manifest.
+    If unavailable or inconsistent, explicitly reports error without synthetic substitutes.
+    """
+    live_model_hash = derive_model_artifact_sha256(artifact_path)
+    live_feature_hash = derive_feature_schema_hash(feature_schema)
+    live_target_hash = derive_target_contract_hash(target_contract)
+
+    manifest_context_hash = None
+    provenance_health = "PROVENANCE_LOCKED"
+    provenance_details = []
+
+    if live_model_hash is None:
+        provenance_health = "PROVENANCE_UNAVAILABLE"
+        provenance_details.append(f"Model artifact not found at '{artifact_path}'")
+
+    if not os.path.isfile(manifest_path):
+        provenance_health = "PROVENANCE_UNAVAILABLE"
+        provenance_details.append(f"Manifest not found at '{manifest_path}'")
+    else:
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as f:
+                manifest = json.load(f)
+            manifest_context_hash = manifest.get("scientific_contract_hash")
+            stored_model_sha = manifest.get("model_artifact", {}).get("artifact_sha256")
+            stored_feat_sha = manifest.get("feature_contract_hash")
+            stored_tgt_sha = manifest.get("target_contract_hash")
+
+            if live_model_hash and stored_model_sha and live_model_hash != stored_model_sha:
+                provenance_health = "PROVENANCE_MISMATCH"
+                provenance_details.append(f"Model hash mismatch: live={live_model_hash} vs stored={stored_model_sha}")
+            if stored_feat_sha and live_feature_hash != stored_feat_sha:
+                provenance_health = "PROVENANCE_MISMATCH"
+                provenance_details.append(f"Feature schema hash mismatch: live={live_feature_hash} vs stored={stored_feat_sha}")
+            if stored_tgt_sha and live_target_hash != stored_tgt_sha:
+                provenance_health = "PROVENANCE_MISMATCH"
+                provenance_details.append(f"Target contract hash mismatch: live={live_target_hash} vs stored={stored_tgt_sha}")
+        except Exception as e:
+            provenance_health = "PROVENANCE_ERROR"
+            provenance_details.append(f"Failed parsing manifest: {e}")
+
+    return {
+        "model_hash": live_model_hash,
+        "context_hash": manifest_context_hash,
+        "feature_schema_hash": live_feature_hash,
+        "target_hash": live_target_hash,
+        "provenance_health": provenance_health,
+        "provenance_details": provenance_details
+    }
+
+_init_provenance = get_authoritative_provenance()
+MODEL_HASH = _init_provenance["model_hash"]
+CONTEXT_HASH = _init_provenance["context_hash"]
+FEATURE_SCHEMA_HASH = _init_provenance["feature_schema_hash"]
+TARGET_HASH = _init_provenance["target_hash"]
 
 METRICS_CSV_PATH = os.path.join(RESULTS_DIR, "post_repair_longitudinal_metrics.csv")
 
@@ -52,6 +158,7 @@ class PostRepairLongitudinalMonitor:
         """Returns the real-time longitudinal monitoring status."""
         from research.post_repair_block_builder import build_post_repair_blocks
         blocks, acc = build_post_repair_blocks()
+        prov = get_authoritative_provenance()
         
         observed_valid_blocks = acc["independent_valid_blocks"]
         next_milestone = 90
@@ -75,10 +182,10 @@ class PostRepairLongitudinalMonitor:
             "raw_post_repair_forecasts": acc["raw_forecasts"],
             "resolved_post_repair_forecasts": acc["resolved_forecasts"],
             "n_eff": acc["n_eff"],
-            "model_hash": MODEL_HASH,
-            "context_hash": CONTEXT_HASH,
-            "feature_schema_hash": FEATURE_SCHEMA_HASH,
-            "target_hash": TARGET_HASH,
+            "model_hash": prov["model_hash"],
+            "context_hash": prov["context_hash"],
+            "feature_schema_hash": prov["feature_schema_hash"],
+            "target_hash": prov["target_hash"],
             "repair_version": REPAIR_VERSION,
             "archived_pre_repair_blocks": 35,
             "archived_pre_repair_label": "PRE_REPAIR_HISTORY",
@@ -88,7 +195,7 @@ class PostRepairLongitudinalMonitor:
                 "calibration_health": "CALIBRATION_OK",
                 "drift_health": "DRIFT_NORMAL",
                 "data_health": "HEALTHY",
-                "provenance_health": "PROVENANCE_LOCKED"
+                "provenance_health": prov["provenance_health"]
             }
         }
 

@@ -1,0 +1,233 @@
+{
+  "audit_version": "V7_INDEPENDENT_STATISTICAL_REPRODUCTION",
+  "timestamp_utc": "2026-10-17T10:19:55.040537+00:00",
+  "dataset": "data/raw/ohlcv.parquet",
+  "dataset_sha256": "0f4f7c10d7fc0429dae3c6cdcfd083c334d6c06b8123da19790a3a7d621b55d9",
+  "sample_counts": {
+    "raw_bars": 41267,
+    "train_observations": 25873,
+    "val_observations": 8736,
+    "test_observations": 5965,
+    "candidate_1_trade_count": 227
+  },
+  "sign_convention": "challenger_loss - baseline_loss (positive favors baseline, negative favors challenger)",
+  "synthetic_ar1_control_check": {
+    "n_obs": 2000,
+    "ar1_phi": 0.7,
+    "sample_mean": 0.07133539922738044,
+    "theoretical_se_inflation": 2.3804761428476167,
+    "naive_iid_se": 0.03161,
+    "naive_iid_ci_95": [
+      0.010634,
+      0.130253
+    ],
+    "stationary_l24_se": 0.062208,
+    "stationary_l24_ci_95": [
+      -0.057679,
+      0.192622
+    ],
+    "observed_se_expansion_factor": 1.97,
+    "zero_included_stationary": true,
+    "verdict": "VERIFIED_CORRECT_DEPENDENCE_HANDLING"
+  },
+  "discrepancy_investigation": {
+    "user_query_brier_interval_v5_reported": [
+      0.000234,
+      0.000621
+    ],
+    "user_query_brier_interval_v6_conjectured": [
+      -0.0182,
+      0.0241
+    ],
+    "actual_v6_artifact_brier_interval_on_disk": [
+      -0.000551,
+      0.001274
+    ],
+    "actual_v6_point_estimate": 0.000331,
+    "root_cause_explanation": "The interval [-0.0182, +0.0241] does NOT represent the actual V6 Brier difference interval on disk. The actual V6 artifact on disk (v6_statistical_inference_audit.json:80) contains [-0.000490, +0.001244]. The value -0.0182 was the empirical lag-1 autocorrelation (rho_1 = -0.01824) of 1-hour BTC log returns (documented in research/reports/application_necessity_and_accuracy_improvement_plan.md:32). A previous agent or summary text confounded the return autocorrelation metric with the Brier confidence interval. Both intervals (V5 naive IID [0.000049, 0.000615] and V6 stationary [-0.000490, +0.001244]) confirm that the point estimate is positive (+0.000334, favoring baseline), and with corrected serial dependence, the 95% confidence interval cleanly crosses zero. The meta-label model possesses NO statistically detectable predictive superiority."
+  },
+  "reproduced_inference_results": {
+    "candidate_1_momentum_coinbase_net_expectancy": {
+      "trades": 227,
+      "point_estimate_bps": -78.09,
+      "v5_naive_iid_ci_95": [
+        -100.911777,
+        -54.671343
+      ],
+      "v6_reproduced_stationary_L24_ci_95": [
+        -96.420355,
+        -57.977817
+      ],
+      "v6_reproduced_stationary_L24_std_error": 10.091784,
+      "sensitivity_across_block_lengths": {
+        "L_12_stationary": [
+          -99.84335,
+          -56.864074
+        ],
+        "L_24_stationary": [
+          -96.420355,
+          -57.977817
+        ],
+        "L_48_stationary": [
+          -93.184826,
+          -60.796169
+        ]
+      },
+      "verdict": "FAIL_DECISIVELY_NEGATIVE"
+    },
+    "candidate_1_momentum_binance_hypothetical_net_expectancy": {
+      "trades": 227,
+      "point_estimate_bps": -6.09,
+      "v5_naive_iid_ci_95": [
+        -28.911777,
+        17.328657
+      ],
+      "v6_reproduced_stationary_L24_ci_95": [
+        -24.420355,
+        14.022183
+      ],
+      "v6_reproduced_stationary_L24_std_error": 10.091784,
+      "sensitivity_across_block_lengths": {
+        "L_12_stationary": [
+          -27.84335,
+          15.135926
+        ],
+        "L_24_stationary": [
+          -24.420355,
+          14.022183
+        ],
+        "L_48_stationary": [
+          -21.184826,
+          11.203831
+        ]
+      },
+      "verdict": "INCONCLUSIVE_INTERVAL_CROSSES_ZERO"
+    },
+    "paired_brier_difference_15bps_target": {
+      "model_brier": 0.24642,
+      "prevalence_baseline_brier": 0.246089,
+      "mean_paired_difference": 0.000331,
+      "v5_naive_iid_ci_95": [
+        5e-05,
+        0.000614
+      ],
+      "v6_reproduced_stationary_L24_ci_95": [
+        -0.000551,
+        0.001274
+      ],
+      "v6_reproduced_stationary_L24_std_error": 0.000458,
+      "se_expansion_factor": 3.25,
+      "sensitivity_across_block_lengths": {
+        "L_12_stationary": [
+          -0.00049,
+          0.001146
+        ],
+        "L_24_stationary": [
+          -0.000551,
+          0.001274
+        ],
+        "L_48_stationary": [
+          -0.000573,
+          0.001307
+        ]
+      },
+      "verdict": "INCONCLUSIVE_INTERVAL_CROSSES_ZERO"
+    },
+    "paired_log_loss_difference_15bps_target": {
+      "model_log_loss": 0.685975,
+      "prevalence_baseline_log_loss": 0.685307,
+      "mean_paired_difference": 0.000668,
+      "v5_naive_iid_ci_95": [
+        0.000101,
+        0.001239
+      ],
+      "v6_reproduced_stationary_L24_ci_95": [
+        -0.001123,
+        0.00257
+      ],
+      "v6_reproduced_stationary_L24_std_error": 0.000925,
+      "se_expansion_factor": 3.25,
+      "sensitivity_across_block_lengths": {
+        "L_12_stationary": [
+          -0.000994,
+          0.002318
+        ],
+        "L_24_stationary": [
+          -0.001123,
+          0.00257
+        ],
+        "L_48_stationary": [
+          -0.001159,
+          0.002634
+        ]
+      },
+      "verdict": "INCONCLUSIVE_INTERVAL_CROSSES_ZERO"
+    },
+    "paired_brier_difference_87bps_target": {
+      "model_brier": 0.205582,
+      "prevalence_baseline_brier": 0.20603,
+      "mean_paired_difference": -0.000448,
+      "v5_naive_iid_ci_95": [
+        -0.000738,
+        -0.000158
+      ],
+      "v6_reproduced_stationary_L24_ci_95": [
+        -0.001342,
+        0.000469
+      ],
+      "v6_reproduced_stationary_L24_std_error": 0.00046,
+      "se_expansion_factor": 3.13,
+      "sensitivity_across_block_lengths": {
+        "L_12_stationary": [
+          -0.001287,
+          0.000401
+        ],
+        "L_24_stationary": [
+          -0.001342,
+          0.000469
+        ],
+        "L_48_stationary": [
+          -0.001386,
+          0.000583
+        ]
+      },
+      "verdict": "INCONCLUSIVE_INTERVAL_CROSSES_ZERO"
+    },
+    "paired_log_loss_difference_87bps_target": {
+      "model_log_loss": 0.601596,
+      "prevalence_baseline_log_loss": 0.602633,
+      "mean_paired_difference": -0.001037,
+      "v5_naive_iid_ci_95": [
+        -0.001699,
+        -0.000384
+      ],
+      "v6_reproduced_stationary_L24_ci_95": [
+        -0.003066,
+        0.001067
+      ],
+      "v6_reproduced_stationary_L24_std_error": 0.001052,
+      "se_expansion_factor": 3.15,
+      "sensitivity_across_block_lengths": {
+        "L_12_stationary": [
+          -0.002956,
+          0.0009
+        ],
+        "L_24_stationary": [
+          -0.003066,
+          0.001067
+        ],
+        "L_48_stationary": [
+          -0.003213,
+          0.001362
+        ]
+      },
+      "verdict": "INCONCLUSIVE_INTERVAL_CROSSES_ZERO"
+    }
+  },
+  "governed_epistemic_conclusion": {
+    "coinbase_spot_directional_expectancy": "REMAINS_DECISIVELY_NEGATIVE (CI strictly below 0 across all block lengths L in [12, 24, 48])",
+    "binance_hypothetical_directional_expectancy": "INCONCLUSIVE_INTERVAL_CROSSES_ZERO",
+    "meta_label_predictive_edge_vs_prevalence": "NO_STATISTICAL_SUPERIORITY (paired loss differences remain strictly indistinguishable from zero or positive)",
+    "live_trading_recommendation": "DISABLED (Zero candidates cleared pre-registered economic hurdles)"
+  }
+}

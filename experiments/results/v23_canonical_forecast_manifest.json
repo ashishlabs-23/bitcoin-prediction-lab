@@ -1,0 +1,142 @@
+{
+  "manifest_version": "23.0.0",
+  "created_at_utc": "2026-10-19T18:05:00Z",
+  "dataset_provenance": {
+    "path": "data/raw/ohlcv.parquet",
+    "sha256": "43c8881b57431759f68fcb7036d78432449d079b11bcaea45f0d0ecfa287e2f6",
+    "total_rows": 41273,
+    "start_timestamp_utc": "2022-01-01 00:00:00+00:00",
+    "end_timestamp_utc": "2026-10-17 15:00:00+00:00",
+    "instrument": "BTC-USD",
+    "frequency": "1h",
+    "provider": "Coinbase Spot Exchange"
+  },
+  "evaluation_protocol": {
+    "training_window_bars": 20000,
+    "evaluation_origins_step": "Non-overlapping step = h (1h: 15000, 4h: 3750, 24h: 625)",
+    "statistical_test": "Diebold-Mariano (1995) with Harvey-Leybourne-Newbold (1997) finite-sample correction against Student-t(N-1)",
+    "skill_score_definition": "(1.0 - MSE_model / MSE_persistence)"
+  },
+  "tournament_results": {
+    "1h": {
+      "horizon": "1h",
+      "horizon_hours": 1,
+      "sample_size_origins": 15000,
+      "n_test_blocks": 15000,
+      "sample_status": "SUFFICIENT_SAMPLE",
+      "status": "PERSISTENCE_BASELINE_UNBEATEN",
+      "statistically_superior_challenger_exists": false,
+      "reliability_note": "Evaluated on 15000 non-overlapping walk-forward blocks with HLN Student-t inference.",
+      "evaluation_step_bars": 1,
+      "non_overlapping_evaluation": true,
+      "persistence_baseline": {
+        "mae_usd": 283.66,
+        "rmse_usd": 435.32,
+        "bias_usd": -1.38,
+        "skill_score": 0.0
+      },
+      "rolling_drift_baseline": {
+        "mae_usd": 285.06,
+        "rmse_usd": 436.62,
+        "bias_usd": 0.73,
+        "skill_score_pct": -0.595,
+        "dm_hln_stat": -4.0199,
+        "p_value": 6e-05
+      },
+      "ridge_candidate": {
+        "mae_usd": 283.68,
+        "rmse_usd": 435.36,
+        "bias_usd": 0.78,
+        "skill_score_pct": -0.016,
+        "dm_hln_stat": -1.2208,
+        "p_value": 0.22219,
+        "statistically_superior_to_rw": false
+      },
+      "verdict": "PERSISTENCE_BASELINE_UNBEATEN"
+    },
+    "4h": {
+      "horizon": "4h",
+      "horizon_hours": 4,
+      "sample_size_origins": 3750,
+      "n_test_blocks": 3750,
+      "sample_status": "SUFFICIENT_SAMPLE",
+      "status": "PERSISTENCE_BASELINE_UNBEATEN",
+      "statistically_superior_challenger_exists": false,
+      "reliability_note": "Evaluated on 3750 non-overlapping walk-forward blocks with HLN Student-t inference.",
+      "evaluation_step_bars": 4,
+      "non_overlapping_evaluation": true,
+      "persistence_baseline": {
+        "mae_usd": 560.48,
+        "rmse_usd": 843.34,
+        "bias_usd": -5.52,
+        "skill_score": 0.0
+      },
+      "rolling_drift_baseline": {
+        "mae_usd": 573.51,
+        "rmse_usd": 853.2,
+        "bias_usd": 2.97,
+        "skill_score_pct": -2.354,
+        "dm_hln_stat": -4.5663,
+        "p_value": 1e-05
+      },
+      "ridge_candidate": {
+        "mae_usd": 560.64,
+        "rmse_usd": 843.52,
+        "bias_usd": 3.34,
+        "skill_score_pct": -0.044,
+        "dm_hln_stat": -0.9695,
+        "p_value": 0.33235,
+        "statistically_superior_to_rw": false
+      },
+      "verdict": "PERSISTENCE_BASELINE_UNBEATEN"
+    },
+    "24h": {
+      "horizon": "24h",
+      "horizon_hours": 24,
+      "sample_size_origins": 625,
+      "n_test_blocks": 625,
+      "sample_status": "SUFFICIENT_SAMPLE",
+      "status": "PERSISTENCE_BASELINE_UNBEATEN",
+      "statistically_superior_challenger_exists": false,
+      "reliability_note": "Evaluated on 625 non-overlapping walk-forward blocks with HLN Student-t inference.",
+      "evaluation_step_bars": 24,
+      "non_overlapping_evaluation": true,
+      "persistence_baseline": {
+        "mae_usd": 1458.31,
+        "rmse_usd": 2073.67,
+        "bias_usd": -33.13,
+        "skill_score": 0.0
+      },
+      "rolling_drift_baseline": {
+        "mae_usd": 1608.82,
+        "rmse_usd": 2221.49,
+        "bias_usd": 20.33,
+        "skill_score_pct": -14.765,
+        "dm_hln_stat": -5.7831,
+        "p_value": 0.0
+      },
+      "ridge_candidate": {
+        "mae_usd": 1458.54,
+        "rmse_usd": 2075.47,
+        "bias_usd": 17.76,
+        "skill_score_pct": -0.173,
+        "dm_hln_stat": -0.6955,
+        "p_value": 0.48702,
+        "statistically_superior_to_rw": false
+      },
+      "verdict": "PERSISTENCE_BASELINE_UNBEATEN"
+    }
+  },
+  "overall_verdict": "PERSISTENCE_BASELINE_UNBEATEN",
+  "reconciliation_audit": {
+    "v18_discrepancy_explanation": "V18 preliminary trial used small initial samples (N=200/50/9) over a high-volatility sub-segment.",
+    "v19_discrepancy_explanation": "V19 evaluated on an earlier 35,000-row parquet snapshot before late-2026 data was appended (yielding .99).",
+    "v20_v23_canonical_truth": "Evaluated on the full authoritative 41,273-row continuous dataset (SHA-256 43c8881b...). True out-of-sample persistence MAEs are .66 (1h), .48 (4h), and ,458.31 (24h).",
+    "hardcoded_fallback_remediation": "Frontend web/app.js fallbacks updated to dynamic canonical values from tournament_leaderboard."
+  },
+  "governance": {
+    "model_authorization": "OFFLINE_RESEARCH_ONLY",
+    "execution_authorization": "DISABLED",
+    "live_trading": "DISABLED"
+  }
+}

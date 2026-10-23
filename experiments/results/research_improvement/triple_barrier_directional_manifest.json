@@ -1,0 +1,42 @@
+{
+  "experiment_id": "EXP-TRIPLE-BARRIER-DIRECTIONAL-2026-v2",
+  "timestamp_utc": "2026-10-17T07:01:29.183551+00:00",
+  "dataset": "data/raw/ohlcv.parquet",
+  "sample_size_total": 41261,
+  "test_sample_size": 6150,
+  "horizon_bars": 24,
+  "barrier_multipliers": {
+    "tp": 1.5,
+    "sl": 1.0
+  },
+  "collision_policy": "SL_FIRST_CONSERVATIVE",
+  "candidates": {
+    "No_Trade_Baseline": {
+      "trades": 0,
+      "win_rate_pct": 0.0,
+      "gross_expectancy_bps": 0.0,
+      "net_expectancy_binance_7bps": 0.0,
+      "net_expectancy_coinbase_40bps": 0.0,
+      "economic_verdict": "ABSTAIN_NEUTRAL"
+    },
+    "Momentum_24h_Baseline": {
+      "trades": 3144,
+      "tp_first_pct": 17.81,
+      "sl_first_pct": 36.13,
+      "timeout_pct": 46.06,
+      "gross_expectancy_bps": -10.0,
+      "net_expectancy_binance_7bps": -17.0,
+      "net_expectancy_coinbase_40bps": -50.0,
+      "economic_verdict": "FAIL_NEGATIVE_AFTER_COSTS"
+    },
+    "High_Conviction_Logistic_p60": {
+      "trades": 0,
+      "coverage_pct": 0.0,
+      "gross_expectancy_bps": 0.0,
+      "net_expectancy_binance_7bps": 0.0,
+      "net_expectancy_coinbase_40bps": 0.0,
+      "economic_verdict": "INSUFFICIENT_EDGE"
+    }
+  },
+  "governed_conclusion": "NO_CANDIDATE_PASSED_PREREGISTERED_GATE"
+}

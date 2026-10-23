@@ -1,0 +1,28 @@
+{
+  "backup_timestamp": "2026-10-19T11:39:57.684256+00:00",
+  "source_db": "c:\\Projects\\BTCognitive\\BTCognitive\\experiments\\results\\market_memory.db",
+  "source_db_sha256": "fce87df0d10ff4ff4355dd60ece38f087850ec7c70a40c00702f415fe7d7b690",
+  "source_db_size_bytes": 69304320,
+  "backup_db": "c:\\Projects\\BTCognitive\\BTCognitive\\experiments\\results\\backups\\v22_initial_verified_backup_20261019\\market_memory.db",
+  "backup_db_sha256": "f9f7304b81dec21bdd0f266c1785fa50b944abd8b930f87ddf250cc594cd24f9",
+  "backup_db_size_bytes": 69304320,
+  "source_csv": "c:\\Projects\\BTCognitive\\BTCognitive\\experiments\\results\\market_memory.csv",
+  "source_csv_sha256": "fd19c819ba7d4a8ca6e67f47ad9712c90b6c2ff445212f2158ee529a0a14ffa3",
+  "source_csv_size_bytes": 3152862,
+  "backup_csv": "c:\\Projects\\BTCognitive\\BTCognitive\\experiments\\results\\backups\\v22_initial_verified_backup_20261019\\market_memory.csv",
+  "backup_csv_sha256": "fd19c819ba7d4a8ca6e67f47ad9712c90b6c2ff445212f2158ee529a0a14ffa3",
+  "backup_csv_size_bytes": 3152862,
+  "db_table_counts": {
+    "predictions": 5611,
+    "stress_trials": 1,
+    "range_forecasts": 60569,
+    "excursion_forecasts": 60569,
+    "uncertainty_forecasts": 60569,
+    "forecast_outcomes": 8957,
+    "hawkes_forecasts": 224,
+    "hawkes_outcomes": 27,
+    "shadow_decision_records": 0,
+    "quarantined_forecast_outcomes": 71
+  },
+  "csv_total_rows": 5553
+}

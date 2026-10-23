@@ -1,12 +1,12 @@
 {
-  "evaluation_timestamp": "2026-10-13T19:10:20.695637+00:00",
+  "evaluation_timestamp": "2026-10-21T08:12:19.773104+00:00",
   "protocol": "MULTI_REGIME_PURGED_CROSS_VALIDATION (2020-2026)",
   "dataset_span": "2022-01-08 00:00:00+00:00 to 2024-05-31 01:00:00+00:00",
   "total_test_observations": 15734,
-  "pooled_effective_sample_size_neff": 1549.49,
-  "pooled_p90_joint_coverage_pct": 90.19,
-  "pooled_spearman_ic_mfe": 0.1171,
-  "pooled_spearman_ic_mae": 0.1826,
+  "pooled_effective_sample_size_neff": 1548.49,
+  "pooled_p90_joint_coverage_pct": 90.13,
+  "pooled_spearman_ic_mfe": 0.1181,
+  "pooled_spearman_ic_mae": 0.1832,
   "fold_breakdown": [
     {
       "fold": 1,
@@ -14,10 +14,10 @@
       "test_size": 5244,
       "start_time": "2022-08-14 12:00:00+00:00",
       "end_time": "2023-03-20 23:00:00+00:00",
-      "joint_coverage_pct": 88.08,
-      "winkler_score": 0.1599,
-      "spearman_ic_mfe": -0.0374,
-      "spearman_ic_mae": -0.3243
+      "joint_coverage_pct": 88.1,
+      "winkler_score": 0.16,
+      "spearman_ic_mfe": -0.0366,
+      "spearman_ic_mae": -0.3227
     },
     {
       "fold": 2,
@@ -25,10 +25,10 @@
       "test_size": 5244,
       "start_time": "2023-03-21 00:00:00+00:00",
       "end_time": "2023-10-25 11:00:00+00:00",
-      "joint_coverage_pct": 92.87,
-      "winkler_score": 0.1135,
-      "spearman_ic_mfe": 0.0531,
-      "spearman_ic_mae": -0.0467
+      "joint_coverage_pct": 92.75,
+      "winkler_score": 0.1133,
+      "spearman_ic_mfe": 0.0571,
+      "spearman_ic_mae": -0.0501
     },
     {
       "fold": 3,
@@ -36,35 +36,35 @@
       "test_size": 5246,
       "start_time": "2023-10-25 12:00:00+00:00",
       "end_time": "2024-05-31 01:00:00+00:00",
-      "joint_coverage_pct": 89.63,
+      "joint_coverage_pct": 89.53,
       "winkler_score": 0.1394,
-      "spearman_ic_mfe": 0.0155,
-      "spearman_ic_mae": 0.1888
+      "spearman_ic_mfe": 0.0146,
+      "spearman_ic_mae": 0.193
     }
   ],
   "regime_stratification": {
     "REGIME_2_FED_HIKING_BEAR": {
       "observations_count": 3348,
-      "effective_sample_size_neff": 468.75,
-      "p90_joint_coverage_pct": 82.23,
-      "spearman_ic_mfe": -0.0302,
-      "spearman_ic_mae": 0.0031,
+      "effective_sample_size_neff": 468.19,
+      "p90_joint_coverage_pct": 82.26,
+      "spearman_ic_mfe": -0.0284,
+      "spearman_ic_mae": 0.0113,
       "calibration_status": "DEGRADED_BELOW_TARGET"
     },
     "REGIME_3_TRANSITION_COMPRESSION": {
       "observations_count": 9000,
-      "effective_sample_size_neff": 961.69,
-      "p90_joint_coverage_pct": 94.22,
-      "spearman_ic_mfe": -0.0139,
-      "spearman_ic_mae": -0.0049,
+      "effective_sample_size_neff": 961.94,
+      "p90_joint_coverage_pct": 94.16,
+      "spearman_ic_mfe": -0.0098,
+      "spearman_ic_mae": -0.0073,
       "calibration_status": "CALIBRATED_NOMINAL"
     },
     "REGIME_4_SPOT_ETF_INSTITUTIONAL": {
       "observations_count": 3386,
-      "effective_sample_size_neff": 446.79,
-      "p90_joint_coverage_pct": 87.36,
-      "spearman_ic_mfe": 0.0067,
-      "spearman_ic_mae": -0.0173,
+      "effective_sample_size_neff": 446.17,
+      "p90_joint_coverage_pct": 87.21,
+      "spearman_ic_mfe": -0.0001,
+      "spearman_ic_mae": -0.0068,
       "calibration_status": "DEGRADED_BELOW_TARGET"
     }
   },

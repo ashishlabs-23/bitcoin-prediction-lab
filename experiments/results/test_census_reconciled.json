@@ -1,0 +1,10 @@
+{
+  "audit_timestamp": "2026-10-19T08:32:20.602588+00:00",
+  "source_file": "experiments/results/test_census.json",
+  "total_raw_trial_entries": 29,
+  "unique_trial_hashes": 1,
+  "duplicate_or_retry_entries": 28,
+  "effective_independent_candidate_count": 1,
+  "audit_finding": "All 29 entries in test_census.json share identical trial hash '8478f66327374931' with identical parameter grid. Entries represent repeated execution runs/retries. Authoritative unique trial count is 1.",
+  "multiple_testing_correction_implication": "Inflated trial count of 29 would artificially over-penalize Bonferroni family-wise error rate. Adjusted for effective N_trials = 1."
+}

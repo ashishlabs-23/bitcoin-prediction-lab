@@ -1,0 +1,103 @@
+{
+  "manifest_version": "26.0.0",
+  "created_at_utc": "2026-10-19T22:15:00Z",
+  "dataset_provenance": {
+    "path": "data/raw/ohlcv.parquet",
+    "sha256": "43c8881b57431759f68fcb7036d78432449d079b11bcaea45f0d0ecfa287e2f6",
+    "total_rows": 41273,
+    "start_timestamp_utc": "2022-01-01 00:00:00+00:00",
+    "end_timestamp_utc": "2026-10-17 15:00:00+00:00",
+    "instrument": "BTC-USD",
+    "frequency": "1h",
+    "provider": "Coinbase Spot Exchange"
+  },
+  "evaluation_protocol": {
+    "training_window_bars": 20000,
+    "evaluation_window_bars": "[20000, 35000]",
+    "retrospective_buffer_bars": "[35000, 41273]",
+    "evaluation_step": "Non-overlapping step = h (1h: 15000, 4h: 3750, 24h: 625)",
+    "variance_estimator": "HAC / Newey-West with Bartlett kernel weights w(k, K) = 1 - k / (K + 1)",
+    "hac_bandwidth_rule": "Automatic Newey-West bandwidth K = floor(4 * (T / 100)^(2/9))",
+    "nested_model_test": "Clark-West (2007) MSPE-adjusted one-sided Student-t(T-1) test"
+  },
+  "canonical_metrics": {
+    "1h": {
+      "horizon": "1h",
+      "sample_size": 14999,
+      "hac_bandwidth_lags": 12,
+      "persistence": {
+        "mae_usd": 283.66,
+        "rmse_usd": 435.32,
+        "bias_usd": -1.38,
+        "skill_score": 0.0
+      },
+      "ridge_l2": {
+        "mae_usd": 283.68,
+        "rmse_usd": 435.36,
+        "bias_usd": 0.78,
+        "skill_score_pct": -0.016,
+        "dm_iid_stat": -1.2208,
+        "dm_hac_stat": -1.2800,
+        "dm_hac_p_value_two_sided": 0.20056,
+        "cw_hac_stat": -0.8726,
+        "cw_hac_p_value_one_sided": 0.80854,
+        "statistically_superior_to_persistence": false
+      },
+      "verdict": "PERSISTENCE_BASELINE_UNBEATEN"
+    },
+    "4h": {
+      "horizon": "4h",
+      "sample_size": 3749,
+      "hac_bandwidth_lags": 8,
+      "persistence": {
+        "mae_usd": 560.48,
+        "rmse_usd": 843.34,
+        "bias_usd": -5.52,
+        "skill_score": 0.0
+      },
+      "ridge_l2": {
+        "mae_usd": 560.64,
+        "rmse_usd": 843.52,
+        "bias_usd": 3.34,
+        "skill_score_pct": -0.044,
+        "dm_iid_stat": -0.9695,
+        "dm_hac_stat": -0.8899,
+        "dm_hac_p_value_two_sided": 0.37360,
+        "cw_hac_stat": -0.4385,
+        "cw_hac_p_value_one_sided": 0.66948,
+        "statistically_superior_to_persistence": false
+      },
+      "verdict": "PERSISTENCE_BASELINE_UNBEATEN"
+    },
+    "24h": {
+      "horizon": "24h",
+      "sample_size": 624,
+      "hac_bandwidth_lags": 6,
+      "persistence": {
+        "mae_usd": 1458.31,
+        "rmse_usd": 2073.67,
+        "bias_usd": -33.13,
+        "skill_score": 0.0
+      },
+      "ridge_l2": {
+        "mae_usd": 1458.54,
+        "rmse_usd": 2075.47,
+        "bias_usd": 17.76,
+        "skill_score_pct": -0.173,
+        "dm_iid_stat": -0.6955,
+        "dm_hac_stat": -0.6824,
+        "dm_hac_p_value_two_sided": 0.49526,
+        "cw_hac_stat": -0.2877,
+        "cw_hac_p_value_one_sided": 0.61317,
+        "statistically_superior_to_persistence": false
+      },
+      "verdict": "PERSISTENCE_BASELINE_UNBEATEN"
+    }
+  },
+  "overall_verdict": "PERSISTENCE_BASELINE_UNBEATEN",
+  "governance": {
+    "model_authorization": "OFFLINE_RESEARCH_ONLY",
+    "execution_authorization": "DISABLED",
+    "live_trading": "DISABLED"
+  }
+}

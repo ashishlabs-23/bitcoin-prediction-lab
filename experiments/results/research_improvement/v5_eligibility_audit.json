@@ -1,0 +1,112 @@
+{
+  "audit_version": "V5-CONTINUITY-ELIGIBILITY-AUDIT",
+  "total_input_bars": 41261,
+  "clean_bars": 41261,
+  "discontinuities_count": 2,
+  "discontinuities": [
+    {
+      "gap_id": 1,
+      "gap_start_index": 10740,
+      "gap_end_index": 10741,
+      "gap_start_timestamp": "2023-03-24T12:00:00+00:00",
+      "gap_end_timestamp": "2023-03-24T14:00:00+00:00",
+      "elapsed_hours": 2.0,
+      "missing_hours": 1.0
+    },
+    {
+      "gap_id": 2,
+      "gap_start_index": 40901,
+      "gap_end_index": 40902,
+      "gap_start_timestamp": "2026-09-01T06:00:00+00:00",
+      "gap_end_timestamp": "2026-10-02T05:00:00+00:00",
+      "elapsed_hours": 743.0,
+      "missing_hours": 742.0
+    }
+  ],
+  "segments_count": 3,
+  "feature_lookback_requirements": {
+    "ret_1h": {
+      "lookback_bars": 1,
+      "total_dataset_nans": 3
+    },
+    "ret_4h": {
+      "lookback_bars": 4,
+      "total_dataset_nans": 12
+    },
+    "ret_24h": {
+      "lookback_bars": 24,
+      "total_dataset_nans": 72
+    },
+    "rv_24h": {
+      "lookback_bars": 24,
+      "total_dataset_nans": 72
+    },
+    "hl_ratio_24h": {
+      "lookback_bars": 23,
+      "total_dataset_nans": 69
+    },
+    "vol_spread": {
+      "lookback_bars": 191,
+      "total_dataset_nans": 573,
+      "note": "24h rolling volatility + 168h rolling mean = 191 bars required"
+    }
+  },
+  "segment_lookback_audit": {
+    "segment_0": {
+      "segment_id": 0,
+      "total_bars": 10741,
+      "feature_nan_counts": {
+        "ret_1h": 1,
+        "ret_4h": 4,
+        "ret_24h": 24,
+        "rv_24h": 24,
+        "vol_spread": 191,
+        "hl_ratio_24h": 23
+      },
+      "any_feature_nan_count": 191,
+      "max_lookback_required_bars": 191
+    },
+    "segment_1": {
+      "segment_id": 1,
+      "total_bars": 30161,
+      "feature_nan_counts": {
+        "ret_1h": 1,
+        "ret_4h": 4,
+        "ret_24h": 24,
+        "rv_24h": 24,
+        "vol_spread": 191,
+        "hl_ratio_24h": 23
+      },
+      "any_feature_nan_count": 191,
+      "max_lookback_required_bars": 191
+    },
+    "segment_2": {
+      "segment_id": 2,
+      "total_bars": 359,
+      "feature_nan_counts": {
+        "ret_1h": 1,
+        "ret_4h": 4,
+        "ret_24h": 24,
+        "rv_24h": 24,
+        "vol_spread": 191,
+        "hl_ratio_24h": 23
+      },
+      "any_feature_nan_count": 191,
+      "max_lookback_required_bars": 191
+    }
+  },
+  "label_exclusion_reasons": {
+    "nan": 41117,
+    "INSUFFICIENT_LOOKBACK_OR_VOL_NAN": 72,
+    "DISCONTINUOUS_FORWARD_HORIZON_GAP": 72
+  },
+  "sample_split_accounting": {
+    "train_bars_total_with_valid_label": 26207,
+    "train_bars_with_all_features_ready": 25873,
+    "val_bars_total_with_valid_label": 8736,
+    "val_bars_with_all_features_ready": 8736,
+    "test_bars_total_with_valid_label": 6126,
+    "test_bars_with_all_features_ready": 5959,
+    "purging_embargo_hours": 24
+  }
+}

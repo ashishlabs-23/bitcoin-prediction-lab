@@ -1,0 +1,156 @@
+{
+  "manifest_version": "26.0.0",
+  "created_at_utc": "2026-10-19T22:20:00Z",
+  "dataset_provenance": {
+    "path": "data/raw/ohlcv.parquet",
+    "sha256": "43c8881b57431759f68fcb7036d78432449d079b11bcaea45f0d0ecfa287e2f6",
+    "total_rows": 41273,
+    "instrument": "BTC-USD",
+    "frequency": "1h",
+    "provider": "Coinbase Spot Exchange"
+  },
+  "evaluation_window": {
+    "oos_start_idx": 31273,
+    "oos_end_idx": 41248,
+    "total_bars": 9975,
+    "calendar_days": 415.625
+  },
+  "nomenclature_reconciliation": {
+    "TS_MOM_TREND": {
+      "reported_label_historical": "Dual-SMA Trend Following",
+      "verified_code_implementation": "Dual-EMA Crossover (Series.ewm(span=24) vs Series.ewm(span=168))",
+      "canonical_v26_label": "Dual-EMA Crossover (24h / 168h)",
+      "discrepancy_resolved": "Code in research/run_v18_price_and_strategy_tournament.py computed exponential moving averages with span=24 and span=168. Dual-SMA would have used rolling(24).mean() and rolling(168).mean(). The manifest and documentation now strictly reflect Dual-EMA."
+    }
+  },
+  "cost_models": {
+    "COINBASE_RETAIL": {
+      "maker_fee_bps": 25.0,
+      "taker_fee_bps": 40.0,
+      "half_spread_bps": 2.5,
+      "slippage_bps": 1.0,
+      "per_turnover_unit_bps": 43.5,
+      "round_trip_bps": 87.0,
+      "description": "Standard Coinbase Advanced retail taker tier with half-spread and minimal slippage"
+    },
+    "BINANCE_SPOT_VIP0": {
+      "maker_fee_bps": 10.0,
+      "taker_fee_bps": 10.0,
+      "half_spread_bps": 1.0,
+      "slippage_bps": 1.0,
+      "per_turnover_unit_bps": 12.0,
+      "round_trip_bps": 24.0,
+      "description": "Standard Binance VIP 0 spot tier with BNB discount / taker fee parity"
+    },
+    "INSTITUTIONAL_LOW_COST": {
+      "maker_fee_bps": 2.0,
+      "taker_fee_bps": 5.0,
+      "half_spread_bps": 1.0,
+      "slippage_bps": 1.0,
+      "per_turnover_unit_bps": 7.0,
+      "round_trip_bps": 14.0,
+      "description": "High-volume institutional tier"
+    }
+  },
+  "strategies": {
+    "NO_TRADE_BENCHMARK": {
+      "strategy_family": "Zero Exposure Cash Benchmark",
+      "signal_events": 0,
+      "reversals": 0,
+      "turnover_units": 0.0,
+      "completed_round_trips": 0.0,
+      "gross_return_bps": 0.0,
+      "net_returns_by_scenario": {
+        "GROSS": 0.0,
+        "COINBASE_RETAIL": 0.0,
+        "BINANCE_SPOT_VIP0": 0.0,
+        "INSTITUTIONAL_LOW_COST": 0.0
+      },
+      "max_drawdown_pct": 0.0,
+      "sharpe_ratio": 0.0,
+      "verdict": "DECISIVE_WINNER"
+    },
+    "TS_MOM_TREND": {
+      "strategy_family": "Dual-EMA Crossover (24h / 168h)",
+      "signal_events": 100,
+      "reversals": 99,
+      "turnover_units": 199.0,
+      "completed_round_trips": 99.5,
+      "gross_return_bps": 1570.6,
+      "net_returns_by_scenario": {
+        "GROSS": 1570.6,
+        "COINBASE_RETAIL": -7085.9,
+        "BINANCE_SPOT_VIP0": -817.4,
+        "INSTITUTIONAL_LOW_COST": 177.6
+      },
+      "max_drawdown_pct": 79.4,
+      "verdict": "REJECTED_UNPROFITABLE_OR_EXCESSIVE_DRAWDOWN"
+    },
+    "TRUE_DUAL_SMA_REFERENCE": {
+      "strategy_family": "True Simple Moving Average Crossover (24h / 168h)",
+      "signal_events": 104,
+      "reversals": 104,
+      "turnover_units": 208.0,
+      "completed_round_trips": 104.0,
+      "gross_return_bps": -438.7,
+      "net_returns_by_scenario": {
+        "GROSS": -438.7,
+        "COINBASE_RETAIL": -9486.7,
+        "BINANCE_SPOT_VIP0": -2934.7,
+        "INSTITUTIONAL_LOW_COST": -1894.7
+      },
+      "max_drawdown_pct": 84.1,
+      "verdict": "REJECTED_UNPROFITABLE"
+    },
+    "SHORT_HORIZON_MEAN_REVERSION": {
+      "strategy_family": "RSI(14) Mean Reversion (<30 / >70)",
+      "signal_events": 642,
+      "reversals": 0,
+      "turnover_units": 642.0,
+      "completed_round_trips": 321.0,
+      "gross_return_bps": -370.5,
+      "net_returns_by_scenario": {
+        "GROSS": -370.5,
+        "COINBASE_RETAIL": -28297.5,
+        "BINANCE_SPOT_VIP0": -8074.5,
+        "INSTITUTIONAL_LOW_COST": -4864.5
+      },
+      "max_drawdown_pct": 94.2,
+      "verdict": "REJECTED_UNPROFITABLE_AFTER_COSTS"
+    },
+    "VOL_COMPRESSION_BREAKOUT": {
+      "strategy_family": "Bollinger Bandwidth Squeeze Breakout",
+      "signal_events": 893,
+      "reversals": 3,
+      "turnover_units": 896.0,
+      "completed_round_trips": 448.0,
+      "gross_return_bps": 2686.0,
+      "net_returns_by_scenario": {
+        "GROSS": 2686.0,
+        "COINBASE_RETAIL": -36290.0,
+        "BINANCE_SPOT_VIP0": -8066.0,
+        "INSTITUTIONAL_LOW_COST": -3586.0
+      },
+      "max_drawdown_pct": 97.4,
+      "verdict": "REJECTED_UNPROFITABLE_AFTER_COSTS"
+    },
+    "REGIME_ADAPTIVE_ROUTER": {
+      "strategy_family": "Volatility-Gated Trend/Mean-Reversion Router",
+      "signal_events": 1011,
+      "reversals": 105,
+      "turnover_units": 1116.0,
+      "completed_round_trips": 558.0,
+      "gross_return_bps": -3561.3,
+      "net_returns_by_scenario": {
+        "GROSS": -3561.3,
+        "COINBASE_RETAIL": -52107.3,
+        "BINANCE_SPOT_VIP0": -16953.3,
+        "INSTITUTIONAL_LOW_COST": -11373.3
+      },
+      "max_drawdown_pct": 99.6,
+      "verdict": "REJECTED_UNPROFITABLE_AFTER_COSTS"
+    }
+  },
+  "governance_verdict": "NO_STRATEGY_WINNER_ESTABLISHED",
+  "execution_authorization": "DISABLED"
+}

@@ -1,0 +1,46 @@
+{
+  "manifest_version": "BTC-FINAL-EVAL-GATE-v1.0",
+  "created_at_utc": "2026-10-16T14:46:05.156827+00:00",
+  "evaluation_protocol": "PRD_PART_E_FINAL_FROZEN_GATE",
+  "holdout_window": {
+    "start": "2026-01-01T00:00:00Z",
+    "end": "2026-09-01T05:00:00Z",
+    "total_hourly_bars": 5838,
+    "epistemic_classification": "VALID_HISTORICAL_OUT_OF_SAMPLE_REPLAY",
+    "prior_tuning_statement": "Training occurred strictly on pre-2026 data (2022-01-31 to 2025-12-24). Final holdout was never used for coefficient fitting or hyperparameter tuning."
+  },
+  "models_evaluated": {
+    "HAR-RS-DOW-v1.0": {
+      "artifact_path": "experiments/results/freeze/har_rs_dow_v1.joblib",
+      "sha256": "750b5d15ed84c3cf24b8484ae928ff7c8098cab0c35eafe310ab28bf57ed285b",
+      "classification": "PRODUCTION_VOLATILITY",
+      "target": "rv7d_var_ann (Annualized forward 7-day realized variance)",
+      "horizon_hours": 168,
+      "calibration_method": "C2 Conformal Prediction (alpha=0.10, nominal 90%)",
+      "baseline": "Point-in-Time Sample Variance (Rolling 30-day)"
+    },
+    "directional-gbm-1h-v1": {
+      "classification": "OFFLINE_RESEARCH_ONLY",
+      "target": "sign(ln(P_{t+1}/P_t)) > 0",
+      "horizon_hours": 1,
+      "baseline": "Random Walk (50.0%) and Majority Class Prior (49.79%)"
+    },
+    "directional-gbm-4h-v1": {
+      "classification": "OFFLINE_RESEARCH_ONLY",
+      "target": "sign(ln(P_{t+4}/P_t)) > 0",
+      "horizon_hours": 4,
+      "baseline": "Random Walk (50.0%) and Majority Class Prior (49.84%)"
+    },
+    "directional-gbm-24h-v1": {
+      "classification": "OFFLINE_RESEARCH_ONLY",
+      "target": "sign(ln(P_{t+24}/P_t)) > 0",
+      "horizon_hours": 24,
+      "baseline": "Random Walk (50.0%) and Majority Class Prior (50.90%)"
+    }
+  },
+  "friction_assumptions_bps": {
+    "institutional_taker_roundtrip": 14.0,
+    "retail_taker_roundtrip": 35.0
+  },
+  "governance_status": "FROZEN_RELEASE_CANDIDATE"
+}

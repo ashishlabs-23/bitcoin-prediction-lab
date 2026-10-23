@@ -1,0 +1,59 @@
+{
+  "manifest_version": "20.0.0",
+  "dataset_sha256": "43c8881b57431759f68fcb7036d78432449d079b11bcaea45f0d0ecfa287e2f6",
+  "dataset_rows": 41273,
+  "date_range_utc": [
+    "2022-01-01 00:00:00+00:00",
+    "2026-10-17 15:00:00+00:00"
+  ],
+  "skill_score_formula": "Skill_pct = (1.0 - MAE_model / MAE_persistence) * 100.0",
+  "statistical_test": "Diebold-Mariano with Harvey-Leybourne-Newbold (1997) correction and Student-t(N-1) distribution",
+  "results_by_horizon": {
+    "1h": {
+      "n_observations": 15000,
+      "persistence_mae_usd": 283.66,
+      "persistence_rmse_usd": 435.32,
+      "persistence_bias_usd": -1.38,
+      "drift_mae_usd": 285.06,
+      "drift_rmse_usd": 436.62,
+      "drift_skill_pct": -0.595,
+      "drift_p_value": 6e-05,
+      "ridge_mae_usd": 283.68,
+      "ridge_rmse_usd": 435.36,
+      "ridge_skill_pct": -0.016,
+      "ridge_p_value": 0.22219,
+      "verdict": "PERSISTENCE_BASELINE_UNBEATEN"
+    },
+    "4h": {
+      "n_observations": 3750,
+      "persistence_mae_usd": 560.48,
+      "persistence_rmse_usd": 843.34,
+      "persistence_bias_usd": -5.52,
+      "drift_mae_usd": 573.51,
+      "drift_rmse_usd": 853.2,
+      "drift_skill_pct": -2.354,
+      "drift_p_value": 1e-05,
+      "ridge_mae_usd": 560.64,
+      "ridge_rmse_usd": 843.52,
+      "ridge_skill_pct": -0.044,
+      "ridge_p_value": 0.33235,
+      "verdict": "PERSISTENCE_BASELINE_UNBEATEN"
+    },
+    "24h": {
+      "n_observations": 625,
+      "persistence_mae_usd": 1458.31,
+      "persistence_rmse_usd": 2073.67,
+      "persistence_bias_usd": -33.13,
+      "drift_mae_usd": 1608.82,
+      "drift_rmse_usd": 2221.49,
+      "drift_skill_pct": -14.765,
+      "drift_p_value": 0.0,
+      "ridge_mae_usd": 1458.54,
+      "ridge_rmse_usd": 2075.47,
+      "ridge_skill_pct": -0.173,
+      "ridge_p_value": 0.48702,
+      "verdict": "PERSISTENCE_BASELINE_UNBEATEN"
+    }
+  },
+  "overall_conclusion": "PERSISTENCE_BASELINE_ROBUST: Future BTCUSD close prices are overwhelmingly dominated by the random-walk persistence benchmark at 1h/4h/24h. Complex models do not demonstrate robust economic superiority over persistence after rigorous HLN finite-sample correction."
+}

@@ -31,10 +31,19 @@ from config.paths import RESULTS_DIR
 from config.database import MARKET_MEMORY_DB_PATH
 from models.forecast_quality_contract import BlockQuality
 
+from research.post_repair_longitudinal_monitor import (
+    get_authoritative_provenance,
+    derive_model_artifact_sha256,
+    derive_feature_schema_hash,
+    derive_target_contract_hash
+)
+
 POST_REPAIR_EVIDENCE_START = "2026-08-21T12:15:00Z"
 REPAIR_VERSION = "v1.0.0-production-data-consistency-repair"
-MODEL_HASH = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-CONTEXT_HASH = "8f48b11c990b7987a04918e6ec29a67a989f71eaf8e544ebdf8edf60c20b0c89"
+
+_prov = get_authoritative_provenance()
+MODEL_HASH = _prov["model_hash"]
+CONTEXT_HASH = _prov["context_hash"]
 
 BLOCKS_CSV_PATH = os.path.join(RESULTS_DIR, "post_repair_blocks.csv")
 

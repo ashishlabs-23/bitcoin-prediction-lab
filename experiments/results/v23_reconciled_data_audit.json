@@ -1,0 +1,9 @@
+{
+  "audit_version": "23.0.0",
+  "timestamp_utc": "2026-10-19T12:37:52.806825+00:00",
+  "matched_rows_count": 5542,
+  "db_only_count": 69,
+  "csv_only_count": 11,
+  "final_synchronized_count": 5622,
+  "non_directional_preserved": true
+}

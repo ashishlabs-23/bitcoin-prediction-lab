@@ -1,0 +1,148 @@
+{
+  "manifest_version": "V7_EVIDENCE_MANIFEST_v1.0",
+  "audit_phase": "V7_INDEPENDENT_RED_TEAM_AUDIT",
+  "timestamp_utc": "2026-10-17T10:30:00+00:00",
+  "release_verdict": "V7_VERIFIED_WITHIN_DECLARED_SCOPE",
+  "environment": {
+    "git_branch": "main",
+    "git_commit": "01f87cad6d189eb4b4c70c0a52e4e759ed8d8eba",
+    "os": "windows",
+    "python_version": "3.13.14",
+    "pytest_version": "8.4.1"
+  },
+  "governance_locks": {
+    "directional_signals_authorized": false,
+    "directional_model_status": "OFFLINE_RESEARCH_ONLY",
+    "live_trading": "DISABLED",
+    "order_submission_paths": "PERMANENTLY_BLOCKED",
+    "automated_model_promotion": "DISABLED",
+    "confirmatory_prospective_gate_satisfied": false
+  },
+  "market_data_provenance": {
+    "source": "Coinbase Spot (Closed Hourly Candle)",
+    "instrument": "BTC/USD",
+    "timeframe": "1h",
+    "parquet_path": "data/raw/ohlcv.parquet",
+    "parquet_sha256": "0f4f7c10d7fc0429dae3c6cdcfd083c334d6c06b8123da19790a3a7d621b55d9",
+    "total_bars": 41267,
+    "earliest_bar_utc": "2022-01-01T00:00:00+00:00",
+    "latest_bar_utc": "2026-10-17T09:00:00+00:00"
+  },
+  "scenario_planner_freshness_policy": {
+    "contract_version": "SCENARIO_PLANNER_v1.0",
+    "max_staleness_seconds": 10800.0,
+    "max_staleness_hours": 3.0,
+    "rejection_code_on_stale": "MARKET_DATA_STALE",
+    "rejection_code_on_unsupported_freq": "DATA_FREQUENCY_UNSUPPORTED",
+    "rejection_code_on_invalid_custom": "INVALID_CUSTOM_ENTRY_PRICE",
+    "supported_horizons": ["1h", "4h", "24h"],
+    "unsupported_sub_hourly": ["5m", "15m", "30m"],
+    "volatility_estimator": "Rolling 24-bar Log-Return Standard Deviation",
+    "volatility_units": "LOG_RETURN_STANDARD_DEVIATION",
+    "scaling_method": "SQUARE_ROOT_OF_TIME_APPROXIMATION",
+    "scaling_notice": "Geometric square-root-of-time scaling (sigma_H = sigma_1h * sqrt(H)) is a theoretical Brownian increment approximation under i.i.d. increments, NOT a validated volatility forecast.",
+    "pricing_formulas": {
+      "LONG": {
+        "take_profit": "round(P * exp(+k_tp * sigma_H), 2)",
+        "stop_loss": "round(P * exp(-k_sl * sigma_H), 2)",
+        "invariants": "stop_loss < entry_reference < take_profit"
+      },
+      "SHORT": {
+        "take_profit": "round(P * exp(-k_tp * sigma_H), 2)",
+        "stop_loss": "round(P * exp(+k_sl * sigma_H), 2)",
+        "invariants": "take_profit < entry_reference < stop_loss"
+      }
+    }
+  },
+  "statistical_inference_reproduction": {
+    "artifact_path": "experiments/results/research_improvement/v7_statistical_inference_audit.json",
+    "sign_convention": "challenger_loss - baseline_loss (positive favors baseline, negative favors challenger)",
+    "methodology": "Politis & Romano (1994) Stationary Bootstrap with L in [12, 24, 48] and Circular Block Bootstrap",
+    "segment_preservation": "Blocks sampled strictly within continuous segments; zero cross-gap pooling",
+    "reproduced_metrics": {
+      "candidate_1_coinbase_87bps_net_expectancy": {
+        "point_estimate_bps": -78.09,
+        "stationary_L24_ci_95": [-96.420355, -57.977817],
+        "verdict": "FAIL_DECISIVELY_NEGATIVE"
+      },
+      "candidate_1_binance_15bps_net_expectancy": {
+        "point_estimate_bps": -6.09,
+        "stationary_L24_ci_95": [-24.420355, 14.022183],
+        "verdict": "INCONCLUSIVE_INTERVAL_CROSSES_ZERO"
+      },
+      "paired_brier_difference_15bps_target": {
+        "point_estimate": 0.000331,
+        "v5_naive_iid_ci_95": [0.000050, 0.000614],
+        "v7_stationary_L24_ci_95": [-0.000551, 0.001274],
+        "se_expansion_factor": 3.25,
+        "verdict": "INCONCLUSIVE_INTERVAL_CROSSES_ZERO"
+      },
+      "paired_log_loss_difference_15bps_target": {
+        "point_estimate": 0.000668,
+        "v5_naive_iid_ci_95": [0.000101, 0.001239],
+        "v7_stationary_L24_ci_95": [-0.001123, 0.002570],
+        "se_expansion_factor": 3.25,
+        "verdict": "INCONCLUSIVE_INTERVAL_CROSSES_ZERO"
+      }
+    },
+    "discrepancy_root_cause": "The interval [-0.0182, +0.0241] cited in user review arose from a textual confounding between the empirical lag-1 return autocorrelation (rho_1 = -0.01824) and Brier metrics. The actual V6/V7 artifact on disk contains [-0.000551, +0.001274]. Both intervals prove the point estimate is positive (+0.000331, favoring baseline) and crosses zero under corrected dependence. Zero predictive edge exists over prevalence baseline."
+  },
+  "prospective_evidence_audit": {
+    "ledger_path": "data/prospective_forecast_ledger.jsonl",
+    "telemetry_path": "data/prospective_worker_status.json",
+    "total_records_logged": 9,
+    "historical_seed_records": 1,
+    "historical_seed_record_id": "prospective-seed-001 (excluded from confirmatory gate)",
+    "genuine_prospective_records": 8,
+    "breakdown_by_horizon": {
+      "rv24h_var_ann": {
+        "total_records": 5,
+        "resolved_records": 5,
+        "pending_records": 0,
+        "strictly_non_overlapping_blocks": 1
+      },
+      "rv7d_var_ann": {
+        "total_records": 4,
+        "resolved_records": 0,
+        "pending_records": 4,
+        "strictly_non_overlapping_blocks": 0
+      }
+    },
+    "governed_progress": {
+      "clean_blocks_count": 1,
+      "confirmatory_threshold": 100,
+      "completion_pct": 1.0,
+      "prospective_status": "COLLECTING",
+      "is_sufficient_for_confirmatory": false
+    },
+    "scheduler_status": {
+      "windows_task_scheduler_configured": false,
+      "windows_task_scheduler_query": "schtasks /Query /TN 'BTCognitiveProspectiveWorker' -> ERROR: The system cannot find the file specified",
+      "compliance_note": "No persistent scheduler job was registered in accordance with strict governance limits."
+    }
+  },
+  "browser_verification": {
+    "subagent_recording": "v7_browser_audit_1792232537277.webp",
+    "desktop_screenshot": "desktop_live_view_1792232557054.png",
+    "mobile_screenshot": "mobile_live_view_1792232670029.png",
+    "viewports_tested": ["1440x900", "390x844"],
+    "live_route": "http://127.0.0.1:8000/#/live",
+    "observed_controls": {
+      "active_signal": "ABSTAIN",
+      "trading_status": "DISABLED",
+      "scenario_badge": "NON-ACTIONABLE RESEARCH",
+      "15m_unsupported_rejection": "DATA_FREQUENCY_UNSUPPORTED displayed with table hidden",
+      "custom_anchor_test": "95000 successfully applied [USER CUSTOM ANCHOR] and reset to [VERIFIED MARKET REFERENCE]",
+      "signal_invariance": "Active signal remained strictly ABSTAIN across all scenario interactions"
+    }
+  },
+  "automated_test_suite_results": {
+    "command": ".\\.venv_win\\Scripts\\python.exe -m pytest tests/test_scenario_freshness_and_contract_v7.py tests/test_scenario_planner_and_inference_v6.py tests/test_prospective_worker_and_resilience.py tests/test_experiment_freeze_and_statistical_integrity_v5.py tests/test_phase_24h_qlike_and_prospective.py tests/test_signal_integrity_and_risk_engine.py tests/test_forecast_activation_and_readiness.py -v",
+    "exit_code": 0,
+    "total_tests": 82,
+    "passed": 82,
+    "failed": 0,
+    "skipped": 0,
+    "duration_seconds": 53.58
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "timestamp_utc": "2026-10-19T12:37:52.268434+00:00",
+  "source_db_sha256": "fce87df0d10ff4ff4355dd60ece38f087850ec7c70a40c00702f415fe7d7b690",
+  "backup_db_sha256": "b727ce5cdcd960baff07660d3845572723440eb31094533527c58554ed94b416",
+  "source_csv_sha256": "fd19c819ba7d4a8ca6e67f47ad9712c90b6c2ff445212f2158ee529a0a14ffa3",
+  "backup_csv_sha256": "fd19c819ba7d4a8ca6e67f47ad9712c90b6c2ff445212f2158ee529a0a14ffa3",
+  "db_size_bytes": 69304320,
+  "csv_size_bytes": 3152862
+}

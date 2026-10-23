@@ -60,6 +60,19 @@ import hashlib
 import subprocess
 from typing import Dict, Any, List, Tuple
 
+# Ensure stdout and stderr support UTF-8 on Windows
+if sys.platform == "win32":
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+    if hasattr(sys.stderr, "reconfigure"):
+        try:
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
 import numpy as np
 
 try:
@@ -222,7 +235,7 @@ def run_verification(strict: bool = False) -> int:
     print(f"  Frozen at : {manifest.get('manifest_created_at', 'UNKNOWN')}")
     print(f"  Model     : {manifest.get('model_version', 'UNKNOWN')}\n")
     print(f"  {'Status':<8}  Check")
-    print(f"  {'─'*8}  {'─'*52}")
+    print(f"  {'-'*8}  {'-'*52}")
 
     # ── CHECK 1: Manifest self-integrity ──────────────────────────────────
     stored_manifest_hash = manifest.get("manifest_hash", "")
@@ -396,19 +409,19 @@ def run_verification(strict: bool = False) -> int:
     n_warn = sum(1 for s, _, _ in results if s == WARN)
     n_skip = sum(1 for s, _, _ in results if s == SKIP)
 
-    print(f"\n  {'─'*60}")
+    print(f"\n  {'-'*60}")
     print(f"  Results : {n_pass} pass, {n_fail} fail, {n_warn} warn, {n_skip} skip")
 
     if n_fail == 0:
         verdict = "ALL_CHECKS_PASSED — scientific core is frozen and intact"
-        print(f"\n  ✓ {verdict}")
+        print(f"\n  [PASS] {verdict}")
         return_code = 0
     else:
         verdict = f"FREEZE_BROKEN — {n_fail} critical check(s) failed"
-        print(f"\n  ✗ {verdict}")
+        print(f"\n  [FAIL] {verdict}")
         return_code = 1
 
-    print(f"  {'─'*60}\n")
+    print(f"  {'-'*60}\n")
     return return_code
 
 

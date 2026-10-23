@@ -1,0 +1,11 @@
+{
+  "condition_cooldowns": {
+    "TEST_COND_PERSIST": 1792570924.8813384,
+    "VOL_COMPRESSION_COILING": 1792570924.8522027
+  },
+  "seen_dedup_hashes": [
+    "VOL_COMPRESSION_COILING_497935_83100.0",
+    "test_hash_persist_1234"
+  ],
+  "last_saved_at": "2026-10-21T08:22:04.882197+00:00"
+}

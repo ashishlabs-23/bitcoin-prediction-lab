@@ -1,0 +1,135 @@
+{
+  "scorecard_version": "PHASE-24H-SCORECARD-v1.0",
+  "generated_at_utc": "2026-10-16T15:31:45.461920+00:00",
+  "primary_daily_non_overlapping": {
+    "sample_size": 243,
+    "origin_schedule": "Daily 00:00 UTC",
+    "mechanical_overlap": false,
+    "results": {
+      "persistence": {
+        "mean_qlike": 0.73028,
+        "rmse": 0.24001,
+        "mae": 0.13994,
+        "diebold_mariano": {
+          "mean_loss_diff": -0.357685,
+          "standard_error": 0.102047,
+          "dm_statistic": -3.5051,
+          "hln_corrected_statistic": -3.4979,
+          "degrees_of_freedom": 242,
+          "p_value_one_sided": 0.99972,
+          "statistically_significant": false
+        }
+      },
+      "rolling_30d": {
+        "mean_qlike": 0.49521,
+        "rmse": 0.2303,
+        "mae": 0.13276,
+        "diebold_mariano": {
+          "mean_loss_diff": -0.12262,
+          "standard_error": 0.070233,
+          "dm_statistic": -1.7459,
+          "hln_corrected_statistic": -1.7423,
+          "degrees_of_freedom": 242,
+          "p_value_one_sided": 0.95864,
+          "statistically_significant": false
+        }
+      },
+      "conventional_har_24h": {
+        "mean_qlike": 0.37259,
+        "rmse": 0.20327,
+        "mae": 0.10063,
+        "diebold_mariano": "BENCHMARK_REFERENCE"
+      },
+      "har_qlike_24h": {
+        "mean_qlike": 0.31729,
+        "rmse": 0.19529,
+        "mae": 0.12084,
+        "diebold_mariano": {
+          "mean_loss_diff": 0.055305,
+          "standard_error": 0.055894,
+          "dm_statistic": 0.9895,
+          "hln_corrected_statistic": 0.9874,
+          "degrees_of_freedom": 242,
+          "p_value_one_sided": 0.16221,
+          "statistically_significant": false
+        }
+      }
+    },
+    "challenger_vs_har_ols": {
+      "raw_qlike_delta": 0.055305,
+      "relative_improvement_pct": 14.84,
+      "diebold_mariano_statistic": 0.9895,
+      "hln_corrected_statistic": 0.9874,
+      "degrees_of_freedom": 242,
+      "p_value_one_sided": 0.16221,
+      "statistically_significant": false
+    }
+  },
+  "secondary_hourly_rolling": {
+    "sample_size": 5815,
+    "origin_schedule": "Hourly rolling",
+    "mechanical_overlap": true,
+    "newey_west_lag": 24,
+    "results": {
+      "persistence": {
+        "mean_qlike": 0.80942,
+        "rmse": 0.24632,
+        "mae": 0.1401,
+        "diebold_mariano": {
+          "mean_loss_diff": -0.434923,
+          "standard_error": 0.087063,
+          "dm_statistic": -4.9955,
+          "hln_corrected_statistic": -4.9753,
+          "degrees_of_freedom": 5814,
+          "p_value_one_sided": 1.0,
+          "statistically_significant": false
+        }
+      },
+      "rolling_30d": {
+        "mean_qlike": 0.50081,
+        "rmse": 0.23498,
+        "mae": 0.13248,
+        "diebold_mariano": {
+          "mean_loss_diff": -0.126307,
+          "standard_error": 0.042048,
+          "dm_statistic": -3.0039,
+          "hln_corrected_statistic": -2.9917,
+          "degrees_of_freedom": 5814,
+          "p_value_one_sided": 0.99861,
+          "statistically_significant": false
+        }
+      },
+      "conventional_har_24h": {
+        "mean_qlike": 0.3745,
+        "rmse": 0.2124,
+        "mae": 0.10549,
+        "diebold_mariano": "BENCHMARK_REFERENCE"
+      },
+      "har_qlike_24h": {
+        "mean_qlike": 0.32419,
+        "rmse": 0.20162,
+        "mae": 0.1205,
+        "diebold_mariano": {
+          "mean_loss_diff": 0.05031,
+          "standard_error": 0.034552,
+          "dm_statistic": 1.4561,
+          "hln_corrected_statistic": 1.4502,
+          "degrees_of_freedom": 5814,
+          "p_value_one_sided": 0.07353,
+          "statistically_significant": false
+        }
+      }
+    },
+    "challenger_vs_har_ols": {
+      "raw_qlike_delta": 0.05031,
+      "relative_improvement_pct": 13.43,
+      "diebold_mariano_statistic": 1.4561,
+      "hln_corrected_statistic": 1.4502,
+      "degrees_of_freedom": 5814,
+      "p_value_one_sided": 0.07353,
+      "statistically_significant": false
+    }
+  },
+  "decision_verdict": "RETAIN_BASELINE_CHALLENGER_RESEARCH_ONLY",
+  "scientific_summary": "On daily non-overlapping origins (N=243), HAR-QLIKE-24H reduces sample mean QLIKE loss from 0.37259 to 0.31729 (+14.84% gain) and RMSE from 0.20327 to 0.19529 (+3.93% gain). However, the Diebold-Mariano HLN-corrected statistic is +0.9874 with a Student's t p-value of 0.1622. Because p >= 0.05, the candidate does not satisfy the preregistered acceptance hurdle for production promotion. On secondary hourly rolling origins (N=5,815), QLIKE improvement is +13.43% with p = 0.0735. In accordance with PRD governance, HAR-QLIKE-24H is classified as OFFLINE_RESEARCH_ONLY."
+}

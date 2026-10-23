@@ -1,0 +1,237 @@
+{
+  "experiment_id": "EXP-RESEARCH-TO-SIGNAL-V5-STATISTICAL-INTEGRITY",
+  "experiment_version": "5.0.0",
+  "freeze_timestamp_utc": "2026-10-17T08:28:11.259436+00:00",
+  "dataset": "data/raw/ohlcv.parquet",
+  "dataset_sha256": "d8313796e968178238f35892d48c446e1196f50e6720b2f9b470deb203defba6",
+  "market_provenance": {
+    "source_exchange": "Coinbase Advanced",
+    "instrument": "BTC-USD",
+    "market_type": "SPOT",
+    "primary_empirical_backtest": "Coinbase Spot Tier 1 (87.0 bps round trip)",
+    "hypothetical_sensitivity_scenario": "Hypothetical Binance USDT-M Futures Perpetual Sensitivity (15.0 bps round trip)"
+  },
+  "time_series_continuity": {
+    "total_input_bars": 41261,
+    "continuous_segments_count": 3,
+    "identified_gaps": [
+      {
+        "gap_id": 1,
+        "gap_start_index": 10740,
+        "gap_end_index": 10741,
+        "gap_start_timestamp": "2023-03-24T12:00:00+00:00",
+        "gap_end_timestamp": "2023-03-24T14:00:00+00:00",
+        "elapsed_hours": 2.0,
+        "missing_hours": 1.0
+      },
+      {
+        "gap_id": 2,
+        "gap_start_index": 40901,
+        "gap_end_index": 40902,
+        "gap_start_timestamp": "2026-09-01T06:00:00+00:00",
+        "gap_end_timestamp": "2026-10-02T05:00:00+00:00",
+        "elapsed_hours": 743.0,
+        "missing_hours": 742.0
+      }
+    ],
+    "purging_embargo_hours": 24,
+    "eligibility_audit_artifact": "experiments/results/research_improvement/v5_eligibility_audit.json"
+  },
+  "sample_split_bars": {
+    "train_bars": 25873,
+    "val_bars": 8736,
+    "test_bars": 5959,
+    "data_exposure_status": "2026 test split is EXPOSED retrospective development/replay data; NOT untouched prospective evidence"
+  },
+  "barrier_parameters": {
+    "horizon_hours": 24,
+    "tp_multiplier": 1.5,
+    "sl_multiplier": 1.0,
+    "collision_policy": "SL_FIRST_CONSERVATIVE"
+  },
+  "execution_costs": {
+    "coinbase_spot_tier1_roundtrip_bps": 87.0,
+    "binance_futures_hypothetical_bps": 15.0
+  },
+  "portfolio_policy": "SINGLE_POSITION_AT_A_TIME",
+  "candidates": {
+    "Candidate_0_No_Trade_Baseline": {
+      "candidate_id": "CAND-0-NO-TRADE",
+      "description": "Zero directional exposure benchmark",
+      "trades": 0,
+      "mean_per_trade_gross_expectancy_bps": 0.0,
+      "mean_per_trade_net_coinbase_bps": 0.0,
+      "mean_per_trade_net_binance_hypothetical_bps": 0.0,
+      "ci_95_net_coinbase_bps": [
+        0.0,
+        0.0
+      ],
+      "ci_95_net_binance_hypothetical_bps": [
+        0.0,
+        0.0
+      ],
+      "portfolio_final_nav_coinbase": 10000.0,
+      "portfolio_cumulative_pnl_pct_coinbase": 0.0,
+      "portfolio_max_drawdown_pct_coinbase": 0.0,
+      "portfolio_final_nav_binance_hypothetical": 10000.0,
+      "portfolio_cumulative_pnl_pct_binance_hypothetical": 0.0,
+      "portfolio_max_drawdown_pct_binance_hypothetical": 0.0,
+      "tp_first_pct": 0.0,
+      "sl_first_pct": 0.0,
+      "timeout_pct": 0.0,
+      "downtime_pct": 100.0,
+      "economic_verdict": "ABSTAIN_NEUTRAL"
+    },
+    "Candidate_1_Momentum_24h_Baseline": {
+      "trades": 227,
+      "mean_per_trade_gross_expectancy_bps": 8.91,
+      "mean_per_trade_net_coinbase_bps": -78.09,
+      "mean_per_trade_net_binance_hypothetical_bps": -6.09,
+      "ci_95_net_coinbase_bps": [
+        -101.18,
+        -55.81
+      ],
+      "ci_95_net_binance_hypothetical_bps": [
+        -28.56,
+        16.36
+      ],
+      "portfolio_final_nav_coinbase": 1628.08,
+      "portfolio_cumulative_pnl_pct_coinbase": -83.72,
+      "portfolio_max_drawdown_pct_coinbase": 83.98,
+      "portfolio_final_nav_binance_hypothetical": 8408.36,
+      "portfolio_cumulative_pnl_pct_binance_hypothetical": -15.92,
+      "portfolio_max_drawdown_pct_binance_hypothetical": 30.62,
+      "tp_first_pct": 18.5,
+      "sl_first_pct": 34.36,
+      "timeout_pct": 47.14,
+      "mean_holding_hours": 17.1,
+      "in_trade_hours": 3876.0,
+      "downtime_pct": 34.96,
+      "economic_verdict": "FAIL_DECISIVELY_NEGATIVE",
+      "candidate_id": "CAND-1-MOMENTUM-24H-GAP-SAFE",
+      "description": "Causal 24h momentum evaluated under gap-safe single-position portfolio accounting"
+    },
+    "Candidate_2_Cost_Aware_Filter": {
+      "trades": 0,
+      "gross_expectancy_bps": 0.0,
+      "net_expectancy_coinbase_bps": 0.0,
+      "net_expectancy_binance_hypothetical_bps": 0.0,
+      "ci_95_net_coinbase_bps": [
+        0.0,
+        0.0
+      ],
+      "ci_95_net_binance_hypothetical_bps": [
+        0.0,
+        0.0
+      ],
+      "portfolio_final_nav_coinbase": 10000.0,
+      "portfolio_cumulative_pnl_pct_coinbase": 0.0,
+      "portfolio_max_drawdown_pct_coinbase": 0.0,
+      "portfolio_final_nav_binance_hypothetical": 10000.0,
+      "portfolio_cumulative_pnl_pct_binance_hypothetical": 0.0,
+      "portfolio_max_drawdown_pct_binance_hypothetical": 0.0,
+      "tp_first_pct": 0.0,
+      "sl_first_pct": 0.0,
+      "timeout_pct": 0.0,
+      "mean_holding_hours": 0.0,
+      "in_trade_hours": 0.0,
+      "downtime_pct": 100.0,
+      "economic_verdict": "ABSTAIN_NEUTRAL",
+      "candidate_id": "CAND-2-COST-AWARE-FILTER",
+      "description": "Selective entry requiring predicted return to exceed roundtrip friction hurdle",
+      "hurdle_bps": 15.0
+    },
+    "Candidate_3A_Meta_Label_15bps_Target": {
+      "trades": 1,
+      "mean_per_trade_gross_expectancy_bps": -221.15,
+      "mean_per_trade_net_coinbase_bps": -308.15,
+      "mean_per_trade_net_binance_hypothetical_bps": -236.15,
+      "ci_95_net_coinbase_bps": [
+        -308.15,
+        -308.15
+      ],
+      "ci_95_net_binance_hypothetical_bps": [
+        -236.15,
+        -236.15
+      ],
+      "portfolio_final_nav_coinbase": 9691.85,
+      "portfolio_cumulative_pnl_pct_coinbase": -3.08,
+      "portfolio_max_drawdown_pct_coinbase": 3.08,
+      "portfolio_final_nav_binance_hypothetical": 9763.85,
+      "portfolio_cumulative_pnl_pct_binance_hypothetical": -2.36,
+      "portfolio_max_drawdown_pct_binance_hypothetical": 2.36,
+      "tp_first_pct": 0.0,
+      "sl_first_pct": 0.0,
+      "timeout_pct": 100.0,
+      "mean_holding_hours": 24.0,
+      "in_trade_hours": 24.0,
+      "downtime_pct": 99.6,
+      "economic_verdict": "FAIL_DECISIVELY_NEGATIVE",
+      "candidate_id": "CAND-3A-META-LABEL-15BPS-TARGET",
+      "target_definition": "Gross tb_return > 15.0 bps (Hypothetical Binance Perpetual break-even hurdle)",
+      "brier_score_model": 0.2485,
+      "brier_score_constant_prevalence_baseline": 0.248,
+      "brier_score_naive_50_baseline": 0.25,
+      "brier_score_difference_ci_95": [
+        0.000234,
+        0.000621
+      ],
+      "log_loss_model": 0.6901,
+      "log_loss_constant_prevalence_baseline": 0.6892,
+      "log_loss_difference_ci_95": [
+        0.000477,
+        0.001277
+      ],
+      "train_positive_class_prevalence": 0.4224,
+      "test_positive_class_prevalence": 0.4485,
+      "decision_threshold": 0.45
+    },
+    "Candidate_3B_Meta_Label_87bps_Target": {
+      "trades": 0,
+      "gross_expectancy_bps": 0.0,
+      "net_expectancy_coinbase_bps": 0.0,
+      "net_expectancy_binance_hypothetical_bps": 0.0,
+      "ci_95_net_coinbase_bps": [
+        0.0,
+        0.0
+      ],
+      "ci_95_net_binance_hypothetical_bps": [
+        0.0,
+        0.0
+      ],
+      "portfolio_final_nav_coinbase": 10000.0,
+      "portfolio_cumulative_pnl_pct_coinbase": 0.0,
+      "portfolio_max_drawdown_pct_coinbase": 0.0,
+      "portfolio_final_nav_binance_hypothetical": 10000.0,
+      "portfolio_cumulative_pnl_pct_binance_hypothetical": 0.0,
+      "portfolio_max_drawdown_pct_binance_hypothetical": 0.0,
+      "tp_first_pct": 0.0,
+      "sl_first_pct": 0.0,
+      "timeout_pct": 0.0,
+      "mean_holding_hours": 0.0,
+      "in_trade_hours": 0.0,
+      "downtime_pct": 100.0,
+      "economic_verdict": "ABSTAIN_NEUTRAL",
+      "candidate_id": "CAND-3B-META-LABEL-87BPS-TARGET",
+      "target_definition": "Gross tb_return > 87.0 bps (Coinbase Spot Tier 1 break-even hurdle)",
+      "brier_score_model": 0.2061,
+      "brier_score_constant_prevalence_baseline": 0.2062,
+      "brier_score_naive_50_baseline": 0.25,
+      "brier_score_difference_ci_95": [
+        -0.000272,
+        0.000131
+      ],
+      "log_loss_model": 0.6026,
+      "log_loss_constant_prevalence_baseline": 0.6028,
+      "log_loss_difference_ci_95": [
+        -0.000643,
+        0.000299
+      ],
+      "train_positive_class_prevalence": 0.3037,
+      "test_positive_class_prevalence": 0.2902,
+      "decision_threshold": 0.45
+    }
+  },
+  "governed_conclusion": "NO_CANDIDATE_PASSED_PREREGISTERED_GATE",
+  "execution_authorization": "DISABLED"
+}

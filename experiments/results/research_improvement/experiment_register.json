@@ -1,0 +1,115 @@
+{
+  "register_version": "BTC-EXP-REG-2026-v1.0",
+  "updated_at_utc": "2026-10-16T15:06:37.315845+00:00",
+  "experiments": [
+    {
+      "experiment_id": "EXP-2026-01-QLIKE-HAR",
+      "candidate_name": "HAR-QLIKE-v1.0",
+      "research_citation": "Puke, M., & Schweikert, K. (2026). Coherent Forecasting of Realized Volatility. Journal of Forecasting, 45(4), 1714\u20131729.",
+      "research_hypothesis": "Loss-coherent parameter estimation directly minimizing sample QLIKE loss improves out-of-sample realized variance forecasting over OLS log-variance regression.",
+      "target": "rv7d_var_ann (168h)",
+      "dataset_used": "data/raw/ohlcv.parquet (Coinbase BTC-USD)",
+      "data_status": "VERIFIED_POINT_IN_TIME",
+      "evaluation_period": "2026-01-01 to 2026-09-01 (5,671 resolved blocks)",
+      "baseline_metric": {
+        "qlike": 0.21483,
+        "causal_coverage_pct": 84.89,
+        "winkler": 1.0444
+      },
+      "challenger_metric": {
+        "qlike": 0.19598,
+        "causal_coverage_pct": 84.22,
+        "winkler": 0.9745
+      },
+      "paired_comparison": {
+        "raw_qlike_delta": -0.01885,
+        "relative_improvement_pct": 8.77,
+        "diebold_mariano_stat": 0.5132,
+        "hln_corrected_stat": 0.498,
+        "p_value": 0.30391,
+        "statistically_significant": false
+      },
+      "preregistered_hurdle": "p < 0.05 under Diebold-Mariano test with NW lag=168",
+      "decision": "REJECT_FOR_PRODUCTION_RETAIN_IN_RESEARCH",
+      "decision_rationale": "Raw loss improves by 8.77%, but overlapping label serial dependence inflates variance, yielding p=0.304. Baseline HAR-RS-DOW-v1.0 is preserved."
+    },
+    {
+      "experiment_id": "EXP-2026-02-OPTIONS-IV",
+      "candidate_name": "HAR-RS-IV-ATM-SLOPE",
+      "research_citation": "Wang, T., Rao, M., & Zhuo, X. (2026). Do hourly Bitcoin options forecast risk beyond a HAR benchmark? Finance Research Letters, 106013.",
+      "research_hypothesis": "Adding hourly ATM implied volatility and term-structure slope from Bitcoin options provides incremental predictive power over HAR benchmark.",
+      "target": "rv7d_var_ann (168h) / rv24h",
+      "dataset_used": "Deribit BTC Options / DVOL Index",
+      "data_status": "BLOCKED_EXTERNAL_DATA_DEPENDENCY",
+      "evaluation_period": "Unconfigured in live runtime",
+      "baseline_metric": {
+        "qlike": 0.21483
+      },
+      "challenger_metric": {
+        "status": "NOT_EVALUABLE_DATA_UNAVAILABLE"
+      },
+      "paired_comparison": {
+        "status": "BLOCKED_DATA_UNAVAILABLE"
+      },
+      "preregistered_hurdle": "Verified point-in-time Deribit options data available at forecast cutoff",
+      "decision": "BLOCKED_EXTERNAL_DEPENDENCY",
+      "decision_rationale": "Historical options IV series (iv7d.parquet) is classified as an offline research benchmark and is missing from local raw datasets. Real-time options APIs require external provider keys. Wang et al. (2026) studied 1h, 6h, and 24h horizons, which cannot be casually extrapolated to 168h variance. In accordance with PRD rules, unavailable external data is explicitly labeled unconfigured rather than fabricated."
+    },
+    {
+      "experiment_id": "EXP-2026-03-CROSS-CRYPTO-SPCA",
+      "candidate_name": "HAR-SPCA-CROSS-VOL",
+      "research_citation": "Yi, Y., He, M., & Zhang, Y. (2022). Out-of-sample prediction of Bitcoin realized volatility: Do other cryptocurrencies help? North American Journal of Economics and Finance, 62, 101731.",
+      "research_hypothesis": "Cross-crypto realized-volatility factors (ETH, BNB, SOL) extracted via fold-level Scaled-PCA add out-of-sample forecasting value beyond single-asset BTC history.",
+      "target": "rv7d_var_ann (168h)",
+      "dataset_used": "Multi-asset crypto OHLCV",
+      "data_status": "BLOCKED_EXTERNAL_DATA_DEPENDENCY",
+      "evaluation_period": "Unconfigured in local raw data",
+      "baseline_metric": {
+        "qlike": 0.21483
+      },
+      "challenger_metric": {
+        "status": "NOT_EVALUABLE_DATA_UNAVAILABLE"
+      },
+      "paired_comparison": {
+        "status": "BLOCKED_DATA_UNAVAILABLE"
+      },
+      "preregistered_hurdle": "Point-in-time aligned cross-asset OHLCV with fold-level PCA fit",
+      "decision": "BLOCKED_EXTERNAL_DEPENDENCY",
+      "decision_rationale": "Local datasets contain verified Coinbase BTC-USD only. Reliable point-in-time ETH/cross-asset hourly data is not currently present. Expanding the feature set with unverified synthetic feeds violates PRD Data Principle 1. Preserved as a future research track once multi-asset historical ingestion is verified."
+    },
+    {
+      "experiment_id": "EXP-2026-04-QLIKE-24H",
+      "candidate_name": "HAR-QLIKE-24H",
+      "research_citation": "Puke, M., & Schweikert, K. (2026). Coherent Forecasting of Realized Volatility. Journal of Forecasting, 45(4), 1714–1729. Corsi, F. (2009). Journal of Financial Econometrics, 7(2), 174–196.",
+      "research_hypothesis": "A loss-coherent HAR model directly minimizing sample QLIKE loss for a 24-hour realized variance target improves out-of-sample forecast accuracy over conventional same-target OLS HAR and non-parametric benchmarks.",
+      "target": "rv24h_var_ann (24h hourly-sampled annualized RV proxy)",
+      "dataset_used": "data/raw/ohlcv.parquet (Coinbase BTC-USD)",
+      "data_status": "VERIFIED_POINT_IN_TIME",
+      "evaluation_period": "2026-01-01 to 2026-09-01 (Daily non-overlapping N=243, Hourly rolling N=5,815)",
+      "baseline_metric": {
+        "persistence_qlike": 0.73028,
+        "rolling_30d_qlike": 0.49521,
+        "har_ols_24h_qlike": 0.37259,
+        "har_ols_24h_rmse": 0.20327
+      },
+      "challenger_metric": {
+        "har_qlike_24h_qlike": 0.31729,
+        "har_qlike_24h_rmse": 0.19529
+      },
+      "paired_comparison": {
+        "raw_qlike_delta": -0.055305,
+        "relative_improvement_pct": 14.84,
+        "rmse_improvement_pct": 3.93,
+        "diebold_mariano_stat": 0.9895,
+        "hln_corrected_stat": 0.9874,
+        "degrees_of_freedom": 242,
+        "p_value": 0.16221,
+        "secondary_hourly_rolling_p_value": 0.07353,
+        "statistically_significant": false
+      },
+      "preregistered_hurdle": "p < 0.05 under Diebold-Mariano test with Harvey-Leybourne-Newbold finite-sample correction against Student's t distribution",
+      "decision": "RETAIN_BASELINE_CHALLENGER_RESEARCH_ONLY",
+      "decision_rationale": "On daily non-overlapping origins (00:00 UTC, N=243), HAR-QLIKE-24H reduces sample mean QLIKE loss from 0.37259 to 0.31729 (+14.84% gain) and RMSE from 0.20327 to 0.19529 (+3.93% gain). However, the HLN-corrected Diebold-Mariano statistic is +0.9874 with a Student's t p-value of 0.1622 (p >= 0.05). On secondary hourly rolling origins (N=5,815), QLIKE improvement is +13.43% with p = 0.0735. The candidate fails the confirmatory significance hurdle (p < 0.05). In accordance with PRD governance, HAR-QLIKE-24H is classified as OFFLINE_RESEARCH_ONLY and retained in research."
+    }
+  ]
+}

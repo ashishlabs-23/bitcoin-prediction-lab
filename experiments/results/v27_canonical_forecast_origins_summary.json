@@ -1,0 +1,35 @@
+{
+  "1h": {
+    "origin_count": 15000,
+    "first_origin_idx": 20000,
+    "first_origin_time_utc": "2024-04-13 09:00:00+00:00",
+    "last_origin_idx": 34999,
+    "last_origin_time_utc": "2025-12-29 08:00:00+00:00",
+    "first_target_idx": 20001,
+    "first_target_time_utc": "2024-04-13 10:00:00+00:00",
+    "last_target_idx": 35000,
+    "last_target_time_utc": "2025-12-29 09:00:00+00:00"
+  },
+  "4h": {
+    "origin_count": 3750,
+    "first_origin_idx": 20000,
+    "first_origin_time_utc": "2024-04-13 09:00:00+00:00",
+    "last_origin_idx": 34996,
+    "last_origin_time_utc": "2025-12-29 05:00:00+00:00",
+    "first_target_idx": 20004,
+    "first_target_time_utc": "2024-04-13 13:00:00+00:00",
+    "last_target_idx": 35000,
+    "last_target_time_utc": "2025-12-29 09:00:00+00:00"
+  },
+  "24h": {
+    "origin_count": 625,
+    "first_origin_idx": 20000,
+    "first_origin_time_utc": "2024-04-13 09:00:00+00:00",
+    "last_origin_idx": 34976,
+    "last_origin_time_utc": "2025-12-28 09:00:00+00:00",
+    "first_target_idx": 20024,
+    "first_target_time_utc": "2024-04-14 09:00:00+00:00",
+    "last_target_idx": 35000,
+    "last_target_time_utc": "2025-12-29 09:00:00+00:00"
+  }
+}
