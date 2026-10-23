@@ -1,0 +1,22 @@
+# V27 Research Evidence Ledger & Defect Tracking
+
+**Release Version:** 27.0.0  
+**Effective Date:** October 2026  
+**Status:** COMPLETE & VERIFIED  
+**Governing Rule:** BTCognitive Operating Contract (`AGENTS.md`) & Master PRD
+
+---
+
+## 1. Register of Audited Findings & Discrepancies
+
+| Finding ID | Classification | Defect Description | Remediation in V27 | Verification Artifact |
+| :--- | :--- | :--- | :--- | :--- |
+| **F-V27-001** | Critical / Strategy | Dual-EMA reported 100 events, 99 reversals, 199 turnover units, but `prepend=pos[0]` in diagnostic script omitted initial entry cost (giving 99/198). | Formally reconciled: portfolio begins FLAT (0 cash) at $t=0$. Initial entry $0 \to s_0$ costs 1 unit. 99 subsequent reversals cost $99 \times 2 = 198$ units. Total = 100 events, 99 reversals, 1 entry, 199.0 turnover units ($99.5$ round trips). | `experiments/results/v27_canonical_strategy_equity_manifest.json`, `tests/test_v27_metric_repair_and_features.py::test_v27_dual_ema_100_events_reconciliation` |
+| **F-V27-002** | Critical / Math | Cumulative log returns were summed in basis points and naively divided by 100 to label as ordinary percentage returns (e.g. $-7,085.9\text{ bps}$ as "$-70.9\%$" and $-52,107.3\text{ bps}$ as "$-521.1\%$"). | Completely corrected return contract. Compounded equity curves $E_t = E_{t-1}(1 - c_t)(1 + s_t R_t)$ were computed. Log return sum of $-7,085.9$ bps maps to $-56.97\%$ compounded simple equity return; Regime Router log sum of $-52,107.3$ bps maps to $-99.50\%$ compounded return. | `experiments/results/v27_canonical_strategy_equity_manifest.json`, `docs/V27_METRIC_RECONCILIATION_REPORT.md` |
+| **F-V27-003** | High / Forecast | Forecast sample sizes in V26 were $14,999, 3,749, 624$ because `range(20000, 35000-h, h)` omitted the final origin whose target is index 35,000. | Contract frozen: evaluation window is $[20000, 35000]$ where candle 35,000 is included. `range(20000, 35000-h+1, h)` yields exact canonical counts: $N=15,000$ (1h), $N=3,750$ (4h), $N=625$ (24h). | `experiments/results/v27_canonical_forecast_manifest.json`, `experiments/results/v27_canonical_forecast_origins_summary.json` |
+| **F-V27-004** | High / Calibration | V26 reported 81.25% empirical coverage as a pass when the target nominal coverage was 90%. | Formally reclassified: 81.25% empirical coverage against a 90% target is undercoverage. Conformal price envelope is labelled `DEGRADED / UNDERCOVERAGE` until calibration evidence supports nominal coverage. | `docs/V27_METRIC_RECONCILIATION_REPORT.md` |
+| **F-V27-005** | High / Research | Conflation of Binance BTC-USDT and Kraken/Coinbase BTC-USD in dislocation metrics without quote currency normalization. | Disambiguated instruments: Coinbase BTC-USD vs Kraken BTC-USD is direct USD fiat dislocation. Coinbase BTC-USD vs Binance BTC-USDT tracks Tether stablecoin basis risk. | `engine/cross_venue_divergence.py`, `docs/V27_CROSS_EXCHANGE_DATA_COVERAGE_REPORT.md` |
+| **F-V27-006** | Medium / Research | Potential false equivalence between hourly realized semi-variance and high-frequency 5-minute continuous/jump decomposition. | Explicitly bounded: hourly-sampled realized semi-variance ($RS^+, RS^-$) is implemented as a causal risk proxy. Continuous/jump decomposition is explicitly disclaimed. | `engine/realized_semi_variance.py`, `docs/V27_REALIZED_SEMI_VARIANCE_RESEARCH_REPORT.md` |
+| **F-V27-007** | Medium / Research | Proposed funding rate threshold (>0.03% per 8h) treated as validated signal rather than exploratory research hypothesis. | Bounded: extreme funding rate flag is classified strictly as `UNVALIDATED_EXPLORATORY_HYPOTHESIS_ONLY`. Derivatives feeds separated from spot feeds. | `engine/funding_rate_research.py`, `docs/V27_FUNDING_RATE_COVERAGE_AND_SCHEMA_REPORT.md` |
+| **F-V27-008** | Invariant / Safety | Non-execution invariant on trading/order routes. | Re-verified: `/api/orders`, `/api/trade`, `/api/paper/order` return HTTP 404/405 fail-closed. Execution is permanently `DISABLED`. | `tests/test_v27_metric_repair_and_features.py::test_v27_execution_gates_fail_closed` |
+| **F-V27-009** | Governance | Zero-exposure cash benchmark status description. | Clarified wording: zero exposure is the best-performing tested baseline within the evaluated 9,975-hour window and cost scenarios, not a universal trading claim. | `experiments/results/v27_canonical_strategy_equity_manifest.json` |

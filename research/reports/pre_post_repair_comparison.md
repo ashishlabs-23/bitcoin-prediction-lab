@@ -1,6 +1,6 @@
 # 📑 Pre-Repair vs Post-Repair Metric Reconciliation & Comparison Report
 
-**Generated:** 2026-10-13T19:10:40.941118+00:00  
+**Generated:** 2026-10-21T08:12:54.785986+00:00  
 **Status:** `COMPLETED_DATA_INTEGRITY_REPAIR`  
 
 ## 1. Architectural & Metric Comparison Table

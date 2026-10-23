@@ -8,11 +8,11 @@ To eliminate temporal overlap correlation, forecasts are evaluated strictly in s
 
 | Cumulative Blocks | Mean MFE Error % | Mean MAE Error % | MFE P90 Coverage % | MAE P90 Coverage % | Joint Path Containment % | Mean Range Width % | Calibration Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 5 blocks (120 hours) | 3.6027 | 1.2736 | 20.0% | 100.0% | 20.0% | 5.93% | CALIBRATION_WARNING |
-| 10 blocks (240 hours) | 2.274 | 1.1803 | 50.0% | 90.0% | 40.0% | 5.93% | CALIBRATION_WARNING |
-| 11 blocks (264 hours) | 2.1005 | 1.0929 | 54.5% | 90.9% | 45.5% | 5.93% | CALIBRATION_WARNING |
+| 5 blocks (120 hours) | 1.0215 | 1.3268 | 80.0% | 80.0% | 60.0% | 5.93% | CALIBRATION_WARNING |
+| 10 blocks (240 hours) | 0.7489 | 0.9895 | 90.0% | 90.0% | 80.0% | 5.93% | CALIBRATION_OK |
+| 11 blocks (264 hours) | 0.7071 | 0.9509 | 90.9% | 90.9% | 81.8% | 5.93% | CALIBRATION_OK |
 
 ## 3. Key Findings
 
-- Across `11` independent 24-hour blocks, joint price path containment remains stable at `45.5%`.
+- Across `11` independent 24-hour blocks, joint price path containment remains stable at `81.8%`.
 - Mean Range Width remains sharp at `5.93%` with zero lookahead bias.

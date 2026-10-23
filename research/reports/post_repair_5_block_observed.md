@@ -1,6 +1,6 @@
 # 🔬 Post-Repair 5-Block Clean Longitudinal Evidence Report
 
-**Report Generated:** 2026-10-14T03:10:16.418126+00:00  
+**Report Generated:** 2026-10-21T08:22:46.913249+00:00  
 **Evidence Boundary:** `2026-08-21T12:15:00Z`  
 **Gate Status:** `WAITING_FOR_5_POST_REPAIR_BLOCKS`  
 
@@ -8,11 +8,11 @@
 
 | Parameter | Current Observed Value | Target Milestone | Status |
 | :--- | :--- | :--- | :--- |
-| **Independent VALID 24H Blocks** | `3` | `5` | `COLLECTING` |
+| **Independent VALID 24H Blocks** | `1` | `5` | `COLLECTING` |
 | **Independent MIXED Blocks** | `0` | `0` (Isolated) | `SEPARATE` |
 | **Independent DEGRADED Blocks** | `0` | `0` (Isolated) | `SEPARATE` |
 | **Degraded Forecasts Count** | `0` | - | `WATCH` |
-| **Effective Sample (N_eff)** | `141.08` | `~5.0` | `COMPUTING_ON_CLOSE` |
+| **Effective Sample (N_eff)** | `10.0` | `~5.0` | `COMPUTING_ON_CLOSE` |
 | **Production Model** | `v3.0.0-ridge-volatility-context` | FROZEN | `ACTIVE` |
 
 

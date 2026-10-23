@@ -6,10 +6,10 @@ High coverage alone is insufficient if achieved via overly wide bounds. The Wink
 
 | Model Name | Mean Width % | Median Width % | P90 Width % | Path Coverage % | Coverage/Width Efficiency | Winkler Score ($) | Sharpness Rating |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1. Production Ridge Conformal | 5.93 | 5.92 | 5.93 | 56.9% | 9.6 | 12760.68 | Wide |
-| 2. Historical Percentile (168h) | 3.6 | 3.6 | 3.6 | 25.0% | 6.94 | 14914.86 | Good |
-| 3. Average True Range (ATR) | 4.0 | 4.0 | 4.0 | 33.3% | 8.33 | 14173.57 | Wide |
-| 4. EWMA Volatility Baseline | 4.5 | 4.5 | 4.5 | 40.9% | 9.1 | 13461.77 | Wide |
+| 1. Production Ridge Conformal | 5.92 | 5.92 | 5.93 | 84.8% | 14.31 | 5023.22 | Wide |
+| 2. Historical Percentile (168h) | 3.6 | 3.6 | 3.6 | 43.8% | 12.18 | 5552.12 | Good |
+| 3. Average True Range (ATR) | 4.0 | 4.0 | 4.0 | 52.2% | 13.04 | 5237.4 | Wide |
+| 4. EWMA Volatility Baseline | 4.5 | 4.5 | 4.5 | 62.7% | 13.93 | 4998.99 | Wide |
 
 ## 2. Key Findings
 
