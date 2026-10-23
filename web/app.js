@@ -5806,6 +5806,127 @@ function ContractInspectionModal({ contract, onClose }) {
 }
 
 // ===========================================================================
+// AlertDiagnosticsPanel — Research Alert Worker Health & Channel Status
+// ===========================================================================
+function AlertDiagnosticsPanel() {
+  const [diag, setDiag] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+
+  const fetchDiag = useCallback(async () => {
+    try {
+      const res = await fetch(`${getApiBaseUrl()}/api/notifications/diagnostics`);
+      if (res.ok) setDiag(await res.json());
+    } catch (e) {
+      // silently ignore network errors; panel shows stale data
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDiag();
+    const iv = setInterval(fetchDiag, 30000);
+    return () => clearInterval(iv);
+  }, [fetchDiag]);
+
+  const workerColor = (s) => {
+    if (s === "RUNNING") return "#00E5A8";
+    if (s === "ERROR" || s === "STOPPED") return "#FF5C7C";
+    return "#FBBF24";
+  };
+
+  const evalStatusColor = (s) => {
+    if (s === "ALERT_DISPATCHED") return "#00E5A8";
+    if (s === "NO_ALERT") return "#94A3B8";
+    if (s === "INITIALIZING" || s === "WAITING_FOR_FIRST_EVALUATION") return "#FBBF24";
+    if (s === "DATA_STALE" || s === "ERROR") return "#FF5C7C";
+    return "#38BDF8";
+  };
+
+  const channelIcon = (ch) => {
+    if (ch?.status === "connected" || ch?.status === "configured") return "●";
+    if (ch?.configured === false || ch?.status === "unconfigured") return "○";
+    return "◐";
+  };
+  const channelColor = (ch) => {
+    if (ch?.status === "connected") return "#00E5A8";
+    if (ch?.status === "configured") return "#38BDF8";
+    return "#64748B";
+  };
+
+  const ws = diag?.worker_status || (loading ? "LOADING" : "UNKNOWN");
+  const evalResult = diag?.last_evaluation || {};
+  const channels = diag?.channels || {};
+
+  return h("div", {
+    style: {
+      background: "rgba(0,0,0,0.35)",
+      border: "1px solid rgba(0,240,255,0.12)",
+      borderRadius: "6px",
+      padding: "8px 10px",
+      marginTop: "8px",
+      fontSize: "0.65rem",
+      fontFamily: "var(--font-mono)"
+    }
+  },
+    // Header
+    h("div", {
+      style: { display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", userSelect: "none" },
+      onClick: () => setExpanded(e => !e)
+    },
+      h("span", { style: { fontWeight: "800", color: "#00F0FF", letterSpacing: "0.05em", textTransform: "uppercase", fontSize: "0.66rem" } },
+        "⚡ ALERT SYSTEM DIAGNOSTICS"
+      ),
+      h("span", { style: { color: workerColor(ws), fontWeight: "700" } }, `${ws} ${expanded ? "▲" : "▼"}`)
+    ),
+
+    // Collapsed: just the heartbeat line
+    !expanded && h("div", { style: { color: "#94A3B8", marginTop: "4px" } },
+      diag
+        ? `Last eval: ${evalResult.reason || evalResult.status || "—"} · ${diag.recent_alerts_count || 0} alert(s) · WS clients: ${diag.channels?.websocket?.active_clients ?? "—"}`
+        : (loading ? "Loading…" : "Unavailable")
+    ),
+
+    // Expanded: full diagnostics
+    expanded && h("div", { style: { marginTop: "6px", display: "flex", flexDirection: "column", gap: "5px" } },
+      // Worker heartbeat
+      h("div", { style: { display: "flex", justifyContent: "space-between" } },
+        h("span", { style: { color: "#94A3B8" } }, "Heartbeat"),
+        h("span", { style: { color: "#CBD5E1" } }, diag?.last_heartbeat ? diag.last_heartbeat.replace("T", " ").split(".")[0] + " UTC" : "—")
+      ),
+      // Last evaluation
+      h("div", { style: { display: "flex", justifyContent: "space-between" } },
+        h("span", { style: { color: "#94A3B8" } }, "Last Eval"),
+        h("span", { style: { color: evalStatusColor(evalResult.status) } },
+          evalResult.status ? `${evalResult.status} · ${evalResult.reason || ""}` : "—"
+        )
+      ),
+      // Alert count
+      h("div", { style: { display: "flex", justifyContent: "space-between" } },
+        h("span", { style: { color: "#94A3B8" } }, "Alerts fired"),
+        h("span", { style: { color: "#CBD5E1" } }, `${diag?.recent_alerts_count ?? "—"}  (cooldowns: ${diag?.cooldown_active_count ?? "—"})`)
+      ),
+      // Channel statuses
+      h("div", { style: { marginTop: "4px" } },
+        h("div", { style: { color: "#64748B", marginBottom: "2px" } }, "CHANNELS"),
+        h("div", { style: { display: "flex", gap: "10px", flexWrap: "wrap" } },
+          ["websocket", "email", "webhook", "telegram"].map(name =>
+            h("span", { key: name, style: { color: channelColor(channels[name]) } },
+              `${channelIcon(channels[name])} ${name}`
+            )
+          )
+        )
+      ),
+      // Governance
+      h("div", { style: { marginTop: "4px", color: "#4B5563", fontSize: "0.62rem", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "4px" } },
+        "ANALYSIS_ONLY · LIVE_TRADING=OFF · EXECUTION=DISABLED"
+      )
+    )
+  );
+}
+
+// ===========================================================================
 // StrategyTournamentDashboard — V13 User-Controlled Strategy Overlay & Tournament
 // ===========================================================================
 function StrategyTournamentDashboard({
@@ -6226,7 +6347,10 @@ function StrategyTournamentDashboard({
       )
     ),
 
-    // 4. Governance Footer
+    // 4. Alert System Diagnostics Panel
+    h(AlertDiagnosticsPanel, null),
+
+    // 5. Governance Footer
     h("div", { style: { textAlign: "center", padding: "6px", fontSize: "0.62rem", color: "#64748B", borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: "10px" } },
       "BTCognitive V13 Strategy Tournament · User-Controlled Research Overlay · No Automated Execution"
     ),
@@ -11703,8 +11827,8 @@ function App() {
     const unsub = backendWS.subscribe(msg => {
       if (msg.type === "connection") {
         setEngineConnected(msg.status === "connected");
-      } else if ((msg.type === "HIGH_PROFIT_ALERT" || msg.type === "RESEARCH_CONDITION_ALERT") && msg.data) {
-        handleIncomingAlert(msg.data);
+      } else if ((msg.type === "HIGH_PROFIT_ALERT" || msg.type === "RESEARCH_CONDITION_ALERT" || msg.type === "NEW_ALERT") && (msg.data || msg.alert)) {
+        handleIncomingAlert(msg.data || msg.alert);
       }
     });
     return unsub;

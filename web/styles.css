@@ -4183,4 +4183,508 @@ html, body {
   }
 }
 
+/* ==========================================================================
+   V12 Strategy Tournament & Risk-First Selection Dashboard Styles
+   ========================================================================== */
+.tournament-sidebar-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 
+.tournament-header-card {
+  background: rgba(15, 23, 42, 0.88);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+}
+
+.tournament-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.tournament-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+}
+
+.tournament-badge.regime {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38BDF8;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+}
+
+.tournament-badge.decision {
+  background: rgba(251, 191, 36, 0.15);
+  color: #FBBF24;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+}
+
+.tournament-badge.disabled {
+  background: rgba(239, 68, 68, 0.15);
+  color: #EF4444;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.tournament-cost-tabs {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 8px;
+  overflow-x: auto;
+}
+
+.tournament-cost-tab {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94A3B8;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.tournament-cost-tab:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #F1F5F9;
+}
+
+.tournament-cost-tab.active {
+  background: rgba(0, 240, 255, 0.15);
+  border-color: #00F0FF;
+  color: #00F0FF;
+}
+
+.tournament-candidate-card {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 8px;
+}
+
+.tournament-candidate-card:hover {
+  border-color: rgba(56, 189, 248, 0.4);
+  background: rgba(15, 23, 42, 0.9);
+}
+
+.tournament-candidate-card.active {
+  border-color: #00F0FF;
+  background: rgba(8, 47, 73, 0.4);
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.15);
+}
+
+.candidate-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.candidate-metric-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.candidate-metric-label {
+  font-size: 0.60rem;
+  color: #64748B;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.candidate-metric-val {
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.tournament-deepdive-card {
+  background: rgba(15, 23, 42, 0.88);
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+}
+
+.setup-levels-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 8px 0;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 4px;
+}
+
+/* ===========================================================================
+   V13 User-Controlled Strategy Overlay & Contract Inspection Modal Styles
+   =========================================================================== */
+.tournament-action-btn-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.tournament-btn-action {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #94A3B8;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tournament-btn-action:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #F8FAFC;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.tournament-btn-action.inspect {
+  border-color: rgba(167, 139, 250, 0.4);
+  color: #C4B5FD;
+}
+.tournament-btn-action.inspect:hover {
+  background: rgba(167, 139, 250, 0.15);
+  border-color: #A78BFA;
+  color: #EDE9FE;
+}
+
+.tournament-btn-action.evidence {
+  border-color: rgba(251, 191, 36, 0.4);
+  color: #FCD34D;
+}
+.tournament-btn-action.evidence:hover {
+  background: rgba(251, 191, 36, 0.15);
+  border-color: #FBBF24;
+  color: #FEF3C7;
+}
+
+.tournament-btn-action.preview {
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #7DD3FC;
+}
+.tournament-btn-action.preview:hover {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: #38BDF8;
+  color: #E0F2FE;
+}
+
+.tournament-btn-action.overlay-enable {
+  border-color: rgba(0, 229, 168, 0.4);
+  color: #00E5A8;
+}
+.tournament-btn-action.overlay-enable:hover {
+  background: rgba(0, 229, 168, 0.15);
+  border-color: #00E5A8;
+  color: #A7F3D0;
+}
+
+.tournament-btn-action.overlay-active {
+  background: rgba(0, 240, 255, 0.18);
+  border-color: #00F0FF;
+  color: #00F0FF;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+}
+.tournament-btn-action.overlay-active:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #EF4444;
+  color: #F87171;
+}
+
+.chart-overlay-diagnostic-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  margin-top: 6px;
+  font-size: 0.74rem;
+  font-family: var(--font-mono);
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.chart-overlay-diagnostic-banner.active {
+  background: rgba(8, 47, 73, 0.5);
+  border-color: rgba(0, 240, 255, 0.4);
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.1);
+}
+
+.chart-overlay-diagnostic-banner.inactive {
+  background: rgba(30, 41, 59, 0.6);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.chart-overlay-diagnostic-banner.off {
+  background: rgba(15, 23, 42, 0.5);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.chart-overlay-diagnostic-banner.preview {
+  background: rgba(45, 27, 0, 0.7);
+  border-color: rgba(245, 158, 11, 0.6);
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.2);
+}
+
+.tournament-btn-action.preview.active-preview {
+  background: rgba(245, 158, 11, 0.25);
+  border-color: #F59E0B;
+  color: #FDE68A;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
+}
+
+.chart-ind-toggle-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94A3B8;
+  font-size: 0.68rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chart-ind-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #F8FAFC;
+}
+
+.chart-ind-toggle-btn.active {
+  background: rgba(0, 240, 255, 0.15);
+  border-color: rgba(0, 240, 255, 0.5);
+  color: #00F0FF;
+}
+
+.clear-overlay-action {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #FCA5A5;
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  padding: 2px 7px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-left: 8px;
+  transition: all 0.15s ease;
+}
+
+.clear-overlay-action:hover {
+  background: rgba(239, 68, 68, 0.3);
+  color: #FFFFFF;
+}
+
+/* Modal Backdrop & Container */
+.contract-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 7, 18, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.contract-modal-container {
+  background: #0B1220;
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  border-radius: 12px;
+  max-width: 820px;
+  width: 100%;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9), 0 0 20px rgba(0, 240, 255, 0.15);
+  overflow: hidden;
+  animation: modalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.contract-modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.7);
+}
+
+.contract-modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  color: #E2E8F0;
+  font-size: 0.82rem;
+}
+
+.contract-modal-close-btn {
+  background: transparent;
+  border: none;
+  color: #94A3B8;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.contract-modal-close-btn:hover {
+  color: #F8FAFC;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.contract-spec-box {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 12px 14px;
+}
+
+.contract-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .contract-grid-2col {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* V15 Terminal Features: Comparator, Alerts, Indicators, Paper Export */
+.spot-comparator-pill {
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  background: rgba(0, 240, 255, 0.06);
+}
+.spot-comparator-pill:hover {
+  background: rgba(0, 240, 255, 0.12);
+  border-color: rgba(0, 240, 255, 0.5);
+}
+
+.indicator-badge-ribbon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 4px 10px;
+  background: rgba(15, 23, 42, 0.6);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+}
+
+.ind-badge {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #CBD5E1;
+}
+.ind-badge.active-rsi-oversold {
+  background: rgba(0, 229, 168, 0.15);
+  border-color: rgba(0, 229, 168, 0.4);
+  color: #00E5A8;
+}
+.ind-badge.active-rsi-overbought {
+  background: rgba(255, 92, 124, 0.15);
+  border-color: rgba(255, 92, 124, 0.4);
+  color: #FF5C7C;
+}
+
+.paper-export-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #F8FAFC;
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+}
+.paper-export-btn:hover {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #38BDF8;
+}
+
+.alert-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.alert-modal-card {
+  background: #0F172A;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 520px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.alert-modal-header {
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
