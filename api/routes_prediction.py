@@ -8,6 +8,7 @@ market regime classification, model health/lineage, and counterfactual matrices.
 import time
 import math
 import logging
+from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 import numpy as np
@@ -116,12 +117,30 @@ async def get_prediction_range():
 
 
 async def get_prediction_range_health():
+    from backtest.market_memory import _get_db
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        total_fc = cur.execute("SELECT COUNT(*) FROM range_forecasts").fetchone()[0]
+        total_oc = cur.execute("SELECT COUNT(*) FROM forecast_outcomes WHERE data_quality = 'VALID'").fetchone()[0]
+        quarantined = cur.execute("SELECT COUNT(*) FROM forecast_outcomes WHERE data_quality LIKE 'QUARANTINED%'").fetchone()[0]
+        unresolved = max(0, total_fc - total_oc - quarantined)
+    except Exception:
+        total_fc, total_oc, quarantined, unresolved = 0, 0, 0, 0
+    finally:
+        conn.close()
+
     return {
         "status": "BLOCKED_PROVENANCE_UNVERIFIED",
         "context_status": "UNAVAILABLE_UNVERIFIED",
         "active_context_version": None,
         "combined_model_version": None,
         "health_metrics": None,
+        "total_forecasts_count": total_fc,
+        "resolved_valid_count": total_oc,
+        "quarantined_test_fixtures_count": quarantined,
+        "unresolved_backlog_count": unresolved,
+        "resolver_queue_status": "PENDING_TIME_ALIGNED_FORWARD_CANDLES" if unresolved > 0 else "QUEUE_DRAINED",
         "reason": UNVERIFIED_RESEARCH_REASON,
     }
 
@@ -159,14 +178,28 @@ def get_prediction_range_history(limit: int = Query(20, ge=1, le=500)):
     return {"status": "AVAILABLE", "forecasts": records, "count": len(records)}
 
 
+def _parse_horizon_hours(horizon: Any) -> int:
+    if isinstance(horizon, int):
+        return max(1, min(horizon, 72))
+    h_str = str(horizon).strip().lower()
+    if h_str.endswith("h"):
+        h_str = h_str[:-1]
+    try:
+        val = int(h_str)
+        return max(1, min(val, 72))
+    except Exception:
+        return 24
+
+
 @router.get("/prediction/range/path")
 @router.get("/api/prediction/range/path")
-async def get_prediction_range_path(horizon: int = Query(24, ge=1, le=72)):
+async def get_prediction_range_path(horizon: str = Query("24")):
     """Fail closed until an authorized, provenance-verified forecast is available."""
+    h_hours = _parse_horizon_hours(horizon)
     return {
         "status": "BLOCKED_PROVENANCE_UNVERIFIED",
         "reason": UNVERIFIED_RESEARCH_REASON,
-        "horizon_hours": horizon,
+        "horizon_hours": h_hours,
         "path": [],
         "forecast": None,
     }
@@ -207,14 +240,85 @@ def get_prediction_history(limit: int = Query(20, ge=1, le=500)):
 
 
 @router.get("/prediction/counterfactual")
-async def get_prediction_counterfactual(top_k: int = Query(5, ge=1, le=20)):
-    """Fail closed rather than manufacture a price/probability for counterfactuals."""
+async def get_prediction_counterfactual(
+    top_k: int = Query(5, ge=1, le=20),
+    live_price: Optional[float] = Query(None, description="Optional spot reference price"),
+    toxicity_filter: Optional[str] = Query(None, description="Toxicity filter override: PASS, BLOCK, or AUTO"),
+    horizon: str = Query("15m", description="Microstructure horizon")
+):
+    """
+    Tier 0 Non-Directional Replay & Counterfactual Lab Endpoint.
+    Evaluates parallel Upper and Lower target scenarios across the 5 canonical MEIE mechanisms
+    under identical point-in-time market conditions.
+    """
+    from engine.counterfactual_contract_engine import generate_counterfactual_lab_contracts
+
+    live_p = float(live_price) if isinstance(live_price, (int, float)) and live_price > 0 else None
+    h_str = horizon if isinstance(horizon, str) else "15m"
+    tox_clean = toxicity_filter.upper().strip() if isinstance(toxicity_filter, str) and toxicity_filter.upper().strip() in ["PASS", "BLOCK"] else None
+    result = generate_counterfactual_lab_contracts(
+        live_price=live_p,
+        toxicity_override=tox_clean,
+        horizon=h_str
+    )
+    result["top_k"] = top_k if isinstance(top_k, int) else 5
+    return result
+
+
+@router.get("/prediction/counterfactual/contract/{strategy_id}")
+async def get_counterfactual_contract_detail(
+    strategy_id: str,
+    live_price: Optional[float] = Query(None),
+    toxicity_filter: Optional[str] = Query(None),
+    horizon: str = Query("15m")
+):
+    """
+    Returns mechanism-specific contract details for Inspect Contract modal/drawer.
+    Includes assumptions, invalidation conditions, formula specs, and evaluated bounds.
+    """
+    from engine.counterfactual_contract_engine import generate_counterfactual_lab_contracts
+
+    clean_id = strategy_id.upper().strip()
+    if not clean_id.startswith("MEIE-"):
+        clean_id = f"MEIE-{clean_id}"
+
+    live_p = float(live_price) if isinstance(live_price, (int, float)) and live_price > 0 else None
+    h_str = horizon if isinstance(horizon, str) else "15m"
+    tox_clean = toxicity_filter.upper().strip() if isinstance(toxicity_filter, str) and toxicity_filter.upper().strip() in ["PASS", "BLOCK"] else None
+    data = generate_counterfactual_lab_contracts(
+        live_price=live_p,
+        toxicity_override=tox_clean,
+        horizon=h_str
+    )
+
+    if data.get("status") != "SUCCESS":
+        raise HTTPException(
+            status_code=503,
+            detail=data.get("reason", "Counterfactual contract engine unavailable")
+        )
+
+    matched = next((c for c in data.get("counterfactuals", []) if c["strategy_id"] == clean_id), None)
+    if not matched:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Mechanism contract '{strategy_id}' not found in canonical registry."
+        )
+
     return {
-        "status": "BLOCKED_PROVENANCE_UNVERIFIED",
-        "reason": UNVERIFIED_RESEARCH_REASON,
-        "top_k": top_k,
-        "scenarios": [],
+        "status": "SUCCESS",
+        "strategy_id": matched["strategy_id"],
+        "name": matched["name"],
+        "mechanism": matched["mechanism"],
+        "regime_specialist": matched["regime_specialist"],
+        "contract": matched,
+        "contract_details": matched["contract_details"],
+        "upper_scenario": matched["upper_scenario"],
+        "lower_scenario": matched["lower_scenario"],
+        "market_snapshot": data.get("market_snapshot"),
+        "timeframe_contract": data.get("timeframe_contract"),
+        "governance": data.get("governance")
     }
+
 
 
 # ---------------------------------------------------------------------------
@@ -224,17 +328,48 @@ async def get_prediction_counterfactual(top_k: int = Query(5, ge=1, le=20)):
 @router.get("/regime/latest")
 @router.get("/api/regime")
 async def get_market_regime(live: bool = False):
-    """Refuses to publish regime state until model provenance is authorized."""
-    return {
-        "status": "BLOCKED_PROVENANCE_UNVERIFIED",
-        "current_regime": None,
-        "trend_score": None,
-        "trend_label": None,
-        "volatility_state": None,
-        "macro_cycle": None,
-        "timestamp": None,
-        "reason": UNVERIFIED_RESEARCH_REASON,
-    }
+    """
+    Returns causal Volatility Regime Routing (PRD-REG-13) based on Wilder ADX(14),
+    EMA 200/50/20, Bollinger Bandwidth, and 3-bar hysteresis confirmation.
+    """
+    from api.routes_tournament import get_tournament_engine
+    try:
+        engine = get_tournament_engine()
+        regime = engine.get_current_market_regime()
+        return {
+            "status": "LIVE",
+            "current_regime": regime.get("regime", "CHOP_SIDEWAYS"),
+            "raw_regime": regime.get("raw_regime"),
+            "hysteresis_status": regime.get("hysteresis_status"),
+            "adx_14": regime.get("adx_14"),
+            "plus_di": regime.get("plus_di"),
+            "minus_di": regime.get("minus_di"),
+            "ema_20": regime.get("ema_20"),
+            "ema_50": regime.get("ema_50"),
+            "ema_200": regime.get("ema_200"),
+            "atr_14": regime.get("atr_14"),
+            "bb_width": regime.get("bb_width"),
+            "bbw_percentile": regime.get("bbw_percentile"),
+            "classification_rule": regime.get("classification_rule"),
+            "timestamp": regime.get("latest_completed_time"),
+            "instrument": regime.get("instrument", "BTC-USD"),
+            "venue": regime.get("venue", "Coinbase Exchange Spot"),
+            "governance": {
+                "directional_authorization": "OFFLINE_RESEARCH_ONLY",
+                "execution_authorization": "DISABLED"
+            }
+        }
+    except Exception as e:
+        logger.warning("Failed to evaluate causal regime: %s", e)
+        return {
+            "status": "DEGRADED",
+            "current_regime": "TRANSITION_UNSUPPORTED",
+            "reason": str(e),
+            "governance": {
+                "directional_authorization": "OFFLINE_RESEARCH_ONLY",
+                "execution_authorization": "DISABLED"
+            }
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -311,11 +446,17 @@ def get_memory_stats():
         if not df.empty and "outcome_resolved" in df.columns
         else pd.DataFrame()
     )
+    directional_trades = (
+        resolved[resolved["direction"].fillna("").astype(str).str.upper().isin(["LONG", "SHORT"])]
+        if not resolved.empty and "direction" in resolved.columns
+        else pd.DataFrame()
+    )
     correctness = (
-        resolved["was_correct"].dropna()
-        if not resolved.empty and "was_correct" in resolved.columns
+        directional_trades["was_correct"].dropna()
+        if not directional_trades.empty and "was_correct" in directional_trades.columns
         else pd.Series(dtype=float)
     )
+
     pnl_values = (
         pd.to_numeric(resolved["pnl"], errors="coerce").dropna()
         if not resolved.empty and "pnl" in resolved.columns
@@ -646,24 +787,28 @@ def get_prediction_intelligence_health():
     from engine.longitudinal_status import longitudinal_status_service
     rep = longitudinal_status_service.get_status_report()
     obs = rep.observed_metrics
+    obs_dict = obs if isinstance(obs, dict) else asdict(obs)
+
+    has_valid_blocks = rep.observed_blocks > 0
+
     return {
         "status": "MONITORING_ACTIVE",
-        "production_status": "VALIDATED_PRODUCTION_RANGE_SYSTEM",
+        "production_status": "VALIDATED_PRODUCTION_RANGE_SYSTEM" if has_valid_blocks else "INSUFFICIENT_EVIDENCE",
         "production_blocks": rep.observed_blocks,
-        "production_N_eff": obs.effective_sample_size if hasattr(obs, "effective_sample_size") else obs.get("effective_sample_size", 141.08),
-        "production_coverage_pct": obs.p90_coverage_pct if hasattr(obs, "p90_coverage_pct") else obs.get("p90_coverage_pct", 91.10),
-        "production_mfe_error_pct": obs.mfe_error_pct if hasattr(obs, "mfe_error_pct") else obs.get("mfe_error_pct", 0.3980),
-        "production_mae_error_pct": obs.mae_error_pct if hasattr(obs, "mae_error_pct") else obs.get("mae_error_pct", 0.5620),
-        "production_baseline_delta_bps": obs.baseline_delta_bps if hasattr(obs, "baseline_delta_bps") else obs.get("baseline_delta_bps", -14.0),
-        "calibration_status": obs.calibration_status if hasattr(obs, "calibration_status") else obs.get("calibration_status", "CALIBRATION_OK"),
+        "production_N_eff": obs_dict.get("effective_sample_size", 0.0),
+        "production_coverage_pct": obs_dict.get("p90_coverage_pct"),
+        "production_mfe_error_pct": obs_dict.get("mfe_error_pct"),
+        "production_mae_error_pct": obs_dict.get("mae_error_pct"),
+        "production_baseline_delta_bps": obs_dict.get("baseline_delta_bps"),
+        "calibration_status": obs_dict.get("calibration_status", "CALIBRATION_PENDING"),
         "context_status": "CONTEXT_STABLE",
-        "model_decay": obs.model_status if hasattr(obs, "model_status") else obs.get("model_status", "MODEL_FROZEN"),
-        "data_quality": "HEALTHY",
+        "model_decay": obs_dict.get("model_status", "MODEL_FROZEN"),
+        "data_quality": "HEALTHY" if has_valid_blocks else "AWAITING_VALID_EVIDENCE",
         "provenance": "PROVENANCE_MATCHED",
         "shadow_hawkes_status": "VALIDATED_SHADOW_MODEL",
-        "shadow_hawkes_N_eff": 135.0,
+        "shadow_hawkes_N_eff": rep.hawkes_shadow_progress.get("effective_sample_size", 0.0),
         "foundation_status": "FOUNDATION_RESEARCH",
-        "overall_reliability": "VERY_HIGH"
+        "overall_reliability": "VERY_HIGH" if has_valid_blocks else "INSUFFICIENT_EVIDENCE"
     }
 
 
@@ -851,4 +996,60 @@ def get_prediction_pipeline_layers():
     payload["status"] = "BLOCKED_PROVENANCE_UNVERIFIED"
     payload["reason"] = UNVERIFIED_RESEARCH_REASON
     return payload
+
+
+# ---------------------------------------------------------------------------
+# Genuine Future-Price Forecasting Research Track (PRD-V18-PRICE-TRACK)
+# ---------------------------------------------------------------------------
+
+@router.get("/prediction/price/forecast")
+@router.get("/api/prediction/price/forecast")
+async def get_price_forecasts(
+    request: Request = None,
+    horizon: Optional[str] = Query(None, description="Optional horizon: 1h, 4h, 24h")
+):
+    """
+    Returns genuine BTCUSD future-price forecast estimates, explicit baselines
+    (Random Walk, Rolling Drift, Ridge Lagged Returns, Empirical Distribution),
+    and non-overlapping walk-forward tournament evaluation.
+    
+    Target Separation:
+    - Future closing prices (P_{t+h}) and log returns (r_{t,t+h}) are strictly separated
+      from HAR-RS-DOW 168-hour realized variance (rv7d_var_ann).
+    - Governance: OFFLINE_RESEARCH_ONLY, Live Trading DISABLED.
+    """
+    from engine.price_forecast_engine import price_forecast_engine
+    
+    live_quote = None
+    if request is not None:
+        try:
+            from api.market_drivers import _fetch_quote
+            client = getattr(request.app.state, "http", None)
+            quote = await _fetch_quote("coinbase", client)
+            if quote and quote.get("price") and float(quote["price"]) > 0:
+                live_quote = {
+                    "provider": "coinbase",
+                    "instrument": "BTC-USD",
+                    "price_usd": float(quote["price"]),
+                    "bid_usd": float(quote.get("bid", 0.0)) if quote.get("bid") else None,
+                    "ask_usd": float(quote.get("ask", 0.0)) if quote.get("ask") else None,
+                    "source_timestamp": quote.get("source_time"),
+                    "retrieved_at": datetime.now(timezone.utc).isoformat(),
+                    "age_seconds": quote.get("cache_age_seconds", 0.0)
+                }
+        except Exception as e:
+            logger.debug(f"Live quote fetch bypassed in price forecast: {e}")
+    
+    if horizon and horizon.lower().strip() != "all":
+        h_clean = horizon.lower().strip()
+        df = price_forecast_engine.load_data()
+        if df is None:
+            raise HTTPException(status_code=503, detail="Market data unavailable for price forecasting.")
+        res = price_forecast_engine.generate_horizon_forecast(df, h_clean, live_quote=live_quote)
+        if res.get("status") == "INVALID_HORIZON":
+            raise HTTPException(status_code=400, detail=f"Invalid horizon '{horizon}'. Supported: 1h, 4h, 24h")
+        return res
+        
+    return price_forecast_engine.get_all_price_forecasts(live_quote=live_quote)
+
 

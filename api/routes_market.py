@@ -25,6 +25,40 @@ def get_candles(
     The dedicated market-monitor router owns refreshed market endpoints; this
     legacy endpoint is explicitly cache-only and never fills missing values.
     """
+    if interval == "15m":
+        from engine.coinbase_15m_adapter import coinbase_15m_adapter
+        try:
+            df_15m, meta = coinbase_15m_adapter.get_or_sync_15m_candles(target_count=limit)
+            candles = []
+            for _, row in df_15m.tail(limit).iterrows():
+                candles.append({
+                    "time": int(row["epoch_time"]),
+                    "open": float(row["open"]),
+                    "high": float(row["high"]),
+                    "low": float(row["low"]),
+                    "close": float(row["close"]),
+                    "volume": float(row["volume"]),
+                })
+            return {
+                "status": "LIVE",
+                "interval": "15m",
+                "candles": candles,
+                "count": len(candles),
+                "degraded": False,
+                "source": "coinbase_15m_adapter",
+                "last_completed_candle_utc": meta.get("last_completed_candle_utc"),
+            }
+        except Exception as e:
+            return {
+                "status": "DATA_UNAVAILABLE",
+                "interval": "15m",
+                "candles": [],
+                "count": 0,
+                "degraded": True,
+                "source": "coinbase_15m_adapter",
+                "reason": str(e),
+            }
+
     if interval != "1h":
         return {
             "status": "UNSUPPORTED_REQUEST",
@@ -74,3 +108,16 @@ def get_candles(
         "degraded": True,
         "source": "feature_cache",
     }
+
+
+@router.get("/comparator")
+@router.get("/api/market/comparator")
+async def get_market_comparator() -> dict:
+    """
+    BTCognitive Multi-Exchange Spot Comparator (PRD-CMP-14).
+    Evaluates real-time spot BTC-USD quotes across Coinbase, Kraken, and Bitstamp.
+    Identifies active primary provider, pairwise divergence in basis points,
+    and stale/degraded feeds.
+    """
+    from engine.spot_exchange_comparator import fetch_and_compare_spot_quotes
+    return await fetch_and_compare_spot_quotes()

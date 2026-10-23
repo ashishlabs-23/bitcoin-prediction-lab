@@ -24,9 +24,12 @@ import os
 import json
 import hashlib
 import re
+import logging
 from typing import Dict, List, Any, Optional
 from fastapi import APIRouter, HTTPException, Query, Path
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger("btcognitive.research")
 
 router = APIRouter(prefix="/api/research", tags=["Research Results"])
 
@@ -37,6 +40,133 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 # ---------------------------------------------------------------------------
 
 REPORT_REGISTRY: Dict[str, Dict[str, Any]] = {
+    "phase-24h-qlike-research": {
+        "title": "24H QLIKE-HAR Challenger & Prospective Evidence Accumulation Sprint",
+        "track": "24-Hour Realized Variance Forecasting & Prospective Evaluation",
+        "date": "2026-10-16",
+        "relative_path": "research/reports/phase_24h_qlike_research.md",
+        "expected_sha256": "e7bda49d9c7e79becee4392464f494fa7a028176fe4e8dac51d45b79094e5f94",
+        "sample_size_description": "2026 Daily Non-Overlapping (N=243, 00:00 UTC) + Hourly Rolling (N=5,815)",
+        "horizon": "24h (1-day realized variance proxy)",
+        "governance_verdict": "RETAIN_BASELINE_CHALLENGER_RESEARCH_ONLY",
+        "provenance_state": "INTEGRITY_CHECKED",
+        "scientific_limitations": (
+            "HAR-QLIKE-24H achieves a 14.84% raw sample QLIKE reduction over OLS HAR-24H on daily non-overlapping origins (N=243), "
+            "and a 13.43% reduction on hourly rolling origins (N=5,815). However, HLN-corrected Diebold-Mariano tests "
+            "yield p = 0.1622 (daily) and p = 0.0735 (hourly). Because p >= 0.05, the candidate fails the confirmatory hurdle "
+            "for production promotion and is classified as OFFLINE_RESEARCH_ONLY. Baseline contracts are preserved."
+        ),
+        "key_metrics": [
+            {
+                "name": "Persistence Benchmark QLIKE (Daily)",
+                "value": "0.73028",
+                "ci_95": None,
+                "unit": "QLIKE",
+                "interpretation": "Trailing 24h realized variance persistence benchmark"
+            },
+            {
+                "name": "Rolling 30D Mean Benchmark QLIKE (Daily)",
+                "value": "0.49521",
+                "ci_95": None,
+                "unit": "QLIKE",
+                "interpretation": "Trailing 30-day realized variance baseline"
+            },
+            {
+                "name": "Conventional HAR-24H (OLS) QLIKE (Daily)",
+                "value": "0.37259",
+                "ci_95": None,
+                "unit": "QLIKE",
+                "interpretation": "Standard OLS log-variance autoregression (RMSE: 0.20327)"
+            },
+            {
+                "name": "HAR-QLIKE-24H Challenger QLIKE (Daily)",
+                "value": "0.31729",
+                "ci_95": None,
+                "unit": "QLIKE",
+                "interpretation": "Direct QLIKE loss minimization (14.84% gain, RMSE: 0.19529)"
+            },
+            {
+                "name": "Daily Non-Overlapping DM Test (HLN corrected)",
+                "value": "DM = +0.9895, HLN = +0.9874, p = 0.16221",
+                "ci_95": None,
+                "unit": "p_val",
+                "interpretation": "Statistically insignificant (p >= 0.05, df=242); fails promotion hurdle"
+            },
+            {
+                "name": "Hourly Rolling DM Test (NW lag=24, HLN corrected)",
+                "value": "DM = +1.4561, HLN = +1.4502, p = 0.07353",
+                "ci_95": None,
+                "unit": "p_val",
+                "interpretation": "Marginally significant raw trend (p >= 0.05, df=5814); retained in research"
+            }
+        ],
+        "contradiction": {
+            "flag": "TARGET_HORIZON_AND_EPISTEMIC_SEPARATION",
+            "conflicting_reports": ["research-improvement-2026", "uncertainty-04"],
+            "primary_issue": "24H Realized Variance Target vs 168H Integrated Volatility Contracts",
+            "resolution_note": (
+                "The 24h target (rv24h_var_ann) is an hourly-sampled realized variance proxy across 24 future log returns. "
+                "It is mathematically distinct from the 168h target (rv7d_var_ann). Shorter horizons do not automatically imply "
+                "production superiority. The candidate is preserved as an offline research artifact without inheriting 168h governance."
+            )
+        }
+    },
+    "research-improvement-2026": {
+        "title": "Research-Driven Improvement Sprint: QLIKE-Coherent Volatility Challenger & Reconciliation",
+        "track": "Realized Volatility Forecasting & Epistemic Reconciliation",
+        "date": "2026-10-16",
+        "relative_path": "research/reports/research_driven_improvement_report.md",
+        "expected_sha256": "4ca93fd513304cf0983c54405c84757e242157593e5deae95c3efc8adbf0d879",
+        "sample_size_description": "2026 out-of-sample replay (N=5,671 resolved 168h blocks)",
+        "horizon": "168h (7-day realized variance)",
+        "governance_verdict": "CHALLENGER_EVALUATED_BASELINE_PRESERVED",
+        "provenance_state": "INTEGRITY_CHECKED",
+        "scientific_limitations": (
+            "HAR-QLIKE-v1.0 achieves an 8.77% raw reduction in sample QLIKE loss over HAR-RS-DOW-v1.0, "
+            "but the improvement does not achieve statistical significance under the Diebold-Mariano test "
+            "(DM = +0.5132, p = 0.3039) when accounting for 168h serial dependence. Baseline is preserved."
+        ),
+        "key_metrics": [
+            {
+                "name": "Baseline HAR-RS-DOW QLIKE",
+                "value": "0.21483",
+                "ci_95": None,
+                "unit": "QLIKE",
+                "interpretation": "Point-in-time benchmark on 2026 holdout"
+            },
+            {
+                "name": "Challenger HAR-QLIKE QLIKE",
+                "value": "0.19598",
+                "ci_95": None,
+                "unit": "QLIKE",
+                "interpretation": "Loss-coherent parameter estimation (8.77% raw reduction)"
+            },
+            {
+                "name": "Paired Diebold-Mariano Test (NW lag=168)",
+                "value": "DM = +0.5132, p = 0.30391",
+                "ci_95": None,
+                "unit": "p_val",
+                "interpretation": "Statistically insignificant difference (p >= 0.05); failed promotion hurdle"
+            },
+            {
+                "name": "Strictly Causal Conformal Coverage",
+                "value": "84.89% (Baseline) vs 84.22% (Challenger)",
+                "ci_95": "[73.14%, 93.14%]",
+                "unit": "%",
+                "interpretation": "Reconciled from legacy leaked 92.36% figure; delayed resolution maintained"
+            }
+        ],
+        "contradiction": {
+            "flag": "RESOLVED_EPIDEMIOLOGY_AND_CAUSALITY",
+            "conflicting_reports": ["uncertainty-04", "stage10-shadow-scorecard"],
+            "primary_issue": "Leaked 92.36% Conformal Coverage vs Strictly Causal 84.89% Delayed Resolution",
+            "resolution_note": (
+                "The earlier 92.36% coverage reported in legacy uncertainty scripts suffered from a 168h contemporaneous "
+                "residual lookahead bug. Correcting to strictly causal delayed-resolution calibration yields 84.89%. "
+                "The 2026 holdout was previously exposed in Stages 10-12 and represents retrospective replay, not untouched prospective evidence."
+            )
+        }
+    },
     "uncertainty-04": {
         "title": "Uncertainty 04: Conformal Risk Envelope & Dependence Audit",
         "track": "Conformal Volatility Risk Envelope",
@@ -979,8 +1109,8 @@ def get_research_results():
                 prov_state = "INTEGRITY_CHECKED"
             else:
                 prov_state = "INTEGRITY_MISMATCH"
-        elif meta.get("provenance_state") == "INDEPENDENTLY_REPRODUCED":
-            prov_state = "INDEPENDENTLY_REPRODUCED"
+        elif meta.get("provenance_state") in ("INDEPENDENTLY_REPRODUCED", "INTEGRITY_CHECKED"):
+            prov_state = meta.get("provenance_state")
         else:
             prov_state = "REPO_READ"
 
@@ -1250,3 +1380,289 @@ def get_forward_validation_status():
             "70% directional accuracy is mathematically and empirically UNSUBSTANTIATED."
         )
     }
+
+
+@router.get("/experiments")
+def get_research_experiment_register():
+    """
+    Returns the machine-readable experiment register documenting forecasting challengers,
+    preregistered loss functions, baseline-versus-candidate paired tests, and governance decisions.
+    """
+    reg_path = os.path.join(
+        REPO_ROOT, "experiments", "results", "research_improvement", "experiment_register.json"
+    )
+    if not os.path.isfile(reg_path):
+        raise HTTPException(status_code=404, detail="Research experiment register not found.")
+
+    try:
+        with open(reg_path, "r", encoding="utf-8") as f:
+            register_data = json.load(f)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load experiment register: {e}")
+
+    return {
+        "status": "AVAILABLE",
+        "register_version": register_data.get("register_version", "BTC-EXP-REG-2026-v1.0"),
+        "updated_at_utc": register_data.get("updated_at_utc"),
+        "active_baseline": {
+            "model_id": "HAR-RS-DOW-v1.0",
+            "target": "rv7d_var_ann (168h)",
+            "causal_holdout_coverage_pct": 84.89,
+            "holdout_qlike": 0.21483,
+            "authorization_status": "BLOCKED_AUDIT_FAILURE",
+            "epistemic_note": "Corrected strictly causal delayed-resolution coverage is 84.89% (reconciled from legacy leaked 92.36%)."
+        },
+        "total_experiments": len(register_data.get("experiments", [])),
+        "experiments": register_data.get("experiments", []),
+        "epistemic_notice": (
+            "All forecasting challengers are evaluated against the frozen baseline on identical eligible observations. "
+            "Raw error improvements that fail serial-dependence-adjusted hypothesis tests (Diebold-Mariano p >= 0.05) "
+            "are retained in the research register but rejected for production promotion."
+        )
+    }
+
+
+@router.get("/prospective-ledger")
+def get_prospective_evidence_ledger(limit: int = Query(50, ge=1, le=500)):
+    """
+    Returns the current real-time status and recent events from the append-only prospective forecast ledger.
+    """
+    from engine.prospective_evidence_pipeline import get_prospective_pipeline
+    pipeline = get_prospective_pipeline()
+    status = pipeline.get_status()
+    recent = pipeline.get_recent_records(limit=limit)
+
+    worker_status_path = os.path.join(REPO_ROOT, "data", "prospective_worker_status.json")
+    worker_telemetry = None
+    if os.path.isfile(worker_status_path):
+        try:
+            with open(worker_status_path, "r", encoding="utf-8") as f:
+                worker_telemetry = json.load(f)
+        except Exception:
+            pass
+
+    return {
+        "status": status,
+        "worker_telemetry": worker_telemetry,
+        "returned_records_count": len(recent),
+        "records": recent
+    }
+
+
+
+@router.get("/24h-scorecard")
+def get_24h_experiment_scorecard():
+    """
+    Returns the empirical scorecard and comparative metrics for the 24H QLIKE-HAR challenger experiment.
+    """
+    scorecard_path = os.path.join(
+        REPO_ROOT, "experiments", "results", "research_improvement", "phase_24h_scorecard.json"
+    )
+    manifest_path = os.path.join(
+        REPO_ROOT, "experiments", "results", "research_improvement", "phase_24h_manifest.json"
+    )
+    if not os.path.isfile(scorecard_path) or not os.path.isfile(manifest_path):
+        raise HTTPException(status_code=404, detail="24H experiment scorecard or manifest not found.")
+    
+    try:
+        with open(scorecard_path, "r", encoding="utf-8") as f:
+            scorecard = json.load(f)
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            manifest = json.load(f)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read 24H experiment data: {e}")
+        
+    return {
+        "experiment_id": "EXP-2026-04-QLIKE-24H",
+        "manifest": manifest,
+        "scorecard": scorecard,
+        "governance_verdict": scorecard.get("decision_verdict"),
+        "authorization_status": "OFFLINE_RESEARCH_ONLY",
+        "live_trading_status": "DISABLED"
+    }
+
+
+@router.get("/directional-v4-manifest")
+def get_directional_v4_experiment_manifest():
+    """
+    Returns the gap-safe, continuity-audited manifest and metrics for Experiment V4.
+    """
+    manifest_path = os.path.join(
+        REPO_ROOT, "experiments", "results", "research_improvement", "v4_gap_aware_directional_manifest.json"
+    )
+    if not os.path.isfile(manifest_path):
+        raise HTTPException(status_code=404, detail="V4 gap-aware experiment manifest not found.")
+
+    try:
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            manifest = json.load(f)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read V4 experiment manifest: {e}")
+
+    return {
+        "experiment_id": manifest.get("experiment_id", "EXP-RESEARCH-TO-SIGNAL-V4-GAP-AWARE"),
+        "manifest": manifest,
+        "governance_verdict": manifest.get("governed_conclusion"),
+        "authorization_status": "OFFLINE_RESEARCH_ONLY",
+        "live_trading_status": manifest.get("execution_authorization", "DISABLED")
+    }
+
+
+@router.get("/directional-v5-freeze-manifest")
+def get_directional_v5_freeze_manifest():
+    """
+    Returns the frozen V5 statistical integrity manifest, artifact hashes, bootstrap CIs, and metrics.
+    """
+    manifest_path = os.path.join(
+        REPO_ROOT, "experiments", "results", "research_improvement", "v5_experiment_freeze_manifest.json"
+    )
+    if not os.path.isfile(manifest_path):
+        raise HTTPException(status_code=404, detail="V5 experiment freeze manifest not found.")
+
+    try:
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            manifest = json.load(f)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read V5 experiment freeze manifest: {e}")
+
+    return {
+        "experiment_id": manifest.get("experiment_id", "EXP-RESEARCH-TO-SIGNAL-V5-STATISTICAL-INTEGRITY"),
+        "manifest": manifest,
+        "governance_verdict": manifest.get("governed_conclusion"),
+        "authorization_status": "OFFLINE_RESEARCH_ONLY",
+        "live_trading_status": manifest.get("execution_authorization", "DISABLED")
+    }
+
+
+@router.get("/eligibility-audit")
+def get_time_series_eligibility_audit():
+    """
+    Returns the machine-readable time-series continuity, lookback warm-up, and eligibility audit.
+    """
+    audit_path = os.path.join(
+        REPO_ROOT, "experiments", "results", "research_improvement", "v5_eligibility_audit.json"
+    )
+    if not os.path.isfile(audit_path):
+        raise HTTPException(status_code=404, detail="V5 eligibility audit artifact not found.")
+
+    try:
+        with open(audit_path, "r", encoding="utf-8") as f:
+            audit = json.load(f)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read eligibility audit artifact: {e}")
+
+    return {
+        "audit_version": audit.get("audit_version", "V5-CONTINUITY-ELIGIBILITY-AUDIT"),
+        "audit": audit,
+        "governance_status": "AUDITED_AND_VERIFIED"
+    }
+
+
+@router.get("/statistical-inference-v6-audit")
+def get_statistical_inference_v6_audit():
+    """
+    Returns the V6 statistical inference repair audit, comparing Politis-Romano stationary
+    bootstrap (L=24h, sensitivity L in [12, 24, 48]) with V5 naive IID bootstrap.
+    """
+    audit_path = os.path.join(
+        REPO_ROOT, "experiments", "results", "research_improvement", "v6_statistical_inference_audit.json"
+    )
+    if not os.path.isfile(audit_path):
+        raise HTTPException(status_code=404, detail="V6 statistical inference audit artifact not found.")
+
+    try:
+        with open(audit_path, "r", encoding="utf-8") as f:
+            audit = json.load(f)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read V6 statistical inference audit artifact: {e}")
+
+    return {
+        "audit_version": audit.get("audit_version", "V6_STATISTICAL_INFERENCE_REPAIR"),
+        "audit": audit,
+        "governance_status": "AUDITED_AND_VERIFIED"
+    }
+
+
+@router.get("/entry-quality")
+def get_entry_quality(
+    side: str = Query("LONG"),
+    k_tp: float = Query(1.5, ge=0.5, le=5.0),
+    k_sl: float = Query(1.0, ge=0.5, le=5.0),
+    threshold: float = Query(0.60, ge=0.40, le=0.90),
+    persist: bool = Query(False)
+):
+    """
+    BTCognitive V28 Probabilistic Entry Quality Engine (PRD-ENT-28).
+    Evaluates candidate BTCUSD long/short entries, estimating whether a defined
+    profit target is likely to be reached before a defined stop-loss.
+    Computes net expectancy in R-multiples and enforces strict cost-aware gating.
+
+    Idempotent: Read queries do not mutate the prospective ledger unless persist=True.
+    """
+    from engine.probabilistic_entry_engine import entry_quality_engine
+    import math
+    import pandas as pd
+    import numpy as np
+
+    ohlcv_path = os.path.join(REPO_ROOT, "data", "raw", "ohlcv.parquet")
+    if os.path.exists(ohlcv_path):
+        df = pd.read_parquet(ohlcv_path)
+        closes = df["close"].values
+        highs = df["high"].values
+        lows = df["low"].values
+        current_price = float(closes[-1])
+        past_rets = np.diff(np.log(closes[-24:]))
+        sigma_t0 = float(np.std(past_rets) * math.sqrt(24))
+        sigma_t0 = max(0.008, sigma_t0)
+        feats = entry_quality_engine.compute_setup_features(closes, highs, lows, side=side)
+    else:
+        current_price = 65000.0
+        sigma_t0 = 0.012
+        feats = {f: 0.0 for f in entry_quality_engine.feature_names}
+
+    try:
+        decision = entry_quality_engine.evaluate_decision_gate(
+            side=side,
+            entry_price=current_price,
+            sigma_t0=sigma_t0,
+            k_tp=k_tp,
+            k_sl=k_sl,
+            features=feats,
+            selective_threshold=threshold
+        )
+        if persist:
+            entry_quality_engine.log_prospective_decision(decision)
+    except Exception as e:
+        logger.error(f"Entry quality decision evaluation failed: {e}")
+        return {
+            "status": "FAILED",
+            "error": str(e),
+            "engine_version": entry_quality_engine.RESOLVER_VERSION,
+            "features_evaluated": feats,
+            "decision": None,
+            "recent_prospective_records": []
+        }
+
+    recent_ledger = []
+    if os.path.exists(entry_quality_engine.ledger_file):
+        try:
+            with open(entry_quality_engine.ledger_file, "r", encoding="utf-8") as f:
+                for line in f.readlines()[-15:]:
+                    if line.strip():
+                        recent_ledger.append(json.loads(line.strip()))
+        except Exception:
+            pass
+
+    return {
+        "status": "SUCCESS",
+        "engine_version": entry_quality_engine.RESOLVER_VERSION,
+        "features_evaluated": feats,
+        "decision": decision,
+        "recent_prospective_records": recent_ledger
+    }
+
+
+
+
+
+

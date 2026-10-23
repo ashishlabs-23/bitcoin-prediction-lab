@@ -34,34 +34,31 @@ def get_arena_context():
     """
     Returns canonical point-in-time 4-State Observatory Context + Exploratory Strategy Context.
     Read-only context and audit layer. Does NOT modify strategy decisions or execution rules.
+    Invariance: GET endpoints must NOT mutate state, append to ledgers, or fabricate consensus actions.
     """
     # 1. Canonical point-in-time 4-state snapshot
     snapshot = observatory.get_canonical_snapshot()
     status = arena_runner.get_status()
     
-    # 2. Extract exploratory strategy actions
-    recent_actions = status.get("recent_actions", ["SKIP", "LONG", "SKIP", "SKIP"])
-    if not recent_actions or len(recent_actions) < 4:
-        recent_actions = ["SKIP", "LONG", "SKIP", "SKIP"]
-    
-    skip_count = recent_actions.count("SKIP")
-    agreement_ratio = float(skip_count / len(recent_actions)) if recent_actions else 0.75
-    ensemble_action = "SKIP" if agreement_ratio >= 0.5 else "LONG"
+    # 2. Extract exploratory strategy actions without fabricating defaults
+    raw_actions = status.get("recent_actions")
+    if raw_actions and isinstance(raw_actions, list) and len(raw_actions) >= 1:
+        recent_actions = [str(a).upper() for a in raw_actions if a]
+        skip_count = recent_actions.count("SKIP")
+        agreement_ratio = round(float(skip_count / len(recent_actions)), 2)
+        ensemble_action = "SKIP" if agreement_ratio >= 0.5 else "ABSTAIN"
+    else:
+        recent_actions = []
+        agreement_ratio = None
+        ensemble_action = "DATA_UNAVAILABLE"
 
-    # 3. Record decision context in immutable ledger at t0
-    arena_runner.record_arena_decision_context(
-        strategy_actions=recent_actions,
-        agreement_ratio=agreement_ratio,
-        ensemble_action=ensemble_action,
-        observatory_snapshot=snapshot.to_dict(),
-        scientific_contract_hash=snapshot.scientific_contract_hash
-    )
+    # Invariant: GET context is strictly read-only and must never record side-effects in ledgers.
 
     return {
         "context": snapshot.to_dict(),
         "strategy": {
             "actions": recent_actions,
-            "agreement_ratio": round(agreement_ratio, 2),
+            "agreement_ratio": agreement_ratio,
             "ensemble_action": ensemble_action,
             "bankroll": status.get("bankroll", 10.0),
             "total_pnl_pct": status.get("total_pnl_pct", 0.0)
@@ -99,6 +96,115 @@ def get_arena_equity(limit: int = Query(100, le=500)):
     return {"equity_curve": equity, "count": len(equity)}
 
 
+# ---------------------------------------------------------------------------
+# Durable Persistent Paper Trade Ledger (PRD-V15-LEDGER)
+# ---------------------------------------------------------------------------
+
+from fastapi import Response
+from engine.paper_trade_ledger import get_paper_trade_ledger
+
+@router.get("/api/arena/paper-trades")
+def get_paper_trades(
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    status: Optional[str] = Query(None, description="Filter by status: OPEN, CLOSED"),
+    strategy_id: Optional[str] = Query(None, description="Filter by strategy ID")
+):
+    """
+    Returns durable paper trades from persistent JSONL ledger surviving restarts,
+    along with calculated portfolio metrics.
+    """
+    ledger = get_paper_trade_ledger()
+    trades = ledger.get_trades(limit=limit, offset=offset, status=status, strategy_id=strategy_id)
+    metrics = ledger.get_portfolio_metrics()
+    return {
+        "status": "SUCCESS",
+        "trades": trades,
+        "count": len(trades),
+        "offset": offset,
+        "limit": limit,
+        "portfolio_metrics": metrics,
+        "governance": {
+            "execution_authorization": "DISABLED",
+            "model_authorization": "OFFLINE_RESEARCH_ONLY",
+            "environment": "DURABLE_PAPER_SIMULATION"
+        }
+    }
+
+
+@router.post("/api/arena/paper-trades")
+def create_paper_trade(
+    payload: Dict[str, Any] = Body(...)
+):
+    """
+    Trade order placement is disabled at the backend boundary.
+    BTCognitive is strictly an analysis-only market research and forecasting application.
+    """
+    return {
+        "status": "DISABLED",
+        "trade": None,
+        "detail": "Analysis-only application; trade order placement and paper-order workflows are disabled at the backend boundary.",
+        "governance": {
+            "execution_authorization": "DISABLED",
+            "model_authorization": "OFFLINE_RESEARCH_ONLY",
+            "live_trading": "DISABLED"
+        }
+    }
+
+
+@router.post("/api/arena/paper-trades/close")
+def close_paper_trade(
+    payload: Dict[str, Any] = Body(...)
+):
+    """
+    Trade order modification is disabled at the backend boundary.
+    BTCognitive is strictly an analysis-only market research and forecasting application.
+    """
+    ledger = get_paper_trade_ledger()
+    return {
+        "status": "DISABLED",
+        "trade": None,
+        "detail": "Analysis-only application; trade order modification is disabled at the backend boundary.",
+        "portfolio_metrics": ledger.get_portfolio_metrics()
+    }
+
+
+@router.get("/api/arena/paper-trades/export")
+def export_paper_trades(
+    format: str = Query("csv", pattern="^(csv|json)$")
+):
+    """
+    Exports full durable paper trade ledger as CSV or JSON file.
+    """
+    ledger = get_paper_trade_ledger()
+    if format == "json":
+        json_content = ledger.export_json()
+        return Response(
+            content=json_content,
+            media_type="application/json",
+            headers={"Content-Disposition": "attachment; filename=btcognitive_paper_trades.json"}
+        )
+    csv_content = ledger.export_csv()
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=btcognitive_paper_trades.csv"}
+    )
+
+
+@router.delete("/api/arena/paper-trades/reset")
+def reset_paper_trades(
+    _role: UserRole = Depends(require_role(UserRole.ADMIN))
+):
+    """
+    Resets the research paper trade ledger, creating a timestamped backup file.
+    Requires ADMIN credentials.
+    """
+    ledger = get_paper_trade_ledger()
+    ledger.reset_ledger(keep_backup=True)
+    return {"status": "RESET_SUCCESSFUL", "message": "Paper trade ledger cleared. Backup archived."}
+
+
 import math
 
 @router.post("/api/arena/trade")
@@ -106,18 +212,21 @@ async def execute_arena_paper_trade(
     payload: Optional[Dict[str, Any]] = Body(default={}),
     _role: UserRole = Depends(require_role(UserRole.ADMIN))
 ):
-    """Executes a single paper trade adhering to the $10 bankroll formula."""
-    if payload is None:
-        payload = {}
-    action = payload.get("action", "BUY").upper()
-    row = feature_cache.get_latest_row()
-    if row is None or "close" not in row or row["close"] is None or math.isnan(float(row["close"])):
-        raise HTTPException(status_code=503, detail="Live market price is currently unavailable. Paper trade blocked.")
-    live_p = float(row["close"])
-    confidence = float(payload.get("confidence", 0.82))
-    reasoning = str(payload.get("reasoning", "Manual / Automated Arena order"))
-    result = arena_runner.execute_paper_trade(action=action, price=live_p, confidence=confidence, reasoning=reasoning)
-    return {"status": "success", "trade": result, "arena_status": arena_runner.get_status()}
+    """
+    Trade execution is disabled at the backend boundary.
+    BTCognitive is strictly an analysis-only market research and forecasting application.
+    """
+    return {
+        "status": "DISABLED",
+        "trade": None,
+        "detail": "Analysis-only application; trade execution is disabled at the backend boundary.",
+        "arena_status": arena_runner.get_status(),
+        "governance": {
+            "execution_authorization": "DISABLED",
+            "model_authorization": "OFFLINE_RESEARCH_ONLY",
+            "live_trading": "DISABLED"
+        }
+    }
 
 
 @router.post("/api/arena/reset")
@@ -723,7 +832,7 @@ def get_active_paper_position(
     user_direction: Optional[str] = Query(default="AUTO", description="User preferred direction: AUTO, LONG, or SHORT"),
     horizon: Optional[str] = Query(default="15m", description="Target horizon: 15m, 1h, 4h, 1d, 7d, CYCLE"),
     evidence_mode: Optional[str] = Query(default="AI_RECOMMEND", description="Evidence mode: AI_RECOMMEND, AI_PLUS_USER, USER_ONLY"),
-    signal_mode: Optional[str] = Query(default="live_ai", description="Signal mode: live_ai (real-time alpha) or surveillance (tier 0 audit)")
+    signal_mode: Optional[str] = Query(default="surveillance", description="Signal mode: live_ai (real-time alpha) or surveillance (tier 0 audit)")
 ):
     """
     Returns the active open paper trading position and its canonical D_t contract levels.
@@ -769,24 +878,24 @@ def get_active_paper_position(
             }
 
         # Market regime & C2 health from observatory if available
-        market_regime = "VOL_EXPANDING"
-        c2_health = "CALIBRATED"
+        market_regime = "NORMAL"
+        c2_health = "DATA_UNAVAILABLE"
         snap_data = {
             "spot_price": live_price,
-            "conformal_p90": round(live_price * 1.008, 2),
-            "conformal_p10": round(live_price * 0.993, 2),
+            "conformal_p90": None,
+            "conformal_p10": None,
         }
         try:
             from engine.observatory import observatory
             snap = observatory.get_canonical_snapshot()
             if snap:
-                market_regime = snap.volatility_regime or "VOL_EXPANDING"
-                c2_health = snap.calibration_health or "CALIBRATED"
+                market_regime = getattr(snap, "volatility_regime", None) or (getattr(snap.market_state, "regime", "NORMAL") if hasattr(snap, "market_state") else "NORMAL")
+                c2_health = getattr(snap, "calibration_health", None) or (getattr(snap.model_state, "health", "CALIBRATED") if hasattr(snap, "model_state") else "CALIBRATED")
                 snap_data.update({
-                    "ofi": getattr(snap, "order_flow_imbalance", 0.65),
-                    "hawkes": getattr(snap, "hawkes_intensity", 2.2),
-                    "vpin": getattr(snap, "vpin", 0.28),
-                    "funding": getattr(snap, "funding_rate", -0.00015)
+                    "ofi": getattr(snap, "order_flow_imbalance", None),
+                    "hawkes": getattr(snap, "hawkes_intensity", None),
+                    "vpin": getattr(snap, "vpin", None),
+                    "funding": getattr(snap, "funding_rate", None)
                 })
         except Exception:
             pass
@@ -821,11 +930,12 @@ def get_active_paper_position(
             target_pos = open_positions[0]
 
         if target_pos:
-            entry_p = float(target_pos["entry_price"])
+            raw_entry = target_pos.get("entry_price")
+            entry_p = float(raw_entry) if raw_entry is not None else 0.0
             is_long = target_pos["direction"] == "LONG"
             pos_size = float(target_pos.get("position_size_usd", 1000.0))
 
-            if live_price > 0:
+            if live_price > 0 and entry_p > 0:
                 unrealized_pct = ((live_price - entry_p) / entry_p * 100.0) if is_long else ((entry_p - live_price) / entry_p * 100.0)
                 unrealized_usd = round(pos_size * (unrealized_pct / 100.0), 2)
             else:
@@ -847,8 +957,8 @@ def get_active_paper_position(
                 "direction": target_pos["direction"],
                 "event_type": target_pos.get("event_type", "MOMENTUM_EXPANSION"),
                 "entry_price": entry_p,
-                "tp_price": float(target_pos["tp_price"]),
-                "sl_price": float(target_pos["sl_price"]),
+                "tp_price": float(target_pos["tp_price"]) if target_pos.get("tp_price") is not None else None,
+                "sl_price": float(target_pos["sl_price"]) if target_pos.get("sl_price") is not None else None,
                 "target_rr": float(target_pos.get("target_rr", 2.0)),
                 "max_hold_bars": int(target_pos.get("max_hold_bars", 30)),
                 "opened_at": target_pos["opened_at"],
@@ -907,119 +1017,175 @@ def get_active_paper_position(
             }
             spec = contract_specs.get(candidate_strat, {"rr": 2.0, "tp_mult": 2.0, "sl_mult": 1.0, "max_hold": bound_max_hold_bars, "event": "SURVEILLANCE"})
             top_ranking_item = next((r for r in selection_result["rankings"] if r["strategy_id"] == candidate_strat), selection_result["rankings"][0])
-            t0_touch = hyp.get("tier_0_geometric_touch", {})
-            raw_u = float(t0_touch.get("conformal_p90", round(live_price * 1.008, 2)))
-            raw_l = float(t0_touch.get("conformal_p10", round(live_price * 0.993, 2)))
+            t0_touch = hyp.get("tier_0_geometric_touch", {}) or {}
+            p90_val = t0_touch.get("conformal_p90")
+            p10_val = t0_touch.get("conformal_p10")
+            raw_u = float(p90_val) if p90_val is not None else round(live_price * 1.008, 2)
+            raw_l = float(p10_val) if p10_val is not None else round(live_price * 0.993, 2)
             u_target = raw_u if raw_u > live_price else round(live_price * 1.008, 2)
             l_target = raw_l if (0 < raw_l < live_price) else round(live_price * 0.993, 2)
 
             if signal_mode == "live_ai":
                 from engine.inference_service import live_engine
-                if live_engine and live_engine.latest_prediction:
-                    pred = live_engine.latest_prediction
-                    h_pred = pred.get("horizons", {}).get(horizon_str, pred)
-                    ai_dir = user_dir_str if user_dir_str in ["LONG", "SHORT"] else h_pred.get("direction", "LONG")
-                    if ai_dir == "SKIP":
-                        ai_dir = "LONG" if h_pred.get("probability", 0.50) >= 0.50 else "SHORT"
-                    
-                    ai_tp = float(h_pred.get("tp", u_target))
-                    ai_sl = float(h_pred.get("sl", l_target))
-                    ai_prob = float(h_pred.get("probability", 0.75))
-                    ai_action = h_pred.get("action", f"TAKE_{ai_dir} / DIRECTIONAL_ALPHA")
-                    ai_ev_net = float(h_pred.get("expected_return_net_pct", 0.45))
-                    ai_rr = float(h_pred.get("reward_risk_ratio", round(abs(ai_tp - live_price) / max(1e-4, abs(live_price - ai_sl)), 2)))
+                from models.calibrated_signal_classifier import CalibratedSignalEvaluator
+                evaluator = CalibratedSignalEvaluator(is_gated=True)
+                from engine.forecast_engine_15m import generate_forecast_contract
+                fc_contract = generate_forecast_contract(horizon=horizon_str)
+                
+                # Check data frequency and model compatibility
+                if horizon_str == "5m":
+                    freq_status = "DATA_FREQUENCY_UNSUPPORTED"
+                    freq_narrative = "Horizon 5m is unsupported; only 15m and hourly data (1h, 4h, 24h, 168h) are verified."
+                    primary_reason = "DATA_FREQUENCY_UNSUPPORTED"
+                    reason_narrative = freq_narrative
+                    ai_engine_status = "DATA_FREQUENCY_UNSUPPORTED"
+                    data_readiness = "DATA_UNAVAILABLE"
+                    model_readiness = "MODEL_TIMEFRAME_INCOMPATIBLE"
+                elif horizon_str == "15m":
+                    freq_status = "SUPPORTED_15M"
+                    freq_narrative = "15-minute Coinbase spot market data is verified. Active directional model is verified exclusively for hourly horizons. Directional signal remains ABSTAIN."
+                    primary_reason = "MODEL_TIMEFRAME_INCOMPATIBLE"
+                    reason_narrative = freq_narrative
+                    ai_engine_status = "MODEL_TIMEFRAME_INCOMPATIBLE"
+                    data_readiness = "DATA_AVAILABLE"
+                    model_readiness = "MODEL_TIMEFRAME_INCOMPATIBLE"
+                else:
+                    freq_status = "SUPPORTED_HOURLY"
+                    freq_narrative = "Hourly data stream verified."
+                    primary_reason = "TIER_2_DIRECTIONAL_GATED"
+                    reason_narrative = "Directional model is gated at Tier 2 (Offline Research Only). Directional prediction and execution are disabled."
+                    ai_engine_status = "HOURLY_VERIFIED_SURVEILLANCE"
+                    data_readiness = "DATA_AVAILABLE"
+                    model_readiness = "MODEL_DIRECTIONAL_GATED"
 
-                    return {
-                        "has_active_position": True,
-                        "strategy_id": f"AI-ALPHA-{horizon_str.upper()}",
-                        "mechanism_under_surveillance": f"AI-ALPHA-{candidate_strat}",
-                        "directional_trading_signal": "ENABLED",
-                        "is_directional_trade_signal": True,
-                        "strategy_version": "v2.0-live",
-                        "registry_status": "PRODUCTION_ALPHA",
-                        "empirical_status": "LIVE_CALIBRATED",
-                        "decision_id": f"dec_ai_{horizon_str.lower()}_{int(time.time())}",
-                        "opportunity_id": f"opp_ai_{horizon_str.lower()}",
-                        "contract_hash": compute_indicator_config_hash(enabled_inds),
-                        "primary_reason": f"AI_{ai_dir}_MOMENTUM_CONVICTION",
-                        "reason_narrative": f"Adaptive Ensemble model projects {ai_dir} momentum with {ai_prob*100:.1f}% probability and +{ai_ev_net:.2f}% Net EV.",
-                        "direction": ai_dir,
-                        "event_type": "DIRECTIONAL_MOMENTUM_ALPHA",
-                        "entry_price": live_price,
-                        "tp_price": ai_tp,
-                        "sl_price": ai_sl,
-                        "target_rr": ai_rr,
+                is_subhourly_unsupported = (freq_status in ["DATA_FREQUENCY_UNSUPPORTED", "SUPPORTED_15M"])
+
+                return {
+                    "product_mode": "ANALYSIS_ONLY",
+                    "live_trading_enabled": False,
+                    "order_submission_enabled": False,
+                    "is_authorized_live": False,
+                    "directional_recommendation_status": "DISABLED",
+                    "execution_status": "DISABLED_ANALYSIS_ONLY",
+                    "execution_disabled_message": "Execution disabled — analysis only",
+                    "has_active_position": False,
+                    "strategy_id": f"AI-ALPHA-{horizon_str.upper()}",
+                    "mechanism_under_surveillance": f"AI-ALPHA-{candidate_strat}",
+                    "directional_trading_signal": "DISABLED",
+                    "is_directional_trade_signal": False,
+                    "strategy_version": "v2.0-research",
+                    "registry_status": "OFFLINE_RESEARCH_ONLY",
+
+                    "empirical_status": "TIER_2_GATED",
+                    "decision_id": f"dec_ai_{horizon_str.lower()}_{int(time.time())}",
+                    "opportunity_id": f"opp_ai_{horizon_str.lower()}",
+                    "contract_hash": compute_indicator_config_hash(enabled_inds),
+                    "primary_reason": primary_reason,
+                    "reason_narrative": reason_narrative,
+                    "direction": "ABSTAIN",
+                    "event_type": "DIRECTIONAL_RESEARCH_BENCHMARK",
+                    "entry_price": None,
+                    "tp_price": None,
+                    "sl_price": None,
+                    "target_rr": None,
+                    "horizon": horizon_str,
+                    "data_frequency_status": freq_status,
+                    "data_readiness": data_readiness,
+                    "model_readiness": model_readiness,
+                    "forecast": fc_contract,
+                    "forecast_contract": fc_contract,
+                    "bar_interval": bar_iv_str,
+                    "bar_interval_seconds": bar_iv_sec,
+                    "max_hold_bars": bound_max_hold_bars,
+                    "execution_timeout_minutes": h_mins,
+                    "execution_timeout_seconds": exec_timeout_sec,
+                    "confidence": None,
+                    "probability_pct": None,
+                    "net_expected_return_pct": None,
+                    "signal_mode": "research_only",
+                    "status": "TIER_2_GATED",
+                    "action": "ABSTAIN",
+                    "execution_authorization": "DISABLED",
+                    "scenario_contracts": None,
+                    "analytical_scenario_contract": None,
+                    "execution_costs": {
+                        "estimated_execution_cost_bps": 9.3,
+                        "venue": "Coinbase Advanced Spot (BTC-USD)",
+                        "tier_assumed": "Institutional / Blended Volume Tier",
+                        "is_observed_schedule": False,
+                        "components": {
+                            "half_spread_bps": 1.5,
+                            "slippage_bps": 2.0,
+                            "exchange_commission_bps": 5.8
+                        },
+                        "total_cost_bps": 9.3
+                    },
+                    "ai_prediction_engine": {
+                        "status": ai_engine_status,
+                        "data_readiness": data_readiness,
+                        "model_readiness": model_readiness,
+                        "data_frequency_status": freq_status,
+                        "reason": freq_narrative,
+                        "market_regime": market_regime,
+                        "forecast": fc_contract,
+                        "dual_hypotheses": {
+                            "h_upper": {
+                                "status": freq_status,
+                                "name": "Upper-Path Hypothesis",
+                                "hypothesis_label": "P(UPPER BOUNDARY FIRST)",
+                                "path_probability_horizon": None if is_subhourly_unsupported else t0_touch.get("finite_horizon_touch", {}).get("p_upper_first_within_horizon"),
+                                "p_upper_first": None if is_subhourly_unsupported else t0_touch.get("finite_horizon_touch", {}).get("p_upper_first_within_horizon"),
+                                "n_eff": None if is_subhourly_unsupported else hyp["long_hypothesis"].get("n_eff"),
+                                "empirical_conformal_ci_width": None if is_subhourly_unsupported else hyp["long_hypothesis"].get("ci_width"),
+                                "confidence_interval_90": None if is_subhourly_unsupported else hyp["long_hypothesis"].get("confidence_interval_90"),
+                                "drag_bps": None if is_subhourly_unsupported else round(hyp["long_hypothesis"].get("drag_bps", 9.3), 1)
+                            },
+                            "h_lower": {
+                                "status": freq_status,
+                                "name": "Lower-Path Hypothesis",
+                                "hypothesis_label": "P(LOWER BOUNDARY FIRST)",
+                                "path_probability_horizon": None if is_subhourly_unsupported else t0_touch.get("finite_horizon_touch", {}).get("p_lower_first_within_horizon"),
+                                "p_lower_first": None if is_subhourly_unsupported else t0_touch.get("finite_horizon_touch", {}).get("p_lower_first_within_horizon"),
+                                "n_eff": None if is_subhourly_unsupported else hyp["short_hypothesis"].get("n_eff"),
+                                "empirical_conformal_ci_width": None if is_subhourly_unsupported else hyp["short_hypothesis"].get("ci_width"),
+                                "confidence_interval_90": None if is_subhourly_unsupported else hyp["short_hypothesis"].get("confidence_interval_90"),
+                                "drag_bps": None if is_subhourly_unsupported else round(hyp["short_hypothesis"].get("drag_bps", 6.0), 1)
+                            }
+                        },
+                        "aeer_evidence_plan": hyp.get("evidence_routing", {}).get("why_these_indicators", []),
+                        "why_these_indicators": hyp.get("evidence_routing", {}).get("why_these_indicators", []),
+                        "decision_questions": hyp.get("evidence_routing", {}).get("decision_questions", {})
+                    },
+                    "decision_anatomy": {
+                        "event": "DIRECTIONAL_RESEARCH_GATED",
+                        "evidence": "Directional model evaluated out-of-sample: ~52.1% accuracy, negative net expectancy after transaction costs.",
+                        "estimated_execution_cost_bps": 9.3,
+                        "cost_breakdown": "Spread 1.5 + Slippage 2.0 + Comm 5.8 bps",
+                        "c2_health": "CALIBRATED",
+                        "risk_check": "OFFLINE_RESEARCH_ONLY",
+                        "action": "ABSTAIN",
+                        "is_directional_trade_signal": False,
+                        "economic_aggregation": "DISABLED_RESEARCH_ONLY"
+                    },
+                    "timeout_binding_invariant": {
+                        "formula": "T_max = max_hold_bars * bar_interval",
                         "horizon": horizon_str,
                         "bar_interval": bar_iv_str,
                         "bar_interval_seconds": bar_iv_sec,
                         "max_hold_bars": bound_max_hold_bars,
-                        "execution_timeout_minutes": h_mins,
                         "execution_timeout_seconds": exec_timeout_sec,
-                        "confidence": ai_prob,
-                        "probability_pct": round(ai_prob * 100, 1),
-                        "net_expected_return_pct": ai_ev_net,
-                        "signal_mode": "live_ai",
-                        "status": "LIVE_AI_ALPHA",
-                        "action": ai_action,
-                        "scenario_contracts": {
-                            "status": "AVAILABLE",
-                            "is_executable": True,
-                            "fail_closed_reason": None,
-                            "upper_excursion": {
-                                "name": "Target Profit Barrier",
-                                "target_price": ai_tp if ai_dir == "LONG" else ai_sl,
-                                "touch_probability_eventual": ai_prob,
-                                "touch_probability_15m": ai_prob,
-                                "target_distance": round(abs(ai_tp - live_price), 2),
-                                "stop_distance": round(abs(live_price - ai_sl), 2),
-                                "target_distance_pct": round(abs(ai_tp - live_price) / live_price * 100.0, 3),
-                                "stop_distance_pct": round(abs(live_price - ai_sl) / live_price * 100.0, 3),
-                                "contract_geometry": {
-                                    "entry_price": round(live_price, 2),
-                                    "take_profit_price": round(ai_tp, 2),
-                                    "stop_loss_price": round(ai_sl, 2),
-                                    "reward_risk_ratio": ai_rr,
-                                    "horizon": horizon_str,
-                                    "bar_interval": bar_iv_str,
-                                    "bar_interval_seconds": bar_iv_sec,
-                                }
-                            }
-                        },
-                        "decision_anatomy": {
-                            "event": "DIRECTIONAL_ALPHA_TRIGGER",
-                            "evidence": f"Ensemble P_{ai_dir} (N=2951, Prob={ai_prob*100:.1f}%)",
-                            "estimated_execution_cost_bps": 10.0,
-                            "c2_health": "CALIBRATED",
-                            "risk_check": "AUTHORIZED",
-                            "action": "TRADE",
-                            "is_directional_trade_signal": True,
-                            "economic_aggregation": "ENABLED_LIVE_ALPHA"
-                        },
-                        "timeout_binding_invariant": {
-                            "formula": "T_max = max_hold_bars * bar_interval",
-                            "horizon": horizon_str,
-                            "bar_interval": bar_iv_str,
-                            "bar_interval_seconds": bar_iv_sec,
-                            "max_hold_bars": bound_max_hold_bars,
-                            "execution_timeout_seconds": exec_timeout_sec,
-                            "is_consistently_bound": True
-                        },
-                        "opened_at": datetime.now(timezone.utc).isoformat(),
-                        "bars_held": 1,
-                        "live_price": live_price,
-                        "unrealized_pnl_usd": 0.0,
-                        "unrealized_pnl_pct": 0.0,
-                        "boundary_consistency_invariant": {
-                            "u_bound": ai_tp,
-                            "l_bound": ai_sl,
-                            "tp_matches_u": True,
-                            "sl_matches_l": True,
-                            "description": "TP and SL are mathematically tied to active multi-horizon AI predictive boundaries"
-                        },
-                        "provenance": hyp.get("provenance", {})
+                        "is_consistently_bound": (exec_timeout_sec == bound_max_hold_bars * bar_iv_sec)
                     }
+                }
 
             return {
+                "product_mode": "ANALYSIS_ONLY",
+                "live_trading_enabled": False,
+                "order_submission_enabled": False,
+                "is_authorized_live": False,
+                "directional_recommendation_status": "DISABLED",
+                "execution_status": "DISABLED_ANALYSIS_ONLY",
+                "execution_disabled_message": "Execution disabled — analysis only",
                 "has_active_position": False,
                 "strategy_id": candidate_strat,
                 "mechanism_under_surveillance": candidate_strat,
@@ -1027,6 +1193,9 @@ def get_active_paper_position(
                 "is_directional_trade_signal": False,
                 "strategy_version": "v1.0",
                 "registry_status": "CANDIDATE",
+                "is_actionable": False,
+                "analytical_status": "ABSTAIN_GATED",
+                "execution_authorization": "DISABLED",
                 "empirical_status": "VALIDATION_IN_PROGRESS",
                 "decision_id": f"dec_eval_{candidate_strat.lower()}",
                 "opportunity_id": "opp_awaiting_trigger",
@@ -1038,7 +1207,8 @@ def get_active_paper_position(
                 "entry_price": live_price,
                 "tp_price": u_target,
                 "sl_price": l_target,
-                "target_rr": spec["rr"],
+                "target_rr": round(abs(u_target - live_price) / max(1e-6, abs(live_price - l_target)), 2),
+                "exact_reward_to_risk": round(abs(u_target - live_price) / max(1e-6, abs(live_price - l_target)), 2),
                 "horizon": horizon_str,
                 "bar_interval": bar_iv_str,
                 "bar_interval_seconds": bar_iv_sec,
@@ -1317,6 +1487,12 @@ def get_active_paper_position(
                         "analytical_status": "ANALYTICALLY_AVAILABLE",
                         "user_selection": "NOT_SELECTED",
                         "execution_status": "NOT_AUTHORIZED_TIER2_GATED",
+                        "execution_disabled_message": "Execution disabled — analysis only",
+                        "product_mode": "ANALYSIS_ONLY",
+                        "live_trading_enabled": False,
+                        "order_submission_enabled": False,
+                        "directional_recommendation_status": "DISABLED",
+                        "is_actionable": False,
                         "entry_price": round(live_price, 2),
                         "take_profit_price": round(u_target, 2),
                         "stop_loss_price": round(l_target, 2),
@@ -1334,7 +1510,12 @@ def get_active_paper_position(
                         "mechanism_under_surveillance": candidate_strat,
                         "analytical_status": "ANALYTICALLY_AVAILABLE",
                         "user_selection": "NOT_SELECTED",
-                        "execution_status": "NOT_AUTHORIZED_TIER2_GATED",
+                        "execution_status": "DISABLED_ANALYSIS_ONLY",
+                        "execution_disabled_message": "Execution disabled — analysis only",
+                        "product_mode": "ANALYSIS_ONLY",
+                        "live_trading_enabled": False,
+                        "order_submission_enabled": False,
+                        "directional_recommendation_status": "DISABLED",
                         "entry_price": round(live_price, 2),
                         "take_profit_price": round(u_target, 2),
                         "stop_loss_price": round(l_target, 2),
@@ -1372,7 +1553,7 @@ def get_active_paper_position(
                         u_fixed=u_target,
                         l_fixed=l_target,
                         current_horizon=horizon_str,
-                        market_snapshot={"rv_5m": float(snap_data.get("rv_5m", 0.0024))},
+                        market_snapshot={"rv_5m": float(snap_data.get("rv_5m") or 0.0024)},
                         active_indicators=enabled_inds
                     )
                 },
@@ -1382,7 +1563,7 @@ def get_active_paper_position(
                     u_fixed=u_target,
                     l_fixed=l_target,
                     current_horizon=horizon_str,
-                    market_snapshot={"rv_5m": float(snap_data.get("rv_5m", 0.0024))},
+                    market_snapshot={"rv_5m": float(snap_data.get("rv_5m") or 0.0024)},
                     active_indicators=enabled_inds
                 ),
                 "provenance": hyp["provenance"]
@@ -1446,9 +1627,15 @@ def get_arena_trade_markers(
             trades = get_recent_trades(strategy_name=s, limit=lim_val)
             for t in trades:
                 if t.get("closed_at") or t.get("resolved") == 1:
+                    dir_str = str(t.get("direction", "")).upper()
+                    if dir_str not in ("LONG", "SHORT"):
+                        continue
+                    entry_p = float(t.get("entry_price", 0.0))
+                    if entry_p <= 0:
+                        continue
                     pnl = float(t.get("net_pnl", 0.0))
                     outcome = "PROFITABLE" if pnl > 0 else ("LOSS" if pnl < 0 else "BREAKEVEN")
-                    is_long = t.get("direction") == "LONG"
+                    is_long = dir_str == "LONG"
                     
                     # Entry Marker
                     markers.append({
@@ -1457,8 +1644,8 @@ def get_arena_trade_markers(
                         "strategy_id": t["strategy_name"],
                         "type": "ENTRY_LONG" if is_long else "ENTRY_SHORT",
                         "timestamp": t.get("opened_at") or t.get("created_at"),
-                        "price": float(t.get("entry_price", 0.0)),
-                        "direction": t.get("direction"),
+                        "price": entry_p,
+                        "direction": dir_str,
                         "event_type": t.get("event_type", "TRADE"),
                         "outcome": "ACTIVE_ENTRY",
                         "net_pnl_usd": None,
@@ -1713,3 +1900,63 @@ def compute_what_if_scenario(
     except Exception as e:
         logger.error(f"what_if_scenario endpoint error: {e}")
         return {"status": "ERROR", "error": str(e), "timestamp": datetime.now(timezone.utc).isoformat()}
+
+
+@router.get("/api/arena/scenario-preview")
+@router.post("/api/arena/scenario-preview")
+def get_scenario_preview(
+    horizon: str = Query(default="24h", description="Supported horizons: 1h, 4h, 24h. Sub-hourly (5m, 15m) rejected."),
+    entry_price: Optional[float] = Query(default=None, description="Optional user-supplied entry price anchor"),
+    k_tp: Optional[float] = Query(default=1.5, description="Take-profit volatility multiplier"),
+    k_sl: Optional[float] = Query(default=1.0, description="Stop-loss volatility multiplier"),
+    body: Optional[Dict[str, Any]] = Body(default=None)
+):
+    """
+    Hypothetical Scenario Planner Endpoint (PRD-PLN-23).
+    Returns mathematically consistent LONG and SHORT scenario price levels around
+    a verified market reference and rolling volatility estimate.
+    Strictly non-actionable, research-only preview. Directional execution is DISABLED.
+    """
+    try:
+        from engine.scenario_contract_engine import scenario_planner
+
+        # Allow parameters via body if POST request
+        if body and isinstance(body, dict):
+            horizon = body.get("horizon", horizon)
+            entry_price = body.get("entry_price", entry_price)
+            k_tp = body.get("k_tp", k_tp)
+            k_sl = body.get("k_sl", k_sl)
+
+        # Defend against direct function calls where FastAPI Query objects remain defaults
+        if not isinstance(k_tp, (int, float)):
+            k_tp = 1.5
+        if not isinstance(k_sl, (int, float)):
+            k_sl = 1.0
+        if not isinstance(horizon, str):
+            horizon = "24h"
+        if not isinstance(entry_price, (int, float)):
+            entry_price = None
+
+        return scenario_planner.compute_scenario_preview(
+            horizon=horizon,
+            entry_price=entry_price,
+            k_tp=k_tp,
+            k_sl=k_sl
+        )
+    except Exception as e:
+        logger.error(f"scenario_preview endpoint error: {e}", exc_info=True)
+        return {
+            "status": "ERROR",
+            "scenario_type": "HYPOTHETICAL_VOLATILITY_BARRIER",
+            "is_actionable": False,
+            "execution_authorization": "DISABLED",
+            "instrument": "BTC/USD",
+            "market_source": "Coinbase Spot (Closed Hourly Candle)",
+            "selected_horizon": horizon,
+            "contract_version": "SCENARIO_PLANNER_v1.0",
+            "rejection_code": "INTERNAL_ERROR",
+            "rejection_narrative": str(e),
+            "scenarios": None,
+            "disclaimer": "Hypothetical volatility barrier calculation only. Does NOT constitute a directional prediction, trade signal, or investment advice. Execution authorization is DISABLED."
+        }
+

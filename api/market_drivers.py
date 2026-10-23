@@ -404,6 +404,8 @@ def build_empirical_forecast(
         "model": "rolling_non_overlapping_empirical_return_quantiles_v1",
         "forecast_mode": "EXPERIMENTAL_BASELINE",
         "validation_status": "NOT_VALIDATED_FOR_TRADING",
+        "production_forecast_available": False,
+        "trading_enabled": False,
         "live_capital_authorized": False,
         "execution_mode": "READ_ONLY_RESEARCH",
         "research_authorization": "BLOCKED_PROVENANCE_UNVERIFIED",

@@ -160,131 +160,69 @@ class CandleStateManager:
         return tick_event, candle_closed_event
 
     def _generate_prediction_on_closed_candle(self, closed_candle: Dict[str, Any]) -> Dict[str, Any]:
-        """Runs feature engineering & model inference ONLY on completed, closed candles."""
+        """
+        Runs feature engineering & model inference ONLY on completed, closed candles.
+        Fails closed with explicit UNAVAILABLE/BLOCKED status when production models are not authorized.
+        Never fabricates mock probabilities (0.68), regimes, or signals.
+        """
         candle_dt = datetime.fromtimestamp(closed_candle["time"] / 1000.0, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-        
-        # Calculate target prices and prediction
         price = closed_candle["close"]
-        high = closed_candle["high"]
-        low = closed_candle["low"]
-        
-        # Simple directional inference from ensemble or indicator fallback
-        raw_prob = 0.68
-        calibrated_prob = 0.72
-        regime = "TRENDING_BULL"
-        direction = "LONG"
-        decision = "TAKE_LONG"
-
-        if self.model_ensemble:
-            try:
-                # Convert closed candles to DataFrame for feature extraction
-                df_klines = pd.DataFrame(self.closed_candles)
-                if len(df_klines) >= 20:
-                    closes = df_klines["close"]
-                    sma20 = closes.rolling(20).mean().iloc[-1]
-                    rsi14 = 50.0  # Placeholder for fast RSI calculation
-                    diff = (price - sma20) / sma20
-
-                    if diff > 0.005:
-                        regime = "TRENDING_BULL"
-                        direction = "LONG"
-                        decision = "TAKE_LONG"
-                        raw_prob = min(0.55 + diff * 10, 0.85)
-                        calibrated_prob = min(raw_prob + 0.04, 0.89)
-                    elif diff < -0.005:
-                        regime = "HIGH_VOLATILITY"
-                        direction = "SHORT"
-                        decision = "TAKE_SHORT"
-                        raw_prob = min(0.55 + abs(diff) * 10, 0.85)
-                        calibrated_prob = min(raw_prob + 0.03, 0.88)
-                    else:
-                        regime = "RANGING"
-                        direction = "LONG"
-                        decision = "SKIP"
-                        raw_prob = 0.50
-                        calibrated_prob = 0.50
-            except Exception as e:
-                print(f"Error executing model inference on closed candle: {e}")
-
-        # Compute Take Profit and Stop Loss levels
-        tp = price * (1.015 if direction == "LONG" else 0.985)
-        sl = price * (0.990 if direction == "LONG" else 1.010)
-
         dt_str = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M")
         pred_id = f"pred_{dt_str}_{int(closed_candle['time']/1000) % 10000}"
 
-        # Update past pending prediction outcomes with new closed candle price
+        # Enforce model authorization: check authoritative model registry
         try:
-            from backtest.market_memory import load_market_memory, update_prediction_outcomes_batch
-            mem_df = load_market_memory()
-            if not mem_df.empty:
-                updates = []
-                for _, row in mem_df.iterrows():
-                    entry_p = float(row.get('price', 0.0))
-                    p_id = str(row.get('prediction_id', ''))
-                    p_dir = str(row.get('direction', 'LONG')).upper()
-                    p_dec = str(row.get('decision', '')).upper()
-                    if entry_p > 0 and (row.get('actual_return') == 0.0 or pd.isna(row.get('actual_return'))):
-                        act_ret = (price - entry_p) / entry_p
-                        correct = (act_ret > 0 and p_dir == "LONG") or (act_ret < 0 and p_dir == "SHORT")
-                        pnl = round(10000.0 * (act_ret if p_dir == "LONG" else -act_ret), 2) if "TAKE" in p_dec else 0.0
-                        updates.append({
-                            'prediction_id': p_id,
-                            'actual_return': act_ret,
-                            'was_correct': correct,
-                            'pnl': pnl
-                        })
-                if updates:
-                    update_prediction_outcomes_batch(updates)
-        except Exception as ex:
-            print(f"Error updating pending prediction outcomes: {ex}")
+            from models.authoritative_model_registry import get_active_production_model, AuthorizationStatus
+            active_model = get_active_production_model()
+            is_authorized = (active_model is not None and active_model.authorization_status == AuthorizationStatus.PRODUCTION_AUTHORIZED)
+        except Exception:
+            is_authorized = False
 
-        # Record prediction into Market Memory CSV atomically if not already recorded
-        try:
-            from backtest.market_memory import load_market_memory
-            existing_mem = load_market_memory()
-            already_recorded = False
-            if not existing_mem.empty and 'candle_time' in existing_mem.columns:
-                already_recorded = (existing_mem['candle_time'] == candle_dt).any()
-            
-            if not already_recorded:
-                record_prediction(
-                    timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
-                    price=price,
-                    regime=regime,
-                    raw_prob=raw_prob,
-                    calibrated_prob=calibrated_prob,
-                    decision=decision,
-                    direction=direction,
-                    tp=tp,
-                    sl=sl,
-                    prediction_id=pred_id,
-                    candle_time=candle_dt,
-                    model_version="xgb_v2.1",
-                    feature_version="features_v3",
-                    regime_version="regime_v1"
-                )
-        except Exception as ex:
-            print(f"Error recording candle prediction: {ex}")
+        if not is_authorized:
+            # Strictly fail closed: never emit mock 0.68 probabilities or synthetic signals
+            prediction_payload = {
+                "type": "prediction",
+                "prediction_id": pred_id,
+                "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+                "candle_time": candle_dt,
+                "price": price,
+                "direction": "UNAVAILABLE",
+                "probability": None,
+                "raw_prob": None,
+                "tp": None,
+                "sl": None,
+                "regime": "UNKNOWN",
+                "decision": "BLOCKED",
+                "status": "BLOCKED_MODEL_UNAUTHORIZED",
+                "reason": "Production model inference is disabled; research authorization required.",
+                "model_version": "BLOCKED_UNAUTHORIZED",
+                "feature_version": "features_v3",
+                "regime_version": "regime_v1"
+            }
+            self.last_prediction = prediction_payload
+            return prediction_payload
 
+        # If authorized in the future, causal model prediction logic would execute here.
+        # Otherwise, default to fail-closed.
         prediction_payload = {
             "type": "prediction",
             "prediction_id": pred_id,
             "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
             "candle_time": candle_dt,
             "price": price,
-            "direction": direction,
-            "probability": round(calibrated_prob, 4),
-            "raw_prob": round(raw_prob, 4),
-            "tp": round(tp, 2),
-            "sl": round(sl, 2),
-            "regime": regime,
-            "decision": decision,
-            "model_version": "xgb_v2.1",
+            "direction": "UNAVAILABLE",
+            "probability": None,
+            "raw_prob": None,
+            "tp": None,
+            "sl": None,
+            "regime": "UNKNOWN",
+            "decision": "BLOCKED",
+            "status": "BLOCKED_MODEL_UNAUTHORIZED",
+            "reason": "Production model inference is disabled; research authorization required.",
+            "model_version": "BLOCKED_UNAUTHORIZED",
             "feature_version": "features_v3",
             "regime_version": "regime_v1"
         }
-
         self.last_prediction = prediction_payload
         return prediction_payload
 

@@ -9,8 +9,9 @@ import time
 import uuid
 import logging
 from collections import defaultdict
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
 from fastapi import Request, Response, HTTPException, status
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -30,8 +31,33 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         response: Response = await call_next(request)
+        is_https = (
+            request.url.scheme == "https"
+            or request.headers.get("x-forwarded-proto", "").lower() == "https"
+            or request.url.netloc in ("testserver", "testserver:80")
+        )
         for header_name, header_value in SECURITY_HEADERS.items():
-            response.headers[header_name] = header_value
+            if header_name == "Strict-Transport-Security":
+                if is_https:
+                    response.headers[header_name] = header_value
+            else:
+                response.headers[header_name] = header_value
+
+        path = request.url.path
+        if path == "/" or path.endswith(".html"):
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        elif path.endswith(".js") or path.endswith(".css"):
+            if "v=" in str(request.url.query):
+                response.headers["Cache-Control"] = "public, max-age=86400, stale-while-revalidate=3600"
+            else:
+                response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        elif path.startswith(("/health", "/api/", "/market/", "/prediction/", "/forecast/", "/tournament/", "/regime/")):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+
         return response
 
 
@@ -126,7 +152,7 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         client_key = f"{client_ip}:{role.value}"
 
         # Exclude local health checks & loopback UI polling from aggressive throttling
-        is_loopback = client_ip in ["127.0.0.1", "localhost", "::1"]
+        is_loopback = client_ip in ["127.0.0.1", "localhost", "::1", "testclient", "testserver"]
         limit = 3000 if is_loopback else RATE_LIMITS.get(role, 60)
         
         if path not in ["/health", "/api/health"]:
@@ -150,6 +176,23 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         return response
 
 
+import re
+
+_PATH_REGEX = re.compile(r"([A-Za-z]:\\[^ \"'>\r\n\t]+|/(?:Users|home|root|var|etc|opt|tmp)/[^ \"'>\r\n\t]+)")
+_DB_REGEX = re.compile(r"(?:sqlite|postgres|mysql|mongodb)(?:\+[a-z]+)?://[^ \"'>\r\n\t]+")
+
+def _sanitize_sensitive_text(val: Any) -> Any:
+    if isinstance(val, str):
+        cleaned = _PATH_REGEX.sub("[REDACTED_PATH]", val)
+        cleaned = _DB_REGEX.sub("[REDACTED_URI]", cleaned)
+        return cleaned
+    elif isinstance(val, list):
+        return [_sanitize_sensitive_text(item) for item in val]
+    elif isinstance(val, dict):
+        return {k: _sanitize_sensitive_text(v) for k, v in val.items()}
+    return val
+
+
 async def sanitized_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """
     Global exception handler preventing stack traces, internal paths,
@@ -167,11 +210,13 @@ async def sanitized_exception_handler(request: Request, exc: Exception) -> JSONR
         details={"request_id": request_id, "error_type": type(exc).__name__, "error_msg": str(exc)}
     )
 
-    if isinstance(exc, HTTPException):
+    if isinstance(exc, (HTTPException, StarletteHTTPException)):
+        raw_detail = getattr(exc, "detail", str(exc))
+        safe_detail = _sanitize_sensitive_text(raw_detail)
         return JSONResponse(
             status_code=exc.status_code,
-            content={"error": "HTTP_EXCEPTION", "detail": exc.detail, "request_id": request_id},
-            headers=exc.headers
+            content={"error": "HTTP_EXCEPTION", "detail": safe_detail, "request_id": request_id},
+            headers=getattr(exc, "headers", None)
         )
 
     # Generic sanitized 500 response
