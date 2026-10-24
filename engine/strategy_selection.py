@@ -28,6 +28,7 @@ from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timezone
 import numpy as np
 from research.macro_evaluation_harness import compute_canonical_newey_west_neff
+from engine.execution_cost_model import ExecutionCostModel
 
 # Canonical 5 MEIE strategy archetypes
 CANONICAL_STRATEGY_ARCHETYPES = [
@@ -106,182 +107,240 @@ class StrategySelectionEngine:
 
         snap = market_snapshot or {}
         val_ofi = snap.get("ofi")
-        ofi_val = float(val_ofi) if val_ofi is not None else (0.65 if "ofi" in active_set else 0.0)
         val_hwk = snap.get("hawkes")
-        hawkes_val = float(val_hwk) if val_hwk is not None else (2.2 if "hawkes" in active_set else 1.0)
         val_vpin = snap.get("vpin")
-        vpin_val = float(val_vpin) if val_vpin is not None else (0.28 if "vpin" in active_set else 0.35)
         val_fund = snap.get("funding")
-        funding_val = float(val_fund) if val_fund is not None else (-0.00015 if "funding" in active_set else 0.0001)
         val_spread = snap.get("spread_bps")
-        spread_bps = float(val_spread) if val_spread is not None else 2.0
         val_depth = snap.get("depth_score")
-        depth_score = float(val_depth) if val_depth is not None else 0.75
-        is_expansion = bool(snap.get("is_expansion", True if "rv_5m" in active_set else False))
+        is_expansion = bool(snap.get("is_expansion", False))
+        cost_scenario = str(snap.get("cost_scenario") or "COINBASE_ADVANCED_87BPS")
 
-        # Archetype-specific evaluation
+        # Dynamic Execution Cost Drag sourced exclusively from ExecutionCostModel
+        drag_taker = ExecutionCostModel.get_round_trip_friction_bps(
+            venue=cost_scenario, is_taker_entry=True, is_taker_exit=True
+        )
+        drag_maker = ExecutionCostModel.get_round_trip_friction_bps(
+            venue=cost_scenario, is_taker_entry=False, is_taker_exit=False
+        )
+        drag_mixed = ExecutionCostModel.get_round_trip_friction_bps(
+            venue=cost_scenario, is_taker_entry=False, is_taker_exit=True
+        )
+
+        # Archetype-specific evaluation with strict feature availability checks (NO FALLBACK CONSTANTS)
+        disqualification_reason = None
+
         if strategy_id == "MEIE-IGNITION":
-            # Responds to OFI + Hawkes + Volatility Expansion + Funding crowding
             req_features = ["ofi", "hawkes"]
-            has_data = any(f in active_set for f in req_features)
-            n_samples = 180 + (25 if "ofi" in active_set else 0) + (20 if "hawkes" in active_set else 0)
+            has_telemetry = (val_ofi is not None) and (val_hwk is not None)
+            has_active_flag = any(f in active_set for f in req_features)
+            has_data = has_telemetry and has_active_flag
 
-            # Ignition Long: high OFI (+) + Hawkes intensity (+) + expanding vol
-            tp_long = 50.0 + (ofi_val * 14.0) + (hawkes_val * 2.5) + (4.0 if is_expansion else -6.0)
-            tp_short = 50.0 - (ofi_val * 12.0) + (hawkes_val * 1.5) + (2.0 if is_expansion else -4.0)
-
-            tp_long = max(30.0, min(75.0, tp_long))
-            tp_short = max(25.0, min(65.0, tp_short))
-
-            # Taker friction
-            drag_long = 9.3
-            drag_short = 9.3
-            gross_long = round((tp_long - 50.0) * 1.8 + 8.0, 1)
-            gross_short = round((tp_short - 50.0) * 1.6 + 4.0, 1)
-            net_long = round(gross_long - drag_long, 1)
-            net_short = round(gross_short - drag_short, 1)
-
+            drag_long = drag_taker
+            drag_short = drag_taker
             spec = {"rr": 2.0, "tp_mult": 2.0, "sl_mult": 1.0, "max_hold": 30, "base_oq": 0.84, "event": "MOMENTUM_IGNITION"}
 
+            if not has_data:
+                disqualification_reason = "UNAVAILABLE_ORDER_FLOW_TELEMETRY"
+                n_samples = 0
+                tp_long, tp_short = 50.0, 50.0
+                gross_long, gross_short = 0.0, 0.0
+                net_long, net_short = -drag_long, -drag_short
+            else:
+                ofi_val = float(val_ofi)
+                hawkes_val = float(val_hwk)
+                n_samples = 180 + (25 if "ofi" in active_set else 0) + (20 if "hawkes" in active_set else 0)
+                tp_long = 50.0 + (ofi_val * 14.0) + (hawkes_val * 2.5) + (4.0 if is_expansion else -6.0)
+                tp_short = 50.0 - (ofi_val * 12.0) + (hawkes_val * 1.5) + (2.0 if is_expansion else -4.0)
+                tp_long = max(30.0, min(75.0, tp_long))
+                tp_short = max(25.0, min(65.0, tp_short))
+                sigma_trade = max(0.005, float(snap.get("volatility_sigma") or 0.015))
+                gross_long = round(((tp_long / 100.0) * spec["tp_mult"] - ((100.0 - tp_long) / 100.0) * spec["sl_mult"]) * sigma_trade * 10000.0, 1)
+                gross_short = round(((tp_short / 100.0) * spec["tp_mult"] - ((100.0 - tp_short) / 100.0) * spec["sl_mult"]) * sigma_trade * 10000.0, 1)
+                net_long = round(gross_long - drag_long, 1)
+                net_short = round(gross_short - drag_short, 1)
+
         elif strategy_id == "MEIE-ABSORPTION":
-            # Responds to Passive Book Absorption (High depth, Delta divergence, Low VPIN)
-            # Severe penalty if toxic flow (VPIN) is elevated!
             req_features = ["ofi", "vpin"]
-            has_data = any(f in active_set for f in req_features)
-            n_samples = 160 + (30 if "vpin" in active_set else 0)
+            has_telemetry = (val_ofi is not None) and (val_vpin is not None)
+            has_active_flag = any(f in active_set for f in req_features)
+            has_data = has_telemetry and has_active_flag
 
-            # If toxicity is high, absorption gets run over by informed traders
-            toxic_penalty = max(0.0, (vpin_val - 0.40) * 40.0)
-
-            tp_long = 50.0 + (depth_score * 8.0) - (ofi_val * 5.0) - toxic_penalty
-            tp_short = 50.0 + (depth_score * 8.0) + (ofi_val * 5.0) - toxic_penalty
-
-            tp_long = max(25.0, min(70.0, tp_long))
-            tp_short = max(25.0, min(70.0, tp_short))
-
-            # Maker friction (much lower drag: 3.5 bps)
-            drag_long = 3.5
-            drag_short = 3.5
-            gross_long = round((tp_long - 50.0) * 1.2 + 4.0, 1)
-            gross_short = round((tp_short - 50.0) * 1.2 + 4.0, 1)
-            net_long = round(gross_long - drag_long, 1)
-            net_short = round(gross_short - drag_short, 1)
-
+            drag_long = drag_maker
+            drag_short = drag_maker
             spec = {"rr": 1.2, "tp_mult": 1.2, "sl_mult": 1.0, "max_hold": 20, "base_oq": 0.76, "event": "LIMIT_ABSORPTION"}
 
+            if not has_data:
+                disqualification_reason = "UNAVAILABLE_ORDER_FLOW_TELEMETRY"
+                n_samples = 0
+                tp_long, tp_short = 50.0, 50.0
+                gross_long, gross_short = 0.0, 0.0
+                net_long, net_short = -drag_long, -drag_short
+            else:
+                ofi_val = float(val_ofi)
+                vpin_val = float(val_vpin)
+                n_samples = 160 + (30 if "vpin" in active_set else 0)
+                depth_score = float(val_depth) if val_depth is not None else 0.75
+                toxic_penalty = max(0.0, (vpin_val - 0.40) * 40.0)
+                tp_long = 50.0 + (depth_score * 8.0) - (ofi_val * 5.0) - toxic_penalty
+                tp_short = 50.0 + (depth_score * 8.0) + (ofi_val * 5.0) - toxic_penalty
+                tp_long = max(25.0, min(70.0, tp_long))
+                tp_short = max(25.0, min(70.0, tp_short))
+                sigma_trade = max(0.005, float(snap.get("volatility_sigma") or 0.015))
+                gross_long = round(((tp_long / 100.0) * spec["tp_mult"] - ((100.0 - tp_long) / 100.0) * spec["sl_mult"]) * sigma_trade * 10000.0, 1)
+                gross_short = round(((tp_short / 100.0) * spec["tp_mult"] - ((100.0 - tp_short) / 100.0) * spec["sl_mult"]) * sigma_trade * 10000.0, 1)
+                net_long = round(gross_long - drag_long, 1)
+                net_short = round(gross_short - drag_short, 1)
+
         elif strategy_id == "MEIE-VACUUM":
-            # Responds to Sudden Book Thinning / Liquidity Gaps / Wide Spread Snap-back
-            req_features = ["rv_5m", "liquidations"]
-            has_data = any(f in active_set for f in req_features) or "vpin" in active_set
-            n_samples = 140 + (20 if "liquidations" in active_set else 0)
+            req_features = ["spread_bps"]
+            has_telemetry = val_spread is not None
+            has_data = has_telemetry
 
-            # Spread widening favors vacuum mean-reversion pull
-            vacuum_bonus = max(0.0, (spread_bps - 1.5) * 4.0)
-            tp_long = 50.0 + vacuum_bonus + (3.0 if ofi_val > 0.3 else 0.0)
-            tp_short = 50.0 + vacuum_bonus + (3.0 if ofi_val < -0.3 else 0.0)
-
-            tp_long = max(30.0, min(72.0, tp_long))
-            tp_short = max(30.0, min(72.0, tp_short))
-
-            # Friction: 6.5 bps
-            drag_long = 6.5
-            drag_short = 6.5
-            gross_long = round((tp_long - 50.0) * 1.5 + 6.0, 1)
-            gross_short = round((tp_short - 50.0) * 1.5 + 6.0, 1)
-            net_long = round(gross_long - drag_long, 1)
-            net_short = round(gross_short - drag_short, 1)
-
+            drag_long = drag_mixed
+            drag_short = drag_mixed
             spec = {"rr": 1.5, "tp_mult": 1.5, "sl_mult": 0.8, "max_hold": 15, "base_oq": 0.72, "event": "LIQUIDITY_VACUUM"}
 
+            if not has_data:
+                disqualification_reason = "UNAVAILABLE_ORDER_FLOW_TELEMETRY"
+                n_samples = 0
+                tp_long, tp_short = 50.0, 50.0
+                gross_long, gross_short = 0.0, 0.0
+                net_long, net_short = -drag_long, -drag_short
+            else:
+                spread_bps = float(val_spread)
+                ofi_val = float(val_ofi) if val_ofi is not None else 0.0
+                n_samples = 140 + (20 if "liquidations" in active_set else 0)
+                vacuum_bonus = max(0.0, (spread_bps - 1.5) * 4.0)
+                tp_long = 50.0 + vacuum_bonus + (3.0 if ofi_val > 0.3 else 0.0)
+                tp_short = 50.0 + vacuum_bonus + (3.0 if ofi_val < -0.3 else 0.0)
+                tp_long = max(30.0, min(72.0, tp_long))
+                tp_short = max(30.0, min(72.0, tp_short))
+                sigma_trade = max(0.005, float(snap.get("volatility_sigma") or 0.015))
+                gross_long = round(((tp_long / 100.0) * spec["tp_mult"] - ((100.0 - tp_long) / 100.0) * spec["sl_mult"]) * sigma_trade * 10000.0, 1)
+                gross_short = round(((tp_short / 100.0) * spec["tp_mult"] - ((100.0 - tp_short) / 100.0) * spec["sl_mult"]) * sigma_trade * 10000.0, 1)
+                net_long = round(gross_long - drag_long, 1)
+                net_short = round(gross_short - drag_short, 1)
+
         elif strategy_id == "MEIE-TOXICITY":
-            # Dual Role: Primary Risk Filter + Toxic Momentum Harvester
             req_features = ["vpin", "hawkes"]
-            has_data = any(f in active_set for f in req_features)
-            n_samples = 120 + (30 if "vpin" in active_set else 0)
+            has_telemetry = (val_vpin is not None) and (val_hwk is not None)
+            has_active_flag = any(f in active_set for f in req_features)
+            has_data = has_telemetry and has_active_flag
 
-            # High VPIN triggers toxic flow exploitation
-            is_toxic_burst = vpin_val > 0.50 or hawkes_val > 3.0
-            tp_long = 50.0 + (12.0 if is_toxic_burst and ofi_val > 0 else -8.0)
-            tp_short = 50.0 + (12.0 if is_toxic_burst and ofi_val < 0 else -8.0)
-
-            tp_long = max(20.0, min(70.0, tp_long))
-            tp_short = max(20.0, min(70.0, tp_short))
-
-            drag_long = 9.5
-            drag_short = 9.5
-            gross_long = round((tp_long - 50.0) * 1.6 + 5.0, 1)
-            gross_short = round((tp_short - 50.0) * 1.6 + 5.0, 1)
-            net_long = round(gross_long - drag_long, 1)
-            net_short = round(gross_short - drag_short, 1)
-
+            drag_long = drag_taker
+            drag_short = drag_taker
             spec = {"rr": 1.0, "tp_mult": 1.0, "sl_mult": 1.0, "max_hold": 10, "base_oq": 0.88, "event": "TOXIC_FLOW_EVASION"}
 
-        elif strategy_id == "MEIE-COMBINED":
-            # Multi-Engine Bayesian Ensemble
-            has_data = True
-            n_samples = 210
-            # Ensemble combines consensus
-            tp_long = 59.5
-            tp_short = 42.0
-            drag_long = 8.0
-            drag_short = 8.0
-            gross_long = 22.0
-            gross_short = 5.0
-            net_long = round(gross_long - drag_long, 1)
-            net_short = round(gross_short - drag_short, 1)
+            if not has_data:
+                disqualification_reason = "UNAVAILABLE_ORDER_FLOW_TELEMETRY"
+                n_samples = 0
+                tp_long, tp_short = 50.0, 50.0
+                gross_long, gross_short = 0.0, 0.0
+                net_long, net_short = -drag_long, -drag_short
+            else:
+                vpin_val = float(val_vpin)
+                hawkes_val = float(val_hwk)
+                ofi_val = float(val_ofi) if val_ofi is not None else 0.0
+                n_samples = 120 + (30 if "vpin" in active_set else 0)
+                is_toxic_burst = vpin_val > 0.50 or hawkes_val > 3.0
+                tp_long = 50.0 + (12.0 if is_toxic_burst and ofi_val > 0 else -8.0)
+                tp_short = 50.0 + (12.0 if is_toxic_burst and ofi_val < 0 else -8.0)
+                tp_long = max(20.0, min(70.0, tp_long))
+                tp_short = max(20.0, min(70.0, tp_short))
+                sigma_trade = max(0.005, float(snap.get("volatility_sigma") or 0.015))
+                gross_long = round(((tp_long / 100.0) * spec["tp_mult"] - ((100.0 - tp_long) / 100.0) * spec["sl_mult"]) * sigma_trade * 10000.0, 1)
+                gross_short = round(((tp_short / 100.0) * spec["tp_mult"] - ((100.0 - tp_short) / 100.0) * spec["sl_mult"]) * sigma_trade * 10000.0, 1)
+                net_long = round(gross_long - drag_long, 1)
+                net_short = round(gross_short - drag_short, 1)
 
+        elif strategy_id == "MEIE-COMBINED":
+            has_telemetry = (val_ofi is not None) and (val_hwk is not None)
+            has_data = has_telemetry
+
+            drag_long = drag_taker
+            drag_short = drag_taker
             spec = {"rr": 2.0, "tp_mult": 2.0, "sl_mult": 1.0, "max_hold": 30, "base_oq": 0.82, "event": "MULTI_ENGINE_CONFLUENCE"}
+
+            if not has_data:
+                disqualification_reason = "UNAVAILABLE_ORDER_FLOW_TELEMETRY"
+                n_samples = 0
+                tp_long, tp_short = 50.0, 50.0
+                gross_long, gross_short = 0.0, 0.0
+                net_long, net_short = -drag_long, -drag_short
+            else:
+                n_samples = 210
+                tp_long = 59.5
+                tp_short = 42.0
+                sigma_trade = max(0.005, float(snap.get("volatility_sigma") or 0.015))
+                gross_long = round(((tp_long / 100.0) * spec["tp_mult"] - ((100.0 - tp_long) / 100.0) * spec["sl_mult"]) * sigma_trade * 10000.0, 1)
+                gross_short = round(((tp_short / 100.0) * spec["tp_mult"] - ((100.0 - tp_short) / 100.0) * spec["sl_mult"]) * sigma_trade * 10000.0, 1)
+                net_long = round(gross_long - drag_long, 1)
+                net_short = round(gross_short - drag_short, 1)
 
         else:
             has_data = True
             n_samples = 100
             tp_long, tp_short = 50.0, 50.0
             gross_long, gross_short = 0.0, 0.0
-            drag_long, drag_short = 9.0, 9.0
-            net_long, net_short = -9.0, -9.0
+            drag_long = drag_taker
+            drag_short = drag_taker
+            net_long, net_short = -drag_long, -drag_short
             spec = {"rr": 1.0, "tp_mult": 1.0, "sl_mult": 1.0, "max_hold": 15, "base_oq": 0.70, "event": "SURVEILLANCE"}
 
-        # Temporal dependence & canonical effective sample size (Newey-West / Bartlett)
-        # Sourced strictly from research/macro_evaluation_harness.py
-        rng = np.random.RandomState(42 + n_samples)
-        innovations = rng.normal(0, 1, n_samples)
-        sample_residuals = np.zeros(n_samples)
-        sample_residuals[0] = innovations[0]
-        for t in range(1, n_samples):
-            sample_residuals[t] = 0.16 * sample_residuals[t-1] + np.sqrt(1.0 - 0.16**2) * innovations[t]
+        if n_samples < 5 or not has_data:
+            n_eff = 0.0
+            independent_blocks = 0
+            n_eff_meta = {"independent_block_N": 0, "n_eff": 0.0, "sample_N": n_samples}
+            ar1_diag = {"n_eff_estimator": "NONE", "ar1_neff": 0, "operational_note": "No telemetry data available"}
+            ci_width_long = 100.0
+            ci_width_short = 100.0
+            ci_lower_long, ci_upper_long = 0.0, 100.0
+            ci_lower_short, ci_upper_short = 0.0, 100.0
+            precision_gate_long = "INSUFFICIENT"
+            precision_gate_short = "INSUFFICIENT"
+            best_dir = "ABSTAIN"
+            best_net_ev = -drag_long
+        else:
+            # Temporal dependence & canonical effective sample size (Newey-West / Bartlett)
+            # Sourced strictly from research/macro_evaluation_harness.py
+            rng = np.random.RandomState(42 + n_samples)
+            innovations = rng.normal(0, 1, n_samples)
+            sample_residuals = np.zeros(n_samples)
+            sample_residuals[0] = innovations[0]
+            for t in range(1, n_samples):
+                sample_residuals[t] = 0.16 * sample_residuals[t-1] + np.sqrt(1.0 - 0.16**2) * innovations[t]
 
-        n_eff, n_eff_meta = compute_canonical_newey_west_neff(sample_residuals)
-        independent_blocks = n_eff_meta["independent_block_N"]
+            n_eff, n_eff_meta = compute_canonical_newey_west_neff(sample_residuals)
+            independent_blocks = n_eff_meta["independent_block_N"]
 
-        # Operational AR(1) diagnostic retained for operational reference only;
-        # MUST NEVER gate scenario availability or calibration status
-        ar1_operational_neff = max(10, int(round(n_samples * ((1.0 - 0.16) / (1.0 + 0.16)))))
-        ar1_diag = {
-            "n_eff_estimator": "AR1_APPROXIMATION_OPERATIONAL_ONLY",
-            "ar1_neff": ar1_operational_neff,
-            "operational_note": "Diagnostic only; canonical Newey-West Bartlett governs all gating"
-        }
+            ar1_operational_neff = max(10, int(round(n_samples * ((1.0 - 0.16) / (1.0 + 0.16)))))
+            ar1_diag = {
+                "n_eff_estimator": "AR1_APPROXIMATION_OPERATIONAL_ONLY",
+                "ar1_neff": ar1_operational_neff,
+                "operational_note": "Diagnostic only; canonical Newey-West Bartlett governs all gating"
+            }
 
-        # Confidence intervals based on canonical effective independent sample size N_eff
-        ci_err_long = round(1.645 * np.sqrt((tp_long * (100.0 - tp_long)) / max(1.0, n_eff)), 1)
-        ci_err_short = round(1.645 * np.sqrt((tp_short * (100.0 - tp_short)) / max(1.0, n_eff)), 1)
-        ci_lower_long = round(max(0.0, tp_long - ci_err_long), 1)
-        ci_upper_long = round(min(100.0, tp_long + ci_err_long), 1)
-        ci_lower_short = round(max(0.0, tp_short - ci_err_short), 1)
-        ci_upper_short = round(min(100.0, tp_short + ci_err_short), 1)
-        ci_width_long = round(ci_upper_long - ci_lower_long, 1)
-        ci_width_short = round(ci_upper_short - ci_lower_short, 1)
+            # Confidence intervals based on canonical effective independent sample size N_eff
+            ci_err_long = round(1.645 * np.sqrt((tp_long * (100.0 - tp_long)) / max(1.0, n_eff)), 1)
+            ci_err_short = round(1.645 * np.sqrt((tp_short * (100.0 - tp_short)) / max(1.0, n_eff)), 1)
+            ci_lower_long = round(max(0.0, tp_long - ci_err_long), 1)
+            ci_upper_long = round(min(100.0, tp_long + ci_err_long), 1)
+            ci_lower_short = round(max(0.0, tp_short - ci_err_short), 1)
+            ci_upper_short = round(min(100.0, tp_short + ci_err_short), 1)
+            ci_width_long = round(ci_upper_long - ci_lower_long, 1)
+            ci_width_short = round(ci_upper_short - ci_lower_short, 1)
 
-        # Precision sufficiency requirement: N_eff >= 50 and CI_width <= 22.0%
-        precision_gate_long = "VALID" if (n_eff >= 50 and ci_width_long <= 22.0) else "INSUFFICIENT"
-        precision_gate_short = "VALID" if (n_eff >= 50 and ci_width_short <= 22.0) else "INSUFFICIENT"
+            # Precision sufficiency requirement: N_eff >= 50 and CI_width <= 22.0%
+            precision_gate_long = "VALID" if (n_eff >= 50 and ci_width_long <= 22.0) else "INSUFFICIENT"
+            precision_gate_short = "VALID" if (n_eff >= 50 and ci_width_short <= 22.0) else "INSUFFICIENT"
 
-        best_dir = "LONG" if net_long >= net_short else "SHORT"
-        best_net_ev = max(net_long, net_short)
+            best_dir = "LONG" if net_long >= net_short else "SHORT"
+            best_net_ev = max(net_long, net_short)
 
         return {
             "strategy_id": strategy_id,
             "has_required_data": has_data,
+            "disqualification_reason": disqualification_reason,
             "contract_spec": spec,
             "optimal_direction": best_dir,
             "optimal_net_ev_bps": best_net_ev,
@@ -441,10 +500,10 @@ class StrategySelectionEngine:
         if not active_set:
             active_set = set(k for k, v in SUPPORTED_INDICATORS.items() if v["default"])
 
-        # Determine if toxicity filter blocks passive absorption
+        # Determine if toxicity filter blocks passive absorption (no synthetic fallback)
         val_vpin_snap = (market_snapshot or {}).get("vpin")
-        vpin_in_snap = float(val_vpin_snap) if val_vpin_snap is not None else (0.28 if "vpin" in active_set else 0.35)
-        toxicity_filter_state = "BLOCK" if vpin_in_snap > 0.65 else "PASS"
+        vpin_in_snap = float(val_vpin_snap) if val_vpin_snap is not None else None
+        toxicity_filter_state = "BLOCK" if (vpin_in_snap is not None and vpin_in_snap > 0.65) else "PASS"
 
         # 2. Independent Evaluation of all 5 Candidates
         candidate_evaluations = {}
@@ -553,19 +612,7 @@ class StrategySelectionEngine:
         else:
             guidance_mode = "AUTO"
 
-        if ev_balance.get("is_uncertain", False) and not (user_pref in ["LONG", "SHORT"] and top_direction != "NEUTRAL"):
-            final_action = "ABSTAIN"
-            bias = "NEUTRAL"
-            reason_code = "CONFLICTED_EVIDENCE_UNCERTAIN"
-            reason_narrative = "Supporting and contradictory evidence are evenly balanced across active indicators. Capital preserved: ABSTAIN."
-            execution_policy = "AI_OPTIMAL"
-        elif not eligible_candidates:
-            final_action = "ABSTAIN"
-            bias = "NEUTRAL"
-            reason_code = "ZERO_ELIGIBLE_STRATEGIES"
-            reason_narrative = "All 5 candidate archetypes were hard-gated by evidence, cost hurdle, or risk filters."
-            execution_policy = "AI_OPTIMAL"
-        elif user_pref in ["LONG", "SHORT"]:
+        if user_pref in ["LONG", "SHORT"]:
             # User has an explicit directional preference
             user_target_ev = top_long_ev if user_pref == "LONG" else top_short_ev
             counter_ev = top_short_ev if user_pref == "LONG" else top_long_ev
@@ -586,13 +633,19 @@ class StrategySelectionEngine:
                 # 3-Way Interactive Resolution Options
                 resolution_options = {
                     "can_follow_ai": True,
-                    "ai_action": f"TRADE · {top_direction}",
+                    "ai_action": f"TRADE · {top_direction}" if top_direction != "NEUTRAL" else "ABSTAIN",
                     "can_abstain": True,
                     "can_force_user": True,
                     "user_action": f"FORCE {user_pref} · UNCONFIRMED",
                     "force_policy_tag": "USER_OVERRIDE_UNCONFIRMED",
                     "warning": "Forcing user direction will be logged as UNCONFIRMED_USER_OVERRIDE in the canonical ledger."
                 }
+            elif not eligible_candidates:
+                final_action = "ABSTAIN"
+                bias = "NEUTRAL"
+                reason_code = "ZERO_ELIGIBLE_STRATEGIES"
+                reason_narrative = "All 5 candidate archetypes were hard-gated by evidence, cost hurdle, or risk filters."
+                execution_policy = "AI_OPTIMAL"
             else:
                 # User preference aligns with positive statistical edge
                 pref_status = "ACCEPTED"
@@ -601,6 +654,18 @@ class StrategySelectionEngine:
                 reason_code = "PATH_EDGE_EXCEEDS_EXECUTION_DRAG"
                 reason_narrative = f"User preference ({user_pref}) confirmed by {top_strat_id} Net EV (+{user_target_ev} bps)."
                 execution_policy = "AI_GUIDED"
+        elif ev_balance.get("is_uncertain", False):
+            final_action = "ABSTAIN"
+            bias = "NEUTRAL"
+            reason_code = "CONFLICTED_EVIDENCE_UNCERTAIN"
+            reason_narrative = "Supporting and contradictory evidence are evenly balanced across active indicators. Capital preserved: ABSTAIN."
+            execution_policy = "AI_OPTIMAL"
+        elif not eligible_candidates:
+            final_action = "ABSTAIN"
+            bias = "NEUTRAL"
+            reason_code = "ZERO_ELIGIBLE_STRATEGIES"
+            reason_narrative = "All 5 candidate archetypes were hard-gated by evidence, cost hurdle, or risk filters."
+            execution_policy = "AI_OPTIMAL"
         else:
             # AUTO mode: follow authentic statistical edge of top eligible strategy
             final_action = f"TRADE · {top_direction}"

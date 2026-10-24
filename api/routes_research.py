@@ -25,15 +25,259 @@ import json
 import hashlib
 import re
 import logging
+from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 from fastapi import APIRouter, HTTPException, Query, Path
 from pydantic import BaseModel, Field
+
+from engine.smart_entry_engine import SmartEntryDecisionEngine
 
 logger = logging.getLogger("btcognitive.research")
 
 router = APIRouter(prefix="/api/research", tags=["Research Results"])
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+ALLOWED_SMART_ENTRY_TIMEFRAMES = {"1m", "5m", "15m", "1h", "4h", "1d"}
+DEFAULT_SMART_ENTRY_INDICTORS = ["ofi", "hawkes", "vpin", "rv_5m", "liquidations"]
+
+
+class SmartEntryCandleModel(BaseModel):
+    timestamp_utc: Optional[str] = None
+    open: Optional[float] = None
+    high: Optional[float] = None
+    low: Optional[float] = None
+    close: Optional[float] = None
+
+
+class SmartEntrySnapshotRequest(BaseModel):
+    instrument: str = Field(..., description="BTC-USD only")
+    timeframe: str = Field(default="1h")
+    timestamp_utc: str = Field(..., description="Research snapshot timestamp in UTC ISO-8601 format")
+    live_price: Optional[float] = Field(default=None, gt=0)
+    candles: List[SmartEntryCandleModel] = Field(default_factory=list)
+    market_snapshot: Dict[str, Any] = Field(default_factory=dict)
+    enabled_indicators: List[str] = Field(default_factory=lambda: DEFAULT_SMART_ENTRY_INDICTORS.copy())
+    regime: str = "VOL_EXPANDING"
+    c2_health: str = "CALIBRATED"
+    user_direction_preference: str = "AUTO"
+    selective_threshold: float = 0.60
+    cost_scenario: str = "COINBASE_RETAIL_87BPS"
+
+
+def _parse_timestamp_utc(value: Optional[str]) -> datetime:
+    if value is None or str(value).strip() == "":
+        raise ValueError("timestamp_utc is required.")
+    text = str(value).strip()
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    dt = datetime.fromisoformat(text)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _expected_cadence_seconds(timeframe: str) -> int:
+    mapping = {
+        "1m": 60,
+        "5m": 300,
+        "15m": 900,
+        "1h": 3600,
+        "4h": 14400,
+        "1d": 86400,
+    }
+    return mapping.get(str(timeframe).strip().lower(), 3600)
+
+
+def _validate_candle_cadence(candles: List[Dict[str, Any]], timeframe: str) -> Optional[str]:
+    if len(candles) < 2:
+        return None
+    expected_seconds = _expected_cadence_seconds(timeframe)
+    tolerance_seconds = max(5, expected_seconds // 10)
+    ordered = sorted(candles, key=lambda candle: _parse_timestamp_utc(candle.get("timestamp_utc") or candle.get("timestamp")))
+    for idx in range(1, len(ordered)):
+        prev_dt = _parse_timestamp_utc(ordered[idx - 1].get("timestamp_utc") or ordered[idx - 1].get("timestamp"))
+        curr_dt = _parse_timestamp_utc(ordered[idx].get("timestamp_utc") or ordered[idx].get("timestamp"))
+        delta = abs(int((curr_dt - prev_dt).total_seconds()))
+        if delta < expected_seconds - tolerance_seconds or delta > expected_seconds + tolerance_seconds:
+            return (
+                f"Candle cadence is inconsistent with timeframe '{timeframe}'. "
+                f"Expected ~{expected_seconds}s steps, found {delta}s between candles {idx - 1} and {idx}."
+            )
+    return None
+
+
+def _smart_entry_abstain_response(reason: str, *, decision_action: str = "ABSTAIN", data_quality_status: str = "INSUFFICIENT_EVIDENCE", missing_inputs: Optional[List[str]] = None, details: Optional[Dict[str, Any]] = None, instrument: Optional[str] = None, timeframe: Optional[str] = None, timestamp_utc: Optional[str] = None) -> Dict[str, Any]:
+    payload = {
+        "status": "ABSTAIN",
+        "decision_action": decision_action,
+        "data_quality_status": data_quality_status,
+        "instrument": instrument or "BTC-USD",
+        "timeframe": timeframe,
+        "timestamp_utc": timestamp_utc,
+        "direction": None,
+        "candidate": None,
+        "resolution": None,
+        "acceptance_status": "ABSTAIN",
+        "reasons": [reason],
+        "missing_inputs": list(missing_inputs or []),
+        "details": details or {},
+        "execution_authorization": "DISABLED — ANALYSIS ONLY",
+        "governance_status": "OFFLINE_RESEARCH_ONLY",
+    }
+    return payload
+
+
+@router.post("/smart-entry")
+def evaluate_smart_entry_snapshot(snapshot: SmartEntrySnapshotRequest):
+    """Evaluate a supplied BTCUSD research snapshot through the research-only smart entry engine."""
+    instrument = str(snapshot.instrument or "").strip().upper()
+    if instrument != "BTC-USD":
+        raise HTTPException(status_code=400, detail="Only BTC-USD is supported for Smart Entry evaluation.")
+
+    timeframe = str(snapshot.timeframe or "1h").strip().lower()
+    if timeframe not in ALLOWED_SMART_ENTRY_TIMEFRAMES:
+        raise HTTPException(status_code=400, detail=f"Unsupported timeframe '{snapshot.timeframe}'. Supported: {sorted(ALLOWED_SMART_ENTRY_TIMEFRAMES)}")
+
+    try:
+        snapshot_ts = _parse_timestamp_utc(snapshot.timestamp_utc)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    now_utc = datetime.now(timezone.utc)
+    age_hours = (now_utc - snapshot_ts).total_seconds() / 3600.0
+    if age_hours > 12.0:
+        return _smart_entry_abstain_response(
+            "Snapshot is stale beyond 12 hours and cannot be evaluated safely.",
+            decision_action="ABSTAIN",
+            data_quality_status="STALE",
+            missing_inputs=["timestamp_utc"],
+            details={"snapshot_age_hours": round(age_hours, 3)},
+        instrument=instrument,
+        timeframe=timeframe,
+        timestamp_utc=snapshot.timestamp_utc,
+    )
+
+    candle_rows = []
+    for idx, candle in enumerate(snapshot.candles):
+        if candle.close is None or candle.open is None or candle.high is None or candle.low is None:
+            return _smart_entry_abstain_response(
+                "One or more candle values are missing.",
+                decision_action="ABSTAIN",
+                data_quality_status="INSUFFICIENT_EVIDENCE",
+                missing_inputs=[f"candles[{idx}].open|high|low|close"],
+                instrument=instrument,
+                timeframe=timeframe,
+                timestamp_utc=snapshot.timestamp_utc,
+            )
+        values = [float(candle.open), float(candle.high), float(candle.low), float(candle.close)]
+        if any(not (float(v) > 0.0) for v in values):
+            return _smart_entry_abstain_response(
+                "Candle OHLC values must be positive and finite.",
+                decision_action="ABSTAIN",
+                data_quality_status="INSUFFICIENT_EVIDENCE",
+                missing_inputs=[f"candles[{idx}]"],
+                instrument=instrument,
+                timeframe=timeframe,
+                timestamp_utc=snapshot.timestamp_utc,
+            )
+        candle_rows.append({
+            "timestamp_utc": candle.timestamp_utc or snapshot.timestamp_utc,
+            "open": float(candle.open),
+            "high": float(candle.high),
+            "low": float(candle.low),
+            "close": float(candle.close),
+        })
+
+    cadence_error = _validate_candle_cadence(candle_rows, timeframe)
+    if cadence_error is not None:
+        return _smart_entry_abstain_response(
+            cadence_error,
+            decision_action="ABSTAIN",
+            data_quality_status="INVALID_TIMEFRAME_CADENCE",
+            missing_inputs=["candles"],
+            instrument=instrument,
+            timeframe=timeframe,
+            timestamp_utc=snapshot.timestamp_utc,
+            details={"expected_seconds": _expected_cadence_seconds(timeframe)},
+        )
+
+    missing_inputs: List[str] = []
+    if snapshot.live_price is None and not candle_rows:
+        missing_inputs.append("live_price")
+    if not snapshot.market_snapshot:
+        missing_inputs.append("market_snapshot")
+    if not snapshot.enabled_indicators:
+        missing_inputs.append("enabled_indicators")
+
+    if missing_inputs:
+        return _smart_entry_abstain_response(
+            "Required Smart Entry inputs are missing or insufficient.",
+            decision_action="ABSTAIN",
+            data_quality_status="INSUFFICIENT_EVIDENCE",
+            missing_inputs=missing_inputs,
+        )
+
+    live_price = float(snapshot.live_price) if snapshot.live_price is not None else float(candle_rows[-1]["close"])
+    if not (float(live_price) > 0):
+        return _smart_entry_abstain_response(
+            "Live price is invalid or non-positive.",
+            decision_action="ABSTAIN",
+            data_quality_status="INSUFFICIENT_EVIDENCE",
+            missing_inputs=["live_price"],
+        )
+
+    engine = SmartEntryDecisionEngine()
+    result = engine.evaluate_market(
+        live_price=live_price,
+        candles=candle_rows,
+        enabled_indicators=list(snapshot.enabled_indicators),
+        market_snapshot=dict(snapshot.market_snapshot or {}),
+        regime=snapshot.regime,
+        c2_health=snapshot.c2_health,
+        user_direction_preference=snapshot.user_direction_preference,
+        selective_threshold=float(snapshot.selective_threshold),
+        cost_scenario=snapshot.cost_scenario,
+        horizon=timeframe,
+    )
+
+    decision = {
+        "status": result.get("status", "ABSTAIN"),
+        "decision_action": result.get("decision_action", "ABSTAIN"),
+        "instrument": instrument,
+        "timeframe": timeframe,
+        "timestamp_utc": snapshot.timestamp_utc,
+        "decision_timestamp_utc": snapshot.timestamp_utc,
+        "data_quality_status": "VALID" if result.get("status") == "SUCCESS" else "INSUFFICIENT_EVIDENCE",
+        "direction": (
+            result.get("direction")
+            or (
+                (result.get("selection") or {}).get("synthesis", {}).get("final_action", "NEUTRAL")
+                .split(" · ")[-1]
+                .strip()
+            )
+            or "NEUTRAL"
+        ),
+        "selected_strategy_id": result.get("selected_strategy_id") or (result.get("selection") or {}).get("selected_strategy_id") or "NONE",
+        "market_regime": snapshot.regime,
+        "candidate": result.get("candidate"),
+        "resolution": result.get("resolution"),
+        "selection": result.get("selection"),
+        "acceptance_status": "ACCEPTED" if result.get("status") == "SUCCESS" else "REJECTED",
+        "reasons": [result.get("primary_reason")] if result.get("primary_reason") else [],
+        "missing_inputs": [],
+        "uncertainty": result.get("selection", {}).get("synthesis", {}).get("confidence") if isinstance(result.get("selection"), dict) else None,
+        "modern_econometrics": result.get("modern_econometrics"),
+        "spot_execution_advisory": result.get("spot_execution_advisory"),
+        "execution_authorization": result.get("execution_authorization", "DISABLED — ANALYSIS ONLY"),
+        "governance_status": result.get("governance_status", "OFFLINE_RESEARCH_ONLY"),
+    }
+
+    if result.get("status") == "ABSTAIN":
+        decision["acceptance_status"] = "ABSTAIN"
+        decision["reasons"] = [result.get("primary_reason") or "Smart Entry engine abstained due to insufficient evidence."]
+    return decision
+
 
 # ---------------------------------------------------------------------------
 # Strict Allowlist of Registered Research Reports
@@ -1662,7 +1906,46 @@ def get_entry_quality(
     }
 
 
+@router.get("/empirical-remediation-report")
+def get_empirical_remediation_report():
+    """Returns the empirical replay remediation, data audit, and first-passage evaluation results."""
+    report_path = os.path.join(REPO_ROOT, "research", "v32_17_empirical_remediation_and_first_passage_report.md")
+    audit_path = os.path.join(REPO_ROOT, "research", "data_audit_summary.json")
+    replay_path = os.path.join(REPO_ROOT, "research", "rigorous_replay_results_v2.json")
+    har_path = os.path.join(REPO_ROOT, "research", "har_calibration_results.json")
 
+    audit_data = {}
+    if os.path.exists(audit_path):
+        with open(audit_path, "r", encoding="utf-8") as f:
+            audit_data = json.load(f)
 
+    replay_data = {}
+    if os.path.exists(replay_path):
+        with open(replay_path, "r", encoding="utf-8") as f:
+            replay_data = json.load(f)
 
+    har_data = {}
+    if os.path.exists(har_path):
+        with open(har_path, "r", encoding="utf-8") as f:
+            har_data = json.load(f)
 
+    markdown_content = ""
+    if os.path.exists(report_path):
+        with open(report_path, "r", encoding="utf-8") as f:
+            markdown_content = f.read()
+
+    return {
+        "report_id": "BTC-REP-V32.17-EMPIRICAL-REMEDIATION-01",
+        "title": "Empirical Replay Remediation, First-Passage Diffusion Baseline, and Methodological Audit",
+        "status": "COMPLETED_AUDITED",
+        "governed_decisions": {
+            "research_experiment": "REJECT_HANDSET_EDGE_RETAIN_BENCHMARK_RESEARCH_ONLY",
+            "prospective_evidence": "COLLECTING_V2",
+            "model_authorization": "OFFLINE_RESEARCH_ONLY",
+            "live_trading": "DISABLED",
+        },
+        "data_audit": audit_data,
+        "rigorous_replay": replay_data,
+        "har_calibration": har_data,
+        "report_markdown": markdown_content,
+    }

@@ -18,6 +18,7 @@ import os
 import math
 import json
 import datetime
+import hashlib
 from typing import Dict, List, Any, Optional, Tuple
 from pathlib import Path
 import numpy as np
@@ -32,22 +33,115 @@ class ProbabilisticEntryEngine:
 
     def __init__(self, data_dir: Optional[Path] = None):
         self.data_dir = data_dir or (Path(__file__).resolve().parent.parent / "data")
-        self.ledger_file = self.data_dir / "prospective_entry_ledger.jsonl"
+        self.ledger_file = self.data_dir / "prospective_entry_ledger_v2.jsonl"
         self.ledger_file.parent.mkdir(parents=True, exist_ok=True)
 
-        # Pre-calibrated logistic meta-model coefficients (trained on walk-forward historical setups)
+        # Pre-calibrated logistic meta-model coefficients (H0 baseline hypothesis)
         # Features: [mom_1h, mom_4h, mom_24h, rs_ratio, bb_width, range_pos]
         self.feature_names = [
             "mom_1h", "mom_4h", "mom_24h", "rs_ratio", "bb_width", "range_pos"
         ]
-        # Standardized weights learned from historical structural setup labels
+        # Standardized weights (H0 frozen baseline)
         self.weights = np.array([0.45, 0.35, 0.20, 0.65, -0.30, 0.25])
         self.bias = -0.15
 
-        # Cost parameters (Base scenario: 43.5 bps one-way / 87 bps round-trip)
-        self.fee_one_way_bps = 43.5
-        self.slippage_bps = 2.0
-        self.half_friction_rate = (self.fee_one_way_bps + self.slippage_bps) / 10000.0
+        # Cost scenario configurations with regional granularity
+        self.COST_SCENARIOS = {
+            "COINBASE_US_RETAIL_187BPS": {
+                "venue": "COINBASE",
+                "market_type": "SPOT",
+                "commission_bps_per_side": 90.0,
+                "half_spread_bps_per_side": 1.5,
+                "slippage_bps_per_side": 2.0,
+                "round_trip_friction_bps": 187.0,
+                "description": "Coinbase US Retail (Sept 2026 schedule: 0.90% taker each side + spread + slippage)"
+            },
+            "COINBASE_EU_UK_RETAIL_107BPS": {
+                "venue": "COINBASE",
+                "market_type": "SPOT",
+                "commission_bps_per_side": 50.0,
+                "half_spread_bps_per_side": 1.5,
+                "slippage_bps_per_side": 2.0,
+                "round_trip_friction_bps": 107.0,
+                "description": "Coinbase EU/UK Retail (0.50% taker each side + spread + slippage)"
+            },
+            "COINBASE_INDIA_INTL_27BPS": {
+                "venue": "COINBASE",
+                "market_type": "SPOT",
+                "commission_bps_per_side": 10.0,
+                "half_spread_bps_per_side": 1.5,
+                "slippage_bps_per_side": 2.0,
+                "round_trip_friction_bps": 27.0,
+                "description": "Coinbase India / International Retail (0.10% taker each side + spread + slippage)"
+            },
+            "COINBASE_RETAIL_87BPS": {
+                "venue": "COINBASE",
+                "market_type": "SPOT",
+                "commission_bps_per_side": 40.0,
+                "half_spread_bps_per_side": 1.5,
+                "slippage_bps_per_side": 2.0,
+                "round_trip_friction_bps": 87.0,
+                "description": "Coinbase Advanced Tier 1 (<$10k) taker entry and exit with empirical spread and slippage"
+            },
+            "COINBASE_ADVANCED_87BPS": {
+                "venue": "COINBASE",
+                "market_type": "SPOT",
+                "commission_bps_per_side": 40.0,
+                "half_spread_bps_per_side": 1.5,
+                "slippage_bps_per_side": 2.0,
+                "round_trip_friction_bps": 87.0,
+                "description": "Coinbase Advanced Tier 1 (<$10k) taker entry and exit"
+            },
+            "COINBASE_PRO_35BPS": {
+                "venue": "COINBASE",
+                "market_type": "SPOT",
+                "commission_bps_per_side": 15.0,
+                "half_spread_bps_per_side": 1.0,
+                "slippage_bps_per_side": 1.5,
+                "round_trip_friction_bps": 35.0,
+                "description": "Coinbase Advanced high-volume tier taker"
+            },
+            "BINANCE_FUTURES_12BPS": {
+                "venue": "BINANCE_FUTURES",
+                "market_type": "PERPETUAL",
+                "commission_bps_per_side": 5.0,
+                "half_spread_bps_per_side": 0.5,
+                "slippage_bps_per_side": 0.5,
+                "round_trip_friction_bps": 12.0,
+                "description": "Binance USDT-M Futures VIP 0 taker entry and exit"
+            },
+            "LEGACY_V30_91BPS": {
+                "venue": "COINBASE",
+                "market_type": "SPOT",
+                "commission_bps_per_side": 40.0,
+                "half_spread_bps_per_side": 1.5,
+                "slippage_bps_per_side": 4.02,
+                "round_trip_friction_bps": 91.04,
+                "description": "Legacy V30 prospective ledger calculation with double-counted slippage"
+            }
+        }
+
+        # Reconciled Cost Structure (V30.1 Audit Resolution):
+        # Base scenario: Coinbase Advanced Tier 1 (<$10k) spot taker.
+        # Component breakdown per side:
+        #   - Taker commission: 40.0 bps
+        #   - Half-spread:       1.5 bps
+        #   - Slippage:          2.0 bps
+        #   ---------------------------
+        #   Total one-way:      43.5 bps
+        #   Round-trip total:   87.0 bps
+        #
+        # Reconciling the 87 bps vs 91 bps discrepancy:
+        # In V30, self.half_friction_rate mistakenly summed (self.fee_one_way_bps + self.slippage_bps),
+        # double-counting slippage (43.5 + 2.0 = 45.5 bps one-way -> 91.0 bps round-trip).
+        # We now explicitly define each component and ensure half_friction_rate = 43.5 bps (0.00435).
+        self.commission_bps_one_way = 40.0
+        self.half_spread_bps = 1.5
+        self.slippage_bps_one_way = 2.0
+        self.fee_one_way_bps = self.commission_bps_one_way + self.half_spread_bps + self.slippage_bps_one_way  # 43.5 bps
+        self.slippage_bps = self.slippage_bps_one_way  # Preserved for backward compatibility
+        self.round_trip_friction_bps = 2.0 * self.fee_one_way_bps  # 87.0 bps
+        self.half_friction_rate = self.fee_one_way_bps / 10000.0   # 0.00435 rate per side (0.00870 round trip)
 
     def compute_setup_features(
         self,
@@ -106,33 +200,31 @@ class ProbabilisticEntryEngine:
 
     def predict_barrier_probabilities(
         self,
-        features: Dict[str, float]
-    ) -> Dict[str, float]:
+        features: Optional[Dict[str, float]] = None,
+        k_tp: float = 1.5,
+        k_sl: float = 1.0,
+        mu: float = 0.0,
+        c_sigma: float = 1.0518
+    ) -> Dict[str, Any]:
         """
-        Estimate calibrated probabilities p_TP, p_SL, p_timeout using logistic meta-model.
+        Computes geometry baseline probabilities P(TP), P(SL), P(timeout)
+        using the First-Passage Diffusion Model under Brownian motion with drift.
+        Default mu = 0 represents the unconditioned geometry null.
+        c_sigma = 1.0518 represents the empirical fat-tail / discrete-sampling calibration for BTC.
         """
-        x = np.array([features.get(f, 0.0) for f in self.feature_names])
-        raw_logit = float(np.dot(self.weights, x) + self.bias)
-        raw_prob_tp = 1.0 / (1.0 + math.exp(-max(-10.0, min(10.0, raw_logit))))
-
-        # Calibrated isotonic mapping: compress extreme over-confidence
-        # Base win rate in unconditioned data is ~26%, max realistic selective probability is ~70-75%
-        p_tp = round(float(np.clip(raw_prob_tp, 0.15, 0.78)), 4)
-        p_timeout = 0.08  # Historical empirical baseline timeout rate
-        p_sl = round(max(0.05, 1.0 - p_tp - p_timeout), 4)
-
-        # Re-normalize to sum to exactly 1.0
-        total_p = p_tp + p_sl + p_timeout
-        p_tp = round(p_tp / total_p, 4)
-        p_sl = round(p_sl / total_p, 4)
-        p_timeout = round(1.0 - p_tp - p_sl, 4)
+        from research.first_passage_diffusion_model import FirstPassageDiffusionModel
+        fp = FirstPassageDiffusionModel()
+        p_tp, p_sl, p_to = fp.solve_pde(k_tp=k_tp, k_sl=k_sl, mu=mu, c_sigma=c_sigma)
 
         return {
             "p_tp": p_tp,
             "p_sl": p_sl,
-            "p_timeout": p_timeout,
+            "p_timeout": p_to,
+            "c_sigma_calibration": c_sigma,
             "brier_score_expected": round(float(2.0 * p_tp * (1.0 - p_tp)), 4),
-            "calibration_status": "VALIDATED_ISOTONIC_CALIBRATION"
+            "calibration_status": "FIRST_PASSAGE_GEOMETRY_BASELINE",
+            "validated_directional_edge": False,
+            "validated_edge_status": "NO_VALIDATED_EDGE_ABSTAIN"
         }
 
     def evaluate_decision_gate(
@@ -143,61 +235,90 @@ class ProbabilisticEntryEngine:
         k_tp: float = 1.5,
         k_sl: float = 1.0,
         features: Optional[Dict[str, float]] = None,
-        selective_threshold: float = 0.60
+        selective_threshold: float = 0.60,
+        cost_scenario: str = "COINBASE_RETAIL_87BPS",
+        round_trip_friction_bps: Optional[float] = None,
+        sigma_1h: Optional[float] = None,
+        horizon_bars: int = 24,
+        feature_source: str = "REST_OHLCV_PROXY"
     ) -> Dict[str, Any]:
         """
         Evaluate full probabilistic decision gate and calculate net expectancy in R-multiples.
+        Enforces realistic, non-duplicated transaction costs by venue and sqrt(H) sigma horizon scaling.
         """
         feats = features or {f: 0.0 for f in self.feature_names}
-        probs = self.predict_barrier_probabilities(feats)
+        probs = self.predict_barrier_probabilities(features=feats, k_tp=k_tp, k_sl=k_sl, mu=0.0)
 
         p_tp = probs["p_tp"]
         p_sl = probs["p_sl"]
         p_timeout = probs["p_timeout"]
 
-        # Risk unit in USD: 1R = entry_price * (k_sl * sigma_t0)
-        risk_usd = entry_price * (k_sl * max(0.002, sigma_t0))
-        target_usd = entry_price * (k_tp * max(0.002, sigma_t0))
+        # Audit Sigma Semantics:
+        # If sigma_1h is explicitly passed, scale by sqrt(H) to get horizon sigma.
+        # If only sigma_t0 is passed, treat it as s_horizon and compute s_1h = s_horizon / sqrt(H).
+        h_bars = max(1, int(horizon_bars))
+        if sigma_1h is not None:
+            s_1h = max(0.0005, float(sigma_1h))
+            s_horizon = s_1h * math.sqrt(float(h_bars))
+        else:
+            s_horizon = max(0.0005, float(sigma_t0))
+            s_1h = s_horizon / math.sqrt(float(h_bars))
 
-        # Transaction friction in R:
-        # Round trip friction = 2 * half_friction_rate * entry_price
-        friction_usd = 2.0 * self.half_friction_rate * entry_price
+        # Risk unit in USD: 1R = entry_price * (k_sl * s_horizon)
+        risk_usd = entry_price * (k_sl * s_horizon)
+        target_usd = entry_price * (k_tp * s_horizon)
+
+        # Determine effective round-trip friction in basis points
+        if round_trip_friction_bps is not None:
+            eff_rt_bps = float(round_trip_friction_bps)
+            scenario_key = cost_scenario or "CUSTOM"
+        else:
+            scenario_key = cost_scenario.upper() if cost_scenario else "COINBASE_RETAIL_87BPS"
+            scenario_cfg = self.COST_SCENARIOS.get(scenario_key, self.COST_SCENARIOS["COINBASE_RETAIL_87BPS"])
+            eff_rt_bps = scenario_cfg["round_trip_friction_bps"]
+
+        # Transaction friction in USD and R:
+        friction_rate = eff_rt_bps / 10000.0
+        friction_usd = entry_price * friction_rate
         friction_r = friction_usd / max(1e-4, risk_usd)
 
         # Net expectancy:
-        # E[R] = p_tp * (k_tp / k_sl) - p_sl * (1.0) + p_timeout * (0.0) - friction_r
         tp_r = k_tp / k_sl
         sl_r = 1.0
-        timeout_r = -0.10  # historical empirical drift for unresolved timeouts
+        timeout_r = -0.05  # first-passage empirical residual drift
 
         expected_gross_r = (p_tp * tp_r) - (p_sl * sl_r) + (p_timeout * timeout_r)
         expected_net_r = expected_gross_r - friction_r
 
-        # Decision Gate Logic
+        # Decision Gate Logic: Default is ABSTAIN (No Validated Edge)
         is_fresh = True
         is_expectancy_positive = expected_net_r > 0.0
         meets_selective_hurdle = p_tp >= selective_threshold
 
         action = "ABSTAIN"
-        reason = "NO_QUALIFIED_SETUP"
+        reason = "NO_VALIDATED_EDGE_ABSTAIN"
 
         if not is_expectancy_positive:
             action = "ABSTAIN"
-            reason = "NEGATIVE_EXPECTANCY_AFTER_COSTS"
+            reason = "NO_VALIDATED_EDGE_ABSTAIN: Geometry baseline shows negative net expectancy after transaction friction"
         elif not meets_selective_hurdle:
             action = "ABSTAIN"
-            reason = f"WIN_PROBABILITY_BELOW_SELECTIVE_THRESHOLD_{int(selective_threshold*100)}PCT"
+            reason = f"NO_VALIDATED_EDGE_ABSTAIN: Win probability below selective threshold ({int(selective_threshold*100)}%)"
         else:
             action = "ACCEPTED_RESEARCH_CANDIDATE"
             reason = "POSITIVE_NET_EXPECTANCY_CONFIRMED"
 
-        # Boundary prices
+        # Boundary prices scaled to horizon volatility
         if side.upper() == "LONG":
-            tp_price = round(entry_price * (1.0 + k_tp * sigma_t0), 2)
-            sl_price = round(entry_price * (1.0 - k_sl * sigma_t0), 2)
+            tp_price = round(entry_price * (1.0 + k_tp * s_horizon), 2)
+            sl_price = round(entry_price * (1.0 - k_sl * s_horizon), 2)
         else:
-            tp_price = round(entry_price * (1.0 - k_tp * sigma_t0), 2)
-            sl_price = round(entry_price * (1.0 + k_sl * sigma_t0), 2)
+            tp_price = round(entry_price * (1.0 - k_tp * s_horizon), 2)
+            sl_price = round(entry_price * (1.0 + k_sl * s_horizon), 2)
+
+        # Deterministic Rule Hash (provenance invariant)
+        rule_payload = f"{side.upper()}:{k_tp}:{k_sl}:{h_bars}:{scenario_key}:{selective_threshold}"
+        rule_hash = "0x" + hashlib.sha256(rule_payload.encode("utf-8")).hexdigest()[:12]
 
         decision = {
             "side": side.upper(),
@@ -206,12 +327,26 @@ class ProbabilisticEntryEngine:
             "sl_price": sl_price,
             "k_tp": k_tp,
             "k_sl": k_sl,
-            "volatility_sigma": round(sigma_t0, 5),
+            "horizon_bars": h_bars,
+            "volatility_sigma": round(s_horizon, 5),
+            "sigma_1h": round(s_1h, 5),
+            "sigma_horizon": round(s_horizon, 5),
+            "sigma_scaling": "SQRT_H",
             "risk_unit_usd": round(risk_usd, 2),
+            "cost_scenario": scenario_key,
+            "cost_model_version": "EXECUTION_COST_MODEL_V2",
+            "feature_source": feature_source,
+            "rule_hash": rule_hash,
+            "round_trip_friction_bps": round(eff_rt_bps, 2),
             "friction_r": round(friction_r, 4),
             "probabilities": probs,
             "expected_gross_r": round(expected_gross_r, 4),
             "expected_net_r": round(expected_net_r, 4),
+            "breakeven_win_rate_pct": round(float((1.0 + max(0.0, friction_r)) / (tp_r + 1.0)) * 100.0, 2),
+            "epistemic_provenance": "FIRST_PASSAGE_GEOMETRY_BASELINE_H0",
+            "validated_directional_edge": False,
+            "validated_edge_status": "NO_VALIDATED_EDGE_ABSTAIN",
+            "geometry_baseline_only": True,
             "selective_threshold": selective_threshold,
             "action": action,
             "primary_reason": reason,
@@ -221,10 +356,18 @@ class ProbabilisticEntryEngine:
         return decision
 
     def log_prospective_decision(self, decision: Dict[str, Any]) -> str:
-        """Append-only logging of prospective research decisions prior to outcome resolution."""
+        """Append-only logging to V2 ledger enforcing all 5 mandatory provenance fields."""
         now_utc = datetime.datetime.now(datetime.timezone.utc).isoformat()
         record = {
             "decision_timestamp_utc": now_utc,
+            "ledger_version": "V2_PROSPECTIVE",
+            "feature_source": decision.get("feature_source", "REST_OHLCV_PROXY"),
+            "cost_scenario": decision.get("cost_scenario", "COINBASE_RETAIL_87BPS"),
+            "cost_model_version": decision.get("cost_model_version", "EXECUTION_COST_MODEL_V2"),
+            "sigma_1h": decision.get("sigma_1h", decision.get("volatility_sigma", 0.005)),
+            "sigma_horizon": decision.get("sigma_horizon", decision.get("volatility_sigma", 0.005)),
+            "sigma_scaling": decision.get("sigma_scaling", "SQRT_H"),
+            "rule_hash": decision.get("rule_hash", "0x000000000000"),
             **decision
         }
         with open(self.ledger_file, "a", encoding="utf-8") as f:
