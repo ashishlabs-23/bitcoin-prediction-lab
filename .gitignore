@@ -96,3 +96,10 @@ Thumbs.db
 desktop.ini
 .idea/
 *.lock
+
+# Temporary scratch & test artifacts
+scratch/
+.dist/
+*.log
+*.xml
+tmp_chrome_profile/
