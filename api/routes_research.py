@@ -1446,7 +1446,20 @@ def get_research_results():
         if not file_exists:
             prov_state = "MISSING_ARTIFACT"
         elif expected_sha:
-            if actual_sha.lower() == expected_sha.lower():
+            raw_match = actual_sha.lower() == expected_sha.lower()
+            norm_match = False
+            if not raw_match and file_exists:
+                # Handle cross-platform git line-ending normalization (CRLF vs LF)
+                try:
+                    with open(full_path, "rb") as f:
+                        b = f.read()
+                    crlf_h = hashlib.sha256(b.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")).hexdigest()
+                    lf_h = hashlib.sha256(b.replace(b"\r\n", b"\n")).hexdigest()
+                    if expected_sha.lower() in (crlf_h.lower(), lf_h.lower()):
+                        norm_match = True
+                except Exception:
+                    pass
+            if raw_match or norm_match:
                 prov_state = "INTEGRITY_CHECKED"
             else:
                 prov_state = "INTEGRITY_MISMATCH"
@@ -1545,7 +1558,14 @@ def get_research_report_content(
     actual_sha = hashlib.sha256(raw_bytes).hexdigest()
     expected_sha = meta.get("expected_sha256")
     if expected_sha:
-        if actual_sha.lower() == expected_sha.lower():
+        raw_match = actual_sha.lower() == expected_sha.lower()
+        norm_match = False
+        if not raw_match:
+            crlf_h = hashlib.sha256(raw_bytes.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")).hexdigest()
+            lf_h = hashlib.sha256(raw_bytes.replace(b"\r\n", b"\n")).hexdigest()
+            if expected_sha.lower() in (crlf_h.lower(), lf_h.lower()):
+                norm_match = True
+        if raw_match or norm_match:
             prov_state = "INTEGRITY_CHECKED"
         else:
             prov_state = "INTEGRITY_MISMATCH"
