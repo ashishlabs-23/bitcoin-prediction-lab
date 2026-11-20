@@ -48,19 +48,34 @@ CONTEXT_HASH = _prov["context_hash"]
 BLOCKS_CSV_PATH = os.path.join(RESULTS_DIR, "post_repair_blocks.csv")
 
 def build_post_repair_blocks() -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-    conn = sqlite3.connect(MARKET_MEMORY_DB_PATH)
-    conn.row_factory = sqlite3.Row
+    if not os.path.isfile(MARKET_MEMORY_DB_PATH):
+        raise FileNotFoundError(f"Database file not found: {MARKET_MEMORY_DB_PATH}")
 
-    start_dt = pd.Timestamp(POST_REPAIR_EVIDENCE_START).tz_convert(timezone.utc)
+    from backtest.market_memory import _get_db
+    conn = _get_db(MARKET_MEMORY_DB_PATH)
+    try:
+        check = conn.execute("PRAGMA quick_check(1);").fetchone()
+        if check and check[0] != "ok":
+            raise sqlite3.DatabaseError(f"Database integrity check failed: {check[0]}")
 
-    query = """
-        SELECT * FROM predictions 
-        WHERE data_source != 'synthetic_arena' 
-        AND regime NOT LIKE 'SIM_ARENA_%'
-        ORDER BY timestamp ASC
-    """
-    rows = conn.execute(query).fetchall()
-    conn.close()
+        tables = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+        if "predictions" not in tables:
+            return [], {
+                "independent_valid_blocks": 0, "raw_forecasts": 0, "resolved_forecasts": 0,
+                "independent_mixed_blocks": 0, "independent_degraded_blocks": 0, "n_eff": 0.0
+            }
+
+        start_dt = pd.Timestamp(POST_REPAIR_EVIDENCE_START).tz_convert(timezone.utc)
+
+        query = """
+            SELECT * FROM predictions 
+            WHERE data_source != 'synthetic_arena' 
+            AND regime NOT LIKE 'SIM_ARENA_%'
+            ORDER BY timestamp ASC
+        """
+        rows = conn.execute(query).fetchall()
+    finally:
+        conn.close()
 
     post_repair_records = []
     for r in rows:
@@ -155,12 +170,22 @@ def build_post_repair_blocks() -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     lag24_autocorr = 0.0
     n_eff = 0.0
     if n_valid_obs >= 5:
-        returns = [float(r["actual_return"]) for r in post_repair_records]
+        returns = [float(r["actual_return"]) for r in post_repair_records if r.get("actual_return") is not None]
         s = pd.Series(returns)
-        lag1_autocorr = round(float(s.autocorr(lag=1)), 4) if not np.isnan(s.autocorr(lag=1)) else 0.0
-        lag24_autocorr = round(float(s.autocorr(lag=24)), 4) if len(s) > 24 and not np.isnan(s.autocorr(lag=24)) else 0.0
-        rho = max(0.0, min(0.95, lag1_autocorr))
-        n_eff = round(n_valid_obs * (1.0 - rho) / (1.0 + rho), 2)
+        # Undefined correlation check: if sample variance is zero, correlation is mathematically undefined (0/0)
+        if len(s) >= 5 and float(s.std()) > 1e-12:
+            ac1 = s.autocorr(lag=1)
+            lag1_autocorr = round(float(ac1), 4) if not np.isnan(ac1) else None
+            if len(s) > 24:
+                ac24 = s.autocorr(lag=24)
+                lag24_autocorr = round(float(ac24), 4) if not np.isnan(ac24) else None
+            rho = max(0.0, min(0.95, lag1_autocorr)) if lag1_autocorr is not None else 0.0
+            n_eff = round(n_valid_obs * (1.0 - rho) / (1.0 + rho), 2)
+        else:
+            # Correlation is mathematically undefined when sample variance is zero; return explicit None
+            lag1_autocorr = None
+            lag24_autocorr = None
+            n_eff = float(n_valid_obs)
 
     accounting = {
         "raw_forecasts": n_valid_obs,

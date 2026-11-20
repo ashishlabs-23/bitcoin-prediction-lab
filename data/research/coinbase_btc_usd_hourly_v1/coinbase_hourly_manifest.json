@@ -1,0 +1,44 @@
+{
+  "dataset_id": "coinbase_btc_usd_hourly_authenticated_v1",
+  "instrument": "BTC-USD",
+  "venue": "COINBASE",
+  "market_type": "SPOT",
+  "timeframe": "1h",
+  "granularity_seconds": 3600,
+  "first_candle_utc": "2023-01-01T00:00:00Z",
+  "last_candle_utc": "2026-10-25T04:00:00Z",
+  "total_candles": 33424,
+  "total_chunks_fetched": 134,
+  "is_monotonic_increasing": true,
+  "duplicate_count": 0,
+  "gap_count": 3,
+  "gaps": [
+    {
+      "gap_after_epoch": 1677949200,
+      "gap_after_utc": "2023-03-04T17:00:00Z",
+      "resumed_epoch": 1677963600,
+      "resumed_utc": "2023-03-04T21:00:00Z",
+      "missing_hours": 3.0
+    },
+    {
+      "gap_after_epoch": 1761404400,
+      "gap_after_utc": "2025-10-25T15:00:00Z",
+      "resumed_epoch": 1761426000,
+      "resumed_utc": "2025-10-25T21:00:00Z",
+      "missing_hours": 5.0
+    },
+    {
+      "gap_after_epoch": 1778202000,
+      "gap_after_utc": "2026-05-08T01:00:00Z",
+      "resumed_epoch": 1778223600,
+      "resumed_utc": "2026-05-08T07:00:00Z",
+      "missing_hours": 5.0
+    }
+  ],
+  "file_path": "C:\\Projects\\BTCognitive\\BTCognitive\\data\\research\\coinbase_btc_usd_hourly_v1\\coinbase_hourly.parquet",
+  "file_size_bytes": 1713424,
+  "sha256_hash": "b81688644812276856ede9b9c38db21aaccba56387b284112a3d0175685bf5cf",
+  "is_authenticated": true,
+  "provenance_statement": "Captured directly via official Coinbase Exchange REST API /products/BTC-USD/candles?granularity=3600 without synthetic interpolation.",
+  "captured_at_utc": "2026-10-25T05:20:48.705854+00:00"
+}

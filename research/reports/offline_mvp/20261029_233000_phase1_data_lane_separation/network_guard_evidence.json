@@ -1,0 +1,46 @@
+{
+  "audit_timestamp_utc": "2026-10-29T18:22:00Z",
+  "phase": "Phase 1: Data-Lane Separation",
+  "guards_evaluated": [
+    {
+      "guard": "assert_no_external_network",
+      "status": "BLOCKED_SUCCESS",
+      "exception": "ExternalNetworkBlockedError",
+      "message": "External market-data network connection blocked for 'test_outbound_http'. Active DATA_MODE='offline_research' strictly prohibits external network calls."
+    },
+    {
+      "guard": "Coinbase15mAdapter.fetch_single_chunk",
+      "status": "BLOCKED_SUCCESS",
+      "exception": "ExternalNetworkBlockedError",
+      "message": "External market-data network connection blocked for 'Coinbase 15m REST fetch'. Active DATA_MODE='offline_research' strictly prohibits external network calls."
+    },
+    {
+      "guard": "SpotExchangeComparator.fetch_and_compare_spot_quotes",
+      "status": "BLOCKED_SUCCESS",
+      "result_status": "DATA_UNAVAILABLE",
+      "primary_price_usd": null,
+      "divergence_reason": "EXTERNAL_NETWORK_BLOCKED",
+      "quotes_count": 0
+    },
+    {
+      "guard": "FixtureModeProtectedFileAccess",
+      "status": "BLOCKED_SUCCESS",
+      "target_file": "data/raw/ohlcv.parquet",
+      "access_permitted": false
+    }
+  ],
+  "active_data_mode_contract": {
+    "mode": "offline_research",
+    "data_mode": "offline_research",
+    "is_fixture": false,
+    "is_offline_research": true,
+    "is_provider": false,
+    "external_network_allowed": false,
+    "provider_configured": false,
+    "provider_status": "DISABLED",
+    "permitted_data_source": "LOCAL_HISTORICAL_SNAPSHOT",
+    "permitted_rights_status": "REVIEW_REQUIRED",
+    "canonical_symbol": "BTC-USD",
+    "live_trading_enabled": false
+  }
+}

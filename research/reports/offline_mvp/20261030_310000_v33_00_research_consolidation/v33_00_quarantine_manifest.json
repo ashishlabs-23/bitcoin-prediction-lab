@@ -1,0 +1,74 @@
+{
+  "manifest_version": "1.0.0",
+  "milestone": "BTCognitive V33.0 — Research Consolidation & Risk-System Reliability",
+  "generated_at": "2026-10-30T18:55:00Z",
+  "lead_orchestrator": "Antigravity",
+  "operating_contract": "OFFLINE_RESEARCH_ONLY",
+  "governance_determination": "CONSOLIDATED_RESEARCH_BASELINE",
+  "summary": "Formal cryptographic quarantine registry documenting quarantined synthetic and unverified datasets, alongside approved authentic baseline datasets.",
+  "quarantined_datasets": [
+    {
+      "relative_path": "data/processed/multi_regime_features.parquet",
+      "sha256": "e37fcc1a896e5a8a60db337f8e49253eaf1d8d011c430e32a23a43d7de04205f",
+      "file_size_bytes": 3095866,
+      "row_count": 42233,
+      "quarantine_category": "QUARANTINED_SYNTHETIC",
+      "quarantine_reason": "Fabricated synthetic mock feature dataset. Forensic audit in V32.79 Phase 0 confirmed the generation script used np.random.normal(seed=42) to simulate macro, on-chain, and options regime features. Completely excluded from all production and barrier backtest paths.",
+      "contamination_scope": "Contaminated 4 historical validation reports prior to V32.79. Core OHLCV barrier backtest milestones (V32.74, V32.77, V32.78) used authentic OHLCV directly and are 100% uncontaminated.",
+      "action_required": "Permanent quarantine. Prohibited from being referenced or read by any production router or future empirical experiment."
+    },
+    {
+      "relative_path": "data/raw/binance_funding_2022_2026.parquet",
+      "sha256": "e90282de4f78ebde4b0e253cd71e50233d965062defa9f1b81be5b87da094436",
+      "file_size_bytes": 145791,
+      "row_count": 5113,
+      "quarantine_category": "QUARANTINED_UNRESOLVED",
+      "quarantine_reason": "Discontinuous upper boundary at +0.000100 (Binance default interest rate component) in 2022, 2025, and 2026, whereas 2023 and 2024 unclamp up to +0.000881. Irreconcilable conflict with contemporaneous local file data/raw/funding.parquet (Pearson r = 0.0159).",
+      "contamination_scope": "Evaluated in V32.79A, V32.80, V32.80A, V32.80B. Proved strategy has insufficient sample (N=64) and non-significant edge (p = 0.106 to 0.269).",
+      "action_required": "Quarantined under SOURCE_LINEAGE_UNRESOLVED. Funding rate research permanently frozen under INSUFFICIENT_EVIDENCE. Offline research cannot make network calls to verify raw exchange archives."
+    },
+    {
+      "relative_path": "data/raw/funding.parquet",
+      "sha256": "f176186ec28c78feac7091fa8dcf1f202145ff3a2ea373426ca3a29ca27dfa66",
+      "file_size_bytes": 12625,
+      "row_count": 375,
+      "quarantine_category": "QUARANTINED_UNRESOLVED",
+      "quarantine_reason": "Contemporaneous funding rate file covering Jan-May 2026. Exhibits rates up to +0.000821, with 113 settlements exceeding +0.000228, while binance_funding_2022_2026.parquet is clamped at +0.000100 for the exact same timestamps (r = 0.0159). Upstream collection method via CCXT differs from direct REST endpoint.",
+      "contamination_scope": "Isolated in V32.80B forensic comparison.",
+      "action_required": "Quarantined under SOURCE_LINEAGE_UNRESOLVED. Neither funding dataset is designated authoritative."
+    }
+  ],
+  "approved_authentic_datasets": [
+    {
+      "relative_path": "data/raw/ohlcv_checkpoint_42233_bars.parquet",
+      "sha256": "f5c15cb11b9d51cf0077c8f8052086382deb1d8577749cbab8d0134842c7a94f",
+      "file_size_bytes": 2329800,
+      "row_count": 42233,
+      "approval_status": "AUTHENTIC_APPROVED",
+      "role": "Core frozen historical OHLCV baseline (2020-2025). Certified free of synthetic fabrication, gaps, or lookahead contamination."
+    },
+    {
+      "relative_path": "data/raw/ohlcv_version_42326_bars.parquet",
+      "sha256": "ba06fb533c0b53387136b001c142efc90b5e2ccfb37937dc509879a76c2a4057",
+      "file_size_bytes": 2334866,
+      "row_count": 42326,
+      "approval_status": "AUTHENTIC_APPROVED",
+      "role": "Extended historical OHLCV baseline used for out-of-sample temporal robustness verification."
+    }
+  ],
+  "prospective_evidence_status": {
+    "relative_path": "data/prospective_forecast_ledger.jsonl",
+    "status": "COLLECTING_FROZEN_OFFLINE",
+    "accumulated_non_overlapping_blocks": 7,
+    "required_hurdle_blocks": 100,
+    "hurdle_completion_pct": 7.0,
+    "governance_note": "Prospective collector is currently stopped with lockfile intact. Collection will resume only under governed prospective evaluation with live exchange data connectivity."
+  },
+  "governance_invariants": {
+    "live_trading": "DISABLED",
+    "model_authorization_default": "OFFLINE_RESEARCH_ONLY",
+    "terminal_analyse_gate": "ABSTAIN",
+    "external_network_access": "BLOCKED"
+  }
+}
+

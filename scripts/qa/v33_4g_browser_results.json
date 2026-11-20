@@ -1,0 +1,40 @@
+{
+  "desktop": {
+    "hasStaleNotice": true,
+    "hasHistoricalBarClose": true,
+    "hasCoinbaseFeedUnconditional": false,
+    "hasSnapshotClose": true,
+    "hasHardcodedShort": false,
+    "sampleSnippet": "BTC/USD \u00b7 Coinbase\n$76,985.40\n\u2014\n24h Range:\nUnavailable \u00b7 insufficient history\n24h Realized Volatility:\nUnavailable \u00b7 insufficient verified history\nFunding:\nUnavailable \u00b7 no verified feed\nTelemetry:\nUnavailable\nREAD-ONLY MONITOR \u00b7 TRADING DISABLED\nB\nBTCognitive\nTerminal\nResearch\nJournal\nMore \u25be\n\ud83d\udd14\nObservations\n\u2728 3D FX: ON\n\u26a1 Clean Focus\nAudio\nEngine Offline\n\ud83d\udd2c\nBTCognitive Research Terminal\nMARKET MONITOR \u00b7 RESEARCH BLOCKED\nNo verified market signal \u00b7 Forecasts and trading are disabled\nResearch status:\nBLOCKED \u00b7 PROVENANCE UNVERIFIED\nFrozen model inputs and evaluation provenance are not authenticated.\nAI Forecasts & Risk \ud83d\udcc8\nHow It Works \ud83d\udca1\nView Research Evidence \u2197\nBTC / USD \u00b7 Historical Bar Close (30 Oct 2026, 13:00 UTC \u00b7 Stale Snapshot)\n$76,985.40\nSTALE SNAPSHOT\nOFFLINE\n1m\n5m\n15m\n1H\n4H\n1D\nEMA 20/50\nBB (20,2)\nBands\nRSI (14)\nATR (14)\nADX (14)\nAI Forecast ON\n\ud83d\udd2c Research Markers\n\ud83d\udd14 Alerts\n\ud83d\udd52\nReal-Time:\n2026-11-01 17:19:48 UTC (22:49:48 Local)\n\ud83d\udd6f\ufe0f\nActive Bar (1h):\n2026-10-30 13:00 UTC\n\u23f3\nBar Cl"
+  },
+  "research_panel": {
+    "hasDirectionalUnavailable": true,
+    "hasRiskEnvelopeWarning": true,
+    "hasHardcodedShortFallback": false,
+    "hasRiskForecastAvailable": true,
+    "sampleSnippet": "BTC/USD \u00b7 Coinbase\n$76,985.40\n\u2014\n24h Range:\nUnavailable \u00b7 insufficient history\n24h Realized Volatility:\nUnavailable \u00b7 insufficient verified history\nFunding:\nUnavailable \u00b7 no verified feed\nTelemetry:\nUnavailable\nREAD-ONLY MONITOR \u00b7 TRADING DISABLED\nB\nBTCognitive\nTerminal\nResearch\nJournal\nMore \u25be\n\ud83d\udd14\nObservations\n\u2728 3D FX: ON\n\u26a1 Clean Focus\nAudio\nEngine Offline\n\ud83d\udd2c\nBTCognitive Research Terminal\nMARKET MONITOR \u00b7 RESEARCH BLOCKED\nNo verified market signal \u00b7 Forecasts and trading are disabled\nResearch status:\nBLOCKED \u00b7 PROVENANCE UNVERIFIED\nFrozen model inputs and evaluation provenance are not authenticated.\nAI Forecasts & Risk \ud83d\udcc8\nHow It Works \ud83d\udca1\nView Research Evidence \u2197\nBTC / USD \u00b7 Historical Bar Close (30 Oct 2026, 13:00 UTC \u00b7 Stale Snapshot)\n$76,985.40\nSTALE SNAPSHOT\nOFFLINE\n1m\n5m\n15m\n1H\n4H\n1D\nEMA"
+  },
+  "forecast_panel": {
+    "hasAbstainSignalDisabled": true,
+    "hasHardcodedProb": false,
+    "hasStaleStatus": true,
+    "sampleSnippet": "BTC/USD \u00b7 Coinbase\n$76,985.40\n\u2014\n24h Range:\nUnavailable \u00b7 insufficient history\n24h Realized Volatility:\nUnavailable \u00b7 insufficient verified history\nFunding:\nUnavailable \u00b7 no verified feed\nTelemetry:\nUnavailable\nREAD-ONLY MONITOR \u00b7 TRADING DISABLED\nB\nBTCognitive\nTerminal\nResearch\nJournal\nMore \u25be\n\ud83d\udd14\nObservations\n\u2728 3D FX: ON\n\u26a1 Clean Focus\nAudio\nEngine Offline\n\ud83d\udd2c\nBTCognitive Research Terminal\nMARKET MONITOR \u00b7 RESEARCH BLOCKED\nNo verified market signal \u00b7 Forecasts and trading are disabled\nResearch status:\nBLOCKED \u00b7 PROVENANCE UNVERIFIED\nFrozen model inputs and evaluation provenance are not authenticated.\nAI Forecasts & Risk \ud83d\udcc8\nHow It Works \ud83d\udca1\nView Research Evidence \u2197\nBTC / USD \u00b7 Historical Bar Close (30 Oct 2026, 13:00 UTC \u00b7 Stale Snapshot)\n$76,985.40\nSTALE SNAPSHOT\nOFFLINE\n1m\n5m\n15m\n1H\n4H\n1D\nEMA"
+  },
+  "smart_entry": {
+    "hasSnapshotCloseStale": true,
+    "hasStaleDisclaimer": true,
+    "hasOldSpotPrice": false,
+    "titlePresent": true,
+    "sampleSnippet": "BTC/USD \u00b7 Coinbase\n$76,985.40\n\u2014\n24h Range:\nUnavailable \u00b7 insufficient history\n24h Realized Volatility:\nUnavailable \u00b7 insufficient verified history\nFunding:\nUnavailable \u00b7 no verified feed\nTelemetry:\nUnavailable\nREAD-ONLY MONITOR \u00b7 TRADING DISABLED\nB\nBTCognitive\nTerminal\nResearch\nJournal\nMore \u25be\n\ud83d\udd14\nObservations\n\u2728 3D FX: ON\n\u26a1 Clean Focus\nAudio\nMarket Monitor Only\n\ud83d\udd2c\nBTCognitive Research Terminal\nMARKET MONITOR \u00b7 RESEARCH BLOCKED\nNo verified market signal \u00b7 Forecasts and trading are disabled\nResearch status:\nBLOCKED \u00b7 PROVENANCE UNVERIFIED\nFrozen model inputs and evaluation provenance are not authenticated.\nAI Forecasts & Risk \ud83d\udcc8\nHow It Works \ud83d\udca1\nView Research Evidence \u2197\nBTC / USD \u00b7 Historical Bar Close (30 Oct 2026, 13:00 UTC \u00b7 Stale Snapshot)\n$76,985.40\nSTALE SNAPSHOT\nOFFLINE\n1m\n5m\n15m\n1H\n4H\n1"
+  },
+  "terminal": {
+    "hasStaleNotice": true,
+    "hasDirectionalUnavailable": false,
+    "hasRiskNotice": false,
+    "terminalPresent": true
+  },
+  "mobile": {
+    "clientWidth": 375,
+    "hasStaleNotice": true
+  }
+}

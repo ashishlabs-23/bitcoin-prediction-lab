@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BTCognitive — Analyse E2E Test Harness</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+  <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin=""></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin=""></script>
+</head>
+<body style="background: #0B0E14; color: #F8FAFC; margin: 0; padding: 0;">
+  <div id="harness-header" style="background: #111827; border-bottom: 1px solid #374151; padding: 8px 16px; font-family: monospace; font-size: 13px; display: flex; justify-content: space-between;">
+    <span>BTCognitive Analyse E2E Test Harness</span>
+    <span id="qa-scenario-badge" style="color: #38BDF8; font-weight: bold;">SCENARIO: ANALYSE_NO_ELIGIBLE_STRATEGY</span>
+  </div>
+
+  <div id="root"><div><div class="three-bg-canvas" style="position: fixed; top: 0px; left: 0px; width: 100%; height: 100%; pointer-events: none; z-index: 0; opacity: 1; transition: opacity 0.4s;"><canvas width="1255" height="804" style="display: block; width: 1255px; height: 804px;"></canvas></div><div class="institutional-ticker-bar"><div class="ticker-item"><span style="color: rgb(248, 250, 252); font-weight: 800;">BTC/USD · Coinbase</span><span class="val down">$103,808.80</span><span style="font-size: 0.72rem; padding: 1px 6px; border-radius: 4px; background: rgba(255, 92, 124, 0.15); color: rgb(255, 92, 124); font-weight: 700;">—</span></div><div class="ticker-item"><span>24h Range:</span><span class="val">Unavailable · insufficient history</span></div><div class="ticker-item"><span>24h Realized Volatility:</span><span class="val cyan">Unavailable · insufficient verified history</span></div><div class="ticker-item"><span>Funding:</span><span class="val up">Unavailable · no verified feed</span></div><div class="ticker-item"><span>Telemetry:</span><span class="val purple">Unavailable</span></div><div class="ticker-item" style="margin-left: auto;"><span style="background: rgba(0, 240, 255, 0.12); border: 1px solid rgba(0, 240, 255, 0.3); color: rgb(0, 240, 255); padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 800;">READ-ONLY MONITOR · TRADING DISABLED</span></div></div><nav class="navbar"><div style="display: flex; align-items: center; gap: 10px;"><button class="mobile-menu-toggle" aria-label="Toggle Menu">☰</button><a href="#/terminal" class="logo"><div class="logo-icon">B</div><span class="logo-text">BTCognitive</span></a></div><ul class="nav-links "><li><a id="nav-terminal" href="#/terminal" class="nav-link-pill active"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>Terminal</a></li><li><a id="nav-research" href="#/research" class="nav-link-pill "><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>Research</a></li><li><a id="nav-manual-journal" href="#/journal" class="nav-link-pill "><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>Journal</a></li><li class="nav-dropdown"><button id="nav-more-menu-btn" class="nav-dropdown-btn " aria-expanded="false" aria-label="More utilities and settings"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>More ▾</button></li></ul><div class="nav-right"><div class="notification-bell-wrapper"><button class="notification-bell-btn" title="Market observations and notification history"><span style="font-size: 1.05rem;">🔔</span><span>Observations</span></button></div><button title="Disable 3D Background FX (saves battery/CPU)" style="background: rgba(167, 139, 250, 0.15); border: 1px solid rgba(167, 139, 250, 0.4); color: rgb(167, 139, 250); padding: 5px 10px; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: 0.2s;">✨ 3D FX: ON</button><button title="Toggle Audio Feedback" style="background: transparent; border: 1px solid rgba(255, 255, 255, 0.1); color: rgb(0, 229, 168); padding: 5px 11px; border-radius: 8px; font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 5px; line-height: 1;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></g></svg>Audio</button><div class="status-badge warming-up" role="button" tabindex="0" aria-label="System status: Warming Up. Press Enter to configure API endpoint." title="Configure API endpoint" style="cursor: pointer; white-space: nowrap;"><div class="status-dot"></div><span class="status-text">Warming Up</span></div></div></nav><div class="research-status-banner" style="background: linear-gradient(90deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98)); border-bottom: 1px solid rgba(56, 189, 248, 0.25); padding: 8px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; font-size: 0.8rem; z-index: 90;"><div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;"><div style="display: flex; align-items: center; gap: 6px;"><span style="font-size: 0.95rem;">🔬</span><strong style="color: rgb(248, 250, 252); font-size: 0.84rem; letter-spacing: 0.02em;">BTCognitive Research Terminal</strong></div><span style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); color: rgb(56, 189, 248); padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.5px;">MARKET MONITOR · RESEARCH BLOCKED</span><span style="color: rgb(148, 163, 184); font-size: 0.74rem;">No verified market signal · Forecasts and trading are disabled</span></div><div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;"><div style="display: flex; align-items: center; gap: 6px; font-size: 0.74rem;"><span style="color: rgb(203, 213, 225);">Research status:</span><span style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: rgb(248, 113, 113); padding: 2px 8px; border-radius: 4px; font-weight: 800; font-family: var(--font-mono); font-size: 0.72rem;">BLOCKED · PROVENANCE UNVERIFIED</span></div><span style="color: rgb(148, 163, 184); font-size: 0.72rem; max-width: 340px; line-height: 1.2;">Frozen model inputs and evaluation provenance are not authenticated.</span><button id="banner-forecast-btn" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: rgb(56, 189, 248); padding: 3px 10px; border-radius: 4px; cursor: pointer; font-weight: 700; font-size: 0.72rem;">AI Forecasts &amp; Risk 📈</button><button id="banner-how-it-works-btn" style="background: rgba(167, 139, 250, 0.15); border: 1px solid rgba(167, 139, 250, 0.4); color: rgb(167, 139, 250); padding: 3px 10px; border-radius: 4px; cursor: pointer; font-weight: 700; font-size: 0.72rem;">How It Works 💡</button><button id="banner-research-btn" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: rgb(56, 189, 248); padding: 3px 10px; border-radius: 4px; cursor: pointer; font-weight: 700; font-size: 0.72rem;">View Research Evidence ↗</button></div></div><div class="terminal-container"><div class="terminal-view-root" style="max-width: 1600px; margin: 0px auto; padding: 10px 16px;"><div id="v19-area-btc-now" class="workstation-workspace"><div class="workstation-chart-wrapper"><div class="glass-card chart-card" style="margin: 0px;"><div class="chart-topbar-wrapper"><div class="chart-topbar"><div class="chart-info"><span class="chart-symbol">BTC / USD · Coinbase Exchange</span><span style="font-family: var(--font-mono); font-weight: 700; font-size: 1.1rem; color: rgb(248, 250, 252); margin-left: 14px;">$103,808.80</span><span style="margin-left: 14px;"><span style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 0.82rem; color: rgb(245, 158, 11); letter-spacing: 0.05em;"><span style="width: 8px; height: 8px; border-radius: 50%; background: rgb(245, 158, 11); box-shadow: rgb(245, 158, 11) 0px 0px 8px; display: inline-block; animation: auto ease 0s 1 normal none running none;"></span>RECONNECTING</span></span></div><div class="tf-buttons" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;"><button id="tf-btn-1m" class="tf-btn">1m</button><button id="tf-btn-5m" class="tf-btn">5m</button><button id="tf-btn-15m" class="tf-btn">15m</button><button id="tf-btn-1H" class="tf-btn active">1H</button><button id="tf-btn-4H" class="tf-btn">4H</button><button id="tf-btn-1D" class="tf-btn">1D</button><div style="width: 1px; height: 16px; background: rgba(148, 163, 184, 0.2); margin: 0px 4px;"></div><button id="toggle-ema-btn" class="chart-ind-toggle-btn active" title="Toggle EMA 20 / 50 Trend Ribbons">EMA 20/50</button><button id="toggle-bb-btn" class="chart-ind-toggle-btn active" title="Toggle Bollinger Bands (20, 2)">BB (20,2)</button><button id="toggle-bands-btn" class="chart-ind-toggle-btn active" title="Toggle Diffusion / Conformal Uncertainty Bands">Bands</button><button id="toggle-rsi-btn" class="chart-ind-toggle-btn " title="Toggle RSI (14) Relative Strength Index">RSI (14)</button><button id="toggle-atr-btn" class="chart-ind-toggle-btn " title="Toggle ATR (14) Average True Range">ATR (14)</button><button id="toggle-adx-btn" class="chart-ind-toggle-btn " title="Toggle ADX (14) Trend Strength Indicator">ADX (14)</button><button id="toggle-ai-forecast-btn" class="chart-ind-toggle-btn active" aria-pressed="true" title="Show or hide the research-only directional forecast overlay">AI Forecast ON</button><div style="width: 1px; height: 16px; background: rgba(148, 163, 184, 0.2); margin: 0px 4px;"></div><button id="toggle-research-markers-btn" class="chart-ind-toggle-btn " title="Toggle Optional Historical Research Setup Markers &amp; Legend">🔬 Research Markers</button><div style="width: 1px; height: 16px; background: rgba(148, 163, 184, 0.2); margin: 0px 4px;"></div><button id="open-alerts-btn" class="chart-ind-toggle-btn" title="Configure Custom Price, Indicator, and Strategy Alerts">🔔 Alerts</button></div></div><div class="chart-time-subbar"><div class="time-subbar-left" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><div class="time-pill live-clock-pill"><span class="pill-icon">🕒</span><span class="pill-label">Real-Time:</span><strong class="pill-value">2026-10-29 12:11:31 UTC (17:41:31 Local)</strong></div><div class="time-pill bar-open-pill"><span class="pill-icon">🕯️</span><span class="pill-label">Active Bar (1h):</span><strong class="pill-value">2026-10-29 12:00 UTC</strong></div><div class="time-pill countdown-pill "><span class="pill-icon">⏳</span><span class="pill-label">Bar Closes in:</span><strong class="pill-value font-mono">48m 29s · 13:00 UTC</strong></div><div class="time-pill quote-freshness-pill urgent"><span class="pill-icon">◉</span><span class="pill-label">Coinbase quote:</span><strong class="pill-value font-mono">Waiting for first quote</strong></div><div id="spot-comparator-pill" class="time-pill spot-comparator-pill " title="Click to inspect cross-exchange quotes &amp; divergence (Coinbase, Kraken, Bitstamp)" style="cursor: pointer;"><span class="pill-icon">🌐</span><span class="pill-label">Spot:</span><strong class="pill-value font-mono">Coinbase Spot</strong></div><div class="indicator-badge-ribbon"><span style="color: rgb(148, 163, 184); font-weight: 700;">INDICATORS:</span><span class="ind-badge active-rsi-overbought" title="RSI(14) Momentum: &lt;30 Oversold, &gt;70 Overbought">RSI(14): 100</span><span class="ind-badge" title="ATR(14) Average True Range Volatility">ATR(14): $819.01</span><span class="ind-badge" title="ADX(14) Trend Strength (&gt;25 Trending)">ADX(14): 100</span><span class="ind-badge" title="Bollinger Bandwidth (BBW)">BBW: 2.31%</span></div></div></div></div><div><div id="btc-lwc-chart" style="width: 100%; height: 520px; border-radius: 0px 0px 12px 12px; position: relative;"><section id="chart-ai-forecast-overlay" class="chart-ai-forecast-overlay" data-forecast-status="FORECAST_MALFORMED" role="region" aria-label="Research-only directional forecast on the Bitcoin price chart" style="position: absolute; top: 12px; left: 12px; z-index: 10; box-sizing: border-box; width: min(330px, 100% - 24px); max-width: calc(100% - 24px); background: rgba(11, 18, 32, 0.94); border: 1px solid rgba(245, 158, 11, 0.55); border-radius: 8px; padding: 9px 11px; color: rgb(253, 230, 138); font-size: 0.72rem; line-height: 1.45; font-family: &quot;JetBrains Mono&quot;, monospace; overflow-wrap: anywhere;"><div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;"><strong id="chart-ai-forecast-status" role="status" aria-live="polite" aria-atomic="true" style="color: rgb(226, 232, 240); font-size: 0.78rem;">Forecast response was invalid; no direction is shown.</strong><button id="chart-ai-forecast-retry" type="button" aria-label="Retry directional forecast request" title="Fetch the latest research-only directional forecast" style="border: 1px solid rgba(148, 163, 184, 0.45); border-radius: 5px; background: rgba(148, 163, 184, 0.12); color: rgb(226, 232, 240); padding: 3px 7px; font-size: 0.66rem; cursor: pointer; flex-shrink: 0;">Retry</button></div><div class="chart-ai-forecast-meta" style="margin-top: 3px; color: rgb(148, 163, 184);">Model: unavailable · Generated: timestamp unavailable</div><div class="chart-ai-forecast-meta" style="margin-top: 2px; color: rgb(148, 163, 184);">Input freshness: UNKNOWN · Governance: OFFLINE_RESEARCH_ONLY · Live trading disabled</div><p style="margin: 4px 0px 0px; color: rgb(253, 230, 138);">What happened: The forecast response has no valid generation timestamp. No directional marker is shown while this output is unavailable or stale. The price chart remains usable; retry or inspect diagnostics.</p><details style="margin-top: 4px; color: rgb(148, 163, 184);"><summary style="cursor: pointer; min-height: 24px;">Forecast details and limitations</summary><div style="padding-top: 3px;">Status code: FORECAST_MALFORMED. Classifier probabilities are not calibrated confidence or a future price path. The displayed persistence baseline and nominal bands are separate, non-directional research context; bands are uncalibrated. No validated edge is claimed.</div></details></section><div class="tv-lightweight-charts" style="overflow: hidden; direction: ltr; width: 796px; height: 520px; user-select: none; -webkit-tap-highlight-color: transparent;"><table cellspacing="0" style="height: 520px; width: 796px;"><tr><td style="padding: 0px;"></td><td style="padding: 0px; position: relative; width: 716px; height: 492px;"><div style="width: 100%; height: 100%; position: relative; overflow: hidden;"><canvas width="740" height="492" style="width: 716px; height: 492px; position: absolute; z-index: 1; left: 0px; top: 0px;"></canvas><canvas width="740" height="492" style="width: 716px; height: 492px; position: absolute; z-index: 2; left: 0px; top: 0px;"></canvas></div></td><td style="padding: 0px;"><div style="height: 492px; overflow: hidden; width: 80px; left: 0px; position: relative;"><canvas width="80" height="492" style="width: 80px; height: 492px; position: absolute; z-index: 1; left: 0px; top: 0px;"></canvas><canvas width="80" height="492" style="width: 80px; height: 492px; position: absolute; z-index: 2; left: 0px; top: 0px;"></canvas></div></td></tr><tr><td style="padding: 0px;"></td><td style="height: 28px; padding: 0px; width: 716px;"><div style="width: 100%; height: 100%; position: relative; overflow: hidden;"><canvas width="740" height="28" style="width: 716px; height: 28px; position: absolute; z-index: 1; left: 0px; top: 0px;"></canvas><canvas width="740" height="28" style="width: 716px; height: 28px; position: absolute; z-index: 2; left: 0px; top: 0px;"></canvas></div></td><td style="padding: 0px;"><div style="width: 80px; height: 28px; overflow: hidden;"><canvas width="80" height="28" style="width: 80px; height: 28px;"></canvas></div></td></tr></table></div></div><div class="chart-overlay-diagnostic-banner off"><div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span style="color: rgb(148, 163, 184); font-weight: 800;">○ STRATEGY OVERLAY: OFF (USER-DIRECTED)</span><span style="color: rgb(100, 116, 139); font-size: 0.7rem;">Select a candidate in Strategy Tournament to inspect rules, preview setup, or enable chart monitoring</span></div><div style="display: flex; align-items: center; gap: 8px; font-size: 0.68rem;"><span style="color: rgb(100, 116, 139);">LIVE TRADING: DISABLED</span></div></div><div style="background: rgba(11, 18, 32, 0.95); border-top: 1px solid rgba(255, 255, 255, 0.08); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; font-size: 0.74rem; border-radius: 0px 0px 12px 12px;"><div style="display: flex; align-items: center; gap: 8px;"><span style="color: rgb(126, 149, 181); font-weight: 700;">DECISION ANATOMY:</span><span style="background: rgba(0, 240, 255, 0.1); color: rgb(0, 240, 255); padding: 2px 8px; border-radius: 4px; font-weight: 700;">Event: RESEARCH_BLOCKED</span><span style="color: rgb(203, 213, 225);">Evidence: Frozen provenance is unverified</span></div><div style="display: flex; align-items: center; gap: 12px; font-family: var(--font-mono);"><span><span style="color: rgb(126, 149, 181);">Est. Cost: </span><strong style="color: rgb(203, 213, 225);">Unavailable</strong></span><span><span style="color: rgb(126, 149, 181);">EV Aggregation: </span><strong style="color: rgb(148, 163, 184);">DISABLED (TIER 0)</strong></span><span style="background: rgba(245, 158, 11, 0.15); color: rgb(245, 158, 11); border: 1px solid rgba(245, 158, 11, 0.3); padding: 2px 8px; border-radius: 4px; font-weight: 800;">ABSTAIN</span></div></div></div><div class="chart-contract-badge" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;"><div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span style="color: rgb(56, 189, 248); font-weight: 700;">PRICE OVERLAY: NON-DIRECTIONAL PERSISTENCE BASELINE (1h) · NOMINAL UNCALIBRATED BANDS</span><span style="color: rgb(148, 163, 184); font-size: 0.72rem;">DIRECTIONAL CLASSIFIER: SHOWN SEPARATELY · OFFLINE_RESEARCH_ONLY · NO VALIDATED EDGE · LIVE TRADING DISABLED</span></div><span style="color: rgb(0, 229, 168); font-family: var(--font-mono); font-size: 0.72rem;">DATA: COINBASE SPOT 1h VERIFIED</span></div></div><div class="glass-card ai-prediction-engine-panel" role="status" style="padding: 18px; margin-bottom: 16px; border: 1px solid rgba(56, 189, 248, 0.25);"><div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;"><div style="max-width: 780px;"><div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;"><span style="font-size: 1.1rem;">🔬</span><strong style="color: rgb(56, 189, 248); font-size: 0.95rem;">Directional Trade Execution Gated · Offline Research Governance Active</strong><span style="background: rgba(56, 189, 248, 0.15); color: rgb(56, 189, 248); padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 700;">RESEARCH ONLY</span></div><p style="color: rgb(203, 213, 225); font-size: 0.82rem; margin: 0px; line-height: 1.4;">Live trading and broker order execution remain permanently disabled. Directional LightGBM models (1h/4h/24h), HAR-RS-DOW 168h volatility envelopes, and price tournaments are actively visible in the AI Forecasts &amp; Risk Outlook workspace.</p></div><div style="display: flex; gap: 8px; flex-wrap: wrap;"><button id="btn-open-forecast-tab" style="background: linear-gradient(135deg, rgb(2, 132, 199), rgb(3, 105, 161)); border: 1px solid rgb(56, 189, 248); color: rgb(255, 255, 255); padding: 7px 14px; border-radius: 6px; cursor: pointer; font-weight: 700; font-size: 0.8rem;">AI Forecasts &amp; Risk Outlook 📈</button><button id="btn-open-smart-entry-tab" style="background: rgba(167, 139, 250, 0.15); border: 1px solid rgba(167, 139, 250, 0.4); color: rgb(167, 139, 250); padding: 7px 14px; border-radius: 6px; cursor: pointer; font-weight: 700; font-size: 0.8rem;">Smart Entry ⚡</button></div></div></div><div class="glass-card" role="status" style="padding: 20px; margin-bottom: 16px;"><strong style="color: rgb(251, 191, 36);">Scenario analysis unavailable · research authorization is blocked.</strong><p style="color: rgb(203, 213, 225); margin-bottom: 0px;">No probability, conformal range, or execution-cost estimate is shown without authenticated provenance.</p></div></div><aside class="workstation-sidebar tournament-sidebar-container" role="region" aria-label="Strategy Tournament"><div class="tournament-header-card"><div style="display: flex; justify-content: space-between; align-items: flex-start;"><div><div style="font-size: 0.68rem; font-weight: 800; color: rgb(0, 240, 255); letter-spacing: 0.06em; text-transform: uppercase;">BTCUSD STRATEGY TOURNAMENT</div><div style="font-size: 0.82rem; font-weight: 700; color: rgb(241, 245, 249); margin-top: 2px;">V13 User-Controlled Strategy &amp; Risk Selection</div></div><div style="text-align: right; font-family: var(--font-mono);"><div style="font-size: 0.82rem; font-weight: 800; color: rgb(0, 229, 168);">$103,808.8</div><div style="font-size: 0.62rem; color: rgb(100, 116, 139);">Coinbase Spot 1h</div></div></div><div class="tournament-badge-row"><span class="tournament-badge regime" style="border-color: rgb(56, 189, 248); color: rgb(56, 189, 248); background: rgba(56, 189, 248, 0.094);">REGIME: EVALUATING</span><span class="tournament-badge decision">DECISION: ABSTAIN</span><span class="tournament-badge disabled">LIVE TRADING: DISABLED</span></div><div style="margin-top: 10px; padding: 8px; background: rgba(0, 0, 0, 0.25); border-radius: 4px; font-size: 0.68rem; font-family: var(--font-mono); color: rgb(203, 213, 225);"><div style="display: flex; justify-content: space-between; margin-bottom: 3px;"><span style="color: rgb(148, 163, 184);">Wilder ADX(14):</span><span style="font-weight: 700; color: rgb(203, 213, 225);">-- (Hurdle: 25.0)</span></div><div style="display: flex; justify-content: space-between; margin-bottom: 3px;"><span style="color: rgb(148, 163, 184);">1h EMA 200:</span><span style="font-weight: 700;">$0</span></div><div style="display: flex; justify-content: space-between; margin-bottom: 3px;"><span style="color: rgb(148, 163, 184);">Bollinger Bandwidth:</span><span style="font-weight: 700;">-- (Pct: 0%)</span></div><div style="display: flex; justify-content: space-between;"><span style="color: rgb(148, 163, 184);">Hysteresis Status:</span><span style="font-weight: 700; color: rgb(251, 191, 36);">PENDING (3-Bar Minimum)</span></div></div><div class="tournament-cost-tabs"><button class="tournament-cost-tab active">Retail Spot (87 bps)</button><button class="tournament-cost-tab ">Inst. Spot (18.6 bps)</button><button class="tournament-cost-tab ">Binance Perp (15 bps)</button></div></div><div style="display: flex; justify-content: space-between; align-items: center; padding: 0px 4px; margin-top: 12px; margin-bottom: 6px;"><div style="font-size: 0.72rem; font-weight: 800; color: rgb(148, 163, 184); letter-spacing: 0.05em; text-transform: uppercase;">TOP 5 STRATEGY CANDIDATES</div><button style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.15); color: rgb(148, 163, 184); border-radius: 4px; padding: 2px 8px; font-size: 0.65rem; cursor: pointer; font-family: var(--font-mono);">Compare Baselines</button></div><div class="tournament-candidates-list"></div><div style="background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(0, 240, 255, 0.12); border-radius: 6px; padding: 8px 10px; margin-top: 8px; font-size: 0.65rem; font-family: var(--font-mono);"><div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;"><span style="font-weight: 800; color: rgb(0, 240, 255); letter-spacing: 0.05em; text-transform: uppercase; font-size: 0.66rem;">⚡ ALERT SYSTEM DIAGNOSTICS</span><span style="color: rgb(251, 191, 36); font-weight: 700;">UNKNOWN ▼</span></div><div role="note" style="color: rgb(148, 163, 184); margin-top: 4px;">Diagnostics report worker and delivery status only; they do not represent validated market observations or notification-test history.</div><div style="color: rgb(148, 163, 184); margin-top: 4px;">Unavailable</div></div><div style="text-align: center; padding: 6px; font-size: 0.62rem; color: rgb(100, 116, 139); border-top: 1px solid rgba(255, 255, 255, 0.06); margin-top: 10px;">BTCognitive V13 Strategy Tournament · User-Controlled Research Overlay · No Automated Execution</div></aside></div><div class="workstation-intent-command-bar" role="status">Research evidence controls are unavailable until input provenance and evaluation are verified.</div><div class="workstation-tabs-container" style="margin-top: 16px;"><div class="workstation-tabs-nav"><button id="tab-btn-live" class="workstation-tab-btn ">🔴 LIVE</button><button id="tab-btn-smart-entry" class="workstation-tab-btn active">🎯 SMART ENTRY</button><button id="tab-btn-forecast" class="workstation-tab-btn ">📈 AI FORECASTS &amp; RISK</button><button id="tab-btn-market" class="workstation-tab-btn ">🟩 MARKET</button><button id="tab-btn-strategies" class="workstation-tab-btn ">⚙️ STRATEGIES</button><button id="tab-btn-trades" class="workstation-tab-btn ">📜 TRADES</button><button id="tab-btn-research" class="workstation-tab-btn ">🔬 RESEARCH</button><button id="tab-btn-replay" class="workstation-tab-btn ">🔁 REPLAY</button><button id="tab-btn-arena" class="workstation-tab-btn ">🏟️ ARENA</button></div><div class="workstation-tab-pane"><div id="v19-area-smart-entry" class="terminal-smart-entry-section" style="padding: 8px 0px;"><div id="v32-43-smart-entry-view" style="padding: 24px 32px; max-width: 1400px; margin: 0px auto; color: rgb(248, 250, 252);"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;"><div><div style="font-size: 0.78rem; color: rgb(148, 163, 184); font-family: var(--font-mono); margin-bottom: 4px;"><span style="cursor: pointer; color: rgb(56, 189, 248);">Home</span> / Smart Entry Simulator</div><h1 style="font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em; margin: 0px;">AI-Assisted Smart Entry Simulator &amp; Strategy Tournament</h1><p style="color: rgb(203, 213, 225); margin: 6px 0px 0px; font-size: 0.84rem;">Analyses the chart, screens strategies and runs the tournament automatically.</p></div><div style="display: flex; gap: 10px; align-items: center;"><button id="btn-analyse-setup" style="background: linear-gradient(135deg, rgb(139, 92, 246), rgb(109, 40, 217)); color: rgb(255, 255, 255); border-width: medium; border-style: none; border-color: currentcolor; border-image: none; font-weight: 700; font-size: 0.88rem; padding: 10px 18px; border-radius: 8px; cursor: pointer; box-shadow: rgba(139, 92, 246, 0.4) 0px 4px 14px; display: flex; align-items: center; gap: 8px; opacity: 1; min-height: 44px; min-width: 44px;"><span style="font-size: 1.1rem;">🔬</span>Analyse Setup</button><button style="background: rgba(255, 255, 255, 0.06); border: 1px solid var(--card-border); color: rgb(203, 213, 225); padding: 9px 14px; border-radius: 8px; cursor: pointer; font-size: 0.82rem;">Market Terminal 📈</button></div></div><div id="smart-entry-warning-banner" style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(139, 92, 246, 0.35); border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; display: flex; align-items: flex-start; gap: 14px;"><span style="font-size: 1.5rem; line-height: 1;">🛡️</span><div style="flex: 1 1 0%;"><div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px;"><strong style="color: rgb(167, 139, 250); font-size: 0.88rem; letter-spacing: 0.04em;">RESEARCH-ONLY SMART ENTRY SIMULATOR · STRICT NON-EXECUTION</strong><span style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: rgb(248, 113, 113); font-size: 0.68rem; font-weight: 800; padding: 2px 8px; border-radius: 4px;">NO BROKER ROUTING</span><span style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: rgb(16, 185, 129); font-size: 0.68rem; font-weight: 800; padding: 2px 8px; border-radius: 4px;">ZERO REAL CAPITAL</span></div><p style="font-size: 0.82rem; color: rgb(148, 163, 184); margin: 0px; line-height: 1.5;">This simulator tests whether AI directional forecasts combined with regime-tailored strategies make superior entry and exit decisions. There is no trading account, no live execution, and no monetary P&amp;L. Simulated trades freeze fixed TP/SL levels upon entry and record whether TP is reached first.</p></div></div><div id="analysis-progress" role="status" aria-live="polite" aria-atomic="true" style="padding: 12px 14px; border-radius: 8px; margin-bottom: 14px; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(148, 163, 184, 0.25);"><div style="font-size: 0.82rem; color: rgb(203, 213, 225); margin-bottom: 8px;">Analysis did not start. Correct the data or timeframe issue shown below; no simulated attempt was created.</div><ol style="display: flex; gap: 8px; flex-wrap: wrap; list-style: none; margin: 0px; padding: 0px;"><li style="border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 6px; padding: 4px 8px; font-size: 0.7rem; color: rgb(203, 213, 225);">Validate closed candles: Not completed</li><li style="border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 6px; padding: 4px 8px; font-size: 0.7rem; color: rgb(203, 213, 225);">Compute features/regime and rank candidates: Not completed</li><li style="border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 6px; padding: 4px 8px; font-size: 0.7rem; color: rgb(203, 213, 225);">Verify or run eligible tournament: Not completed</li><li style="border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 6px; padding: 4px 8px; font-size: 0.7rem; color: rgb(203, 213, 225);">Form final decision: Not completed</li></ol></div><div id="analysis-market-state" style="margin-bottom: 14px; color: rgb(203, 213, 225); font-size: 0.78rem;">BTC-USD · 1h · Feed: Coinbase REST candles ready · Latest chart bar: 2026-10-29T12:00:00.000Z · Live price: $103,808.8</div><div id="analysis-error" role="alert" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgb(239, 68, 68); color: rgb(252, 165, 165); padding: 12px 16px; border-radius: 8px; margin-bottom: 20px;">Analysis could not finish: The chart is not backed by a ready Coinbase BTC-USD candle feed. Refresh the chart feed; no analysis or attempt was created. No simulated attempt was created.</div><div id="smart-entry-forecast-panel" class="glass-card" style="padding: 18px 24px; border-radius: 12px; border: 1px solid rgba(56, 189, 248, 0.3); background: rgba(15, 23, 42, 0.75); margin-bottom: 24px;"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;"><div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 1.1rem;">📡</span><strong style="color: rgb(56, 189, 248); font-size: 0.95rem;">ALWAYS-VISIBLE AI FORECAST CONTEXT</strong><span style="background: rgba(0, 229, 168, 0.15); color: rgb(0, 229, 168); font-size: 0.68rem; font-weight: 800; padding: 2px 6px; border-radius: 4px;">FORECAST RECEIVED</span></div><div style="font-size: 0.72rem; color: rgb(148, 163, 184); font-family: var(--font-mono);">Model: not reported · timestamp unavailable</div></div><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;"><div style="background: rgba(0, 0, 0, 0.25); padding: 12px; border-radius: 8px;"><div style="font-size: 0.7rem; color: rgb(148, 163, 184);">DIRECTION ESTIMATE (1h / 4h / 24h)</div><div style="font-size: 1.2rem; font-weight: 800; color: rgb(203, 213, 225);">UNAVAILABLE · P(UP)=n/a</div><div style="font-size: 0.68rem; color: rgb(100, 116, 139);">P(DOWN) = n/a · Directional probability is not TP-first probability.</div></div><div style="background: rgba(0, 0, 0, 0.25); padding: 12px; border-radius: 8px;"><div style="font-size: 0.7rem; color: rgb(148, 163, 184);">CURRENT MARKET REGIME</div><div style="font-size: 1.2rem; font-weight: 800; color: rgb(167, 139, 250);">Not yet analyzed</div><div style="font-size: 0.68rem; color: rgb(100, 116, 139);">Regime unavailable until analysis completes.</div></div><div style="background: rgba(0, 0, 0, 0.25); padding: 12px; border-radius: 8px;"><div style="font-size: 0.7rem; color: rgb(148, 163, 184);">CALIBRATION STATUS</div><div style="font-size: 1.1rem; font-weight: 800; color: rgb(251, 191, 36);">NOT CALIBRATED (TP-FIRST)</div><div style="font-size: 0.68rem; color: rgb(148, 163, 184);">P(UP) is price sign only; NOT trade success probability.</div></div></div></div><div id="smart-entry-analyse-section" style="margin-bottom: 32px;"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;"><h2 style="font-size: 1.2rem; font-weight: 700; margin: 0px;">1. Current Market Analysis &amp; Top-Two Candidate Shortlist</h2><div style="font-size: 0.78rem; color: rgb(148, 163, 184);">Analyse does not create a simulated trade</div></div><div class="glass-card" style="padding: 32px; text-align: center; color: rgb(148, 163, 184); border-radius: 12px;"><p style="margin: 0px 0px 14px; font-size: 0.95rem;">Use the Analyse Setup button above to analyze the current closed chart candles. A missing or stale feed blocks analysis.</p></div></div><div id="smart-entry-evaluation-section" style="margin-bottom: 40px;"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;"><h2 style="font-size: 1.2rem; font-weight: 700; margin: 0px;">4. Simulated Attempts History &amp; TP-First Outcome Evaluation</h2><div style="font-size: 0.78rem; color: rgb(148, 163, 184);">No monetary P&amp;L displayed</div></div><div class="glass-card" style="padding: 24px; text-align: center; color: rgb(148, 163, 184); border-radius: 12px;">No completed simulated trade attempts recorded yet.</div></div></div></div></div></div></div></div><footer style="padding: 20px 40px; border-top: 1px solid var(--card-border); display: flex; justify-content: space-between; align-items: center; background: rgba(5, 8, 22, 0.85); margin-top: 40px;"><div style="font-size: 0.85rem; color: var(--text-muted);">© 2026 BTCognitive AI Market Intelligence Engine · Powered by Adaptive Regimes</div><div class="footer-latency"><span class="latency-item">Market: <span class="latency-val">n/a</span></span><span>·</span><span class="latency-item">Model: <span class="latency-val">n/a</span></span><span>·</span><span class="latency-item">WS: <span class="latency-val">n/a</span></span></div></footer></div></div>
+
+  <!-- QA Result Container -->
+  <div id="qa-results-container" style="display: none;">
+    <div id="qa-scenario-status">FAIL</div>
+    <pre id="qa-results-json">{
+  "scenario": "ANALYSE_NO_ELIGIBLE_STRATEGY",
+  "started_at": "2026-10-29T12:11:23.665Z",
+  "button_clicked": true,
+  "click_timestamp": "2026-10-29T12:11:25.453Z",
+  "requests_intercepted": [
+    {
+      "endpoint": "COINBASE_CANDLES",
+      "url": "https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=3600"
+    }
+  ],
+  "responses_received": [],
+  "analysis_stage_transitions": [],
+  "final_outcome": "BLOCKED_PREFLIGHT",
+  "error_message": "Analysis could not finish: The chart is not backed by a ready Coinbase BTC-USD candle feed. Refresh the chart feed; no analysis or attempt was created. No simulated attempt was created.",
+  "simulated_attempts_created": 0,
+  "passed": false
+}</pre>
+  </div>
+
+  <script>
+    // Extract scenario from query parameter
+    const params = new URLSearchParams(window.location.search);
+    const scenario = params.get("scenario") || "ANALYSE_NORMAL";
+    document.getElementById("qa-scenario-badge").textContent = "SCENARIO: " + scenario;
+    window.__QA_SCENARIO__ = scenario;
+    window.__QA_RESULTS__ = {
+      scenario: scenario,
+      started_at: new Date().toISOString(),
+      button_clicked: false,
+      click_timestamp: null,
+      requests_intercepted: [],
+      responses_received: [],
+      analysis_stage_transitions: [],
+      final_outcome: null,
+      error_message: null,
+      simulated_attempts_created: 0,
+      passed: false
+    };
+
+    // Pre-flight Mock Interceptor for Coinbase REST & WS
+    const origFetch = window.fetch;
+    window.fetch = async function(url, options = {}) {
+      const urlStr = typeof url === "string" ? url : (url.url || "");
+      
+      // Intercept Coinbase candles
+      if (urlStr.includes("api.exchange.coinbase.com/products/BTC-USD/candles")) {
+        window.__QA_RESULTS__.requests_intercepted.push({ endpoint: "COINBASE_CANDLES", url: urlStr });
+        if (scenario === "ANALYSE_PROVIDER_UNAVAILABLE") {
+          return new Response(JSON.stringify([]), { status: 503, headers: { "Content-Type": "application/json" } });
+        }
+        // Fetch deterministic seed candles from local QA server
+        const res = await origFetch("/api/qa/seed-candles?scenario=" + scenario);
+        const data = await res.json();
+        // Coinbase REST format: [[time, low, high, open, close, volume], ...] in descending order
+        const cbCandles = data.map(c => [c.time, c.low, c.high, c.open, c.close, c.volume]).reverse();
+        return new Response(JSON.stringify(cbCandles), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+
+      // Intercept Analyse API calls to log telemetry
+      if (urlStr.includes("/api/tournament/analyse")) {
+        window.__QA_RESULTS__.requests_intercepted.push({
+          endpoint: "ANALYSE",
+          payload: options.body ? JSON.parse(options.body) : null
+        });
+      }
+
+      const resp = await origFetch(url, options);
+      if (urlStr.includes("/api/tournament/analyse")) {
+        const clone = resp.clone();
+        try {
+          const body = await clone.json();
+          window.__QA_RESULTS__.responses_received.push({ status: resp.status, body: body });
+        } catch(e) {}
+      }
+      return resp;
+    };
+
+    // Mock WebSocket for Coinbase feed
+    window.WebSocket = function(url) {
+      return {
+        readyState: 1, // OPEN
+        send: function() {},
+        close: function() {},
+        addEventListener: function() {},
+        removeEventListener: function() {}
+      };
+    };
+  </script>
+
+  <!-- Load Real Application Script -->
+  <script src="/app.js"></script>
+
+  <!-- Automated Scenario Driver -->
+  <script>
+    (async function runTestDriver() {
+      // Set hash route to smart entry
+      window.location.hash = "#/smart-entry";
+
+      // Wait for app mount and button presence
+      let btn = null;
+      for (let i = 0; i < 40; i++) {
+        await new Promise(r => setTimeout(r, 100));
+        btn = document.getElementById("btn-analyse-setup");
+        if (btn) break;
+      }
+
+      if (!btn) {
+        window.__QA_RESULTS__.error_message = "btn-analyse-setup not found in DOM within 4s";
+        finalize(false);
+        return;
+      }
+
+      // Allow 300ms for candle feed state propagation
+      await new Promise(r => setTimeout(r, 300));
+
+      // Execute scenario-specific click behavior
+      window.__QA_RESULTS__.button_clicked = true;
+      window.__QA_RESULTS__.click_timestamp = new Date().toISOString();
+
+      if (scenario === "ANALYSE_DOUBLE_CLICK") {
+        btn.click();
+        await new Promise(r => setTimeout(r, 20));
+        btn.click(); // rapid double-click
+      } else {
+        btn.click();
+      }
+
+      // Poll for completion or terminal state
+      let terminalStateReached = false;
+      for (let j = 0; j < 35; j++) {
+        await new Promise(r => setTimeout(r, 150));
+        const errEl = document.getElementById("analysis-error");
+        const outcomeEl = document.querySelector("#v32-43-smart-entry-view h2, #v32-43-smart-entry-view h3, [role='status']");
+        const statusText = document.body.innerText;
+
+        if (errEl && errEl.textContent.trim()) {
+          window.__QA_RESULTS__.error_message = errEl.textContent.trim();
+          terminalStateReached = true;
+          break;
+        }
+
+        if (statusText.includes("ENTRY CANDIDATE FOUND") ||
+            statusText.includes("NO QUALIFYING SETUP") ||
+            statusText.includes("ANALYSIS ABSTAINED") ||
+            statusText.includes("Analysis complete") ||
+            statusText.includes("Analysis did not start") ||
+            statusText.includes("Analysis request failed")) {
+          terminalStateReached = true;
+          break;
+        }
+      }
+
+      // Capture final rendered outcome
+      const bodyText = document.body.innerText;
+      if (bodyText.includes("ENTRY CANDIDATE FOUND")) {
+        window.__QA_RESULTS__.final_outcome = "ENTRY_CANDIDATE_FOUND";
+      } else if (bodyText.includes("NO QUALIFYING SETUP")) {
+        window.__QA_RESULTS__.final_outcome = "NO_QUALIFYING_SETUP";
+      } else if (bodyText.includes("ANALYSIS ABSTAINED")) {
+        window.__QA_RESULTS__.final_outcome = "ANALYSIS_ABSTAINED";
+      } else if (bodyText.includes("Analysis did not start")) {
+        window.__QA_RESULTS__.final_outcome = "BLOCKED_PREFLIGHT";
+      } else if (bodyText.includes("Analysis request failed")) {
+        window.__QA_RESULTS__.final_outcome = "ERROR_HANDLED";
+      } else {
+        window.__QA_RESULTS__.final_outcome = "TIMEOUT_OR_UNRESOLVED";
+      }
+
+      // Check invariant: zero simulated attempts created
+      const attemptsCount = document.querySelectorAll(".simulated-trade-card, #active-simulated-trade").length;
+      window.__QA_RESULTS__.simulated_attempts_created = attemptsCount;
+
+      // Evaluate scenario pass/fail
+      let passed = false;
+      switch (scenario) {
+        case "ANALYSE_NORMAL":
+          passed = (window.__QA_RESULTS__.final_outcome === "NO_QUALIFYING_SETUP" || window.__QA_RESULTS__.final_outcome === "ENTRY_CANDIDATE_FOUND") && attemptsCount === 0;
+          break;
+        case "ANALYSE_NO_ELIGIBLE_STRATEGY":
+          passed = (window.__QA_RESULTS__.final_outcome === "NO_QUALIFYING_SETUP" || window.__QA_RESULTS__.final_outcome === "ANALYSIS_ABSTAINED") && attemptsCount === 0;
+          break;
+        case "ANALYSE_GAPS":
+          passed = (window.__QA_RESULTS__.final_outcome === "BLOCKED_PREFLIGHT" || window.__QA_RESULTS__.final_outcome === "ERROR_HANDLED" || Boolean(window.__QA_RESULTS__.error_message)) && attemptsCount === 0;
+          break;
+        case "ANALYSE_DUPLICATE_OR_INVALID_OHLCV":
+          passed = (window.__QA_RESULTS__.final_outcome === "ERROR_HANDLED" || Boolean(window.__QA_RESULTS__.error_message)) && attemptsCount === 0;
+          break;
+        case "ANALYSE_STALE_DATA":
+          passed = (window.__QA_RESULTS__.final_outcome === "BLOCKED_PREFLIGHT" || window.__QA_RESULTS__.final_outcome === "ERROR_HANDLED" || Boolean(window.__QA_RESULTS__.error_message)) && attemptsCount === 0;
+          break;
+        case "ANALYSE_PROVIDER_UNAVAILABLE":
+          passed = (window.__QA_RESULTS__.final_outcome === "BLOCKED_PREFLIGHT" || Boolean(window.__QA_RESULTS__.error_message)) && !bodyText.includes("$80,000") && attemptsCount === 0;
+          break;
+        case "ANALYSE_MALFORMED_OR_MISSING_FORECAST":
+          passed = (window.__QA_RESULTS__.final_outcome !== "TIMEOUT_OR_UNRESOLVED") && attemptsCount === 0;
+          break;
+        case "ANALYSE_TIMEOUT_OR_SERVER_ERROR":
+          passed = (window.__QA_RESULTS__.final_outcome === "ERROR_HANDLED" || Boolean(window.__QA_RESULTS__.error_message)) && attemptsCount === 0;
+          break;
+        case "ANALYSE_DOUBLE_CLICK":
+          passed = (window.__QA_RESULTS__.requests_intercepted.filter(r => r.endpoint === "ANALYSE").length <= 1) && attemptsCount === 0;
+          break;
+        case "ANALYSE_QUALIFYING_CANDIDATE":
+          passed = (window.__QA_RESULTS__.final_outcome === "ENTRY_CANDIDATE_FOUND") && attemptsCount === 0;
+          break;
+        default:
+          passed = false;
+      }
+
+      window.__QA_RESULTS__.passed = passed;
+      finalize(passed);
+    })();
+
+    function finalize(passed) {
+      document.getElementById("qa-scenario-status").textContent = passed ? "PASS" : "FAIL";
+      document.getElementById("qa-results-json").textContent = JSON.stringify(window.__QA_RESULTS__, null, 2);
+      window.__QA_DONE__ = true;
+    }
+  </script>
+
+
+</body></html>

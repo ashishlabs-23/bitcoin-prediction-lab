@@ -1,0 +1,77 @@
+{
+  "timestamp_utc": "2026-10-29T11:38:29Z",
+  "total_scenarios": 5,
+  "all_passed": true,
+  "scenarios": [
+    {
+      "test_id": "NORMAL_DESKTOP",
+      "scenario": "NORMAL",
+      "viewport": [
+        1280,
+        800
+      ],
+      "screenshot_path": "research\\reports\\v32_58_open_source_provider_review\\20261029_170100_review\\screenshots\\chart_desktop_normal.png",
+      "screenshot_size_bytes": 296013,
+      "dom_path": "research\\reports\\v32_58_open_source_provider_review\\20261029_170100_review\\screenshots\\chart_desktop_normal_dom.html",
+      "exit_code": 0,
+      "no_fabricated_price_verified": true,
+      "passed": true
+    },
+    {
+      "test_id": "MOBILE_375PX",
+      "scenario": "NORMAL",
+      "viewport": [
+        375,
+        667
+      ],
+      "screenshot_path": "research\\reports\\v32_58_open_source_provider_review\\20261029_170100_review\\screenshots\\chart_mobile_375px.png",
+      "screenshot_size_bytes": 116119,
+      "dom_path": "research\\reports\\v32_58_open_source_provider_review\\20261029_170100_review\\screenshots\\chart_mobile_375px_dom.html",
+      "exit_code": 0,
+      "no_fabricated_price_verified": true,
+      "passed": true
+    },
+    {
+      "test_id": "TIMEFRAME_MISMATCH",
+      "scenario": "TIMEFRAME_MISMATCH",
+      "viewport": [
+        1280,
+        800
+      ],
+      "screenshot_path": "research\\reports\\v32_58_open_source_provider_review\\20261029_170100_review\\screenshots\\chart_timeframe_mismatch.png",
+      "screenshot_size_bytes": 330344,
+      "dom_path": "research\\reports\\v32_58_open_source_provider_review\\20261029_170100_review\\screenshots\\chart_timeframe_mismatch_dom.html",
+      "exit_code": 0,
+      "no_fabricated_price_verified": true,
+      "passed": true
+    },
+    {
+      "test_id": "DATA_STALE",
+      "scenario": "STALE",
+      "viewport": [
+        1280,
+        800
+      ],
+      "screenshot_path": "research\\reports\\v32_58_open_source_provider_review\\20261029_170100_review\\screenshots\\chart_data_stale.png",
+      "screenshot_size_bytes": 304689,
+      "dom_path": "research\\reports\\v32_58_open_source_provider_review\\20261029_170100_review\\screenshots\\chart_data_stale_dom.html",
+      "exit_code": 0,
+      "no_fabricated_price_verified": true,
+      "passed": true
+    },
+    {
+      "test_id": "PROVIDER_UNAVAILABLE",
+      "scenario": "PROVIDER_UNAVAILABLE",
+      "viewport": [
+        1280,
+        800
+      ],
+      "screenshot_path": "research\\reports\\v32_58_open_source_provider_review\\20261029_170100_review\\screenshots\\chart_provider_unavailable.png",
+      "screenshot_size_bytes": 316910,
+      "dom_path": "research\\reports\\v32_58_open_source_provider_review\\20261029_170100_review\\screenshots\\chart_provider_unavailable_dom.html",
+      "exit_code": 0,
+      "no_fabricated_price_verified": true,
+      "passed": true
+    }
+  ]
+}

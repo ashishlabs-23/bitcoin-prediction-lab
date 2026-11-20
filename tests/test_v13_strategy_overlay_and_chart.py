@@ -121,8 +121,36 @@ def test_v13_drawdown_mathematical_correction():
 # ==============================================================================
 # 3. P0 — User-Controlled Strategy Setup Contract Endpoint
 # ==============================================================================
-def test_v13_strategy_setup_contract_endpoint():
+def test_v13_strategy_setup_contract_endpoint(tmp_path, monkeypatch):
     """Verify GET /api/tournament/setup/{strategy_id} returns a typed, governed V13 contract."""
+    import api.routes_tournament as tournament_routes
+
+    fixture_path = tmp_path / "deterministic_fixture_ohlcv.parquet"
+    rng = np.random.default_rng(13013)
+    count = 2000
+    timestamps = pd.date_range(
+        end=pd.Timestamp.now(tz="UTC").floor("h") - pd.Timedelta(hours=1),
+        periods=count,
+        freq="h",
+    )
+    returns = rng.normal(0.0, 0.005, count)
+    close = 80_000.0 * np.exp(np.cumsum(returns))
+    open_price = np.concatenate(([close[0]], close[:-1]))
+    fixture = pd.DataFrame(
+        {
+            "timestamp": timestamps,
+            "open": open_price,
+            "high": np.maximum(open_price, close) * 1.0002,
+            "low": np.minimum(open_price, close) * 0.9998,
+            "close": close,
+            "volume": rng.uniform(100.0, 1000.0, count),
+            "data_source": "DETERMINISTIC_TEST_FIXTURE",
+        }
+    )
+    fixture.to_parquet(fixture_path, index=False)
+    engine = V12StrategyTournamentEngine(data_path=str(fixture_path))
+    assert engine.data_status == "AVAILABLE"
+    monkeypatch.setattr(tournament_routes, "get_tournament_engine", lambda: engine)
     response = client.get("/api/tournament/setup/HTF_RANGE_EXPANSION_BREAKOUT?enabled=false")
     assert response.status_code == 200, f"Error: {response.text}"
     data = response.json()
@@ -207,35 +235,73 @@ def test_v13_strategy_contract_detail_endpoint():
 # ==============================================================================
 def test_v13_counterfactual_lab_endpoints():
     """Verify /prediction/counterfactual and /prediction/counterfactual/contract endpoints."""
-    # 1. Main counterfactual endpoint
-    res = client.get("/prediction/counterfactual")
-    assert res.status_code == 200
-    data = res.json()
-    assert "counterfactuals" in data
-    assert len(data["counterfactuals"]) >= 5
+    from engine.feature_cache import feature_cache
 
-    # Check each canonical mechanism has valid upper_scenario and lower_scenario
-    mechanisms = {c["genome_id"] for c in data["counterfactuals"]}
-    assert "MEIE-IGNITION" in mechanisms
-    assert "MEIE-ABSORPTION" in mechanisms
-    assert "MEIE-VACUUM" in mechanisms
-    assert "MEIE-TOXICITY" in mechanisms
-    assert "MEIE-COMBINED" in mechanisms
+    previous_state = (
+        feature_cache._df.copy(deep=True) if feature_cache._df is not None else None,
+        feature_cache._last_update_ts,
+        feature_cache._is_initialized,
+        feature_cache._is_degraded,
+    )
+    candle_count = 96
+    timestamps = pd.date_range(
+        end=pd.Timestamp.now(tz="UTC").floor("15min") - pd.Timedelta(minutes=15),
+        periods=candle_count,
+        freq="15min",
+    )
+    closes = 80_000.0 + np.arange(candle_count, dtype=float) * 2.0
+    fixture_candles = [
+        {
+            "timestamp": timestamp,
+            "open": float(close - 1.0),
+            "high": float(close + 2.0),
+            "low": float(close - 2.0),
+            "close": float(close),
+            "volume": 100.0,
+            "data_source": "DETERMINISTIC_TEST_FIXTURE",
+        }
+        for timestamp, close in zip(timestamps, closes)
+    ]
+    feature_cache.update_from_candles(fixture_candles)
+    feature_cache._is_degraded = False
 
-    for c in data["counterfactuals"]:
-        assert "upper_scenario" in c
-        assert "lower_scenario" in c
-        assert c["upper_scenario"]["status"] in ["AVAILABLE", "BLOCKED", "UNAVAILABLE"]
-        assert c["lower_scenario"]["status"] in ["AVAILABLE", "BLOCKED", "UNAVAILABLE"]
+    try:
+        # 1. Main counterfactual endpoint
+        res = client.get("/prediction/counterfactual")
+        assert res.status_code == 200
+        data = res.json()
+        assert "counterfactuals" in data
+        assert len(data["counterfactuals"]) >= 5
 
-    # 2. Counterfactual contract detail endpoint for modal inspection
-    res_contract = client.get("/prediction/counterfactual/contract/MEIE-IGNITION")
-    assert res_contract.status_code == 200
-    contract_data = res_contract.json()
-    assert contract_data["status"] == "SUCCESS"
-    assert "contract" in contract_data or "contract_details" in contract_data
-    assert "upper_scenario" in contract_data
-    assert "lower_scenario" in contract_data
+        # Check each canonical mechanism has valid upper_scenario and lower_scenario
+        mechanisms = {c["genome_id"] for c in data["counterfactuals"]}
+        assert "MEIE-IGNITION" in mechanisms
+        assert "MEIE-ABSORPTION" in mechanisms
+        assert "MEIE-VACUUM" in mechanisms
+        assert "MEIE-TOXICITY" in mechanisms
+        assert "MEIE-COMBINED" in mechanisms
+
+        for c in data["counterfactuals"]:
+            assert "upper_scenario" in c
+            assert "lower_scenario" in c
+            assert c["upper_scenario"]["status"] in ["AVAILABLE", "BLOCKED", "UNAVAILABLE"]
+            assert c["lower_scenario"]["status"] in ["AVAILABLE", "BLOCKED", "UNAVAILABLE"]
+
+        # 2. Counterfactual contract detail endpoint for modal inspection
+        res_contract = client.get("/prediction/counterfactual/contract/MEIE-IGNITION")
+        assert res_contract.status_code == 200
+        contract_data = res_contract.json()
+        assert contract_data["status"] == "SUCCESS"
+        assert "contract" in contract_data or "contract_details" in contract_data
+        assert "upper_scenario" in contract_data
+        assert "lower_scenario" in contract_data
+    finally:
+        (
+            feature_cache._df,
+            feature_cache._last_update_ts,
+            feature_cache._is_initialized,
+            feature_cache._is_degraded,
+        ) = previous_state
 
 
 # ==============================================================================

@@ -1,0 +1,218 @@
+{
+  "sim_results": {
+    "full_period": {
+      "baseline_100pct": {
+        "start_equity": 100000.0,
+        "final_equity": 100553.98502680863,
+        "total_return_pct": 0.5539850268086302,
+        "cagr_pct": 0.11780810272561393,
+        "max_drawdown_pct": 47.34597829251809,
+        "total_turnover_usd": 42696109.77678803,
+        "total_exposure_hours": 13720.0,
+        "exposure_pct": 33.35602450646699,
+        "sharpe_ratio": 0.14108006951439475,
+        "sortino_ratio": 0.3090126663061182,
+        "trade_count": 194
+      },
+      "filtered_100pct": {
+        "start_equity": 100000.0,
+        "final_equity": 171809.03704376,
+        "total_return_pct": 71.80903704376,
+        "cagr_pct": 12.225799515871572,
+        "max_drawdown_pct": 28.34791194798589,
+        "total_turnover_usd": 31528308.2787831,
+        "total_exposure_hours": 7928.0,
+        "exposure_pct": 19.274530778955558,
+        "sharpe_ratio": 0.6347176453472031,
+        "sortino_ratio": 1.5908712387109678,
+        "trade_count": 110
+      },
+      "baseline_10pct": {
+        "start_equity": 100000.0,
+        "final_equity": 101686.72730168978,
+        "total_return_pct": 1.6867273016897815,
+        "cagr_pct": 0.3571113240091739,
+        "max_drawdown_pct": 5.883494507903734,
+        "total_turnover_usd": 3945395.919453,
+        "total_exposure_hours": 13720.0,
+        "exposure_pct": 33.35602450646699,
+        "sharpe_ratio": 0.14108006951439475,
+        "sortino_ratio": 0.3090126663061182,
+        "trade_count": 194
+      },
+      "filtered_10pct": {
+        "start_equity": 100000.0,
+        "final_equity": 106613.6213493215,
+        "total_return_pct": 6.6136213493215035,
+        "cagr_pct": 1.3741922024539388,
+        "max_drawdown_pct": 3.191925165529113,
+        "total_turnover_usd": 2288896.7034080727,
+        "total_exposure_hours": 7928.0,
+        "exposure_pct": 19.274530778955558,
+        "sharpe_ratio": 0.634717645347203,
+        "sortino_ratio": 1.5908712387109676,
+        "trade_count": 110
+      }
+    },
+    "is_period": {
+      "baseline_100pct": {
+        "start_equity": 100000.0,
+        "final_equity": 106697.09931658758,
+        "total_return_pct": 6.697099316587584,
+        "cagr_pct": 3.347061958058606,
+        "max_drawdown_pct": 39.08824941598285,
+        "total_turnover_usd": 13155871.929579688,
+        "total_exposure_hours": 5200.0,
+        "exposure_pct": 30.127462340672075,
+        "sharpe_ratio": 0.25752576968470026,
+        "sortino_ratio": 0.5236225259095659,
+        "trade_count": 75
+      },
+      "filtered_100pct": {
+        "start_equity": 100000.0,
+        "final_equity": 162864.81648195893,
+        "total_return_pct": 62.86481648195893,
+        "cagr_pct": 28.109910577397134,
+        "max_drawdown_pct": 24.423302458522624,
+        "total_turnover_usd": 10701887.722470775,
+        "total_exposure_hours": 3272.0,
+        "exposure_pct": 18.95712630359212,
+        "sharpe_ratio": 1.1494548586484785,
+        "sortino_ratio": 2.7912171621033455,
+        "trade_count": 46
+      },
+      "baseline_10pct": {
+        "start_equity": 100000.0,
+        "final_equity": 101458.02416808643,
+        "total_return_pct": 1.4580241680864274,
+        "cagr_pct": 0.7378630301464462,
+        "max_drawdown_pct": 4.686418752836987,
+        "total_turnover_usd": 1485843.6366366188,
+        "total_exposure_hours": 5200.0,
+        "exposure_pct": 30.127462340672075,
+        "sharpe_ratio": 0.25752576968470037,
+        "sortino_ratio": 0.5236225259095663,
+        "trade_count": 75
+      },
+      "filtered_10pct": {
+        "start_equity": 100000.0,
+        "final_equity": 105548.49810424825,
+        "total_return_pct": 5.548498104248254,
+        "cagr_pct": 2.780522042083078,
+        "max_drawdown_pct": 2.6868083241861984,
+        "total_turnover_usd": 935554.5609187791,
+        "total_exposure_hours": 3272.0,
+        "exposure_pct": 18.95712630359212,
+        "sharpe_ratio": 1.1494548586484779,
+        "sortino_ratio": 2.791217162103345,
+        "trade_count": 46
+      }
+    },
+    "oos_period": {
+      "baseline_100pct": {
+        "start_equity": 100000.0,
+        "final_equity": 94242.47301086294,
+        "total_return_pct": -5.757526989137055,
+        "cagr_pct": -2.1539808470439348,
+        "max_drawdown_pct": 47.34597829251808,
+        "total_turnover_usd": 27686073.97616094,
+        "total_exposure_hours": 8520.0,
+        "exposure_pct": 35.69034852546917,
+        "sharpe_ratio": 0.04456907069164828,
+        "sortino_ratio": 0.10830539917489257,
+        "trade_count": 119
+      },
+      "filtered_100pct": {
+        "start_equity": 100000.0,
+        "final_equity": 105491.80649019555,
+        "total_return_pct": 5.491806490195551,
+        "cagr_pct": 1.9826078958548266,
+        "max_drawdown_pct": 28.34791194798586,
+        "total_turnover_usd": 12787550.439796394,
+        "total_exposure_hours": 4656.0,
+        "exposure_pct": 19.50402144772118,
+        "sharpe_ratio": 0.19562336214755194,
+        "sortino_ratio": 0.4981920496757027,
+        "trade_count": 64
+      },
+      "baseline_10pct": {
+        "start_equity": 100000.0,
+        "final_equity": 100225.41650646037,
+        "total_return_pct": 0.22541650646037306,
+        "cagr_pct": 0.08271588143797803,
+        "max_drawdown_pct": 5.883494507903689,
+        "total_turnover_usd": 2424206.762337121,
+        "total_exposure_hours": 8520.0,
+        "exposure_pct": 35.69034852546917,
+        "sharpe_ratio": 0.044569070691648345,
+        "sortino_ratio": 0.10830539917489271,
+        "trade_count": 119
+      },
+      "filtered_10pct": {
+        "start_equity": 100000.0,
+        "final_equity": 101009.13159751569,
+        "total_return_pct": 1.0091315975156903,
+        "cagr_pct": 0.3693849525043147,
+        "max_drawdown_pct": 3.1919251655291636,
+        "total_turnover_usd": 1282199.336605077,
+        "total_exposure_hours": 4656.0,
+        "exposure_pct": 19.50402144772118,
+        "sharpe_ratio": 0.19562336214755197,
+        "sortino_ratio": 0.4981920496757026,
+        "trade_count": 64
+      }
+    }
+  },
+  "stat_summary": {
+    "full_period": {
+      "base_n": 194,
+      "base_ev": 9.571260605967824,
+      "base_std": 437.35829857428655,
+      "base_wr": 0.4381443298969072,
+      "filt_n": 110,
+      "filt_ev": 59.25460065478394,
+      "filt_std": 454.07935755772746,
+      "filt_wr": 0.4818181818181818,
+      "excl_n": 84,
+      "excl_ev": -55.49025612462475,
+      "excl_std": 407.99069182607275,
+      "excl_wr": 0.38095238095238093,
+      "t_stat_filt_vs_base": 0.9289562654437931,
+      "p_val_filt_vs_base": 0.3539320611301785,
+      "t_stat_filt_vs_excl": 1.8478269280078208,
+      "p_val_filt_vs_excl": 0.06620747159859244
+    },
+    "is_period": {
+      "base_n": 75,
+      "base_ev": 20.507067993249986,
+      "base_std": 494.77599234545914,
+      "base_wr": 0.44,
+      "filt_n": 46,
+      "filt_ev": 118.7029318783815,
+      "filt_std": 504.6629682968004,
+      "filt_wr": 0.5,
+      "excl_n": 29,
+      "excl_ev": -135.25188851419998,
+      "excl_std": 443.5052944982228,
+      "excl_wr": 0.3448275862068966
+    },
+    "oos_period": {
+      "base_n": 119,
+      "base_ev": 2.678945025747973,
+      "base_std": 399.01802150814717,
+      "base_wr": 0.4369747899159664,
+      "filt_n": 64,
+      "filt_ev": 16.526112587823242,
+      "filt_std": 412.7775014199695,
+      "filt_wr": 0.46875,
+      "excl_n": 55,
+      "excl_ev": -13.434122682848708,
+      "excl_std": 385.53935179844154,
+      "excl_wr": 0.4,
+      "t_stat_filt_vs_base": 0.21893708236511053,
+      "p_val_filt_vs_base": 0.8270551864278635,
+      "t_stat_filt_vs_excl": 0.40904152551208545,
+      "p_val_filt_vs_excl": 0.683262334855001
+    }
+  }
+}

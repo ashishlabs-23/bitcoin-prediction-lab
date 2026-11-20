@@ -3,7 +3,7 @@ import sqlite3
 
 import pandas as pd
 
-from api import routes_market, routes_prediction
+from api import routes_market, routes_prediction, routes_tournament
 
 
 def test_candles_do_not_fabricate_rows_when_cache_is_empty(monkeypatch):
@@ -107,6 +107,18 @@ def test_unverified_forecasts_and_explanations_remain_unavailable():
     assert explanation["top_5_indicators"] == []
     assert quality["status"] == "BLOCKED_PROVENANCE_UNVERIFIED"
     assert quality["score"] is None
+
+
+def test_market_regime_does_not_infer_missing_venue(monkeypatch):
+    class RegimeEngine:
+        def get_current_market_regime(self):
+            return {"regime": "UNKNOWN"}
+
+    monkeypatch.setattr(routes_tournament, "get_tournament_engine", lambda: RegimeEngine())
+    regime = asyncio.run(routes_prediction.get_market_regime())
+
+    assert regime["status"] == "LIVE"
+    assert regime["venue"] == "UNAVAILABLE"
 
 
 def test_prediction_range_history_uses_existing_schema_columns(monkeypatch):

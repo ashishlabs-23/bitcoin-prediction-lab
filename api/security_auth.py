@@ -60,6 +60,41 @@ def get_current_user_role(
         headers={"WWW-Authenticate": "Bearer, ApiKey"}
     )
 
+
+def get_current_principal_id(
+    request: Request,
+    current_role: UserRole = Security(get_current_user_role),
+) -> str:
+    """Return a trusted ASGI-authenticated principal ID or fail closed.
+
+    Configured API keys identify an authorization role, not an individual.
+    Record ownership therefore requires an authenticated principal supplied by
+    trusted ASGI authentication middleware; client headers/body/query values
+    are deliberately not treated as identity.
+    """
+    if ROLE_HIERARCHY[current_role] < ROLE_HIERARCHY[UserRole.USER]:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authenticated user identity is required.",
+            headers={"WWW-Authenticate": "Bearer, ApiKey"},
+        )
+
+    principal = request.scope.get("user")
+    if principal is None or not getattr(principal, "is_authenticated", False):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="A trusted authenticated-principal identity provider is not configured.",
+        )
+
+    identity = getattr(principal, "identity", None)
+    if not isinstance(identity, str) or not identity.strip():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The authenticated principal has no stable identity.",
+        )
+    return identity.strip()
+
+
 def require_role(min_role: UserRole) -> Callable:
     """
     Dependency factory enforcing minimum required role hierarchy.

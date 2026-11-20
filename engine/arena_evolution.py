@@ -51,9 +51,6 @@ _STRATEGY_EVENT_MAP = {
 }
 
 # 168h risk gate: if Observatory macro regime contains any of these → block all trades
-_MACRO_BLOCK_REGIMES = {"HIGH_UNCERTAINTY", "CRISIS", "BEAR_EXTREME"}
-
-
 def _get_macro_regime() -> str:
     """Read macro regime from Observatory (read-only)."""
     try:
@@ -65,17 +62,8 @@ def _get_macro_regime() -> str:
 
 
 def _get_c2_risk_multiplier(macro_regime: str) -> float:
-    """
-    Computes C2 risk multiplier based on Observatory snapshot:
-      - CRISIS / HIGH_UNCERTAINTY / BEAR_EXTREME: 0.0 (mandatory ABSTAIN)
-      - DEGRADED / ELEVATED: 0.5 (half risk budget)
-      - CALIBRATED / NORMAL / COMPRESSION: 1.0 (standard budget)
-    """
-    if any(r in macro_regime for r in _MACRO_BLOCK_REGIMES):
-        return 0.0
-    if "DEGRADED" in macro_regime or "ELEVATED" in macro_regime:
-        return 0.5
-    return 1.0
+    """Keep the C2 risk multiplier fail-closed until calibration is verified."""
+    return 0.0
 
 
 def process_candle(candle: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -175,7 +163,7 @@ def process_candle(candle: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             if strategy_name not in strategies_to_act:
                 continue
 
-            c2_state_label = "CRISIS" if c2_scale == 0.0 else ("DEGRADED" if c2_scale < 1.0 else "CALIBRATED")
+            c2_state_label = "UNAVAILABLE"
 
             # Estimate payoff (EV gate + execution blockers)
             payoff: PayoffEstimate = estimate_payoff(

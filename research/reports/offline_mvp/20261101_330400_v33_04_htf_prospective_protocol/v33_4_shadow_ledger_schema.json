@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HTFProspectiveShadowLedgerEntry",
+  "description": "Pre-registered schema for prospective shadow evaluation of HTF_RANGE_EXPANSION_BREAKOUT with MarketRegimeClassifier.",
+  "type": "object",
+  "required": [
+    "signal_id",
+    "timestamp_issue_utc",
+    "breakout_bar_close",
+    "execution_open_price",
+    "stop_loss_price",
+    "regime_at_entry",
+    "regime_confirmed_bars",
+    "filter_action",
+    "cost_modeled_bps",
+    "exit_timestamp_utc",
+    "exit_price",
+    "holding_hours",
+    "gross_return_bps",
+    "net_return_bps",
+    "protocol_version"
+  ],
+  "properties": {
+    "signal_id": {
+      "type": "string",
+      "description": "Unique identifier for the breakout signal event."
+    },
+    "timestamp_issue_utc": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the 4h breakout bar closed and signal was issued."
+    },
+    "breakout_bar_close": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Close price of the breakout candle."
+    },
+    "execution_open_price": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Fill price at the open of the next candle (nxt['open'])."
+    },
+    "stop_loss_price": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Trailing Donchian 20-period 4h low."
+    },
+    "regime_at_entry": {
+      "type": "string",
+      "enum": ["BULL_TREND", "BEAR_TREND", "VOLATILITY_EXPANSION", "CONSOLIDATION_RANGE"],
+      "description": "Macro regime classified by MarketRegimeClassifier at entry timestamp."
+    },
+    "regime_confirmed_bars": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of consecutive 1h bars confirming the regime."
+    },
+    "filter_action": {
+      "type": "string",
+      "enum": ["EXECUTED_SHADOW", "SUPPRESSED_CHOP"],
+      "description": "Whether the trade was executed in shadow portfolio or suppressed as chop."
+    },
+    "cost_modeled_bps": {
+      "type": "number",
+      "enum": [26.0],
+      "description": "Fixed Binance VIP0 modeled friction (20 comm + 2 spread + 2 base slip + 2 exp slip)."
+    },
+    "exit_timestamp_utc": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when position closed (either stop hit or max 72h expired)."
+    },
+    "exit_price": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Realized exit price."
+    },
+    "holding_hours": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 72.0,
+      "description": "Duration the position was held (capped at 72.0h)."
+    },
+    "gross_return_bps": {
+      "type": "number",
+      "description": "Gross percentage return in basis points."
+    },
+    "net_return_bps": {
+      "type": "number",
+      "description": "Net return after subtracting 26.0 bps cost."
+    },
+    "protocol_version": {
+      "type": "string",
+      "enum": ["V33.4_FROZEN_SHADOW"],
+      "description": "Pre-registered protocol version tag."
+    }
+  },
+  "additionalProperties": false
+}
+

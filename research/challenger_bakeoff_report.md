@@ -4,12 +4,12 @@
 
 | Bake-Off Metric | Production (Ridge v3.0.0) | Challenger (EWMA v3.1.0) | Winner |
 | --- | --- | --- | --- |
-| 1. MFE Point Error (MAE %) | 1.8744% | 1.9964% | Production Ridge |
-| 2. MAE Point Error (MAE %) | 1.4546% | 1.3188% | Production Ridge |
-| 3. Quantile Pinball Loss | 1.0878 | 1.0310 | Production Ridge |
-| 4. MFE P90 Coverage % | 75.8% | 75.8% | Production Ridge |
-| 5. Joint Path Containment % | 69.7% | 60.6% | Production Ridge |
-| 6. Mean Range Width % | 7.76% | 6.44% | Challenger (Tighter, but lower coverage) |
+| 1. MFE Point Error (MAE %) | 0.8318% | 0.8950% | Production Ridge |
+| 2. MAE Point Error (MAE %) | 0.9479% | 0.9296% | Production Ridge |
+| 3. Quantile Pinball Loss | 0.3677 | 0.3066 | Production Ridge |
+| 4. MFE P90 Coverage % | 90.9% | 84.8% | Production Ridge |
+| 5. Joint Path Containment % | 78.8% | 72.7% | Production Ridge |
+| 6. Mean Range Width % | 6.10% | 5.06% | Challenger (Tighter, but lower coverage) |
 
 ## 2. Decision & Governance Verdict
 

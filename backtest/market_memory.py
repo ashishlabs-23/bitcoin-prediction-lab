@@ -13,6 +13,7 @@ import time
 import sqlite3
 import logging
 import threading
+import tempfile
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 import numpy as np
@@ -22,6 +23,9 @@ import pandas as pd
 _csv_lock = threading.Lock()
 # Process-level lock for serialized SQLite write/DDL operations across threads
 _db_lock = threading.Lock()
+_fixture_db_lock = threading.Lock()
+_fixture_db_anchor: Optional[sqlite3.Connection] = None
+_FIXTURE_DB_URI = "file:btcognitive_market_memory_fixture?mode=memory&cache=shared"
 
 # Ensure project root is in sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -34,6 +38,17 @@ logger = logging.getLogger("btcognitive.market_memory")
 DB_PATH = MARKET_MEMORY_DB_PATH
 CSV_PATH = os.path.join(RESULTS_DIR, "market_memory.csv")
 EXPORTS_DIR = os.path.join(RESULTS_DIR, "exports")
+
+
+class MarketMemoryUnavailableError(sqlite3.OperationalError):
+    """Raised when fixture mode requests persistent market-memory storage."""
+
+
+def _fixture_mode_active() -> bool:
+    from engine.data_mode import get_data_mode
+
+    return get_data_mode() == "fixture"
+
 
 DEFAULT_COLUMNS = [
     'prediction_id', 'timestamp', 'candle_time', 'price', 'regime', 'raw_prob',
@@ -67,6 +82,41 @@ def get_stress_trials_file() -> str:
 def _get_db(db_file: Optional[str] = None) -> sqlite3.Connection:
     """Returns thread-safe SQLite connection with WAL mode enabled."""
     target_db = db_file or DB_PATH
+    if _fixture_mode_active():
+        db_path = os.fspath(target_db)
+        is_memory_uri = (
+            db_path == ":memory:"
+            or db_path.startswith("file::memory:")
+            or "mode=memory" in db_path
+        )
+        if db_path.startswith("file:"):
+            db_path = db_path[5:].split("?", 1)[0]
+        try:
+            is_disposable_path = os.path.commonpath(
+                [
+                    os.path.normcase(os.path.abspath(tempfile.gettempdir())),
+                    os.path.normcase(os.path.abspath(db_path)),
+                ]
+            ) == os.path.normcase(os.path.abspath(tempfile.gettempdir()))
+        except ValueError:
+            is_disposable_path = False
+        if not is_memory_uri and not is_disposable_path:
+            global _fixture_db_anchor
+            with _fixture_db_lock:
+                if _fixture_db_anchor is None:
+                    anchor = sqlite3.connect(_FIXTURE_DB_URI, uri=True, timeout=30.0)
+                    anchor.row_factory = sqlite3.Row
+                    try:
+                        _init_tables(anchor)
+                    except Exception as exc:
+                        anchor.close()
+                        raise MarketMemoryUnavailableError(
+                            "Disposable fixture market memory could not be initialized."
+                        ) from exc
+                    _fixture_db_anchor = anchor
+            conn = sqlite3.connect(_FIXTURE_DB_URI, uri=True, timeout=30.0)
+            conn.row_factory = sqlite3.Row
+            return conn
     os.makedirs(os.path.dirname(os.path.abspath(target_db)), exist_ok=True)
     conn = sqlite3.connect(target_db, timeout=30.0)
     conn.row_factory = sqlite3.Row
@@ -122,6 +172,10 @@ def _init_tables(conn: sqlite3.Connection):
                 exit_reason TEXT DEFAULT 'OPEN'
             );
         """)
+        # Enforce the research contract on legacy data: unresolved outcomes must not carry a
+        # non-null correctness label, because such rows contaminate win-rate and longitudinal metrics.
+        conn.execute("UPDATE predictions SET was_correct = NULL, outcome_resolved_at = NULL WHERE outcome_resolved = 0 AND was_correct IS NOT NULL")
+        conn.execute("UPDATE predictions SET was_correct = NULL WHERE outcome_resolved = 0 AND was_correct IS NOT NULL")
         # Safe table migration for existing databases
         for col_name, col_type in [
             ('strategy_name', 'TEXT DEFAULT "MEIE-IGNITION"'),
@@ -254,9 +308,10 @@ def _init_tables(conn: sqlite3.Connection):
 
 
 try:
-    _conn = _get_db()
-    _init_tables(_conn)
-    _conn.close()
+    if not _fixture_mode_active():
+        _conn = _get_db()
+        _init_tables(_conn)
+        _conn.close()
 except Exception:
     pass
 

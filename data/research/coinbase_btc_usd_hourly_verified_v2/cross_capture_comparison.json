@@ -1,0 +1,20 @@
+{
+  "earlier_dataset": "C:\\Projects\\BTCognitive\\BTCognitive\\data\\research\\coinbase_btc_usd_hourly_v1\\coinbase_hourly.parquet",
+  "earlier_sha256": "b81688644812276856ede9b9c38db21aaccba56387b284112a3d0175685bf5cf",
+  "earlier_rows": 33424,
+  "later_dataset": "C:\\Projects\\BTCognitive\\BTCognitive\\data\\research\\coinbase_btc_usd_hourly_verified_v2\\coinbase_btc_usd_hourly.parquet",
+  "later_sha256": "172a21c99a67b91198988efd7dfdf4a26035701dbb05bdd2d213b481ad6a6360",
+  "later_rows": 42237,
+  "shared_timestamps": 33424,
+  "earlier_only_timestamps": 0,
+  "later_only_timestamps": 8813,
+  "exact_numeric_mismatches_by_field": {
+    "open": 0,
+    "high": 0,
+    "low": 0,
+    "close": 0,
+    "volume": 0
+  },
+  "exact_numeric_mismatch_count": 0,
+  "mismatch_sample": []
+}

@@ -1,0 +1,87 @@
+{
+  "version": "V32.42",
+  "component": "UserPositionTracker_and_AdaptiveRiskCopilot",
+  "generated_at_utc": "2026-10-25T16:51:00Z",
+  "status": "QUALIFIED_AND_VERIFIED",
+  "governance": {
+    "operating_posture": "OFFLINE_RESEARCH_ONLY",
+    "economic_posture": "NO_GO_NO_VALIDATED_EDGE",
+    "live_trading": "DISABLED",
+    "broker_execution_adapters": "STRICTLY_NONE",
+    "position_registry_mode": "READ_ONLY_OBSERVATIONAL_TELEMETRY"
+  },
+  "modules": {
+    "engine_tracker": "engine/user_position_tracker.py",
+    "engine_copilot": "engine/adaptive_risk_copilot.py",
+    "api_endpoints": [
+      "GET /api/positions",
+      "POST /api/positions/open",
+      "GET /api/positions/{id}",
+      "POST /api/positions/{id}/partial-exit",
+      "POST /api/positions/{id}/close",
+      "GET /api/positions/history",
+      "GET /api/positions/status"
+    ],
+    "frontend_view": "PositionMonitorView (#/position-monitor in web/app.js)",
+    "frontend_api_client": "web_src/api_client.js"
+  },
+  "safety_and_rules": {
+    "spot_short_rejection": {
+      "rule": "SPOT_SHORT_INELIGIBLE",
+      "status": "ENFORCED_FAIL_CLOSED",
+      "detail": "Naked spot shorting rejected; derivative shorts require PERPETUAL market type"
+    },
+    "derivative_leverage_modeling": {
+      "rule": "ESTIMATED_LIQUIDATION_PRICE",
+      "status": "ACTIVE",
+      "detail": "Approximates liquidation threshold based on maintenance margin formula"
+    },
+    "partial_exits": {
+      "rule": "QUANTITY_MONOTONICITY_AND_PNL_REALIZATION",
+      "status": "ENFORCED",
+      "detail": "Strict 0 < Q <= Q_rem validation; realized P&L and fees accumulated monotonically"
+    },
+    "feed_staleness": {
+      "threshold_seconds": 5.0,
+      "rule": "L2_DATA_STALE",
+      "status": "FAIL_CLOSED_WARNING"
+    },
+    "adaptive_alerts": [
+      "STOP_LOSS_BREACH",
+      "STOP_LOSS_NEAR",
+      "TAKE_PROFIT_HIT",
+      "TAKE_PROFIT_NEAR",
+      "FORECAST_DIRECTION_CONFLICT",
+      "REGIME_VOLATILITY_EXPANSION"
+    ]
+  },
+  "test_verification": {
+    "test_file": "tests/test_v32_42_user_position_tracker_and_risk_copilot.py",
+    "total_tests": 10,
+    "passed_tests": 10,
+    "failed_tests": 0,
+    "frontend_test_file": "tests_frontend.js",
+    "frontend_status": "ALL_PASSED",
+    "cdp_browser_qa": {
+      "runner": "engine/run_v32_42_cdp_browser_qa.py",
+      "viewports_tested": [
+        {"name": "desktop", "width": 1280, "height": 800, "status": "PASSED"},
+        {"name": "tablet", "width": 768, "height": 1024, "status": "PASSED"},
+        {"name": "mobile", "width": 375, "height": 667, "status": "PASSED"}
+      ],
+      "screenshots": [
+        "research/reports/artifacts/browser_qa/v32_42_position_copilot_desktop.png",
+        "research/reports/artifacts/browser_qa/v32_42_position_copilot_tablet.png",
+        "research/reports/artifacts/browser_qa/v32_42_position_copilot_mobile.png"
+      ]
+    }
+  },
+  "protected_files_sha256": {
+    "data/prospective_entry_ledger.jsonl": "91C3AED984002F611A59C78A2EB4C342C0970BA3CA4BFDB8FF44019E77EB1BF3",
+    "data/prospective_shadow_v1.jsonl": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+    "data/prospective_entry_ledger_v2.jsonl": "E6E33E3C7BEB4C255467E967FC819B85481B0AF0E671BD07C0A2EAE245E61E08",
+    "data/raw/ohlcv.parquet": "1E722F33734A89E74764C02FDE0552752CC1EA25A5A4A7604FCE8C0FF28DE76E",
+    "data/raw/ohlcv_pre_backfill_backup.parquet": "C4949E5B5695FFA172677681B15AF2EA6167E73A66EE4BE88194BEFE8B64835A",
+    "status": "ALL_100_PERCENT_BIT_IDENTICAL"
+  }
+}

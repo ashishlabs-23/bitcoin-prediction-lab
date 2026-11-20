@@ -1,14 +1,4 @@
-"""
-engine/range_forecast_service.py — Production-Grade BTCUSD Range & Excursion Intelligence Service
-================================================================================================
-Generates probabilistic range forecasts, excursion envelopes, and risk intelligence:
-- MFE & MAE Quantiles (P10, P25, P50, P75, P90)
-- Price Range Boundaries: Upper_q = P * (1 + MFE_q), Lower_q = P * (1 - MAE_q)
-- Uncertainty & Conformal Quality Gating
-- Secondary Direction Overlay (Default: NO_DIRECTIONAL_EDGE)
-- Tradeability Research Score (Non-execution informational score)
-- Immutable persistence in SQLite WAL database
-"""
+"""Unvalidated fixed-multiplier BTCUSD excursion heuristics and diagnostics."""
 
 import os
 import sys
@@ -68,7 +58,8 @@ class BTCUSDRangeForecast:
 
     # Quality & Intelligence
     uncertainty: float
-    coverage_confidence: float
+    coverage_confidence: Optional[float]
+    calibration_status: str
     market_regime: str
     data_quality: str  # VALID, DEGRADED, INVALID
     degraded: bool
@@ -78,7 +69,7 @@ class BTCUSDRangeForecast:
     direction_state: str  # NO_DIRECTIONAL_EDGE, BULLISH, BEARISH, NEUTRAL, LOW_CONFIDENCE
     tradeability_category: str  # HIGH, MEDIUM, LOW
     natural_language_explanation: str
-    volatility_harvest_signal: str = "RANGE_NEUTRAL"  # CONFORMAL_ACCUMULATION_BUY, CONFORMAL_DISTRIBUTION_SELL, RANGE_NEUTRAL
+    volatility_harvest_signal: str = "UNAVAILABLE_UNCALIBRATED"
     conformal_trade_setup: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
@@ -92,7 +83,7 @@ class RangeForecastService:
 
     def __init__(
         self,
-        model_version: str = "v3.0.0-excursion-ridge-conformal",
+        model_version: str = "fixed-multiplier-heuristic-unvalidated",
         default_horizon: str = "24h"
     ):
         self.model_version = model_version
@@ -109,12 +100,22 @@ class RangeForecastService:
         """
         Data quality gate checking price validity, freshness, and feature completeness.
         """
-        if current_price is None or current_price <= 0 or np.isnan(current_price):
+        try:
+            price = float(current_price)
+        except (TypeError, ValueError, OverflowError):
+            return "INVALID", True
+        if not np.isfinite(price) or price <= 0:
             return "INVALID", True
 
-        # Check essential features
         req_keys = ['vol_24h', 'rsi_14']
-        missing = [k for k in req_keys if k not in features or np.isnan(features[k])]
+        missing = []
+        for key in req_keys:
+            try:
+                valid = key in features and np.isfinite(float(features[key]))
+            except (TypeError, ValueError, OverflowError):
+                valid = False
+            if not valid:
+                missing.append(key)
 
         if len(missing) == len(req_keys):
             return "INVALID", True
@@ -125,18 +126,31 @@ class RangeForecastService:
     def generate_forecast(
         self,
         current_price: float,
-        vol_24h: float = 0.015,
+        vol_24h: Optional[float] = None,
         features: Optional[Dict[str, Any]] = None,
         market_regime: str = "Sideways",
         directional_prob: float = 0.50,
         timestamp: Optional[str] = None
     ) -> BTCUSDRangeForecast:
         """
-        Generates a calibrated probabilistic BTCUSD range forecast and envelope.
+        Generates an explicitly unvalidated fixed-multiplier excursion heuristic.
         """
         if features is None:
-            features = {'vol_24h': vol_24h, 'rsi_14': 50.0}
-
+            features = {"vol_24h": vol_24h} if vol_24h is not None else {}
+        else:
+            features = dict(features)
+        if vol_24h is None:
+            vol_24h = features.get("vol_24h")
+        try:
+            vol_24h = float(vol_24h)
+        except (TypeError, ValueError, OverflowError):
+            vol_24h = None
+        if vol_24h is None or not np.isfinite(vol_24h) or vol_24h <= 0:
+            raise ValueError("A finite positive observed 24h volatility input is required.")
+        try:
+            current_price = float(current_price)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("A finite positive current price is required.") from exc
         dq_status, degraded = self.validate_data_quality(current_price, features)
         if dq_status == "INVALID":
             raise ValueError(f"Cannot generate range forecast for invalid price or features (price={current_price}).")
@@ -144,26 +158,22 @@ class RangeForecastService:
         ts_str = timestamp or datetime.now(timezone.utc).isoformat()
         forecast_id = str(uuid.uuid4())
 
-        # Mondrian Volatility-Adaptive Conformal Scaling
-        # Dynamically scales residual quantiles based on term structure ratio (sigma_1h / sigma_24h)
+        # This fixed heuristic scaling is not learned or calibration-verified.
         vol_ratio = float(features.get('vol_ratio_1h_24h', 1.0)) if features is not None else 1.0
         mfe_scale = float(np.clip(1.0 + 0.35 * (vol_ratio - 1.0), 0.85, 1.45))
         mae_scale = float(np.clip(1.0 + 0.50 * (vol_ratio - 1.0), 0.85, 1.60))
 
-        # Calibrated Base Multipliers for 24h MFE / MAE Quantiles
-        base_vol = max(0.005, vol_24h)
-        mfe_p10 = float(np.maximum(0.001, base_vol * 0.35 * mfe_scale))
-        mfe_p25 = float(np.maximum(0.002, base_vol * 0.55 * mfe_scale))
-        mfe_p50 = float(np.maximum(0.004, base_vol * 0.85 * mfe_scale))
-        mfe_p75 = float(np.maximum(0.007, base_vol * 1.25 * mfe_scale))
-        mfe_p90 = float(np.maximum(0.010, base_vol * 1.75 * mfe_scale))
-
-        mae_p10 = float(np.maximum(0.001, base_vol * 0.40 * mae_scale))
-        mae_p25 = float(np.maximum(0.002, base_vol * 0.65 * mae_scale))
-        mae_p50 = float(np.maximum(0.004, base_vol * 1.10 * mae_scale))
-        mae_p75 = float(np.maximum(0.007, base_vol * 1.55 * mae_scale))
-        mae_p90 = float(np.maximum(0.010, base_vol * 2.20 * mae_scale))
-
+        base_vol = float(vol_24h)
+        mfe_p10 = base_vol * 0.35 * mfe_scale
+        mfe_p25 = base_vol * 0.55 * mfe_scale
+        mfe_p50 = base_vol * 0.85 * mfe_scale
+        mfe_p75 = base_vol * 1.25 * mfe_scale
+        mfe_p90 = base_vol * 1.75 * mfe_scale
+        mae_p10 = base_vol * 0.40 * mae_scale
+        mae_p25 = base_vol * 0.65 * mae_scale
+        mae_p50 = base_vol * 1.10 * mae_scale
+        mae_p75 = base_vol * 1.55 * mae_scale
+        mae_p90 = base_vol * 2.20 * mae_scale
 
         # Price Range Boundaries
         upper_p10 = round(current_price * (1.0 + mfe_p10), 2)
@@ -207,38 +217,14 @@ class RangeForecastService:
             f"BTCUSD current price is ${current_price:,.2f}. "
             f"The 24h forecast places median favorable excursion at +{mfe_p50*100.0:.2f}% "
             f"and median adverse excursion at -{mae_p50*100.0:.2f}%. "
-            f"The 90% empirical forecast envelope is [${lower_p90:,.0f}, ${upper_p90:,.0f}]. "
-            f"Forecast confidence is {unc_eval.confidence_level}. "
+            f"Unvalidated fixed-multiplier heuristic range: [${lower_p90:,.0f}, ${upper_p90:,.0f}]. "
+            f"Empirical calibration is unavailable ({unc_eval.confidence_level}). "
             f"Directional evidence is {dir_res.state}. "
-            f"This forecast is a probabilistic risk/range estimate, not a guaranteed price target."
+            f"This is not a calibrated quantile forecast or a guaranteed price target."
         )
 
-        # Conformal Range Volatility Harvesting Strategy
-        vol_harvest_signal = "RANGE_NEUTRAL"
+        vol_harvest_signal = "UNAVAILABLE_UNCALIBRATED"
         trade_setup = None
-
-        if current_price <= lower_p25 and unc_eval.confidence_level != "LOW_CONFIDENCE":
-            vol_harvest_signal = "CONFORMAL_ACCUMULATION_BUY"
-            trade_setup = {
-                "strategy": "CONFORMAL_RANGE_HARVESTER",
-                "action": "ACCUMULATE_LONG",
-                "entry_price": current_price,
-                "target_tp_price": upper_p50,
-                "defensive_sl_price": lower_p90,
-                "expected_rr": round((upper_p50 - current_price) / max(1.0, current_price - lower_p90), 2),
-                "rationale": "Price situated at lower 25th percentile conformal band with 90% empirical boundary containment."
-            }
-        elif current_price >= upper_p75 and unc_eval.confidence_level != "LOW_CONFIDENCE":
-            vol_harvest_signal = "CONFORMAL_DISTRIBUTION_SELL"
-            trade_setup = {
-                "strategy": "CONFORMAL_RANGE_HARVESTER",
-                "action": "DISTRIBUTE_SHORT",
-                "entry_price": current_price,
-                "target_tp_price": lower_p50,
-                "defensive_sl_price": upper_p90,
-                "expected_rr": round((current_price - lower_p50) / max(1.0, upper_p90 - current_price), 2),
-                "rationale": "Price situated at upper 75th percentile conformal band with 90% empirical boundary containment."
-            }
 
         forecast = BTCUSDRangeForecast(
             forecast_id=forecast_id,
@@ -268,6 +254,7 @@ class RangeForecastService:
             lower_p90=lower_p90,
             uncertainty=unc_eval.relative_uncertainty,
             coverage_confidence=unc_eval.coverage_confidence_pct,
+            calibration_status="UNAVAILABLE",
             market_regime=market_regime,
             data_quality=dq_status,
             degraded=degraded,

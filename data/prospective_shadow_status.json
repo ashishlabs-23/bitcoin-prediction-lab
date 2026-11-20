@@ -1,0 +1,25 @@
+{
+  "runner_version": "V30.5-SHADOW-FEED-RUNNER",
+  "last_cycle_timestamp_utc": "2026-10-23T13:13:46.402256+00:00",
+  "feed_status": "HEALTHY",
+  "latest_closed_1h_candle": "2026-10-23T12:00:00+00:00",
+  "latest_closed_4h_candle": "2026-10-23T12:00:00+00:00",
+  "active_unresolved_candidate_id": null,
+  "ledger_summary": {
+    "ledger_path": "C:\\Projects\\BTCognitive\\BTCognitive\\data\\prospective_shadow_v1.jsonl",
+    "total_candidates": 0,
+    "total_outcomes": 0,
+    "pending_resolution": 0,
+    "registered_candidate_ids": [],
+    "resolved_candidate_ids": []
+  },
+  "last_cycle_details": {
+    "candles_fetched": 349,
+    "candles_added_to_storage": 0,
+    "resolved_outcome": null,
+    "emitted_candidate": null,
+    "notice": null
+  },
+  "live_trading_authorization": "DISABLED \u2014 ANALYSIS ONLY",
+  "governance_status": "OFFLINE_RESEARCH_ONLY"
+}

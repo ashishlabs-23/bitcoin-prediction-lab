@@ -1,0 +1,41 @@
+{
+  "strategy_id": "TSMOM_DONCHIAN_24H_168H",
+  "dataset_file": "C:\\Projects\\BTCognitive\\BTCognitive\\data\\research\\coinbase_btc_usd_hourly_v1\\coinbase_hourly.parquet",
+  "first_candle_utc": "2023-01-01T00:00:00Z",
+  "last_candle_utc": "2026-10-25T04:00:00Z",
+  "total_bars_evaluated": 33424,
+  "total_trades": 758,
+  "spot_short_abstentions": 927,
+  "outcome_counts": {
+    "TP_FIRST": 320,
+    "SL_FIRST": 415,
+    "TIMEOUT": 23
+  },
+  "outcome_rates": {
+    "p_tp": 0.4222,
+    "p_sl": 0.5475,
+    "p_to": 0.0303
+  },
+  "mean_gross_r": 0.088,
+  "cost_scenarios": {
+    "COINBASE_RETAIL_87BPS": {
+      "mean_net_r": -0.9898,
+      "ci_95_lower_r": -1.0883,
+      "ci_95_upper_r": -0.8921,
+      "profit_factor": 0.176,
+      "max_drawdown_r": 751.97,
+      "annualized_sharpe_r": -10.43,
+      "positive_expectancy_proven": false
+    },
+    "ACTIVE_TRADER_27BPS": {
+      "mean_net_r": -0.2465,
+      "ci_95_lower_r": -0.3433,
+      "ci_95_upper_r": -0.1508,
+      "profit_factor": 0.682,
+      "max_drawdown_r": 195.83,
+      "annualized_sharpe_r": -2.62,
+      "positive_expectancy_proven": false
+    }
+  },
+  "evaluated_at_utc": "2026-10-25T05:21:48.271717+00:00"
+}

@@ -1,0 +1,246 @@
+{
+  "experiment_id": "V32.37_CHRONOS2_COMPARATIVE_BENCHMARK",
+  "evaluated_at_utc": "2026-10-25T12:02:35.822512+00:00",
+  "epistemic_posture": "RETROSPECTIVE_DIAGNOSTIC_REPLAY",
+  "production_lock": "OFFLINE_RESEARCH_ONLY",
+  "live_trading_status": "DISABLED",
+  "dataset_provenance": {
+    "source": "C:\\Projects\\BTCognitive\\BTCognitive\\data\\research\\coinbase_btc_usd_hourly_v1\\coinbase_hourly.parquet",
+    "sha256": "b81688644812276856ede9b9c38db21aaccba56387b284112a3d0175685bf5cf",
+    "eval_period": "2026-01-01T00:00:00Z to 2026-10-25T04:00:00Z",
+    "total_bars_2026": 7128,
+    "evaluated_origins": 7104,
+    "context_length_bars": 120,
+    "prediction_length_bars": 24
+  },
+  "system_and_hardware_profile": {
+    "model_identifier": "amazon/chronos-2",
+    "architecture": "T5-based probabilistic tokenized time-series foundation model (120M params)",
+    "device": "CPU",
+    "torch_version": "2.14.0+cpu",
+    "total_inference_time_sec": 209.27,
+    "throughput_origins_per_sec": 33.95,
+    "latency_ms_per_origin": 29.46,
+    "batch_size": 32
+  },
+  "sample_size_reconciliation": {
+    "reported_directional_bars": 7127,
+    "reported_causal_coverage_bars": 5671,
+    "reconciliation_explanation": "5,671 bars was an earlier 2026 snapshot (ending Sept 2026) in Stage 12 with a 168-hour maturity requirement (5,842 total bars - 171 maturing bars = 5,671 fully resolved 168h blocks). 7,127 bars is the full 2026 holdout dataset extending through 2026-10-25 04:00 UTC (7,128 total 2026 bars - 1 bar horizon = 7,127 resolved 1h points; 7,104 resolved 24h points)."
+  },
+  "horizons": {
+    "1h": {
+      "eval_samples": 7104,
+      "horizon_stride_bars": 1,
+      "base_rate_up": 0.4983,
+      "directional_evaluation": {
+        "chronos2_median_accuracy": 0.4876,
+        "gbdt_directional_accuracy": 0.5177,
+        "gbdt_auc_roc": 0.5285,
+        "gbdt_brier_skill_score": 0.0005,
+        "chronos_derived_auc_roc_proxy": 0.4886,
+        "chronos_derived_bss_proxy": -0.0501,
+        "chronos_predicted_up_rate": 0.551,
+        "gbdt_predicted_up_rate": 0.5425,
+        "verdict_directional": "GBDT_SUPERIOR"
+      },
+      "point_return_forecast": {
+        "chronos2_return_mae": 0.003182,
+        "random_walk_return_mae": 0.002947,
+        "empirical_return_mae": 0.002958,
+        "chronos2_return_rmse": 0.004862,
+        "random_walk_return_rmse": 0.004547,
+        "empirical_return_rmse": 0.004555,
+        "chronos2_price_mae_usd": 232.28,
+        "random_walk_price_mae_usd": 214.88,
+        "chronos2_mape_pct": 0.3182,
+        "random_walk_mape_pct": 0.2947,
+        "diebold_mariano_test": {
+          "dm_stat": 0.0,
+          "hln_stat": 0.0,
+          "p_value": 1.0,
+          "mean_loss_diff": 2.9592083584861825e-06
+        },
+        "beats_random_walk_point_mae": false,
+        "beats_random_walk_point_rmse": false
+      },
+      "quantile_and_interval_evaluation": {
+        "chronos2_pinball_mean": 78.55,
+        "empirical_pinball_mean": 74.61,
+        "chronos2_coverage_80pct_nominal": 0.7918,
+        "empirical_coverage_80pct_nominal": 0.7931,
+        "chronos2_mean_width_pct": 1.01,
+        "empirical_mean_width_pct": 0.88,
+        "chronos2_winkler_score": 1195.14,
+        "empirical_winkler_score": 1159.75,
+        "verdict_quantiles": "EMPIRICAL_SUPERIOR_QUANTILES"
+      },
+      "sub_regime_breakdown": {
+        "high_volatility": {
+          "n_samples": 3552,
+          "chronos_dir_acc": 0.4913,
+          "gbdt_dir_acc": 0.5251,
+          "chronos_ret_mae": 0.004,
+          "rw_ret_mae": 0.003683,
+          "chronos_coverage_80pct": 0.8029
+        },
+        "low_volatility": {
+          "n_samples": 3552,
+          "chronos_dir_acc": 0.484,
+          "gbdt_dir_acc": 0.5104,
+          "chronos_ret_mae": 0.002365,
+          "rw_ret_mae": 0.00221,
+          "chronos_coverage_80pct": 0.7807
+        }
+      },
+      "gap_sensitivity": {
+        "outage_gaps_detected": 1,
+        "gap_filtered_chronos_dir_acc": 0.4877,
+        "gap_filtered_gbdt_dir_acc": 0.5177
+      }
+    },
+    "4h": {
+      "eval_samples": 7104,
+      "horizon_stride_bars": 4,
+      "base_rate_up": 0.5015,
+      "directional_evaluation": {
+        "chronos2_median_accuracy": 0.4966,
+        "gbdt_directional_accuracy": 0.5169,
+        "gbdt_auc_roc": 0.5227,
+        "gbdt_brier_skill_score": -0.0016,
+        "chronos_derived_auc_roc_proxy": 0.4944,
+        "chronos_derived_bss_proxy": -0.0498,
+        "chronos_predicted_up_rate": 0.5266,
+        "gbdt_predicted_up_rate": 0.5429,
+        "verdict_directional": "GBDT_SUPERIOR"
+      },
+      "point_return_forecast": {
+        "chronos2_return_mae": 0.0065,
+        "random_walk_return_mae": 0.005971,
+        "empirical_return_mae": 0.006014,
+        "chronos2_return_rmse": 0.009605,
+        "random_walk_return_rmse": 0.008982,
+        "empirical_return_rmse": 0.009012,
+        "chronos2_price_mae_usd": 474.38,
+        "random_walk_price_mae_usd": 435.55,
+        "chronos2_mape_pct": 0.6499,
+        "random_walk_mape_pct": 0.5971,
+        "diebold_mariano_test": {
+          "dm_stat": 7.1539,
+          "hln_stat": 7.1503,
+          "p_value": 0.0,
+          "mean_loss_diff": 1.159e-05
+        },
+        "beats_random_walk_point_mae": false,
+        "beats_random_walk_point_rmse": false
+      },
+      "quantile_and_interval_evaluation": {
+        "chronos2_pinball_mean": 162.23,
+        "empirical_pinball_mean": 152.43,
+        "chronos2_coverage_80pct_nominal": 0.7551,
+        "empirical_coverage_80pct_nominal": 0.7791,
+        "chronos2_mean_width_pct": 1.95,
+        "empirical_mean_width_pct": 1.87,
+        "chronos2_winkler_score": 2495.08,
+        "empirical_winkler_score": 2379.4,
+        "verdict_quantiles": "EMPIRICAL_SUPERIOR_QUANTILES"
+      },
+      "sub_regime_breakdown": {
+        "high_volatility": {
+          "n_samples": 3552,
+          "chronos_dir_acc": 0.5045,
+          "gbdt_dir_acc": 0.5253,
+          "chronos_ret_mae": 0.007988,
+          "rw_ret_mae": 0.007241,
+          "chronos_coverage_80pct": 0.7759
+        },
+        "low_volatility": {
+          "n_samples": 3552,
+          "chronos_dir_acc": 0.4887,
+          "gbdt_dir_acc": 0.5084,
+          "chronos_ret_mae": 0.005013,
+          "rw_ret_mae": 0.0047,
+          "chronos_coverage_80pct": 0.7342
+        }
+      },
+      "gap_sensitivity": {
+        "outage_gaps_detected": 4,
+        "gap_filtered_chronos_dir_acc": 0.4966,
+        "gap_filtered_gbdt_dir_acc": 0.5169
+      }
+    },
+    "24h": {
+      "eval_samples": 7104,
+      "horizon_stride_bars": 24,
+      "base_rate_up": 0.5093,
+      "directional_evaluation": {
+        "chronos2_median_accuracy": 0.4811,
+        "gbdt_directional_accuracy": 0.5104,
+        "gbdt_auc_roc": 0.5136,
+        "gbdt_brier_skill_score": -0.0064,
+        "chronos_derived_auc_roc_proxy": 0.4756,
+        "chronos_derived_bss_proxy": -0.0889,
+        "chronos_predicted_up_rate": 0.5206,
+        "gbdt_predicted_up_rate": 0.4595,
+        "verdict_directional": "GBDT_SUPERIOR"
+      },
+      "point_return_forecast": {
+        "chronos2_return_mae": 0.017641,
+        "random_walk_return_mae": 0.015901,
+        "empirical_return_mae": 0.016938,
+        "chronos2_return_rmse": 0.024421,
+        "random_walk_return_rmse": 0.022345,
+        "empirical_return_rmse": 0.023253,
+        "chronos2_price_mae_usd": 1291.01,
+        "random_walk_price_mae_usd": 1162.45,
+        "chronos2_mape_pct": 1.762,
+        "random_walk_mape_pct": 1.5906,
+        "diebold_mariano_test": {
+          "dm_stat": 4.4472,
+          "hln_stat": 4.4325,
+          "p_value": 9e-06,
+          "mean_loss_diff": 9.707e-05
+        },
+        "beats_random_walk_point_mae": false,
+        "beats_random_walk_point_rmse": false
+      },
+      "quantile_and_interval_evaluation": {
+        "chronos2_pinball_mean": 438.39,
+        "empirical_pinball_mean": 419.32,
+        "chronos2_coverage_80pct_nominal": 0.7034,
+        "empirical_coverage_80pct_nominal": 0.7259,
+        "chronos2_mean_width_pct": 4.9,
+        "empirical_mean_width_pct": 4.95,
+        "chronos2_winkler_score": 6696.8,
+        "empirical_winkler_score": 6394.37,
+        "verdict_quantiles": "EMPIRICAL_SUPERIOR_QUANTILES"
+      },
+      "sub_regime_breakdown": {
+        "high_volatility": {
+          "n_samples": 3552,
+          "chronos_dir_acc": 0.4972,
+          "gbdt_dir_acc": 0.511,
+          "chronos_ret_mae": 0.021306,
+          "rw_ret_mae": 0.019012,
+          "chronos_coverage_80pct": 0.7227
+        },
+        "low_volatility": {
+          "n_samples": 3552,
+          "chronos_dir_acc": 0.4651,
+          "gbdt_dir_acc": 0.5099,
+          "chronos_ret_mae": 0.013976,
+          "rw_ret_mae": 0.012791,
+          "chronos_coverage_80pct": 0.6841
+        }
+      },
+      "gap_sensitivity": {
+        "outage_gaps_detected": 24,
+        "gap_filtered_chronos_dir_acc": 0.4811,
+        "gap_filtered_gbdt_dir_acc": 0.5105
+      }
+    }
+  },
+  "master_decision": "NO_INCREMENTAL_FORECAST_VALUE",
+  "decision_reason": "Chronos-2 failed to outperform the simple Random Walk persistence baseline on return MAE/RMSE across all tested horizons and lagged GBDT directional accuracy.",
+  "recommended_next_phase": "If CHRONOS2_RESEARCH_CANDIDATE, preregister a prospective shadow validation phase with append-only ledger. If NO_INCREMENTAL_FORECAST_VALUE, retain NO_GO_NO_VALIDATED_EDGE and focus on risk envelopes and structural market friction."
+}

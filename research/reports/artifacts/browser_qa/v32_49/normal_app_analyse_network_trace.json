@@ -1,0 +1,60 @@
+{
+  "observed_on": "2026-10-26",
+  "runtime": {
+    "entrypoint": "api.server:app",
+    "host": "127.0.0.1",
+    "port": 8096,
+    "environment": "development",
+    "simulator_ledger": "session-scoped temporary JSONL ledger",
+    "collector_changes": false
+  },
+  "request": {
+    "method": "POST",
+    "path": "/api/tournament/analyse",
+    "http_status": 200,
+    "instrument": "BTC-USD",
+    "timeframe": "1h",
+    "source": "COINBASE_EXCHANGE_REST",
+    "auto_tournament": true,
+    "candle_payload_count": 349,
+    "first_closed_timestamp": "2026-10-12T01:00:00.000Z",
+    "last_closed_timestamp": "2026-10-26T13:00:00.000Z",
+    "request_payload_sha256": "3911dd589fbc72a8a364daf9218cf8082f8f2dabdd95bd5ed859bfafbe4fd64d",
+    "request_payload_hash_scope": "Canonical JSON serialization of the candles array only; this is the API field named request_payload_sha256, not a hash of the full request envelope.",
+    "full_candle_payload_retained": false
+  },
+  "response": {
+    "decision": "NO_SMART_ENTRY",
+    "reason": "Regime TRENDING_BEARISH identified. 0 compatible candidate(s) shortlisted. The screen rejected 5 strategies; review the rejection details. The tournament was skipped because no candidates were eligible. Retry after a new closed candle; no simulated attempt was created.",
+    "tournament_execution_source": "NOT_RUN_NO_ELIGIBLE_CANDIDATES",
+    "attempts_created": 0,
+    "analyzed_closed_candle_count": 349,
+    "analyzed_window_sha256": "e6d2ce3eabd3af596d879a0de4c90ddc4af44ba5f753ec5b7d7318366d67df3d",
+    "watermark_window_sha256": "e6d2ce3eabd3af596d879a0de4c90ddc4af44ba5f753ec5b7d7318366d67df3d",
+    "latest_closed_timestamp": "2026-10-26T13:00:00+00:00",
+    "research_authorization": "OFFLINE_RESEARCH_ONLY"
+  },
+  "visible_ui": {
+    "result": "NO QUALIFYING SETUP",
+    "progress": [
+      "Check data: Complete",
+      "Detect regime: Complete",
+      "Screen strategies: Complete",
+      "Run tournament: Skipped (no eligible candidates)",
+      "Final decision: Complete"
+    ],
+    "empty_state_includes_rejection_count": true,
+    "empty_state_states_no_attempt_created": true
+  },
+  "interpretation": {
+    "data_kind": "Observed Coinbase REST chart feed during the isolated QA run; not a prospective validation sample.",
+    "tournament": "No arms ran because the actual analysis yielded zero eligible candidates.",
+    "edge_claim": false,
+    "live_trading_enabled": false,
+    "limitations": [
+      "The exact candle body was not retained in this trace; the request hash and server-returned analyzed-window watermark are recorded.",
+      "The independent deterministic API test captures the submitted DataFrame passed to the analysis function and confirms exact equality.",
+      "No simulated entry occurred, so browser-level active-monitor and exit flows could not be exercised."
+    ]
+  }
+}

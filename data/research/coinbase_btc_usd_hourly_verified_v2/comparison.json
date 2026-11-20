@@ -1,0 +1,653 @@
+{
+  "existing_path": "C:\\Projects\\BTCognitive\\BTCognitive\\data\\raw\\ohlcv.parquet",
+  "existing_rows": 42233,
+  "acquired_rows": 42237,
+  "shared_timestamps": 42220,
+  "missing_from_acquired": [
+    "2023-03-04T18:00:00+00:00",
+    "2023-03-04T19:00:00+00:00",
+    "2023-03-04T20:00:00+00:00",
+    "2025-10-25T16:00:00+00:00",
+    "2025-10-25T17:00:00+00:00",
+    "2025-10-25T18:00:00+00:00",
+    "2025-10-25T19:00:00+00:00",
+    "2025-10-25T20:00:00+00:00",
+    "2026-05-08T02:00:00+00:00",
+    "2026-05-08T03:00:00+00:00",
+    "2026-05-08T04:00:00+00:00",
+    "2026-05-08T05:00:00+00:00",
+    "2026-05-08T06:00:00+00:00"
+  ],
+  "only_in_acquired": [
+    "2026-10-26T17:00:00+00:00",
+    "2026-10-26T18:00:00+00:00",
+    "2026-10-26T19:00:00+00:00",
+    "2026-10-26T20:00:00+00:00",
+    "2026-10-26T21:00:00+00:00",
+    "2026-10-26T22:00:00+00:00",
+    "2026-10-26T23:00:00+00:00",
+    "2026-10-27T00:00:00+00:00",
+    "2026-10-27T01:00:00+00:00",
+    "2026-10-27T02:00:00+00:00",
+    "2026-10-27T03:00:00+00:00",
+    "2026-10-27T04:00:00+00:00",
+    "2026-10-27T05:00:00+00:00",
+    "2026-10-27T06:00:00+00:00",
+    "2026-10-27T07:00:00+00:00",
+    "2026-10-27T08:00:00+00:00",
+    "2026-10-27T09:00:00+00:00"
+  ],
+  "shared_value_mismatch_count": 204236,
+  "shared_value_mismatch_count_by_field": {
+    "open": 40874,
+    "high": 40787,
+    "low": 40799,
+    "close": 40885,
+    "volume": 40891
+  },
+  "shared_value_mismatch_sample": [
+    {
+      "timestamp_utc": "2022-01-01T00:00:00+00:00",
+      "field": "open",
+      "existing": 46216.93,
+      "acquired": 46211.24
+    },
+    {
+      "timestamp_utc": "2022-01-01T00:00:00+00:00",
+      "field": "high",
+      "existing": 46731.39,
+      "acquired": 46744.99
+    },
+    {
+      "timestamp_utc": "2022-01-01T00:00:00+00:00",
+      "field": "low",
+      "existing": 46208.37,
+      "acquired": 46205.0
+    },
+    {
+      "timestamp_utc": "2022-01-01T00:00:00+00:00",
+      "field": "close",
+      "existing": 46656.13,
+      "acquired": 46656.85
+    },
+    {
+      "timestamp_utc": "2022-01-01T00:00:00+00:00",
+      "field": "volume",
+      "existing": 1503.33095,
+      "acquired": 822.31631024
+    },
+    {
+      "timestamp_utc": "2022-01-01T01:00:00+00:00",
+      "field": "open",
+      "existing": 46656.14,
+      "acquired": 46656.85
+    },
+    {
+      "timestamp_utc": "2022-01-01T01:00:00+00:00",
+      "field": "high",
+      "existing": 46949.99,
+      "acquired": 46931.0
+    },
+    {
+      "timestamp_utc": "2022-01-01T01:00:00+00:00",
+      "field": "low",
+      "existing": 46574.06,
+      "acquired": 46573.65
+    },
+    {
+      "timestamp_utc": "2022-01-01T01:00:00+00:00",
+      "field": "close",
+      "existing": 46778.14,
+      "acquired": 46780.85
+    },
+    {
+      "timestamp_utc": "2022-01-01T01:00:00+00:00",
+      "field": "volume",
+      "existing": 943.81539,
+      "acquired": 686.07385399
+    },
+    {
+      "timestamp_utc": "2022-01-01T02:00:00+00:00",
+      "field": "open",
+      "existing": 46778.14,
+      "acquired": 46778.0
+    },
+    {
+      "timestamp_utc": "2022-01-01T02:00:00+00:00",
+      "field": "high",
+      "existing": 46928.94,
+      "acquired": 46929.2
+    },
+    {
+      "timestamp_utc": "2022-01-01T02:00:00+00:00",
+      "field": "low",
+      "existing": 46721.96,
+      "acquired": 46728.5
+    },
+    {
+      "timestamp_utc": "2022-01-01T02:00:00+00:00",
+      "field": "close",
+      "existing": 46811.77,
+      "acquired": 46808.55
+    },
+    {
+      "timestamp_utc": "2022-01-01T02:00:00+00:00",
+      "field": "volume",
+      "existing": 485.1686,
+      "acquired": 433.37379104
+    },
+    {
+      "timestamp_utc": "2022-01-01T03:00:00+00:00",
+      "field": "open",
+      "existing": 46811.77,
+      "acquired": 46808.55
+    },
+    {
+      "timestamp_utc": "2022-01-01T03:00:00+00:00",
+      "field": "high",
+      "existing": 46916.63,
+      "acquired": 46895.06
+    },
+    {
+      "timestamp_utc": "2022-01-01T03:00:00+00:00",
+      "field": "low",
+      "existing": 46760.12,
+      "acquired": 46757.45
+    },
+    {
+      "timestamp_utc": "2022-01-01T03:00:00+00:00",
+      "field": "close",
+      "existing": 46813.2,
+      "acquired": 46804.01
+    },
+    {
+      "timestamp_utc": "2022-01-01T03:00:00+00:00",
+      "field": "volume",
+      "existing": 562.88971,
+      "acquired": 354.24451222
+    },
+    {
+      "timestamp_utc": "2022-01-01T04:00:00+00:00",
+      "field": "open",
+      "existing": 46813.21,
+      "acquired": 46804.0
+    },
+    {
+      "timestamp_utc": "2022-01-01T04:00:00+00:00",
+      "field": "high",
+      "existing": 46887.33,
+      "acquired": 46872.86
+    },
+    {
+      "timestamp_utc": "2022-01-01T04:00:00+00:00",
+      "field": "low",
+      "existing": 46591.23,
+      "acquired": 46621.59
+    },
+    {
+      "timestamp_utc": "2022-01-01T04:00:00+00:00",
+      "field": "close",
+      "existing": 46711.05,
+      "acquired": 46701.29
+    },
+    {
+      "timestamp_utc": "2022-01-01T04:00:00+00:00",
+      "field": "volume",
+      "existing": 861.88389,
+      "acquired": 495.42676441
+    },
+    {
+      "timestamp_utc": "2022-01-01T05:00:00+00:00",
+      "field": "open",
+      "existing": 46711.05,
+      "acquired": 46696.45
+    },
+    {
+      "timestamp_utc": "2022-01-01T05:00:00+00:00",
+      "field": "high",
+      "existing": 47555.55,
+      "acquired": 47548.53
+    },
+    {
+      "timestamp_utc": "2022-01-01T05:00:00+00:00",
+      "field": "low",
+      "existing": 46673.94,
+      "acquired": 46668.64
+    },
+    {
+      "timestamp_utc": "2022-01-01T05:00:00+00:00",
+      "field": "close",
+      "existing": 47192.55,
+      "acquired": 47188.0
+    },
+    {
+      "timestamp_utc": "2022-01-01T05:00:00+00:00",
+      "field": "volume",
+      "existing": 1400.73642,
+      "acquired": 642.63840159
+    },
+    {
+      "timestamp_utc": "2022-01-01T06:00:00+00:00",
+      "field": "open",
+      "existing": 47192.56,
+      "acquired": 47188.0
+    },
+    {
+      "timestamp_utc": "2022-01-01T06:00:00+00:00",
+      "field": "high",
+      "existing": 47324.42,
+      "acquired": 47327.89
+    },
+    {
+      "timestamp_utc": "2022-01-01T06:00:00+00:00",
+      "field": "low",
+      "existing": 46940.0,
+      "acquired": 46944.81
+    },
+    {
+      "timestamp_utc": "2022-01-01T06:00:00+00:00",
+      "field": "close",
+      "existing": 46979.62,
+      "acquired": 46976.98
+    },
+    {
+      "timestamp_utc": "2022-01-01T06:00:00+00:00",
+      "field": "volume",
+      "existing": 613.97776,
+      "acquired": 380.56047962
+    },
+    {
+      "timestamp_utc": "2022-01-01T07:00:00+00:00",
+      "field": "open",
+      "existing": 46979.61,
+      "acquired": 46982.82
+    },
+    {
+      "timestamp_utc": "2022-01-01T07:00:00+00:00",
+      "field": "high",
+      "existing": 47255.85,
+      "acquired": 47251.76
+    },
+    {
+      "timestamp_utc": "2022-01-01T07:00:00+00:00",
+      "field": "low",
+      "existing": 46864.84,
+      "acquired": 46903.5
+    },
+    {
+      "timestamp_utc": "2022-01-01T07:00:00+00:00",
+      "field": "close",
+      "existing": 47194.73,
+      "acquired": 47200.01
+    },
+    {
+      "timestamp_utc": "2022-01-01T07:00:00+00:00",
+      "field": "volume",
+      "existing": 646.20081,
+      "acquired": 298.90128256
+    },
+    {
+      "timestamp_utc": "2022-01-01T08:00:00+00:00",
+      "field": "open",
+      "existing": 47194.73,
+      "acquired": 47200.14
+    },
+    {
+      "timestamp_utc": "2022-01-01T08:00:00+00:00",
+      "field": "high",
+      "existing": 47344.69,
+      "acquired": 47347.54
+    },
+    {
+      "timestamp_utc": "2022-01-01T08:00:00+00:00",
+      "field": "low",
+      "existing": 47075.11,
+      "acquired": 47087.17
+    },
+    {
+      "timestamp_utc": "2022-01-01T08:00:00+00:00",
+      "field": "close",
+      "existing": 47124.82,
+      "acquired": 47119.93
+    },
+    {
+      "timestamp_utc": "2022-01-01T08:00:00+00:00",
+      "field": "volume",
+      "existing": 532.44767,
+      "acquired": 215.98324574
+    },
+    {
+      "timestamp_utc": "2022-01-01T09:00:00+00:00",
+      "field": "open",
+      "existing": 47124.82,
+      "acquired": 47124.07
+    },
+    {
+      "timestamp_utc": "2022-01-01T09:00:00+00:00",
+      "field": "high",
+      "existing": 47215.56,
+      "acquired": 47212.89
+    },
+    {
+      "timestamp_utc": "2022-01-01T09:00:00+00:00",
+      "field": "low",
+      "existing": 46933.58,
+      "acquired": 46938.37
+    },
+    {
+      "timestamp_utc": "2022-01-01T09:00:00+00:00",
+      "field": "close",
+      "existing": 47143.98,
+      "acquired": 47139.67
+    },
+    {
+      "timestamp_utc": "2022-01-01T09:00:00+00:00",
+      "field": "volume",
+      "existing": 541.32491,
+      "acquired": 137.01504693
+    },
+    {
+      "timestamp_utc": "2022-01-01T10:00:00+00:00",
+      "field": "open",
+      "existing": 47143.98,
+      "acquired": 47139.66
+    },
+    {
+      "timestamp_utc": "2022-01-01T10:00:00+00:00",
+      "field": "high",
+      "existing": 47298.75,
+      "acquired": 47299.79
+    },
+    {
+      "timestamp_utc": "2022-01-01T10:00:00+00:00",
+      "field": "low",
+      "existing": 46715.39,
+      "acquired": 46722.71
+    },
+    {
+      "timestamp_utc": "2022-01-01T10:00:00+00:00",
+      "field": "close",
+      "existing": 46871.08,
+      "acquired": 46863.79
+    },
+    {
+      "timestamp_utc": "2022-01-01T10:00:00+00:00",
+      "field": "volume",
+      "existing": 923.0176,
+      "acquired": 267.99629024
+    },
+    {
+      "timestamp_utc": "2022-01-01T11:00:00+00:00",
+      "field": "open",
+      "existing": 46871.09,
+      "acquired": 46863.79
+    },
+    {
+      "timestamp_utc": "2022-01-01T11:00:00+00:00",
+      "field": "high",
+      "existing": 47007.73,
+      "acquired": 47000.0
+    },
+    {
+      "timestamp_utc": "2022-01-01T11:00:00+00:00",
+      "field": "low",
+      "existing": 46756.77,
+      "acquired": 46205.0
+    },
+    {
+      "timestamp_utc": "2022-01-01T11:00:00+00:00",
+      "field": "close",
+      "existing": 46758.87,
+      "acquired": 46758.11
+    },
+    {
+      "timestamp_utc": "2022-01-01T11:00:00+00:00",
+      "field": "volume",
+      "existing": 732.88793,
+      "acquired": 490.03927819
+    },
+    {
+      "timestamp_utc": "2022-01-01T12:00:00+00:00",
+      "field": "open",
+      "existing": 46758.87,
+      "acquired": 46754.97
+    },
+    {
+      "timestamp_utc": "2022-01-01T12:00:00+00:00",
+      "field": "high",
+      "existing": 47150.48,
+      "acquired": 47155.28
+    },
+    {
+      "timestamp_utc": "2022-01-01T12:00:00+00:00",
+      "field": "low",
+      "existing": 46756.3,
+      "acquired": 46754.97
+    },
+    {
+      "timestamp_utc": "2022-01-01T12:00:00+00:00",
+      "field": "close",
+      "existing": 47074.05,
+      "acquired": 47085.01
+    },
+    {
+      "timestamp_utc": "2022-01-01T12:00:00+00:00",
+      "field": "volume",
+      "existing": 582.15009,
+      "acquired": 137.75219026
+    },
+    {
+      "timestamp_utc": "2022-01-01T13:00:00+00:00",
+      "field": "open",
+      "existing": 47074.05,
+      "acquired": 47085.01
+    },
+    {
+      "timestamp_utc": "2022-01-01T13:00:00+00:00",
+      "field": "high",
+      "existing": 47199.67,
+      "acquired": 47206.01
+    },
+    {
+      "timestamp_utc": "2022-01-01T13:00:00+00:00",
+      "field": "low",
+      "existing": 46935.09,
+      "acquired": 46950.75
+    },
+    {
+      "timestamp_utc": "2022-01-01T13:00:00+00:00",
+      "field": "close",
+      "existing": 47023.24,
+      "acquired": 47023.9
+    },
+    {
+      "timestamp_utc": "2022-01-01T13:00:00+00:00",
+      "field": "volume",
+      "existing": 454.14412,
+      "acquired": 153.96634482
+    },
+    {
+      "timestamp_utc": "2022-01-01T14:00:00+00:00",
+      "field": "open",
+      "existing": 47023.24,
+      "acquired": 47023.89
+    },
+    {
+      "timestamp_utc": "2022-01-01T14:00:00+00:00",
+      "field": "high",
+      "existing": 47100.0,
+      "acquired": 47115.48
+    },
+    {
+      "timestamp_utc": "2022-01-01T14:00:00+00:00",
+      "field": "low",
+      "existing": 46850.18,
+      "acquired": 46855.69
+    },
+    {
+      "timestamp_utc": "2022-01-01T14:00:00+00:00",
+      "field": "close",
+      "existing": 46926.22,
+      "acquired": 46926.47
+    },
+    {
+      "timestamp_utc": "2022-01-01T14:00:00+00:00",
+      "field": "volume",
+      "existing": 503.6622,
+      "acquired": 202.86323425
+    },
+    {
+      "timestamp_utc": "2022-01-01T15:00:00+00:00",
+      "field": "open",
+      "existing": 46920.01,
+      "acquired": 46926.42
+    },
+    {
+      "timestamp_utc": "2022-01-01T15:00:00+00:00",
+      "field": "high",
+      "existing": 47491.14,
+      "acquired": 47486.85
+    },
+    {
+      "timestamp_utc": "2022-01-01T15:00:00+00:00",
+      "field": "low",
+      "existing": 46871.69,
+      "acquired": 46872.46
+    },
+    {
+      "timestamp_utc": "2022-01-01T15:00:00+00:00",
+      "field": "close",
+      "existing": 47219.04,
+      "acquired": 47231.0
+    },
+    {
+      "timestamp_utc": "2022-01-01T15:00:00+00:00",
+      "field": "volume",
+      "existing": 1515.95305,
+      "acquired": 517.2656672
+    },
+    {
+      "timestamp_utc": "2022-01-01T16:00:00+00:00",
+      "field": "open",
+      "existing": 47219.04,
+      "acquired": 47231.0
+    },
+    {
+      "timestamp_utc": "2022-01-01T16:00:00+00:00",
+      "field": "high",
+      "existing": 47527.24,
+      "acquired": 47549.69
+    },
+    {
+      "timestamp_utc": "2022-01-01T16:00:00+00:00",
+      "field": "low",
+      "existing": 47186.07,
+      "acquired": 47202.18
+    },
+    {
+      "timestamp_utc": "2022-01-01T16:00:00+00:00",
+      "field": "close",
+      "existing": 47268.62,
+      "acquired": 47302.78
+    },
+    {
+      "timestamp_utc": "2022-01-01T16:00:00+00:00",
+      "field": "volume",
+      "existing": 1049.57919,
+      "acquired": 714.76515328
+    },
+    {
+      "timestamp_utc": "2022-01-01T17:00:00+00:00",
+      "field": "open",
+      "existing": 47268.61,
+      "acquired": 47301.52
+    },
+    {
+      "timestamp_utc": "2022-01-01T17:00:00+00:00",
+      "field": "high",
+      "existing": 47954.63,
+      "acquired": 47967.12
+    },
+    {
+      "timestamp_utc": "2022-01-01T17:00:00+00:00",
+      "field": "low",
+      "existing": 47238.81,
+      "acquired": 47260.55
+    },
+    {
+      "timestamp_utc": "2022-01-01T17:00:00+00:00",
+      "field": "close",
+      "existing": 47754.48,
+      "acquired": 47769.78
+    },
+    {
+      "timestamp_utc": "2022-01-01T17:00:00+00:00",
+      "field": "volume",
+      "existing": 1320.66577,
+      "acquired": 518.79278746
+    },
+    {
+      "timestamp_utc": "2022-01-01T18:00:00+00:00",
+      "field": "open",
+      "existing": 47754.47,
+      "acquired": 47769.78
+    },
+    {
+      "timestamp_utc": "2022-01-01T18:00:00+00:00",
+      "field": "high",
+      "existing": 47844.97,
+      "acquired": 47850.0
+    },
+    {
+      "timestamp_utc": "2022-01-01T18:00:00+00:00",
+      "field": "low",
+      "existing": 47420.0,
+      "acquired": 47436.76
+    },
+    {
+      "timestamp_utc": "2022-01-01T18:00:00+00:00",
+      "field": "close",
+      "existing": 47560.55,
+      "acquired": 47578.42
+    },
+    {
+      "timestamp_utc": "2022-01-01T18:00:00+00:00",
+      "field": "volume",
+      "existing": 860.76025,
+      "acquired": 381.57847244
+    },
+    {
+      "timestamp_utc": "2022-01-01T19:00:00+00:00",
+      "field": "open",
+      "existing": 47560.54,
+      "acquired": 47577.44
+    },
+    {
+      "timestamp_utc": "2022-01-01T19:00:00+00:00",
+      "field": "high",
+      "existing": 47611.84,
+      "acquired": 47634.98
+    },
+    {
+      "timestamp_utc": "2022-01-01T19:00:00+00:00",
+      "field": "low",
+      "existing": 47292.72,
+      "acquired": 47305.71
+    },
+    {
+      "timestamp_utc": "2022-01-01T19:00:00+00:00",
+      "field": "close",
+      "existing": 47329.78,
+      "acquired": 47347.77
+    },
+    {
+      "timestamp_utc": "2022-01-01T19:00:00+00:00",
+      "field": "volume",
+      "existing": 830.6716,
+      "acquired": 335.73703623
+    }
+  ],
+  "shared_value_mismatches_file": "shared_value_mismatches.jsonl.gz",
+  "shared_value_mismatches_sha256": "ed98cbccf845ee9788a53c9c186b990056ea80ba32793bd045fe38ae1855e2cd",
+  "shared_value_mismatches_compressed_bytes": 2482851
+}

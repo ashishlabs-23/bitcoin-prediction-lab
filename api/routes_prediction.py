@@ -6,6 +6,7 @@ market regime classification, model health/lineage, and counterfactual matrices.
 """
 
 import time
+import sqlite3
 import math
 import logging
 from dataclasses import asdict
@@ -19,6 +20,7 @@ from engine.feature_cache import feature_cache
 from backtest.market_memory import load_market_memory, record_prediction
 from api.security_auth import require_role
 from config.security import UserRole
+from models.authoritative_model_registry import is_production_authorized
 
 logger = logging.getLogger("btcognitive.routes_prediction")
 
@@ -118,20 +120,25 @@ async def get_prediction_range():
 
 async def get_prediction_range_health():
     from backtest.market_memory import _get_db
-    conn = _get_db()
+    conn = None
+    status = "BLOCKED_PROVENANCE_UNVERIFIED"
     try:
+        conn = _get_db()
         cur = conn.cursor()
         total_fc = cur.execute("SELECT COUNT(*) FROM range_forecasts").fetchone()[0]
         total_oc = cur.execute("SELECT COUNT(*) FROM forecast_outcomes WHERE data_quality = 'VALID'").fetchone()[0]
         quarantined = cur.execute("SELECT COUNT(*) FROM forecast_outcomes WHERE data_quality LIKE 'QUARANTINED%'").fetchone()[0]
         unresolved = max(0, total_fc - total_oc - quarantined)
-    except Exception:
-        total_fc, total_oc, quarantined, unresolved = 0, 0, 0, 0
+    except sqlite3.Error as exc:
+        logger.warning("Forecast range health is unavailable: %s", exc)
+        total_fc, total_oc, quarantined, unresolved = None, None, None, None
+        status = "UNAVAILABLE"
     finally:
-        conn.close()
+        if conn is not None:
+            conn.close()
 
     return {
-        "status": "BLOCKED_PROVENANCE_UNVERIFIED",
+        "status": status,
         "context_status": "UNAVAILABLE_UNVERIFIED",
         "active_context_version": None,
         "combined_model_version": None,
@@ -140,7 +147,10 @@ async def get_prediction_range_health():
         "resolved_valid_count": total_oc,
         "quarantined_test_fixtures_count": quarantined,
         "unresolved_backlog_count": unresolved,
-        "resolver_queue_status": "PENDING_TIME_ALIGNED_FORWARD_CANDLES" if unresolved > 0 else "QUEUE_DRAINED",
+        "resolver_queue_status": (
+            "UNAVAILABLE" if unresolved is None else
+            "PENDING_TIME_ALIGNED_FORWARD_CANDLES" if unresolved > 0 else "QUEUE_DRAINED"
+        ),
         "reason": UNVERIFIED_RESEARCH_REASON,
     }
 
@@ -353,7 +363,7 @@ async def get_market_regime(live: bool = False):
             "classification_rule": regime.get("classification_rule"),
             "timestamp": regime.get("latest_completed_time"),
             "instrument": regime.get("instrument", "BTC-USD"),
-            "venue": regime.get("venue", "Coinbase Exchange Spot"),
+            "venue": regime.get("venue") or "UNAVAILABLE",
             "governance": {
                 "directional_authorization": "OFFLINE_RESEARCH_ONLY",
                 "execution_authorization": "DISABLED"
@@ -610,7 +620,7 @@ def post_prediction_record(
 ):
     """Records a prediction only with admin identity and an explicit research gate."""
     gate = getattr(request.app.state, "research_gate", None)
-    if not isinstance(gate, dict) or gate.get("authorized") is not True:
+    if not isinstance(gate, dict) or not is_production_authorized(gate):
         raise HTTPException(status_code=403, detail=UNVERIFIED_RESEARCH_REASON)
 
     required = ("timestamp", "price", "regime", "raw_prob", "decision", "direction")
@@ -664,29 +674,15 @@ def post_prediction_record(
 
 @router.get("/prediction/multiscale")
 def get_multiscale_prediction():
-    from engine.multiscale_forecast import multiscale_assembler
-    from engine.feature_cache import feature_cache
-
-    live_price = float(feature_cache.get_latest_price()) if feature_cache else 0.0
-    if live_price <= 0:
-        try:
-            from engine.observatory import observatory
-            snap = observatory.get_canonical_snapshot() if observatory else None
-            if snap and getattr(snap, "spot_price", 0.0) > 0:
-                live_price = float(snap.spot_price)
-        except Exception:
-            pass
-
-    if live_price <= 0:
-        raise HTTPException(status_code=503, detail="Market price unavailable for multiscale prediction.")
-
-    fc = multiscale_assembler.generate_multiscale(current_price=live_price, vol_24h=0.015, df_recent_events=None)
-    data = fc.to_dict()
-    data["symbol"] = "BTCUSD"
-    data["production_model_version"] = "v3.0.0-excursion-ridge-conformal"
-    data["shadow_model_version"] = "v1.0.0-challenger-hawkes-microstructure"
-    data["shadow_health"] = {"status": "HEALTHY"}
-    return data
+    raise HTTPException(
+        status_code=503,
+        detail={
+            "status": "UNAVAILABLE",
+            "reason": "Verified multiscale forecast and calibration artifacts are unavailable.",
+            "model_authorization": "OFFLINE_RESEARCH_ONLY",
+            "c2_status": "DISABLED",
+        },
+    )
 
 
 @router.get("/prediction/multiscale/health")
@@ -734,10 +730,11 @@ def get_prediction_horizons_health():
     from research.horizon_health import evaluate_horizon_health_and_gaps
     df_h, meta = evaluate_horizon_health_and_gaps()
     return {
-        "status": "HEALTHY",
+        "status": "UNAVAILABLE",
         "horizon_count": len(df_h),
         "primary_research_gap": meta.get("primary_gap", "Longer horizons lack high-frequency LOB features."),
-        "health_records": df_h.to_dict(orient="records"),
+        "health_records": [],
+        "reason": "Historical horizon-health assessments are not evidence of current validated calibration.",
     }
 
 
@@ -749,12 +746,11 @@ def get_prediction_market_state():
 
 @router.get("/prediction/market-state/history")
 def get_prediction_market_state_history(limit: int = Query(50, ge=1, le=200)):
-    from engine.market_state import market_state_engine
-    state = market_state_engine.evaluate_market_state().to_dict()
     return {
-        "status": "VALID",
-        "count": limit,
-        "history": [state] * limit,
+        "status": "UNAVAILABLE",
+        "count": None,
+        "history": [],
+        "reason": "Historical market-state observations are not persisted; the current state is not repeated as synthetic history.",
     }
 
 
@@ -789,26 +785,27 @@ def get_prediction_intelligence_health():
     obs = rep.observed_metrics
     obs_dict = obs if isinstance(obs, dict) else asdict(obs)
 
-    has_valid_blocks = rep.observed_blocks > 0
+    has_observed_blocks = rep.observed_blocks > 0
 
     return {
         "status": "MONITORING_ACTIVE",
-        "production_status": "VALIDATED_PRODUCTION_RANGE_SYSTEM" if has_valid_blocks else "INSUFFICIENT_EVIDENCE",
+        "production_status": "OFFLINE_RESEARCH_ONLY",
+        "model_authorization": "OFFLINE_RESEARCH_ONLY",
         "production_blocks": rep.observed_blocks,
-        "production_N_eff": obs_dict.get("effective_sample_size", 0.0),
-        "production_coverage_pct": obs_dict.get("p90_coverage_pct"),
-        "production_mfe_error_pct": obs_dict.get("mfe_error_pct"),
-        "production_mae_error_pct": obs_dict.get("mae_error_pct"),
-        "production_baseline_delta_bps": obs_dict.get("baseline_delta_bps"),
-        "calibration_status": obs_dict.get("calibration_status", "CALIBRATION_PENDING"),
-        "context_status": "CONTEXT_STABLE",
-        "model_decay": obs_dict.get("model_status", "MODEL_FROZEN"),
-        "data_quality": "HEALTHY" if has_valid_blocks else "AWAITING_VALID_EVIDENCE",
-        "provenance": "PROVENANCE_MATCHED",
-        "shadow_hawkes_status": "VALIDATED_SHADOW_MODEL",
-        "shadow_hawkes_N_eff": rep.hawkes_shadow_progress.get("effective_sample_size", 0.0),
+        "production_N_eff": obs_dict.get("effective_sample_size") or None,
+        "production_coverage_pct": None,
+        "production_mfe_error_pct": None,
+        "production_mae_error_pct": None,
+        "production_baseline_delta_bps": None,
+        "calibration_status": "UNAVAILABLE",
+        "context_status": "UNAVAILABLE",
+        "model_decay": "NOT_ASSESSED",
+        "data_quality": "EVIDENCE_PRESENT_REQUIRES_VALIDATION" if has_observed_blocks else "AWAITING_VALID_EVIDENCE",
+        "provenance": "UNAVAILABLE",
+        "shadow_hawkes_status": "OFFLINE_RESEARCH_ONLY",
+        "shadow_hawkes_N_eff": rep.hawkes_shadow_progress.get("effective_sample_size") or None,
         "foundation_status": "FOUNDATION_RESEARCH",
-        "overall_reliability": "VERY_HIGH" if has_valid_blocks else "INSUFFICIENT_EVIDENCE"
+        "overall_reliability": "NOT_ESTABLISHED"
     }
 
 
@@ -817,14 +814,14 @@ def get_prediction_intelligence_health():
 def get_research_all_models_leaderboard():
     return {
         "title": "BTCUSD MODEL RESEARCH & PRODUCTION LEADERBOARD",
-        "status": "MONITORING_ACTIVE",
-        "authoritative": True,
+        "status": "UNAVAILABLE",
+        "authoritative": False,
         "categories": {
             "PRODUCTION": [
-                {"model": "Ridge + Volatility Context", "version": "v3.0.0-ridge-vol-v1.0.0", "horizon": "24h", "status": "ACTIVE_PRODUCTION"}
+                {"model": "Ridge + Volatility Context", "version": "v3.0.0-ridge-vol-v1.0.0", "horizon": "24h", "status": "NOT_ESTABLISHED"}
             ],
             "SHADOW": [
-                {"model": "Hawkes Microstructure", "version": "v1.0.0-challenger-hawkes-microstructure", "horizon": "5m", "status": "VALIDATED_SHADOW"}
+                {"model": "Hawkes Microstructure", "version": "v1.0.0-challenger-hawkes-microstructure", "horizon": "5m", "status": "OFFLINE_RESEARCH_ONLY"}
             ],
             "RESEARCH": [
                 {"model": "Intermediate Horizon 1H", "version": "1h-tech-ofi-vol", "horizon": "1h", "status": "RESEARCH_ONLY"},
@@ -834,6 +831,8 @@ def get_research_all_models_leaderboard():
                 {"model": "Mamba State-Space Model v1", "version": "v1.0.0-challenger-mamba-selective-ssm", "horizon": "24h", "rejection_reason": "Worse MFE/MAE than Ridge; no paired improvement"}
             ],
         },
+        "model_authorization": "OFFLINE_RESEARCH_ONLY",
+        "reason": "Current validation evidence and verified model artifacts are unavailable.",
         "foundation_models": {
             "status": "UNAVAILABLE_NOT_EXECUTED",
             "authoritative": False,
@@ -865,7 +864,7 @@ def get_prediction_accuracy():
             "joint_path_containment_pct": None,
             "winkler_score": None,
             "interval_width_pct": None,
-            "calibration_status": "UNVERIFIED",
+            "calibration_status": "UNAVAILABLE",
         },
         "directional_accuracy": {
             "status": "UNAVAILABLE_UNVERIFIED",
@@ -896,7 +895,7 @@ def get_prediction_accuracy():
 def get_prediction_accuracy_history(limit: int = Query(30, ge=1, le=365)):
     return {
         "status": "UNAVAILABLE_UNVERIFIED",
-        "count": 0,
+        "count": None,
         "history": [],
         "reason": UNVERIFIED_RESEARCH_REASON,
     }
@@ -921,10 +920,35 @@ def get_prediction_longitudinal():
     """
     Returns active longitudinal monitoring progress, strictly separating OBSERVED evidence from TARGET milestones.
     """
-    from engine.longitudinal_status import longitudinal_status_service
-    res = longitudinal_status_service.get_status_report().to_dict()
-    res["governance_mode"] = "LONGITUDINAL_MONITORING_ACTIVE"
-    return res
+    try:
+        from engine.longitudinal_status import longitudinal_status_service
+        res = longitudinal_status_service.get_status_report().to_dict()
+        observed_metrics = res.get("observed_metrics")
+        if isinstance(observed_metrics, dict):
+            for key in (
+                "mfe_error_pct",
+                "mae_error_pct",
+                "p90_coverage_pct",
+                "winkler_score",
+                "conformal_interval_width_pct",
+                "baseline_delta_bps",
+                "drift_psi",
+            ):
+                observed_metrics[key] = None
+            observed_metrics["calibration_status"] = "UNAVAILABLE"
+            observed_metrics["model_status"] = "NOT_ESTABLISHED"
+        res["governance_mode"] = "OFFLINE_RESEARCH_ONLY"
+        return res
+    except (sqlite3.OperationalError, TimeoutError) as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Longitudinal monitoring database is locked or temporarily unavailable: {exc}"
+        )
+    except (sqlite3.DatabaseError, FileNotFoundError) as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Longitudinal monitoring database is missing or corrupted: {exc}"
+        )
 
 
 @router.get("/prediction/longitudinal/health")
@@ -933,21 +957,33 @@ def get_prediction_longitudinal_health():
     """
     Returns automated daily longitudinal evidence collector health and provenance status.
     """
-    from research.post_repair_longitudinal_monitor import post_repair_monitor
-    status = post_repair_monitor.get_status()
-    return {
-        "monitor_status": status["monitoring_status"],
-        "evidence_phase": status["evidence_phase"],
-        "evidence_boundary": status["evidence_boundary"],
-        "model_health": status["health_status"]["model_health"],
-        "context_health": status["health_status"]["context_health"],
-        "data_health": status["health_status"]["data_health"],
-        "provenance_health": status["health_status"]["provenance_health"],
-        "stop_rule": "NO_NEW_RESEARCH_REQUIRED",
-        "observed_blocks": status["observed_valid_blocks"],
-        "observed_valid_blocks": status["observed_valid_blocks"],
-        "next_milestone": status["next_milestone"]
-    }
+    try:
+        from research.post_repair_longitudinal_monitor import post_repair_monitor
+        status = post_repair_monitor.get_status()
+        return {
+            "monitor_status": status["monitoring_status"],
+            "evidence_phase": status["evidence_phase"],
+            "evidence_boundary": status["evidence_boundary"],
+            "model_health": "UNAVAILABLE",
+            "context_health": "UNAVAILABLE",
+            "data_health": "UNAVAILABLE",
+            "provenance_health": "UNAVAILABLE",
+            "calibration_health": "UNAVAILABLE",
+            "stop_rule": "NO_NEW_RESEARCH_REQUIRED",
+            "observed_blocks": status["observed_valid_blocks"],
+            "observed_valid_blocks": status["observed_valid_blocks"],
+            "next_milestone": status["next_milestone"]
+        }
+    except (sqlite3.OperationalError, TimeoutError) as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Longitudinal monitoring database is locked or temporarily unavailable: {exc}"
+        )
+    except (sqlite3.DatabaseError, FileNotFoundError) as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Longitudinal monitoring database is missing or corrupted: {exc}"
+        )
 
 
 @router.get("/prediction/longitudinal/resolution-health")
@@ -979,18 +1015,18 @@ def get_prediction_pipeline_layers():
     """
     from engine.prediction_pipeline import prediction_pipeline
     from engine.feature_cache import feature_cache
-    from datetime import datetime, timezone
 
     row = feature_cache.get_latest_row()
-    candle = row if row is not None else {
-        "open": 0.0,
-        "high": 0.0,
-        "low": 0.0,
-        "close": 0.0,
-        "volume": 0.0,
-        "vol_24h": 0.0,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
+    if row is None:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "DATA_UNAVAILABLE",
+                "reason": "A verified market-data row is required to evaluate prediction pipeline layers.",
+                "model_authorization": "OFFLINE_RESEARCH_ONLY",
+            },
+        )
+    candle = row
     res = prediction_pipeline.run_pipeline(candle=candle)
     payload = res.to_dict()
     payload["status"] = "BLOCKED_PROVENANCE_UNVERIFIED"
@@ -1051,5 +1087,3 @@ async def get_price_forecasts(
         return res
         
     return price_forecast_engine.get_all_price_forecasts(live_quote=live_quote)
-
-

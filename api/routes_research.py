@@ -26,7 +26,7 @@ import hashlib
 import re
 import logging
 from datetime import datetime, timezone
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Literal
 from fastapi import APIRouter, HTTPException, Query, Path
 from pydantic import BaseModel, Field
 
@@ -59,7 +59,7 @@ class SmartEntrySnapshotRequest(BaseModel):
     market_snapshot: Dict[str, Any] = Field(default_factory=dict)
     enabled_indicators: List[str] = Field(default_factory=lambda: DEFAULT_SMART_ENTRY_INDICTORS.copy())
     regime: str = "VOL_EXPANDING"
-    c2_health: str = "CALIBRATED"
+    c2_health: Literal["UNAVAILABLE"] = "UNAVAILABLE"
     user_direction_preference: str = "AUTO"
     selective_threshold: float = 0.60
     cost_scenario: str = "COINBASE_RETAIL_87BPS"
@@ -122,6 +122,11 @@ def _smart_entry_abstain_response(reason: str, *, decision_action: str = "ABSTAI
         "reasons": [reason],
         "missing_inputs": list(missing_inputs or []),
         "details": details or {},
+        "first_passage_geometry_baseline": None,
+        "drift_parameter_mu": 0.0,
+        "drift_status": "DRIFTLESS_NULL_BASELINE",
+        "directional_model_evidence": None,
+        "persisted": False,
         "execution_authorization": "DISABLED — ANALYSIS ONLY",
         "governance_status": "OFFLINE_RESEARCH_ONLY",
     }
@@ -239,6 +244,7 @@ def evaluate_smart_entry_snapshot(snapshot: SmartEntrySnapshotRequest):
         selective_threshold=float(snapshot.selective_threshold),
         cost_scenario=snapshot.cost_scenario,
         horizon=timeframe,
+        persist=False,
     )
 
     decision = {
@@ -263,12 +269,19 @@ def evaluate_smart_entry_snapshot(snapshot: SmartEntrySnapshotRequest):
         "candidate": result.get("candidate"),
         "resolution": result.get("resolution"),
         "selection": result.get("selection"),
+        "first_passage_geometry_baseline": result.get("first_passage_geometry_baseline"),
+        "drift_parameter_mu": result.get("drift_parameter_mu", 0.0),
+        "drift_status": result.get("drift_status", "DRIFTLESS_NULL_BASELINE"),
+        "directional_model_evidence": result.get("directional_model_evidence"),
         "acceptance_status": "ACCEPTED" if result.get("status") == "SUCCESS" else "REJECTED",
         "reasons": [result.get("primary_reason")] if result.get("primary_reason") else [],
         "missing_inputs": [],
         "uncertainty": result.get("selection", {}).get("synthesis", {}).get("confidence") if isinstance(result.get("selection"), dict) else None,
         "modern_econometrics": result.get("modern_econometrics"),
         "spot_execution_advisory": result.get("spot_execution_advisory"),
+        "persisted": result.get("persisted", False),
+        "persisted_timestamp_utc": result.get("persisted_timestamp_utc"),
+        "persistence_error": result.get("persistence_error"),
         "execution_authorization": result.get("execution_authorization", "DISABLED — ANALYSIS ONLY"),
         "governance_status": result.get("governance_status", "OFFLINE_RESEARCH_ONLY"),
     }
@@ -277,6 +290,90 @@ def evaluate_smart_entry_snapshot(snapshot: SmartEntrySnapshotRequest):
         decision["acceptance_status"] = "ABSTAIN"
         decision["reasons"] = [result.get("primary_reason") or "Smart Entry engine abstained due to insufficient evidence."]
     return decision
+
+
+class SmartEntryPipelineRequest(BaseModel):
+    strategy_id: str = Field(default="TSMOM_DONCHIAN_24H_168H", description="Strategy identifier")
+    instrument: str = Field(default="BTC-USD", description="Authorized instrument (BTC-USD only)")
+    venue: str = Field(default="COINBASE", description="Authorized venue (COINBASE only)")
+    timeframe: str = Field(default="1h", description="Candle timeframe")
+    assumed_cost_scenario: str = Field(default="COINBASE_RETAIL_87BPS", description="Assumed fee scenario")
+    custom_friction_bps: Optional[float] = Field(default=None, description="Optional custom round-trip bps")
+    candles: Optional[List[SmartEntryCandleModel]] = Field(default=None, description="Optional explicit candle sequence")
+
+
+@router.post("/smart-entry/pipeline")
+def execute_smart_entry_pipeline(req: SmartEntryPipelineRequest):
+    """
+    Executes the 6-stage quantitative pipeline:
+    Verified data -> Strategy signal -> Horizon-matched AI forecast ->
+    Cost and uncertainty evaluation -> Smart Entry risk gate -> Positive-edge research alert.
+    """
+    from engine.smart_entry_pipeline import SmartEntryPipeline
+
+    candle_data: List[Dict[str, Any]] = []
+    if req.candles:
+        for c in req.candles:
+            if c.close is not None and c.open is not None and c.high is not None and c.low is not None:
+                candle_data.append({
+                    "timestamp_utc": c.timestamp_utc or datetime.now(timezone.utc).isoformat(),
+                    "open": float(c.open),
+                    "high": float(c.high),
+                    "low": float(c.low),
+                    "close": float(c.close),
+                    "volume": 100.0
+                })
+    else:
+        # Load exclusively from verified historical Coinbase research parquet store
+        auth_parquet = os.path.join(REPO_ROOT, "data", "research", "coinbase_btc_usd_hourly_v1", "coinbase_hourly.parquet")
+        if os.path.exists(auth_parquet):
+            try:
+                import pandas as pd
+                df = pd.read_parquet(auth_parquet)
+                recent = df.tail(300).copy()
+                ts_col = "timestamp_utc" if "timestamp_utc" in recent.columns else "timestamp"
+                for _, row in recent.iterrows():
+                    ts_val = row[ts_col]
+                    ts_str = ts_val if isinstance(ts_val, str) else pd.to_datetime(ts_val, utc=True).isoformat().replace("+00:00", "Z")
+                    candle_data.append({
+                        "timestamp_utc": ts_str,
+                        "open": float(row["open"]),
+                        "high": float(row["high"]),
+                        "low": float(row["low"]),
+                        "close": float(row["close"]),
+                        "volume": float(row.get("volume", 0.0))
+                    })
+            except Exception as e:
+                logger.error(f"Failed loading verified candles from parquet: {e}")
+        else:
+            logger.warning("Verified Coinbase research dataset not found on disk; failing closed without unverified fallback.")
+
+    report = SmartEntryPipeline.execute_pipeline(
+        candles=candle_data,
+        strategy_id=req.strategy_id,
+        instrument=req.instrument,
+        venue=req.venue,
+        timeframe=req.timeframe,
+        assumed_cost_scenario=req.assumed_cost_scenario,
+        custom_friction_bps=req.custom_friction_bps
+    )
+    return report.to_dict()
+
+
+@router.get("/smart-entry/pipeline/latest")
+def get_latest_smart_entry_pipeline(
+    strategy_id: str = Query(default="TSMOM_DONCHIAN_24H_168H"),
+    assumed_cost_scenario: str = Query(default="COINBASE_RETAIL_87BPS")
+):
+    """
+    Evaluates the latest verified market data through the full 6-stage strategy-to-alert pipeline.
+    """
+    req = SmartEntryPipelineRequest(
+        strategy_id=strategy_id,
+        assumed_cost_scenario=assumed_cost_scenario
+    )
+    return execute_smart_entry_pipeline(req)
+
 
 
 # ---------------------------------------------------------------------------
@@ -1649,12 +1746,17 @@ def get_research_experiment_register():
         "register_version": register_data.get("register_version", "BTC-EXP-REG-2026-v1.0"),
         "updated_at_utc": register_data.get("updated_at_utc"),
         "active_baseline": {
-            "model_id": "HAR-RS-DOW-v1.0",
+            "model_id": "Standard-HAR-v1.0",
             "target": "rv7d_var_ann (168h)",
-            "causal_holdout_coverage_pct": 84.89,
-            "holdout_qlike": 0.21483,
-            "authorization_status": "BLOCKED_AUDIT_FAILURE",
-            "epistemic_note": "Corrected strictly causal delayed-resolution coverage is 84.89% (reconciled from legacy leaked 92.36%)."
+            "forecast_accuracy_status": "NOT_ESTABLISHED",
+            "causal_holdout_coverage_pct": None,
+            "holdout_qlike": None,
+            "authorization_status": "OFFLINE_RESEARCH_ONLY",
+            "epistemic_note": (
+                "The registered Standard HAR artifact and authoritative hash are not verified. "
+                "Retrospective register entries remain available below as historical records but are not "
+                "reported as the performance of the currently registered artifact."
+            )
         },
         "total_experiments": len(register_data.get("experiments", [])),
         "experiments": register_data.get("experiments", []),
@@ -1833,7 +1935,6 @@ def get_entry_quality(
     k_tp: float = Query(1.5, ge=0.5, le=5.0),
     k_sl: float = Query(1.0, ge=0.5, le=5.0),
     threshold: float = Query(0.60, ge=0.40, le=0.90),
-    persist: bool = Query(False)
 ):
     """
     BTCognitive V28 Probabilistic Entry Quality Engine (PRD-ENT-28).
@@ -1841,7 +1942,8 @@ def get_entry_quality(
     profit target is likely to be reached before a defined stop-loss.
     Computes net expectancy in R-multiples and enforces strict cost-aware gating.
 
-    Idempotent: Read queries do not mutate the prospective ledger unless persist=True.
+    Strictly Idempotent and Read-Only: Research query evaluates decision gate in-memory.
+    Per HTTP GET specifications, this endpoint never mutates prospective ledgers.
     """
     from engine.probabilistic_entry_engine import entry_quality_engine
     import math
@@ -1874,8 +1976,9 @@ def get_entry_quality(
             features=feats,
             selective_threshold=threshold
         )
-        if persist:
-            entry_quality_engine.log_prospective_decision(decision)
+        persisted = False
+        persistence_error = None
+        decision["persisted"] = persisted
     except Exception as e:
         logger.error(f"Entry quality decision evaluation failed: {e}")
         return {
@@ -1899,6 +2002,8 @@ def get_entry_quality(
 
     return {
         "status": "SUCCESS",
+        "persisted": persisted,
+        "persistence_error": persistence_error,
         "engine_version": entry_quality_engine.RESOLVER_VERSION,
         "features_evaluated": feats,
         "decision": decision,
@@ -1948,4 +2053,144 @@ def get_empirical_remediation_report():
         "rigorous_replay": replay_data,
         "har_calibration": har_data,
         "report_markdown": markdown_content,
+    }
+
+
+@router.get("/l2-gating-status")
+def get_l2_gating_status() -> Dict[str, Any]:
+    """
+    Returns the current configuration, liveness, and order-book synchronization status
+    for the opt-in Coinbase L2 entry-gating research pipeline.
+    Default posture is DISABLED. Live trading is permanently DISABLED.
+    """
+    collector_enabled = os.environ.get("COINBASE_L2_COLLECTOR_ENABLED", "0").lower() in ("1", "true", "yes")
+    return {
+        "status": "SUCCESS",
+        "operating_posture": "OFFLINE_RESEARCH_ONLY",
+        "live_trading": "DISABLED",
+        "collector_enabled_default": False,
+        "collector_enabled_current": collector_enabled,
+        "product_id": "BTC-USD",
+        "venue": "COINBASE",
+        "ws_endpoint": "wss://ws-feed.exchange.coinbase.com",
+        "target_strategy": "TSMOM_DONCHIAN_168H_336H",
+        "gating_rules": {
+            "ofi_min": 0.0,
+            "obi_5_min": -0.20,
+            "max_spread_bps": 5.0,
+            "max_staleness_sec": 5.0,
+            "fail_closed_mode": "GATE_ABSTAIN_L2_UNAVAILABLE"
+        },
+        "governance": {
+            "authorization": "OFFLINE_RESEARCH_ONLY",
+            "order_placement": "DISABLED",
+            "broker_apis": "DISCONNECTED"
+        }
+    }
+
+
+@router.get("/l2-shadow-evaluation")
+def get_l2_shadow_evaluation() -> Dict[str, Any]:
+    """
+    Returns the comparative evaluation summary between the ungated 168h control cohort
+    and the contemporaneous L2-gated candidate cohort from the versioned research ledger.
+    """
+    from engine.prospective_l2_shadow_gating import L2ShadowGatingEngine
+    engine = L2ShadowGatingEngine()
+    summary = engine.compute_evaluation_summary()
+    summary["protocol_version"] = "V32.31_PROSPECTIVE_L2_GATED_V1"
+    summary["ledger_path"] = "data/research/prospective_l2_gated_ledger_v1.jsonl"
+    return summary
+
+
+# ---------------------------------------------------------------------------
+# BTCognitive V32.41: Paper-Trading & Shadow Evaluation Endpoints
+# ---------------------------------------------------------------------------
+
+@router.get("/paper-trading/status")
+def get_paper_trading_status() -> Dict[str, Any]:
+    """
+    Returns operational readiness and strict non-execution safety status
+    for the BTCognitive V32.41 virtual paper-trading engine.
+    """
+    from engine.paper_trading_engine import PaperTradingEngine, COST_REGISTRY
+    engine = PaperTradingEngine()
+    summary = engine.get_summary_report()
+    return {
+        "status": "SUCCESS",
+        "protocol_version": "V32.41_PAPER_TRADING",
+        "engine_state": summary.get("engine_status", "PAPER_ENGINE_READY"),
+        "operating_posture": "OFFLINE_RESEARCH_ONLY",
+        "economic_verdict": "NO_GO_NO_VALIDATED_EDGE",
+        "live_trading": "DISABLED",
+        "broker_execution_adapters": "NONE",
+        "order_placement_routes": "NONE",
+        "latency_delay_ms": engine.latency_delay_sec * 1000.0,
+        "cost_scenarios_supported": list(COST_REGISTRY.keys()),
+        "active_cost_scenario": engine.cost_scenario,
+        "sleeves": ["TSMOM_DONCHIAN_168H_336H_L2_GATED", "TSMOM_DONCHIAN_168H_336H_UNGATED"],
+        "quarantined_models": ["Chronos-2"],
+        "disclaimer": summary.get("disclaimer")
+    }
+
+
+@router.get("/paper-trading/portfolio")
+def get_paper_trading_portfolio() -> Dict[str, Any]:
+    """
+    Returns virtual portfolio metrics, equity, drawdowns, and positions
+    comparing the L2-gated sleeve vs the ungated control sleeve.
+    """
+    from engine.paper_trading_engine import PaperTradingEngine
+    engine = PaperTradingEngine()
+    return {
+        "status": "SUCCESS",
+        "portfolio": engine.get_summary_report()
+    }
+
+
+@router.get("/paper-trading/ledger")
+def get_paper_trading_ledger(limit: int = Query(default=50, ge=1, le=500)) -> Dict[str, Any]:
+    """
+    Returns recent append-only records from the isolated paper execution ledger.
+    """
+    from engine.paper_trading_engine import DEFAULT_PAPER_LEDGER
+    records = []
+    if os.path.exists(DEFAULT_PAPER_LEDGER):
+        try:
+            with open(DEFAULT_PAPER_LEDGER, "r", encoding="utf-8") as f:
+                for line in f:
+                    if line.strip():
+                        records.append(json.loads(line))
+        except Exception as e:
+            logger.warning(f"Error reading paper ledger: {e}")
+
+    return {
+        "status": "SUCCESS",
+        "total_records": len(records),
+        "records": records[-limit:],
+        "ledger_path": "data/research/paper_trading/paper_execution_ledger.jsonl"
+    }
+
+
+@router.get("/paper-trading/gbdt-evaluation")
+def get_paper_trading_gbdt_evaluation(limit: int = Query(default=50, ge=1, le=500)) -> Dict[str, Any]:
+    """
+    Returns point-in-time GBDT forecast logs and matured evaluations.
+    """
+    from engine.paper_trading_engine import DEFAULT_GBDT_EVAL_LEDGER
+    records = []
+    if os.path.exists(DEFAULT_GBDT_EVAL_LEDGER):
+        try:
+            with open(DEFAULT_GBDT_EVAL_LEDGER, "r", encoding="utf-8") as f:
+                for line in f:
+                    if line.strip():
+                        records.append(json.loads(line))
+        except Exception as e:
+            logger.warning(f"Error reading GBDT eval ledger: {e}")
+
+    return {
+        "status": "SUCCESS",
+        "total_records": len(records),
+        "records": records[-limit:],
+        "ledger_path": "data/research/paper_trading/paper_gbdt_eval_ledger.jsonl"
     }

@@ -229,8 +229,203 @@ const api = {
   },
   async fetchResearchReport(reportId) {
     return resilientFetch(`${getApiBaseUrl()}/api/research/reports/${encodeURIComponent(reportId)}`);
+  },
+  async fetchSmartEntryDecision(payload = {}) {
+    return resilientFetch(`${getApiBaseUrl()}/api/research/smart-entry`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }, 0);
+  },
+  async fetchL2GatingStatus() {
+    return resilientFetch(`${getApiBaseUrl()}/api/research/l2-gating-status`);
+  },
+  async fetchL2ShadowEvaluation() {
+    return resilientFetch(`${getApiBaseUrl()}/api/research/l2-shadow-evaluation`);
+  },
+  async fetchForecastLatest(horizon = "1h") {
+    return resilientFetch(`${getApiBaseUrl()}/api/forecast/latest?horizon=${encodeURIComponent(horizon)}`);
+  },
+  async fetchTerminalLive() {
+    return resilientFetch(`${getApiBaseUrl()}/api/terminal/live`);
+  },
+  async fetchPriceForecast(horizon = "all") {
+    return resilientFetch(`${getApiBaseUrl()}/api/prediction/price/forecast?horizon=${encodeURIComponent(horizon)}`);
+  },
+  async fetchUserPositions(userId) {
+    const url = userId ? `${getApiBaseUrl()}/api/positions?user_id=${encodeURIComponent(userId)}` : `${getApiBaseUrl()}/api/positions`;
+    return resilientFetch(url);
+  },
+  async fetchUserPositionsHistory(userId) {
+    const url = userId ? `${getApiBaseUrl()}/api/positions/history?user_id=${encodeURIComponent(userId)}` : `${getApiBaseUrl()}/api/positions/history`;
+    return resilientFetch(url);
+  },
+  async fetchCopilotStatus() {
+    return resilientFetch(`${getApiBaseUrl()}/api/positions/status`);
+  },
+  async recordOpenPosition(payload) {
+    const res = await fetch(`${getApiBaseUrl()}/api/positions/open`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Open position failed (${res.status})`);
+    }
+    return res.json();
+  },
+  async recordPartialExit(positionId, payload) {
+    const res = await fetch(`${getApiBaseUrl()}/api/positions/${encodeURIComponent(positionId)}/partial-exit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Partial exit failed (${res.status})`);
+    }
+    return res.json();
+  },
+  async recordClosePosition(positionId, payload) {
+    const res = await fetch(`${getApiBaseUrl()}/api/positions/${encodeURIComponent(positionId)}/close`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Close position failed (${res.status})`);
+    }
+    return res.json();
+  },
+  async fetchJournalStatus() {
+    return resilientFetch(`${getApiBaseUrl()}/api/journal/status`);
+  },
+  async fetchJournalTrades(userId) {
+    const url = userId ? `${getApiBaseUrl()}/api/journal/trades?user_id=${encodeURIComponent(userId)}` : `${getApiBaseUrl()}/api/journal/trades`;
+    return resilientFetch(url);
+  },
+  async fetchJournalEvaluation() {
+    return resilientFetch(`${getApiBaseUrl()}/api/journal/evaluation`);
+  },
+  async recordEnterTrade(payload) {
+    const res = await fetch(`${getApiBaseUrl()}/api/journal/trades/enter`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Enter trade failed (${res.status})`);
+    }
+    return res.json();
+  },
+  async recordExitTrade(tradeId, payload) {
+    const res = await fetch(`${getApiBaseUrl()}/api/journal/trades/${encodeURIComponent(tradeId)}/exit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Exit trade failed (${res.status})`);
+    }
+    return res.json();
+  },
+  async recordAdjustTrade(tradeId, payload) {
+    const res = await fetch(`${getApiBaseUrl()}/api/journal/trades/${encodeURIComponent(tradeId)}/adjust`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Adjust trade failed (${res.status})`);
+    }
+    return res.json();
+  },
+
+  // V32.43 Strategy Tournament & Smart Entry Lifecycle API
+  async analyseMarket(payload = {}) {
+    return resilientFetch(`${getApiBaseUrl()}/api/tournament/analyse`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }, 0);
+  },
+  async runTournament(payload = {}) {
+    return resilientFetch(`${getApiBaseUrl()}/api/tournament/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }, 0);
+  },
+  async fetchSmartEntryLatest() {
+    return resilientFetch(`${getApiBaseUrl()}/api/tournament/smart-entry/latest`);
+  },
+  async fetchHistoricalEvidence() {
+    return resilientFetch(`${getApiBaseUrl()}/api/tournament/historical-evidence`);
+  },
+  async enterSimulatedTrade(payload) {
+    const res = await fetch(`${getApiBaseUrl()}/api/tournament/smart-entry/enter`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Enter simulated trade failed (${res.status})`);
+    }
+    return res.json();
+  },
+  async fetchSimulatedAttempts() {
+    return resilientFetch(`${getApiBaseUrl()}/api/tournament/smart-entry/attempts`);
+  },
+  async exitSimulatedAttempt(attemptId, payload) {
+    const res = await fetch(`${getApiBaseUrl()}/api/tournament/smart-entry/attempts/${encodeURIComponent(attemptId)}/exit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Exit attempt failed (${res.status})`);
+    }
+    return res.json();
+  },
+  async partialExitSimulatedAttempt(attemptId, payload) {
+    const res = await fetch(`${getApiBaseUrl()}/api/tournament/smart-entry/attempts/${encodeURIComponent(attemptId)}/partial-exit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Partial exit failed (${res.status})`);
+    }
+    return res.json();
+  },
+  async monitorSimulatedAttempt(payload = {}) {
+    const res = await fetch(`${getApiBaseUrl()}/api/tournament/smart-entry/monitor`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Monitor simulated attempt failed (${res.status})`);
+    }
+    return res.json();
+  },
+  async fetchSmartEntryEvaluation() {
+    return resilientFetch(`${getApiBaseUrl()}/api/tournament/smart-entry/evaluation`);
+  },
+  async fetchStrategyRegistry() {
+    return resilientFetch(`${getApiBaseUrl()}/api/tournament/registry`);
   }
 };
+
 
 if (typeof module !== "undefined" && module.exports) {
   module.exports = { api, resilientFetch, getApiBaseUrl, isTabVisible, _inflightRequests, _responseCache };

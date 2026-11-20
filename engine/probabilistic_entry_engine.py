@@ -4,7 +4,7 @@ engine/probabilistic_entry_engine.py — Probabilistic Entry Quality Engine & De
 Implements:
 1. Candidate Entry Event Formulation (Side, Executable Entry at t0 + dt, ATR Volatility).
 2. Conservative Triple-Barrier Outcome Resolver (with SL_FIRST on intrabar collisions).
-3. Calibrated Meta-Label Quality Model (p_TP, p_SL, p_timeout).
+3. First-passage geometry baseline probabilities (p_TP, p_SL, p_timeout).
 4. Cost-Aware Net Expectancy Decision Gate (E[R_net] > 0).
 5. Append-Only Prospective Entry Ledger (data/prospective_entry_ledger.jsonl).
 
@@ -19,14 +19,14 @@ import math
 import json
 import datetime
 import hashlib
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional, Tuple, Union
 from pathlib import Path
 import numpy as np
 import pandas as pd
 
 
 class ProbabilisticEntryEngine:
-    """Evaluates candidate trade setups, estimates calibrated barrier probabilities, and gates decisions."""
+    """Evaluates research setups with baseline barrier probabilities and a fail-closed gate."""
 
     RESOLVER_VERSION = "ENTRY_TP_SL_RESOLVER_V1"
     RESEARCH_STATUS = "OFFLINE_RESEARCH_ONLY"
@@ -344,6 +344,8 @@ class ProbabilisticEntryEngine:
             "expected_net_r": round(expected_net_r, 4),
             "breakeven_win_rate_pct": round(float((1.0 + max(0.0, friction_r)) / (tp_r + 1.0)) * 100.0, 2),
             "epistemic_provenance": "FIRST_PASSAGE_GEOMETRY_BASELINE_H0",
+            "drift_parameter_mu": 0.0,
+            "drift_status": "DRIFTLESS_NULL_BASELINE",
             "validated_directional_edge": False,
             "validated_edge_status": "NO_VALIDATED_EDGE_ABSTAIN",
             "geometry_baseline_only": True,
@@ -355,7 +357,11 @@ class ProbabilisticEntryEngine:
         }
         return decision
 
-    def log_prospective_decision(self, decision: Dict[str, Any]) -> str:
+    def log_prospective_decision(
+        self,
+        decision: Dict[str, Any],
+        ledger_path: Optional[Union[Path, str]] = None
+    ) -> str:
         """Append-only logging to V2 ledger enforcing all 5 mandatory provenance fields."""
         now_utc = datetime.datetime.now(datetime.timezone.utc).isoformat()
         record = {
@@ -370,7 +376,8 @@ class ProbabilisticEntryEngine:
             "rule_hash": decision.get("rule_hash", "0x000000000000"),
             **decision
         }
-        with open(self.ledger_file, "a", encoding="utf-8") as f:
+        target_path = Path(ledger_path) if ledger_path else self.ledger_file
+        with open(target_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(record) + "\n")
         return now_utc
 

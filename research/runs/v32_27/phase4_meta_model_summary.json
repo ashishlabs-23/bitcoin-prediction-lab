@@ -1,0 +1,63 @@
+{
+  "experiment_id": "PHASE4_STRATEGY_CONDITIONED_TRISTATE_METAMODEL_V1",
+  "dataset": "C:\\Projects\\BTCognitive\\BTCognitive\\data\\research\\coinbase_btc_usd_hourly_v1\\coinbase_hourly.parquet",
+  "sample_counts": {
+    "total_candidates": 660,
+    "train_candidates_2023_2024": 355,
+    "calib_candidates_2025": 175,
+    "eval_candidates_2026": 130
+  },
+  "base_rate_prior_probabilities": {
+    "p_tp": 0.4169,
+    "p_sl": 0.569,
+    "p_to": 0.0141
+  },
+  "training_timeout_mean_gross_r": 0.0581,
+  "calibration_and_scoring": {
+    "model_type": "LogisticRegression_Multinomial_CalibratedSigmoid",
+    "probabilities_sum_to_one": true,
+    "eval_multiclass_brier_model": 0.5234,
+    "eval_multiclass_brier_base": 0.5295,
+    "brier_skill_score": 0.0115,
+    "eval_log_loss_model": 0.8328,
+    "eval_log_loss_base": 0.8755,
+    "scoring_improvement_proven": true
+  },
+  "cost_and_economic_expectancy": {
+    "COINBASE_RETAIL_87BPS": {
+      "friction_bps": 87.0,
+      "strategy_alone": {
+        "trades": 130,
+        "mean_net_r": -1.1119
+      },
+      "strategy_plus_meta_model": {
+        "trades_admitted": 0,
+        "trades_rejected": 130,
+        "filter_admission_rate": 0.0,
+        "mean_net_r": 0.0,
+        "ci_95_lower_r": 0.0,
+        "ci_95_upper_r": 0.0,
+        "validated_positive_edge": false
+      }
+    },
+    "ACTIVE_TRADER_27BPS": {
+      "friction_bps": 27.0,
+      "strategy_alone": {
+        "trades": 130,
+        "mean_net_r": -0.3557
+      },
+      "strategy_plus_meta_model": {
+        "trades_admitted": 0,
+        "trades_rejected": 130,
+        "filter_admission_rate": 0.0,
+        "mean_net_r": 0.0,
+        "ci_95_lower_r": 0.0,
+        "ci_95_upper_r": 0.0,
+        "validated_positive_edge": false
+      }
+    }
+  },
+  "evaluated_at_utc": "2026-10-25T05:27:43.863637+00:00",
+  "phase4_verdict": "NO_GO_EVIDENCE_GAP_NO_VALIDATED_EDGE",
+  "action_taken": "Keep META_MODEL_UNAVAILABLE / NO_VALIDATED_EDGE active; positive-edge alerts remain disabled."
+}

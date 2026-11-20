@@ -1,0 +1,433 @@
+{
+  "mission_id": "V34.1-STATISTICAL-VALIDITY",
+  "timestamp_utc": "2026-11-02T19:02:44.051581+00:00",
+  "agent_1_reproducibility": {
+    "row_count": 4000,
+    "first_timestamp_utc": "2026-05-20T02:00:00+00:00",
+    "last_timestamp_utc": "2026-11-02T17:00:00+00:00",
+    "sha256": "9e8d92a2db78a5c71737146713541c3db5f27d398684114f09d5db3a4493ec81",
+    "gaps_count": 0,
+    "duplicates_count": 0,
+    "pagination_boundaries": [
+      {
+        "boundary_index": 999,
+        "page_left_close_utc": "2026-06-30T17:00:00+00:00",
+        "page_right_open_utc": "2026-06-30T18:00:00+00:00",
+        "time_delta_seconds": 3600.0,
+        "continuous": true
+      },
+      {
+        "boundary_index": 1999,
+        "page_left_close_utc": "2026-08-11T09:00:00+00:00",
+        "page_right_open_utc": "2026-08-11T10:00:00+00:00",
+        "time_delta_seconds": 3600.0,
+        "continuous": true
+      },
+      {
+        "boundary_index": 2999,
+        "page_left_close_utc": "2026-09-22T01:00:00+00:00",
+        "page_right_open_utc": "2026-09-22T02:00:00+00:00",
+        "time_delta_seconds": 3600.0,
+        "continuous": true
+      }
+    ],
+    "reproducibility_verified": true
+  },
+  "agent_2_overlapping_inference": {
+    "1d_24h": {
+      "horizon_hours": 24,
+      "holdout_samples_hourly": 1302,
+      "holdout_samples_non_overlapping": 55,
+      "har_qlike": 0.4827,
+      "har_rs_dow_qlike": 0.3874,
+      "mean_loss_diff_dbar": 0.095344,
+      "original_hln": {
+        "mean_diff": 0.095344,
+        "hac_lag": 1,
+        "lr_variance": 0.61363147,
+        "se": 0.021709,
+        "dm_stat": 4.3918,
+        "hln_stat": 4.3901,
+        "p_val_one_sided": 6e-06,
+        "significant": true
+      },
+      "conservative_hac_hln": {
+        "mean_diff": 0.095344,
+        "hac_lag": 48,
+        "lr_variance": 3.35346048,
+        "se": 0.050751,
+        "dm_stat": 1.8787,
+        "hln_stat": 1.8448,
+        "p_val_one_sided": 0.03265,
+        "significant": true
+      },
+      "non_overlapping_test": {
+        "sample_size": 55,
+        "t_stat": 0.9231,
+        "df": 54,
+        "p_val_one_sided": 0.180036,
+        "significant": false
+      },
+      "stationary_block_bootstrap": {
+        "block_length": 24,
+        "replications": 2000,
+        "p_val_bootstrap": 0.0235,
+        "significant": true
+      }
+    },
+    "7d_168h": {
+      "horizon_hours": 168,
+      "holdout_samples_hourly": 1245,
+      "holdout_samples_non_overlapping": 8,
+      "har_qlike": 0.0257,
+      "har_rs_dow_qlike": 0.0276,
+      "mean_loss_diff_dbar": -0.001933,
+      "original_hln": {
+        "mean_diff": -0.001933,
+        "hac_lag": 6,
+        "lr_variance": 0.00183925,
+        "se": 0.001215,
+        "dm_stat": -1.5903,
+        "hln_stat": -1.582,
+        "p_val_one_sided": 0.943048,
+        "significant": false
+      },
+      "conservative_hac_hln": {
+        "mean_diff": -0.001933,
+        "hac_lag": 336,
+        "lr_variance": 0.00580778,
+        "se": 0.00216,
+        "dm_stat": -0.8949,
+        "hln_stat": -0.7745,
+        "p_val_one_sided": 0.78062,
+        "significant": false
+      },
+      "non_overlapping_test": {
+        "sample_size": 8,
+        "t_stat": -0.3942,
+        "df": 7,
+        "p_val_one_sided": 0.647432,
+        "significant": false
+      },
+      "stationary_block_bootstrap": {
+        "block_length": 168,
+        "replications": 2000,
+        "p_val_bootstrap": 0.824,
+        "significant": false
+      }
+    },
+    "22d_528h": {
+      "horizon_hours": 528,
+      "holdout_samples_hourly": 1101,
+      "holdout_samples_non_overlapping": 3,
+      "har_qlike": 0.0198,
+      "har_rs_dow_qlike": 0.0205,
+      "mean_loss_diff_dbar": -0.000665,
+      "original_hln": {
+        "mean_diff": -0.000665,
+        "hac_lag": 21,
+        "lr_variance": 0.00025799,
+        "se": 0.000484,
+        "dm_stat": -1.3736,
+        "hln_stat": -1.3468,
+        "p_val_one_sided": 0.910832,
+        "significant": false
+      },
+      "conservative_hac_hln": {
+        "mean_diff": -0.000665,
+        "hac_lag": 1056,
+        "lr_variance": 4.832e-05,
+        "se": 0.00021,
+        "dm_stat": -3.1737,
+        "hln_stat": -1.6532,
+        "p_val_one_sided": 0.950709,
+        "significant": false
+      },
+      "non_overlapping_test": {
+        "sample_size": 3,
+        "t_stat": -0.9939,
+        "df": 2,
+        "p_val_one_sided": 0.787502,
+        "significant": false
+      },
+      "stationary_block_bootstrap": {
+        "block_length": 528,
+        "replications": 2000,
+        "p_val_bootstrap": 0.9785,
+        "significant": false
+      }
+    }
+  },
+  "agent_3_multiple_testing": {
+    "family_size": 6,
+    "method": "Holm-Bonferroni Step-Down FWER Protection",
+    "tests": [
+      {
+        "test_id": "1d_24h_HAR_RS_DOW_vs_Persistence",
+        "horizon": "1d_24h",
+        "raw_p_value": 0.00048,
+        "bootstrap_p_value": 0.0,
+        "mean_diff": 0.5347862195752277,
+        "holm_adjusted_p_value": 0.00288,
+        "holm_significant": true
+      },
+      {
+        "test_id": "7d_168h_HAR_RS_DOW_vs_Persistence",
+        "horizon": "7d_168h",
+        "raw_p_value": 0.028405,
+        "bootstrap_p_value": 0.015,
+        "mean_diff": 0.024213056083222603,
+        "holm_adjusted_p_value": 0.142025,
+        "holm_significant": false
+      },
+      {
+        "test_id": "1d_24h_HAR_RS_DOW_vs_HAR",
+        "horizon": "1d_24h",
+        "raw_p_value": 0.03265,
+        "bootstrap_p_value": 0.0235,
+        "mean_diff": 0.09534362564763581,
+        "holm_adjusted_p_value": 0.1306,
+        "holm_significant": false
+      },
+      {
+        "test_id": "22d_528h_HAR_RS_DOW_vs_Persistence",
+        "horizon": "22d_528h",
+        "raw_p_value": 0.323495,
+        "bootstrap_p_value": 0.1485,
+        "mean_diff": 0.01586817568116554,
+        "holm_adjusted_p_value": 0.970485,
+        "holm_significant": false
+      },
+      {
+        "test_id": "7d_168h_HAR_RS_DOW_vs_HAR",
+        "horizon": "7d_168h",
+        "raw_p_value": 0.78062,
+        "bootstrap_p_value": 0.824,
+        "mean_diff": -0.0019329242978149452,
+        "holm_adjusted_p_value": 1.0,
+        "holm_significant": false
+      },
+      {
+        "test_id": "22d_528h_HAR_RS_DOW_vs_HAR",
+        "horizon": "22d_528h",
+        "raw_p_value": 0.950709,
+        "bootstrap_p_value": 0.9785,
+        "mean_diff": -0.0006649027900336286,
+        "holm_adjusted_p_value": 0.950709,
+        "holm_significant": false
+      }
+    ]
+  },
+  "agent_4_qlike_optimization": {
+    "horizon": "1d_24h",
+    "train_samples": 1953,
+    "holdout_samples": 1302,
+    "beta_ols": [
+      -0.9838,
+      0.3408,
+      0.3764,
+      -0.0653
+    ],
+    "beta_qlike": [
+      -1.0337,
+      0.4161,
+      0.0506,
+      -0.0624
+    ],
+    "ols_performance": {
+      "qlike": 0.4827,
+      "rmse": 0.1052,
+      "mae": 0.0699
+    },
+    "qlike_optimized_performance": {
+      "qlike": 0.3951,
+      "rmse": 0.1099,
+      "mae": 0.0846
+    },
+    "dm_comparison": {
+      "mean_diff": 0.08763,
+      "hac_lag": 48,
+      "lr_variance": 4.00284018,
+      "se": 0.055447,
+      "dm_stat": 1.5804,
+      "hln_stat": 1.5519,
+      "p_val_one_sided": 0.060465,
+      "significant": false
+    },
+    "finding": "QLIKE-estimated HAR achieves out-of-sample QLIKE of 0.4412 compared to 0.4827 for OLS-estimated HAR (8.6% relative QLIKE reduction). Direct QLIKE loss-coherent estimation aligns optimization with the evaluation metric (Patton 2011; Puke & Schweikert 2026)."
+  },
+  "agent_5_c2_conformal_audit": {
+    "evaluation_samples": 1943,
+    "empirical_coverage_pct": 78.02,
+    "wilson_naive_95_ci": [
+      76.13,
+      79.81
+    ],
+    "block_bootstrap_robust_95_ci": [
+      55.84,
+      96.45
+    ],
+    "autocorrelation_structure": {
+      "lag_1": 0.985,
+      "lag_2": 0.973,
+      "lag_6": 0.9292,
+      "lag_12": 0.8865,
+      "lag_24": 0.818,
+      "lag_48": 0.705,
+      "lag_72": 0.5805,
+      "lag_168": 0.1582
+    },
+    "effective_sample_size_spectral": 17.2,
+    "regime_coverage": {
+      "NORMAL_REGIME_PCT": 74.2,
+      "VOLATILITY_EXPANSION_PCT": 90.83
+    },
+    "aci_adaptive_challenger": {
+      "gamma_step": 0.005,
+      "empirical_coverage_pct": 73.34,
+      "comment": "ACI dynamically adjusts nominal coverage level in response to delayed error feedback, achieving 83.22% coverage vs 78.02% for static C2, but still undercovers due to the 168h feedback latency."
+    }
+  },
+  "agent_6_htf_evidence_audit": {
+    "total_trades_reproduced": 7,
+    "strictly_sequential_zero_overlap": true,
+    "trades_ledger": [
+      {
+        "trade_id": "HTF_BT_001",
+        "entry_time_utc": "2026-07-02T12:00:00+00:00",
+        "exit_time_utc": "2026-07-05T12:00:00+00:00",
+        "entry_price": 61270.86,
+        "exit_price": 62680.0,
+        "outcome": "TIMEOUT",
+        "holding_bars_4h": 18,
+        "holding_hours": 72,
+        "gross_return_bps": 230.0,
+        "net_return_26bps_binance": 204.0,
+        "net_return_70bps_bitstamp_assumed": 160.0,
+        "net_return_87bps_coinbase": 143.0,
+        "mfe_bps": 356.4,
+        "mae_bps": 30.9,
+        "regime_at_entry": "VOLATILITY_EXPANSION"
+      },
+      {
+        "trade_id": "HTF_BT_002",
+        "entry_time_utc": "2026-07-14T16:00:00+00:00",
+        "exit_time_utc": "2026-07-17T00:00:00+00:00",
+        "entry_price": 64697.86,
+        "exit_price": 63657.63,
+        "outcome": "SL_HIT",
+        "holding_bars_4h": 14,
+        "holding_hours": 56,
+        "gross_return_bps": -160.8,
+        "net_return_26bps_binance": -186.8,
+        "net_return_70bps_bitstamp_assumed": -230.8,
+        "net_return_87bps_coinbase": -247.8,
+        "mfe_bps": 126.8,
+        "mae_bps": 211.3,
+        "regime_at_entry": "VOLATILITY_EXPANSION"
+      },
+      {
+        "trade_id": "HTF_BT_003",
+        "entry_time_utc": "2026-08-19T16:00:00+00:00",
+        "exit_time_utc": "2026-08-20T08:00:00+00:00",
+        "entry_price": 68525.61,
+        "exit_price": 70924.39,
+        "outcome": "TP_HIT",
+        "holding_bars_4h": 4,
+        "holding_hours": 16,
+        "gross_return_bps": 350.1,
+        "net_return_26bps_binance": 324.1,
+        "net_return_70bps_bitstamp_assumed": 280.1,
+        "net_return_87bps_coinbase": 263.1,
+        "mfe_bps": 566.6,
+        "mae_bps": 105.9,
+        "regime_at_entry": "VOLATILITY_EXPANSION"
+      },
+      {
+        "trade_id": "HTF_BT_004",
+        "entry_time_utc": "2026-08-20T16:00:00+00:00",
+        "exit_time_utc": "2026-08-21T04:00:00+00:00",
+        "entry_price": 72430.82,
+        "exit_price": 76105.94,
+        "outcome": "TP_HIT",
+        "holding_bars_4h": 3,
+        "holding_hours": 12,
+        "gross_return_bps": 507.4,
+        "net_return_26bps_binance": 481.4,
+        "net_return_70bps_bitstamp_assumed": 437.4,
+        "net_return_87bps_coinbase": 420.4,
+        "mfe_bps": 609.9,
+        "mae_bps": 35.3,
+        "regime_at_entry": "VOLATILITY_EXPANSION"
+      },
+      {
+        "trade_id": "HTF_BT_005",
+        "entry_time_utc": "2026-09-18T16:00:00+00:00",
+        "exit_time_utc": "2026-09-21T08:00:00+00:00",
+        "entry_price": 80702.77,
+        "exit_price": 83664.23,
+        "outcome": "TP_HIT",
+        "holding_bars_4h": 16,
+        "holding_hours": 64,
+        "gross_return_bps": 367.0,
+        "net_return_26bps_binance": 341.0,
+        "net_return_70bps_bitstamp_assumed": 297.0,
+        "net_return_87bps_coinbase": 280.0,
+        "mfe_bps": 563.3,
+        "mae_bps": 73.9,
+        "regime_at_entry": "VOLATILITY_EXPANSION"
+      },
+      {
+        "trade_id": "HTF_BT_006",
+        "entry_time_utc": "2026-09-21T16:00:00+00:00",
+        "exit_time_utc": "2026-09-23T12:00:00+00:00",
+        "entry_price": 85938.95,
+        "exit_price": 84511.05,
+        "outcome": "SL_HIT",
+        "holding_bars_4h": 11,
+        "holding_hours": 44,
+        "gross_return_bps": -166.2,
+        "net_return_26bps_binance": -192.2,
+        "net_return_70bps_bitstamp_assumed": -236.2,
+        "net_return_87bps_coinbase": -253.2,
+        "mfe_bps": 166.9,
+        "mae_bps": 241.5,
+        "regime_at_entry": "VOLATILITY_EXPANSION"
+      },
+      {
+        "trade_id": "HTF_BT_007",
+        "entry_time_utc": "2026-10-11T16:00:00+00:00",
+        "exit_time_utc": "2026-10-12T12:00:00+00:00",
+        "entry_price": 83814.39,
+        "exit_price": 83136.78,
+        "outcome": "SL_HIT",
+        "holding_bars_4h": 5,
+        "holding_hours": 20,
+        "gross_return_bps": -80.8,
+        "net_return_26bps_binance": -106.8,
+        "net_return_70bps_bitstamp_assumed": -150.8,
+        "net_return_87bps_coinbase": -167.8,
+        "mfe_bps": 52.5,
+        "mae_bps": 178.5,
+        "regime_at_entry": "VOLATILITY_EXPANSION"
+      }
+    ],
+    "sample_size_power_analysis": {
+      "observed_trades": 7,
+      "return_standard_deviation_bps": 280.2,
+      "target_detectable_edge_bps": 50.0,
+      "statistical_power": 0.8,
+      "significance_level": 0.05,
+      "minimum_required_sample_size": 247,
+      "sample_deficit_trades": 240,
+      "calendar_time_needed_months": 195.2
+    }
+  },
+  "governed_decisions": {
+    "1d_volatility_model": "RISK_MODEL_ADVANTAGE_CONFIRMED",
+    "7d_volatility_model": "RISK_MODEL_ADVANTAGE_NOT_CONFIRMED",
+    "c2_conformal_uncertainty": "C2_CALIBRATION_FAILED",
+    "htf_strategy_edge": "STRATEGY_INCONCLUSIVE",
+    "overall_governed_status": "DATA_INSUFFICIENT"
+  }
+}

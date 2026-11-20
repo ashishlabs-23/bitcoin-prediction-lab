@@ -1,0 +1,42 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.14, pytest-8.4.1, pluggy-1.6.0 -- C:\Projects\BTCognitive\BTCognitive\.venv_win\Scripts\python.exe
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: C:\Projects\BTCognitive\BTCognitive
+configfile: pytest.ini
+plugins: anyio-4.13.0, hypothesis-6.168.5, platformdirs-4.13.0, asyncio-0.23.7, timeout-2.4.0
+asyncio: mode=Mode.STRICT
+collecting ... collected 30 items
+
+tests/test_v32_64_data_lane_separation.py::test_01_data_mode_parsing_and_fail_closed PASSED [  3%]
+tests/test_v32_64_data_lane_separation.py::test_02_mode_defaulting_rules PASSED [  6%]
+tests/test_v32_64_data_lane_separation.py::test_03_fixture_mode_blocks_protected_files PASSED [ 10%]
+tests/test_v32_64_data_lane_separation.py::test_04_offline_research_mode_serves_snapshot PASSED [ 13%]
+tests/test_v32_64_data_lane_separation.py::test_05_comparator_fails_closed_without_sockets PASSED [ 16%]
+tests/test_v32_64_data_lane_separation.py::test_06_transport_guard_blocks_network PASSED [ 20%]
+tests/test_v32_64_data_lane_separation.py::test_07_canonical_symbol_and_envelope PASSED [ 23%]
+tests/test_v32_64_data_lane_separation.py::test_08_provider_mode_fails_closed PASSED [ 26%]
+tests/test_v32_64_data_lane_separation.py::test_09_truthful_reporting_without_fabrication PASSED [ 30%]
+tests/test_v32_64_data_lane_separation.py::test_10_status_contract_data_mode PASSED [ 33%]
+tests/test_v32_64_data_lane_separation.py::test_11_protected_artifacts_bit_level_invariance PASSED [ 36%]
+tests/test_v32_62_offline_research_mode.py::test_historical_dataset_integrity_and_gap_preservation PASSED [ 40%]
+tests/test_v32_62_offline_research_mode.py::test_offline_technical_indicator_computation PASSED [ 43%]
+tests/test_v32_62_offline_research_mode.py::test_offline_terminal_status_and_live_intelligence PASSED [ 46%]
+tests/test_v32_62_offline_research_mode.py::test_offline_strategy_registry PASSED [ 50%]
+tests/test_v32_62_offline_research_mode.py::test_offline_analyse_setup_on_historical_bars PASSED [ 53%]
+tests/test_v32_62_offline_research_mode.py::test_offline_fail_closed_on_unsupported_inputs PASSED [ 56%]
+tests/test_v32_62_offline_research_mode.py::test_external_comparator_fails_closed_when_network_down PASSED [ 60%]
+tests/test_v32_62_offline_research_mode.py::test_provider_adapter_gated_offline PASSED [ 63%]
+tests/test_v32_62_offline_research_mode.py::test_protected_artifacts_bit_level_invariance PASSED [ 66%]
+tests/test_v32_63_calculation_correctness.py::test_01_ema_golden_hand_calculated PASSED [ 70%]
+tests/test_v32_63_calculation_correctness.py::test_02_wilson_ci_exact_answers PASSED [ 73%]
+tests/test_v32_63_calculation_correctness.py::test_03_breakeven_winrate_formula PASSED [ 76%]
+tests/test_v32_63_calculation_correctness.py::test_04_donchian_causal_no_lookahead PASSED [ 80%]
+tests/test_v32_63_calculation_correctness.py::test_05_atr_true_range_fixtures PASSED [ 83%]
+tests/test_v32_63_calculation_correctness.py::test_06_adx_bounded_and_smoothing PASSED [ 86%]
+tests/test_v32_63_calculation_correctness.py::test_07_bollinger_bandwidth_calculation PASSED [ 90%]
+tests/test_v32_63_calculation_correctness.py::test_08_parkinson_volatility PASSED [ 93%]
+tests/test_v32_63_calculation_correctness.py::test_09_offline_analyse_zero_mutations PASSED [ 96%]
+tests/test_v32_63_calculation_correctness.py::test_10_protected_files_invariance PASSED [100%]
+
+============================= 30 passed in 20.19s =============================

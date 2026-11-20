@@ -57,6 +57,8 @@ def _iso_param(epoch: int) -> str:
 
 async def _get_json(client: Any, url: str, params: dict[str, Any] | None = None) -> Any:
     """Fetch public market data using the app's shared client when available."""
+    from engine.data_mode import assert_no_external_network
+    assert_no_external_network(f"HTTP GET {url}")
     if client is not None:
         response = await client.get(url, params=params, timeout=httpx.Timeout(5.0, connect=2.0))
         response.raise_for_status()
@@ -357,13 +359,13 @@ def _walk_forward_metrics(returns: list[float]) -> dict[str, Any]:
             "train_blocks_before_first_test": initial,
             "test_blocks": len(tests),
             "interval_coverage_pct": None,
+            "calibration_status": "UNAVAILABLE",
             "median_absolute_error_pct": None,
             "zero_return_baseline_mae_pct": None,
             "median_vs_zero_mae_skill_pct": None,
             "note": "Not enough independent, non-overlapping test blocks for a meaningful comparison.",
         }
 
-    hits = 0
     forecast_errors = []
     baseline_errors = []
     for index in range(initial, n):
@@ -372,7 +374,6 @@ def _walk_forward_metrics(returns: list[float]) -> dict[str, Any]:
         p50 = _percentile(history, 0.50)
         p90 = _percentile(history, 0.90)
         actual = returns[index]
-        hits += int(p10 <= actual <= p90)
         forecast_errors.append(abs(actual - p50))
         baseline_errors.append(abs(actual))  # zero-return/random-walk baseline
 
@@ -380,14 +381,15 @@ def _walk_forward_metrics(returns: list[float]) -> dict[str, Any]:
     baseline_mae = statistics.fmean(baseline_errors)
     skill = ((baseline_mae - forecast_mae) / baseline_mae * 100.0) if baseline_mae > 0 else None
     return {
-        "status": "WALK_FORWARD_MEASURED_NOT_PROMOTED",
+        "status": "WALK_FORWARD_RESEARCH_ONLY",
         "train_blocks_before_first_test": initial,
         "test_blocks": len(tests),
-        "interval_coverage_pct": round(hits / len(tests) * 100.0, 2),
+        "interval_coverage_pct": None,
+        "calibration_status": "UNAVAILABLE",
         "median_absolute_error_pct": round(forecast_mae * 100.0, 5),
         "zero_return_baseline_mae_pct": round(baseline_mae * 100.0, 5),
         "median_vs_zero_mae_skill_pct": round(skill, 2) if skill is not None else None,
-        "note": "Historical rolling-origin baseline only; not evidence of live profitability or validation of the frozen production model.",
+        "note": "Historical rolling-origin baseline only. Coverage is suppressed because no verified calibration artifact is available.",
     }
 
 
@@ -447,6 +449,7 @@ def build_empirical_forecast(
                 "status": "INSUFFICIENT_HISTORY",
                 "test_blocks": 0,
                 "interval_coverage_pct": None,
+                "calibration_status": "UNAVAILABLE",
                 "median_absolute_error_pct": None,
                 "zero_return_baseline_mae_pct": None,
                 "median_vs_zero_mae_skill_pct": None,
@@ -476,7 +479,7 @@ def build_empirical_forecast(
         "historical_positive_return_frequency_pct": round(sum(value > 0 for value in returns) / len(returns) * 100.0, 2),
         "sample_blocks": len(returns),
         "sample_quality": "LIMITED" if len(returns) < 60 else "MODERATE",
-        "central_interval_nominal_coverage_pct": 80.0,
+        "central_interval_nominal_coverage_pct": None,
         "backtest": _walk_forward_metrics(returns),
         # Safe compatibility fields: these are not TP/SL orders or targets.
         "entry_price": round(valid_price, 2),
@@ -489,6 +492,8 @@ def build_empirical_forecast(
         "action": "READ_ONLY_EXPERIMENTAL_FORECAST",
         "research_classification": "EXPERIMENTAL_BASELINE",
         "claim_level": "UNVALIDATED",
+        "calibration_status": "UNAVAILABLE",
+        "calibration_coverage_pct": None,
     }
 
 
@@ -536,8 +541,189 @@ async def _load_provider_bundle(provider: str, client: Any) -> tuple[dict[str, A
     return quote, candles
 
 
+_OFFLINE_CANDLES_CACHE: list[dict[str, float]] | None = None
+_OFFLINE_CACHE_LOCK = threading.Lock()
+
+
+def get_fixture_candles(count: int = 168) -> list[dict[str, float]]:
+    """Generates deterministic synthetic 1h BTC-USD candles without disk or network access."""
+    base_end_epoch = 1761494400  # 2025-10-26 16:00:00 UTC (fixed boundary)
+    candles = []
+    for i in range(count):
+        t = base_end_epoch - (count - 1 - i) * HOUR
+        phase = i / 12.0
+        center = 80000.0 + 1200.0 * math.sin(phase) + 300.0 * math.cos(phase * 0.5)
+        o = round(center, 2)
+        c = round(center + 60.0 * math.cos(phase * 1.5), 2)
+        h = round(max(o, c) + 45.0, 2)
+        l = round(min(o, c) - 45.0, 2)
+        v = round(250.0 + 50.0 * math.sin(phase), 4)
+        candles.append({
+            "time": float(t),
+            "open": o,
+            "high": h,
+            "low": l,
+            "close": c,
+            "volume": v,
+        })
+    return candles
+
+
+def get_offline_historical_candles(limit: int = 500) -> list[dict[str, float]]:
+    """Loads validated historical 1h BTC-USD candles from data/raw/ohlcv.parquet."""
+    global _OFFLINE_CANDLES_CACHE
+    with _OFFLINE_CACHE_LOCK:
+        if _OFFLINE_CANDLES_CACHE is None:
+            import os
+            import pandas as pd
+            repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+            parquet_path = os.path.join(repo_root, "data", "raw", "ohlcv.parquet")
+            if not os.path.exists(parquet_path):
+                return []
+            df = pd.read_parquet(parquet_path)
+            if df.empty:
+                return []
+            tail_df = df.tail(max(1000, limit)).copy()
+            tail_df["timestamp"] = pd.to_datetime(tail_df["timestamp"], utc=True)
+            loaded = []
+            for _, r in tail_df.iterrows():
+                loaded.append({
+                    "time": float(int(r["timestamp"].timestamp())),
+                    "open": float(r["open"]),
+                    "high": float(r["high"]),
+                    "low": float(r["low"]),
+                    "close": float(r["close"]),
+                    "volume": float(r["volume"]),
+                })
+            _OFFLINE_CANDLES_CACHE = loaded
+        return list(_OFFLINE_CANDLES_CACHE[-limit:])
+
+
 async def get_market_dashboard(client: Any = None, horizon: str = "24h") -> dict[str, Any]:
     """Single source of truth for the dashboard, live market routes and baseline forecast."""
+    from engine.data_mode import get_data_mode, DataMode, is_external_network_permitted
+
+    mode = get_data_mode()
+
+    if mode == DataMode.FIXTURE:
+        candles = get_fixture_candles(168)
+        last_candle = candles[-1]
+        price = last_candle["close"]
+        last_iso = _utc_iso(last_candle["time"])
+        return {
+            "status": "HISTORICAL_SNAPSHOT",
+            "generated_at": _utc_iso(time.time()),
+            "market": {
+                "status": "HISTORICAL_SNAPSHOT",
+                "symbol": "BTC-USD",
+                "source": "DETERMINISTIC_FIXTURE",
+                "price_usd": price,
+                "bid_usd": round(price - 2.0, 2),
+                "ask_usd": round(price + 2.0, 2),
+                "source_timestamp": last_iso,
+                "retrieved_at": last_iso,
+                "age_seconds": 0.0,
+                "reason": "Serving deterministic test fixture without external network or protected file reads.",
+            },
+            "technical": _derive_technical(candles),
+            "candles": candles,
+            "candle_interval": "1h",
+            "candle_count": len(candles),
+            "forecast": build_empirical_forecast(candles, price, horizon),
+            "drivers": [],
+            "derivatives": {"status": "UNAVAILABLE", "funding_rate": None, "open_interest_contracts": None},
+            "capital_flows": {"status": "NOT_CONFIGURED", "reason": "No verified provider configured."},
+            "macro": {"status": "NOT_CONFIGURED", "reason": "No verified provider configured."},
+            "provider_errors": {},
+        }
+
+    if mode == DataMode.OFFLINE_RESEARCH:
+        candles = get_offline_historical_candles(500)
+        if not candles:
+            return {
+                "status": "DATA_UNAVAILABLE",
+                "generated_at": _utc_iso(time.time()),
+                "market": {
+                    "status": "DATA_UNAVAILABLE",
+                    "symbol": "BTC-USD",
+                    "source": None,
+                    "price_usd": None,
+                    "bid_usd": None,
+                    "ask_usd": None,
+                    "source_timestamp": None,
+                    "retrieved_at": None,
+                    "age_seconds": None,
+                    "reason": "Validated local historical candles are unavailable.",
+                },
+                "technical": {},
+                "candles": [],
+                "candle_interval": "1h",
+                "candle_count": 0,
+                "forecast": build_empirical_forecast([], None, horizon),
+                "drivers": [],
+                "derivatives": {"status": "UNAVAILABLE", "funding_rate": None, "open_interest_contracts": None},
+                "capital_flows": {"status": "NOT_CONFIGURED", "reason": "No verified provider configured."},
+                "macro": {"status": "NOT_CONFIGURED", "reason": "No verified provider configured."},
+                "provider_errors": {"local_snapshot": "DATA_UNAVAILABLE"},
+            }
+        last_candle = candles[-1]
+        price = last_candle["close"]
+        last_iso = _utc_iso(last_candle["time"])
+        return {
+            "status": "HISTORICAL_SNAPSHOT",
+            "generated_at": _utc_iso(time.time()),
+            "market": {
+                "status": "HISTORICAL_SNAPSHOT",
+                "symbol": "BTC-USD",
+                "source": "LOCAL_HISTORICAL_SNAPSHOT",
+                "price_usd": price,
+                "bid_usd": round(price - 5.0, 2),
+                "ask_usd": round(price + 5.0, 2),
+                "source_timestamp": last_iso,
+                "retrieved_at": last_iso,
+                "age_seconds": round(time.time() - last_candle["time"], 1),
+                "reason": "Serving validated local historical snapshot from data/raw/ohlcv.parquet",
+            },
+            "technical": _derive_technical(candles),
+            "candles": candles,
+            "candle_interval": "1h",
+            "candle_count": len(candles),
+            "forecast": build_empirical_forecast(candles, price, horizon),
+            "drivers": [],
+            "derivatives": {"status": "UNAVAILABLE", "funding_rate": None, "open_interest_contracts": None},
+            "capital_flows": {"status": "NOT_CONFIGURED", "reason": "No verified provider configured."},
+            "macro": {"status": "NOT_CONFIGURED", "reason": "No verified provider configured."},
+            "provider_errors": {},
+        }
+
+    if not is_external_network_permitted():
+        return {
+            "status": "DATA_UNAVAILABLE",
+            "generated_at": _utc_iso(time.time()),
+            "market": {
+                "status": "DATA_UNAVAILABLE",
+                "symbol": "BTC-USD",
+                "source": None,
+                "price_usd": None,
+                "bid_usd": None,
+                "ask_usd": None,
+                "source_timestamp": None,
+                "retrieved_at": None,
+                "age_seconds": None,
+                "reason": "Market-data provider lane is blocked: no verified commercial data provider configured.",
+            },
+            "technical": {},
+            "candles": [],
+            "candle_interval": "1h",
+            "candle_count": 0,
+            "forecast": build_empirical_forecast([], None, horizon),
+            "drivers": [],
+            "derivatives": {"status": "UNAVAILABLE", "funding_rate": None, "open_interest_contracts": None},
+            "capital_flows": {"status": "NOT_CONFIGURED", "reason": "No verified provider configured."},
+            "macro": {"status": "NOT_CONFIGURED", "reason": "No verified provider configured."},
+            "provider_errors": {"provider_lane": "PROVIDER_NOT_CONFIGURED"},
+        }
+
     own_client = None
     if client is None:
         own_client = httpx.AsyncClient(

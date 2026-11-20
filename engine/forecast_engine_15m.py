@@ -33,6 +33,18 @@ def _utc_iso(epoch_sec: float) -> str:
     return datetime.fromtimestamp(epoch_sec, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _classify_candle_freshness(now_epoch: int, candle_open_epoch: int, data_granularity_sec: int) -> Tuple[int, int, str]:
+    candle_close_epoch = candle_open_epoch + data_granularity_sec
+    seconds_since_close = max(0, now_epoch - candle_close_epoch)
+    if seconds_since_close <= data_granularity_sec:
+        status = "FRESH"
+    elif seconds_since_close <= data_granularity_sec * 2:
+        status = "DELAYED"
+    else:
+        status = "STALE"
+    return candle_close_epoch, seconds_since_close, status
+
+
 def compute_15m_volatility(df: Optional[pd.DataFrame] = None, window: int = 32) -> Dict[str, Any]:
     """
     Computes Parkinson and close-to-close rolling volatility on 15-minute bars.
@@ -52,7 +64,9 @@ def compute_15m_volatility(df: Optional[pd.DataFrame] = None, window: int = 32) 
     # Close-to-close log returns
     closes = recent["close"].values
     log_rets = np.diff(np.log(closes))
-    std_ret = float(np.std(log_rets, ddof=1)) if len(log_rets) > 1 else 0.005
+    if len(log_rets) < 2:
+        raise ValueError("At least two close-to-close returns are required for volatility estimation.")
+    std_ret = float(np.std(log_rets, ddof=1))
 
     # Parkinson (High-Low) realized volatility
     # sigma_p^2 = (1 / (4 * ln 2)) * (ln(H/L))^2
@@ -92,12 +106,15 @@ def generate_forecast_contract(
         steps_ahead = num_steps
     now_epoch = int(time.time())
     h_lower = str(horizon).lower().strip()
+    data_source = "UNAVAILABLE"
 
     if h_lower == "15m":
         granularity_sec = GRANULARITY_15M
+        data_granularity_sec = GRANULARITY_15M
         step_label = "15m"
         try:
             df, meta = coinbase_15m_adapter.get_or_sync_15m_candles(target_count=400, max_age_seconds=1800)
+            data_source = meta.get("source", "UNAVAILABLE") if isinstance(meta, dict) else "UNAVAILABLE"
         except Exception as e:
             return {
                 "status": "DATA_UNAVAILABLE",
@@ -107,6 +124,7 @@ def generate_forecast_contract(
                 "governance_state": "TIER 2 GATED (ABSTAIN)",
                 "live_trading": "DISABLED",
                 "source_timeframe": "15m",
+                "source": data_source,
                 "reason": f"Failed fetching 15m market data from Coinbase: {str(e)}",
                 "forecast_origin_timestamp": None,
                 "forecast_points": [],
@@ -123,6 +141,7 @@ def generate_forecast_contract(
                 "governance_state": "TIER 2 GATED (ABSTAIN)",
                 "live_trading": "DISABLED",
                 "source_timeframe": "15m",
+                "source": data_source,
                 "reason": "Insufficient 15-minute history available (requires >= 32 bars)",
                 "forecast_origin_timestamp": None,
                 "forecast_points": [],
@@ -134,14 +153,12 @@ def generate_forecast_contract(
         origin_price = float(last_row["close"])
         vol_stats = compute_15m_volatility(df, window=32)
         base_vol = vol_stats["sigma_15m"]
-        model_note = (
-            "15-minute market data and features are verified. Production directional models "
-            "(HAR-RS-DOW, TripleBarrierClassifier) remain HOURLY-ONLY. Directional signals remain ABSTAIN."
-        )
-        model_readiness = "MODEL_TIMEFRAME_INCOMPATIBLE"
+        model_note = "Directional model and calibrated uncertainty evidence are unavailable."
+        model_readiness = "OFFLINE_RESEARCH_ONLY"
     else:
         # Hourly / Macro horizons
         granularity_sec = 3600
+        data_granularity_sec = 3600
         step_label = "1h"
         from engine.feature_cache import feature_cache
         df_h = feature_cache.get_features_df()
@@ -150,6 +167,7 @@ def generate_forecast_contract(
             ohlcv_path = os.path.join(REPO_ROOT, "data", "raw", "ohlcv.parquet")
             if os.path.exists(ohlcv_path):
                 df_h = pd.read_parquet(ohlcv_path)
+                data_source = "LOCAL_HISTORICAL_SNAPSHOT"
             else:
                 return {
                     "status": "DATA_UNAVAILABLE",
@@ -173,15 +191,83 @@ def generate_forecast_contract(
             origin_epoch = int(time.time() // 3600) * 3600
         origin_price = float(last_row["close"])
         # Hourly rolling volatility (~0.0075 typical)
-        closes = df_h["close"].tail(48).values
-        rets = np.diff(np.log(closes))
-        base_vol = float(np.std(rets, ddof=1)) if len(rets) > 1 else 0.0075
-        vol_stats = {"sigma_1h": round(base_vol, 6), "lookback_bars": min(48, len(closes))}
-        model_note = "Hourly verified market data. Directional model evaluated out-of-sample: ~52.1% accuracy, net expectancy negative after fees."
-        model_readiness = "MODEL_DIRECTIONAL_GATED"
+        closes_vol = df_h["close"].tail(48).values
+        rets = np.diff(np.log(closes_vol))
+        if len(rets) < 2:
+            return {
+                "status": "DATA_UNAVAILABLE",
+                "data_readiness": "DATA_UNAVAILABLE",
+                "model_readiness": "OFFLINE_RESEARCH_ONLY",
+                "forecast_readiness": "FORECAST_NOT_AVAILABLE",
+                "governance_state": "TIER 2 GATED (ABSTAIN)",
+                "live_trading": "DISABLED",
+                "source": data_source,
+                "source_timeframe": horizon,
+                "reason": "At least two hourly returns are required for volatility estimation.",
+                "forecast_origin_timestamp": None,
+                "forecast_points": [],
+                "upper_band": [],
+                "lower_band": [],
+            }
+        base_vol = float(np.std(rets, ddof=1))
+        vol_stats = {"sigma_1h": round(base_vol, 6), "lookback_bars": min(48, len(closes_vol))}
+
+        # If validated Coinbase 15m candles provide a fresher live market anchor, synchronize origin
+        cached_15m = coinbase_15m_adapter.load_cached()
+        if cached_15m is not None:
+            df_15m, meta_15m = cached_15m
+            if not df_15m.empty:
+                last_15m = df_15m.iloc[-1]
+                t_15m = int(last_15m["epoch_time"])
+                if t_15m > origin_epoch:
+                    data_source = meta_15m.get("source", "UNAVAILABLE")
+                    origin_epoch = t_15m
+                    origin_price = float(last_15m["close"])
+                    data_granularity_sec = GRANULARITY_15M
+                    if len(df_15m) >= 32:
+                        v15 = compute_15m_volatility(df_15m, window=32)
+                        base_vol = v15["sigma_15m"] * 2.0  # Scale 15m to 1h: sqrt(4) = 2.0
+                        vol_stats = {"sigma_1h": round(base_vol, 6), "lookback_bars": 32, "source": "Coinbase 15m aggregated to 1h"}
+                        data_source = "UNAVAILABLE"
+
+        model_note = "Hourly input provenance and directional validation are unavailable."
+        model_readiness = "OFFLINE_RESEARCH_ONLY"
 
     origin_utc = _utc_iso(origin_epoch)
     data_age_sec = max(0, now_epoch - origin_epoch)
+
+    # Documented Candle-Close & Freshness Contract
+    candle_open_epoch = origin_epoch
+    candle_close_epoch, seconds_since_close, data_freshness_status = _classify_candle_freshness(
+        now_epoch,
+        candle_open_epoch,
+        data_granularity_sec
+    )
+    candle_open_utc = _utc_iso(candle_open_epoch)
+    candle_close_utc = _utc_iso(candle_close_epoch)
+
+    if data_freshness_status != "FRESH" or data_source == "UNAVAILABLE":
+        return {
+            "status": "DATA_UNAVAILABLE",
+            "data_readiness": "DATA_UNAVAILABLE",
+            "model_readiness": "OFFLINE_RESEARCH_ONLY",
+            "forecast_readiness": "FORECAST_NOT_AVAILABLE",
+            "source": data_source,
+            "source_timeframe": h_lower,
+            "last_completed_candle_utc": origin_utc,
+            "last_completed_candle_close_utc": candle_close_utc,
+            "data_freshness_status": data_freshness_status,
+            "data_age_seconds": data_age_sec,
+            "reason": "Fresh candle data with verifiable source provenance is required.",
+            "forecast_origin_timestamp": None,
+            "forecast_points": [],
+            "upper_band": [],
+            "lower_band": [],
+            "confidence_level": None,
+            "diffusion_band_calibration_status": "UNAVAILABLE",
+            "live_trading_enabled": False,
+            "order_submission_enabled": False,
+        }
 
     # Conformal 90% multiplier
     z_mult = 1.645
@@ -225,12 +311,19 @@ def generate_forecast_contract(
         "status": "FORECAST_AVAILABLE_RESEARCH_ONLY",
         "forecast_id": decision_id,
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-        "source": "Coinbase Exchange Spot REST",
+        "source": data_source,
         "instrument": "BTC-USD",
         "market_type": "spot",
         "source_timeframe": h_lower,
         "granularity_seconds": granularity_sec,
+        "data_granularity_seconds": data_granularity_sec,
         "last_completed_candle_utc": origin_utc,
+        "last_completed_candle_open_utc": candle_open_utc,
+        "last_completed_candle_close_utc": candle_close_utc,
+        "candle_open_epoch": candle_open_epoch,
+        "candle_close_epoch": candle_close_epoch,
+        "seconds_since_candle_close": seconds_since_close,
+        "data_freshness_status": data_freshness_status,
         "data_age_seconds": data_age_sec,
         "reference_price": origin_price,
         "reference_timestamp_utc": origin_utc,
@@ -245,8 +338,8 @@ def generate_forecast_contract(
         "forecast_points": forecast_points,
         "upper_band": upper_band,
         "lower_band": lower_band,
-        "confidence_level": confidence_level,
-        "uncertainty_method": "Nominal Model-Based Diffusion Envelope (sqrt-time scaled; uncalibrated coverage)",
+        "confidence_level": None,
+        "uncertainty_method": "UNAVAILABLE — nominal diffusion bands are not calibrated coverage intervals",
         "volatility_stats": vol_stats,
         "data_readiness": "DATA_AVAILABLE",
         "feature_readiness": "FEATURES_READY",
@@ -260,6 +353,24 @@ def generate_forecast_contract(
         "price_forecast_status": "AVAILABLE",
         "directional_signal": "ABSTAIN",
         "directional_recommendation": "ABSTAIN",
+        "historical_accuracy_pct": None,
+        "historical_accuracy_source": None,
+        "historical_accuracy_metric": None,
+        "cost_adjusted_expectancy": None,
+        "directional_status": "UNAVAILABLE",
+        "directional_model_id": None,
+        "directional_model_governance": "OFFLINE_RESEARCH_ONLY",
+        "directional_model_runtime_status": "OFFLINE_RESEARCH_ONLY",
+        "directional_probability_up": None,
+        "directional_probability_down": None,
+        "directional_predicted_direction": "NOT_ESTABLISHED",
+        "directional_forecast": {
+            "status": "UNAVAILABLE",
+            "probability_up": None,
+            "probability_down": None,
+            "historical_accuracy_pct": None,
+        },
+        "diffusion_band_calibration_status": "UNAVAILABLE",
         "governance_state": "TIER 2 GATED (ABSTAIN)",
         "governance_status": "TIER 2 GATED (ABSTAIN)",
         "live_trading": "DISABLED",

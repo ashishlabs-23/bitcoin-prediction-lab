@@ -1,0 +1,11 @@
+BTCognitive V32.62 Environment & Execution Metadata
+===================================================
+Timestamp: 2026-10-29T21:42:00+05:30
+Python Version: 3.13.14 (tags/v3.13.14:fd17997, Jun 10 2026, 13:03:48) [MSC v.1944 64 bit (AMD64)]
+Platform: Windows-11-10.0.26300-SP0
+Git Branch: main
+Git Commit SHA: 25d483f4c3646661b57311de9d0b53d2be881adb
+Workspace Mode: INTERNAL_OFFLINE_RESEARCH_MODE
+Network Binding: 127.0.0.1 (Loopback only)
+External Ingestion: DISABLED
+Public Deployment: BLOCKED_BY_DATA_RIGHTS

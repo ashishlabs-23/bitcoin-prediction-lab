@@ -60,8 +60,8 @@ def test_v28_point_in_time_features(temp_engine):
     assert np.isclose(feats_long["rs_ratio"], 1.0 - feats_short["rs_ratio"], atol=1e-4)
 
 
-def test_v28_calibrated_probabilities_normalization(temp_engine):
-    """Verify probability predictions are calibrated and sum to exactly 1.0."""
+def test_v28_first_passage_probability_baseline_is_normalized(temp_engine):
+    """Verify first-passage baseline probabilities normalize without claiming a validated edge."""
     features = {
         "mom_1h": 0.005,
         "mom_4h": 0.012,
@@ -72,12 +72,14 @@ def test_v28_calibrated_probabilities_normalization(temp_engine):
     }
     probs = temp_engine.predict_barrier_probabilities(features)
 
-    assert 0.15 <= probs["p_tp"] <= 0.78
-    assert probs["p_timeout"] == 0.08
-    assert probs["p_sl"] >= 0.05
+    assert 0.0 <= probs["p_tp"] <= 1.0
+    assert 0.0 <= probs["p_sl"] <= 1.0
+    assert 0.0 <= probs["p_timeout"] <= 1.0
     total_p = probs["p_tp"] + probs["p_sl"] + probs["p_timeout"]
     assert np.isclose(total_p, 1.0, atol=1e-4)
-    assert probs["calibration_status"] == "VALIDATED_ISOTONIC_CALIBRATION"
+    assert probs["calibration_status"] == "FIRST_PASSAGE_GEOMETRY_BASELINE"
+    assert probs["validated_directional_edge"] is False
+    assert probs["validated_edge_status"] == "NO_VALIDATED_EDGE_ABSTAIN"
 
 
 def test_v28_friction_and_net_expectancy(temp_engine):

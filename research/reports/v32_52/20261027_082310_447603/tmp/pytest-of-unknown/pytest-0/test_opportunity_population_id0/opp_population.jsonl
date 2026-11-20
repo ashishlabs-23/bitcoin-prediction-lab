@@ -1,0 +1,1 @@
+{"opportunity_id": "OPP-20260831-BTCUSDT-IGNITION-12345678", "t_0": "2026-08-31T15:00:00Z", "asset": "BTCUSDT", "event": {"type": "IGNITION"}, "state": {"vol": "NORMAL"}, "contract": {"tau_max": 1800}, "cluster_id": "CLUST-001", "population_definition_hash": "pop_hash_abc", "registered_at": "2026-10-27T03:17:30.919255+00:00"}

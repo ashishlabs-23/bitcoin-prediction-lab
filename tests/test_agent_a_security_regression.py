@@ -125,16 +125,18 @@ def test_rate_limiter_cardinality_and_lru_eviction():
     assert len(limiter.requests) <= 500, f"RateLimiter exceeded max_cardinality: {len(limiter.requests)}"
 
 
-def test_sheet_sync_no_sensitive_data_leakage(monkeypatch):
+def test_sheet_sync_no_sensitive_data_leakage(monkeypatch, tmp_path):
     """Verify sheet sync failure does not leak raw tokens or internal upstream body."""
     import httpx
+    from engine.arena_runner import ArenaRunner
 
     def mock_post(*args, **kwargs):
         raise httpx.ConnectTimeout("Upstream timed out")
 
     monkeypatch.setattr(httpx.Client, "post", mock_post)
 
-    result = arena_runner.sync_to_google_script("https://script.google.com/macros/s/test/exec")
+    runner = ArenaRunner(db_path=str(tmp_path / "arena_sync_test.db"))
+    result = runner.sync_to_google_script("https://script.google.com/macros/s/test/exec")
     assert result["status"] == "error"
     assert result["reason"] == "Webhook destination timed out."
     assert "https://script.google.com" not in result["reason"]

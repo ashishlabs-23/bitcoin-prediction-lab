@@ -1,0 +1,50 @@
+{
+  "timestamp_utc": "2026-10-26T08:33:02Z",
+  "test_port": 8092,
+  "api_matrix_a_results": {
+    "analyse_watermark_hash": "028eb3c0b53848b6",
+    "regime_detected": "TRENDING_BEARISH",
+    "shortlisted_count": 0,
+    "candidate_rejections_count": 5
+  },
+  "api_matrix_b_results": {
+    "evaluation_protocol": "WALK_FORWARD_CAUSAL_SPLIT_v1",
+    "has_winner": false,
+    "provenance": "REAL_EXECUTION"
+  },
+  "api_matrix_d_results": {
+    "attempt_id": "att_4ffab603f7bb",
+    "frozen_tp_price": 86700.0,
+    "frozen_sl_price": 84150.0,
+    "immutable_sha256": "6f068390c9b268c13afbeff52d65189a3370681412da43ebe5700a752966b8c6",
+    "direction_change_alert": true,
+    "risk_spike_alert": true,
+    "anomaly_events_count": 2,
+    "data_quality_state": "DEGRADED_STALE_PRICE_FEED"
+  },
+  "browser_cdp_results": {
+    "has_view": true,
+    "has_active_card": true,
+    "has_data_quality_badge": true,
+    "has_direction_alert": true,
+    "has_risk_alert": true,
+    "has_continue_btn": true,
+    "has_partial_btn": true,
+    "has_exit_now_btn": true,
+    "has_anomaly_log": true
+  },
+  "screenshots": {
+    "desktop_1280x800": "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_47_real_backend\\v32_47_desktop_smart_entry_monitor.png",
+    "tablet_768x1024": "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_47_real_backend\\v32_47_tablet_smart_entry_monitor.png",
+    "mobile_375x667": "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_47_real_backend\\v32_47_mobile_smart_entry_monitor.png"
+  },
+  "console_errors": [],
+  "protected_files_status": "PASSED_BIT_IDENTICAL",
+  "protected_file_hashes": {
+    "data/prospective_entry_ledger.jsonl": "91c3aed984002f611a59c78a2eb4c342c0970baebbd2e3d6df7973be7acf1dd7",
+    "data/prospective_shadow_v1.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "data/prospective_entry_ledger_v2.jsonl": "e6e33e3c7beb4c255467e967fc819b85481b0afb1052c3ea7bd248c53f87b604",
+    "data/raw/ohlcv.parquet": "1e722f33734a89e74764c02fde0552752cc1ea2eff62ca9046c9d6edf2347d5c",
+    "data/raw/ohlcv_pre_backfill_backup.parquet": "c4949e5b5695ffa172677681b15af2ea6167e73317c3496546f2286a6730b1c8"
+  }
+}

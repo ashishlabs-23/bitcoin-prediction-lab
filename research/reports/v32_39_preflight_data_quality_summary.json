@@ -1,0 +1,94 @@
+{
+  "experiment_id": "V32.39_PROSPECTIVE_L2_SHADOW_QUALIFICATION",
+  "evaluated_at_utc": "2026-10-25T13:16:00.000000+00:00",
+  "protocol_version": "V32.39_PROSPECTIVE_L2_PROTOCOL",
+  "schema_version": "PROSPECTIVE_L2_GATED_V2",
+  "epistemic_posture": "PROSPECTIVE_SHADOW_QUALIFICATION",
+  "governance_authorization": "OFFLINE_RESEARCH_ONLY",
+  "live_trading_status": "DISABLED",
+  "economic_verdict": "NO_GO_NO_VALIDATED_EDGE",
+  "master_decision": "READY_FOR_OPERATOR_AUTHORIZATION",
+  "decision_rationale": "The prospective capture procedure, preflight diagnostics, unbiased two-phase evaluation ledger (PROSPECTIVE_L2_GATED_V2), independent block accounting, and operator burn-in runbook are 100% verified. Live collection is safely stopped pending explicit operator authorization.",
+  "preflight_and_ingestion_audit": {
+    "target_product": "BTC-USD",
+    "market_venue": "Coinbase Exchange Spot",
+    "feed_url": "wss://ws-feed.exchange.coinbase.com",
+    "channels": [
+      "level2_batch",
+      "matches",
+      "heartbeat"
+    ],
+    "dns_resolution_status": "RESOLVED",
+    "free_disk_space_mb": 88698.27,
+    "disk_space_threshold_mb": 500.0,
+    "disk_space_sufficient": true,
+    "collector_operational_status": "STOPPED_DISABLED",
+    "permission_respected": true,
+    "heartbeat_stall_threshold_sec": 5.0,
+    "reconnect_recovery_procedure": "AUTHORITATIVE_SNAPSHOT_REQUIRED",
+    "sequence_gap_behavior": "FAIL_CLOSED_GATE_ABSTENTION",
+    "deterministic_replay": "VERIFIED_100_PERCENT_BIT_IDENTICAL"
+  },
+  "preregistered_hypothesis": {
+    "hypothesis_id": "H1_L2_CONT_MICROSTRUCTURE_GATE",
+    "target_strategy": "TSMOM_DONCHIAN_168H_336H",
+    "horizon_hours": 168,
+    "preregistered_filter_rules": {
+      "ofi_15m_threshold": "> 0.0",
+      "obi_5_threshold": "> -0.20",
+      "spread_bps_max": 5.0,
+      "feed_max_staleness_sec": 5.0
+    },
+    "cost_scenarios": {
+      "primary_benchmark": {
+        "name": "ACTIVE_TRADER_27BPS",
+        "round_trip_bps": 27.0,
+        "entry_commission_bps": 10.0,
+        "exit_commission_bps": 10.0,
+        "half_spread_bps": 3.0,
+        "slippage_bps": 4.0
+      },
+      "secondary_scenario": {
+        "name": "RETAIL_87BPS",
+        "round_trip_bps": 87.0
+      }
+    },
+    "statistical_testing_framework": {
+      "primary_sample_unit": "NON_OVERLAPPING_168H_INDEPENDENT_BLOCKS",
+      "operational_minimum_blocks": 100,
+      "current_independent_blocks_accumulated": 0,
+      "hurdle_achieved": false,
+      "comparison_statistic": "PAIRED_DIFFERENCE_MEAN_NET_R",
+      "hypothesis_test": "DIEBOLD_MARIANO_HLN_STUDENTS_T",
+      "minimum_practical_benefit_hurdle_r": 0.05,
+      "significance_threshold_p": 0.05
+    }
+  },
+  "unbiased_prospective_ledger": {
+    "ledger_file": "data/research/prospective_l2_gated_ledger_v2.jsonl",
+    "records_accepted_candidates": true,
+    "records_rejected_candidates": true,
+    "records_unfiltered_baseline_parity": true,
+    "delayed_outcome_resolution_guard": true,
+    "zero_historical_l2_fabrication_assertion": true
+  },
+  "operator_runbook": {
+    "script_path": "engine/run_l2_prospective_burnin.py",
+    "dry_run_command": "& '.\\.venv_win\\Scripts\\python.exe' engine/run_l2_prospective_burnin.py --dry-run",
+    "authorized_live_command": "$env:COINBASE_L2_COLLECTOR_ENABLED = '1'; & '.\\.venv_win\\Scripts\\python.exe' engine/run_l2_prospective_burnin.py --authorize-collection --duration-seconds 300",
+    "graceful_shutdown": "SIGINT (Ctrl+C) / SIGTERM invokes clean collector stop and thread join"
+  },
+  "protected_files_audit": {
+    "data/prospective_entry_ledger.jsonl": "MATCH",
+    "data/prospective_shadow_v1.jsonl": "MATCH",
+    "data/prospective_entry_ledger_v2.jsonl": "MATCH",
+    "data/raw/ohlcv.parquet": "MATCH",
+    "data/raw/ohlcv_pre_backfill_backup.parquet": "MATCH"
+  },
+  "test_verification": {
+    "test_suite": "tests/test_v32_39_prospective_l2_qualification.py",
+    "total_tests": 9,
+    "passed": 9,
+    "failed": 0
+  }
+}

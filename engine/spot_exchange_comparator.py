@@ -201,6 +201,26 @@ async def fetch_and_compare_spot_quotes(client: Any = None) -> Dict[str, Any]:
     Guaranteed non-blocking with resilient fallbacks.
     """
     import asyncio
+    from engine.data_mode import is_external_network_permitted
+
+    if not is_external_network_permitted():
+        return {
+            "status": "DATA_UNAVAILABLE",
+            "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+            "active_primary_provider": None,
+            "primary_price_usd": None,
+            "max_disagreement_bps": None,
+            "is_divergent": False,
+            "divergence_reason": "EXTERNAL_NETWORK_BLOCKED",
+            "healthy_providers_count": 0,
+            "quotes": {},
+            "governance": {
+                "directional_authorization": "OFFLINE_RESEARCH_ONLY",
+                "execution_authorization": "DISABLED",
+                "cross_exchange_arbitrage": "DISABLED_RESEARCH_ONLY"
+            }
+        }
+
     from api.market_drivers import _fetch_quote
 
     comparator = get_spot_comparator()

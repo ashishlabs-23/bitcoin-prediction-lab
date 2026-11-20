@@ -347,6 +347,38 @@ def evaluate_runtime_readiness(
       CALIBRATION_UNAVAILABLE, DATA_STALE, INSUFFICIENT_HISTORY, MODEL_UNAUTHORIZED.
     """
     global _CACHED_READINESS
+    from engine.data_mode import get_data_mode
+
+    if get_data_mode() == "fixture":
+        from datetime import datetime, timezone
+
+        return {
+            "status": "BLOCKED",
+            "authorized": False,
+            "authorization_status": "BLOCKED_AUDIT_FAILURE",
+            "reason_code": "FIXTURE_MODE_DATA_UNAVAILABLE",
+            "reason": (
+                "Fixture mode permits deterministic fixtures only; protected market "
+                "data and canonical model readiness were not inspected."
+            ),
+            "remediation": "Use deterministic fixture inputs or select offline_research mode.",
+            "canonical_model_id": None,
+            "model_version": None,
+            "system_classification": "FIXTURE_ONLY",
+            "forecast_target": "Annualized 7-Day Realized Variance (rv7d_var_ann)",
+            "forecast_horizon": "168h (7 calendar days)",
+            "directional_prediction_capability": False,
+            "research_edge_status": "NO_GO_NO_VALIDATED_EDGE",
+            "trading_enabled": False,
+            "live_capital_authorized": False,
+            "checks": {
+                "data_mode": {"status": "PASS", "mode": "fixture"},
+                "point_in_time_data": {"status": "UNAVAILABLE", "reason": "FIXTURE_MODE"},
+                "model_readiness": {"status": "NOT_CHECKED", "reason": "FIXTURE_MODE"},
+            },
+            "evaluated_at": datetime.now(timezone.utc).isoformat(),
+        }
+
     if _CACHED_READINESS is not None and not force_refresh:
         return _CACHED_READINESS
 
@@ -377,6 +409,7 @@ def evaluate_runtime_readiness(
             "forecast_target": "Annualized 7-Day Realized Variance (rv7d_var_ann)",
             "forecast_horizon": "168h (7 calendar days)",
             "directional_prediction_capability": False,
+            "research_edge_status": "NO_GO_NO_VALIDATED_EDGE",
             "trading_enabled": False,
             "live_capital_authorized": False,
             "checks": checks,
@@ -607,24 +640,25 @@ def evaluate_runtime_readiness(
             {"state": fie.state, "code": fie.code}
         )
 
-    # All checks passed: Canonical production volatility model is authorized!
+    # Integrity and input checks do not grant production authorization.
     result = {
-        "status": "READY",
-        "authorized": True,
-        "authorization_status": "AUTHORIZED_FOR_PRODUCTION",
-        "restricted_serving_scope": "AUTHORIZED_FOR_VOLATILITY_RISK_ONLY",
-        "reason_code": "NONE",
+        "status": "OFFLINE_RESEARCH_ONLY",
+        "authorized": False,
+        "authorization_status": "OFFLINE_RESEARCH_ONLY",
+        "restricted_serving_scope": "NONE",
+        "reason_code": "MODEL_UNAUTHORIZED",
         "reason": (
-            "Canonical 168h annualized realized variance risk model (HAR-RS-DOW-v1.0) "
-            "and C2 conformal risk envelope are fully verified and authorized for volatility risk."
+            "Runtime integrity checks passed, but governance keeps all forecasts "
+            "OFFLINE_RESEARCH_ONLY pending a separate authorization decision."
         ),
-        "remediation": "None. Canonical production risk inference is authorized.",
+        "remediation": "Obtain and document a separate governance authorization before production serving.",
         "canonical_model_id": "HAR-RS-DOW-v1.0",
         "model_version": "1.0.0",
         "system_classification": "PRODUCTION_VOLATILITY",
         "forecast_target": "Annualized 7-Day Realized Variance (rv7d_var_ann)",
         "forecast_horizon": "168h (7 calendar days)",
         "directional_prediction_capability": False,
+        "research_edge_status": "NO_GO_NO_VALIDATED_EDGE",
         "trading_enabled": False,
         "live_capital_authorized": False,
         "governance_breakdown": {
@@ -634,16 +668,17 @@ def evaluate_runtime_readiness(
             "input_feature_readiness": "VERIFIED",
             "numerical_inference_availability": "AVAILABLE",
             "calibration_readiness": "VERIFIED",
-            "formal_research_validation": "VALIDATED",
-            "volatility_risk_serving_authorization": "AUTHORIZED_FOR_VOLATILITY_RISK_ONLY",
+            "formal_research_validation": "NO_GO_NO_VALIDATED_EDGE",
+            "volatility_risk_serving_authorization": "OFFLINE_RESEARCH_ONLY",
             "confirmatory_prospective_gate_24h": "COLLECTING (3/100 blocks)",
             "confirmatory_prospective_gate_168h": "COLLECTING (0/100 blocks)",
             "directional_model_authorization": "OFFLINE_RESEARCH_ONLY",
             "live_trading_authorization": "DISABLED"
         },
         "epistemic_notice": (
-            "Model forecasts realized variance and risk envelope magnitude. "
-            "Directional price forecasting is NOT supported. Live execution is strictly disabled."
+            "Runtime verification is not empirical strategy validation or production "
+            "authorization. Forecasts remain OFFLINE_RESEARCH_ONLY; no validated edge "
+            "is claimed and live execution is strictly disabled."
         ),
         "checks": checks,
         "evaluated_at": now_iso,
@@ -651,4 +686,3 @@ def evaluate_runtime_readiness(
 
     _CACHED_READINESS = result
     return result
-

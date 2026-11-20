@@ -1,0 +1,126 @@
+{
+  "manifest_id": "v32_73_retrospective_walk_forward",
+  "milestone": "V32.73",
+  "generation_utc": "2026-10-30T12:06:17Z",
+  "evidence_classification": "RETROSPECTIVE_DEVELOPMENT_REPLAY",
+  "is_confirmatory": false,
+  "evidence_role": "RETROSPECTIVE_DEVELOPMENT_REPLAY",
+  "prevents_abstention_gate_bypass": true,
+  "abstention_gate_note": "This manifest is for exploratory research only. It MUST NOT be used to override or bypass the Analysis abstention gate in engine/regime_strategy_tournament.py (lines 1162-1204). The abstention gate requires a prospective, confirmatory walk-forward manifest with minimum 100 non-overlapping clean blocks of prospective evidence.",
+  "model_authorization": "OFFLINE_RESEARCH_ONLY",
+  "live_trading": "DISABLED",
+  "production_deployment": "BLOCKED",
+  "dataset": {
+    "path": "data/raw/ohlcv_backfilled.parquet",
+    "sha256": "1e722f33734a89e74764c02fde0552752cc1ea2eff62ca9046c9d6edf2347d5c",
+    "known_hash_v32_73": "1e722f33734a89e74764c02fde0552752cc1ea2eff62ca9046c9d6edf2347d5c",
+    "hash_match": true,
+    "n_rows": 42177,
+    "frequency": "1H",
+    "symbol": "BTCUSD",
+    "first_timestamp": "2022-01-01 00:00:00+00:00",
+    "last_timestamp": "2026-10-24 08:00:00+00:00",
+    "provenance": "Backfilled continuous hourly OHLCV \u2014 NOT a raw exchange feed",
+    "redistribution_rights": "PRIVATE_OFFLINE_RESEARCH_ONLY"
+  },
+  "strategy_nomenclature_map": {
+    "v26_strategies": [
+      "NO_TRADE_BENCHMARK",
+      "TS_MOM_TREND",
+      "TRUE_DUAL_SMA_REFERENCE",
+      "SHORT_HORIZON_MEAN_REVERSION",
+      "VOL_COMPRESSION_BREAKOUT",
+      "REGIME_ADAPTIVE_ROUTER"
+    ],
+    "v32_73_active_strategies": [
+      "TSMOM_DONCHIAN_24H_168H",
+      "RANGE_BOLLINGER_REVERSION_20H",
+      "ATR_VOLATILITY_BREAKOUT_12H",
+      "HTF_RANGE_EXPANSION_BREAKOUT"
+    ],
+    "v32_73_quarantined_strategies": [
+      "CHRONOS2_FOUNDATION"
+    ],
+    "mapping_note": "V26 strategies operated on a different dataset (41,273-row, SHA43c8881b). V32.73 strategies are re-specified from scratch on the 42,177-row backfilled dataset. No V26 strategy results should be imported into V32.73 evaluation."
+  },
+  "fold_count": 5,
+  "embargo_hours": 24,
+  "embargo_rule": "24-hour gap between train_end and test_start at each fold",
+  "expanding_train": true,
+  "folds": [
+    {
+      "fold_id": 1,
+      "train_start": "2022-01-01T00:00:00Z",
+      "train_end": "2023-06-30T23:00:00Z",
+      "embargo_start": "2023-07-01T00:00:00Z",
+      "embargo_end": "2023-07-01T23:00:00Z",
+      "test_start": "2023-07-02T00:00:00Z",
+      "test_end": "2023-12-31T23:00:00Z",
+      "fold_type": "EXPANDING_TRAIN",
+      "purpose": "Early OOS generalization \u2014 2023 H2 regime"
+    },
+    {
+      "fold_id": 2,
+      "train_start": "2022-01-01T00:00:00Z",
+      "train_end": "2023-12-31T23:00:00Z",
+      "embargo_start": "2024-01-01T00:00:00Z",
+      "embargo_end": "2024-01-01T23:00:00Z",
+      "test_start": "2024-01-02T00:00:00Z",
+      "test_end": "2024-06-30T23:00:00Z",
+      "fold_type": "EXPANDING_TRAIN",
+      "purpose": "2024 H1 bull regime generalization"
+    },
+    {
+      "fold_id": 3,
+      "train_start": "2022-01-01T00:00:00Z",
+      "train_end": "2024-06-30T23:00:00Z",
+      "embargo_start": "2024-07-01T00:00:00Z",
+      "embargo_end": "2024-07-01T23:00:00Z",
+      "test_start": "2024-07-02T00:00:00Z",
+      "test_end": "2024-12-31T23:00:00Z",
+      "fold_type": "EXPANDING_TRAIN",
+      "purpose": "2024 H2 post-halving regime generalization"
+    },
+    {
+      "fold_id": 4,
+      "train_start": "2022-01-01T00:00:00Z",
+      "train_end": "2024-12-31T23:00:00Z",
+      "embargo_start": "2025-01-01T00:00:00Z",
+      "embargo_end": "2025-01-01T23:00:00Z",
+      "test_start": "2025-01-02T00:00:00Z",
+      "test_end": "2025-06-30T23:00:00Z",
+      "fold_type": "EXPANDING_TRAIN",
+      "purpose": "2025 H1 regime shift generalization"
+    },
+    {
+      "fold_id": 5,
+      "train_start": "2022-01-01T00:00:00Z",
+      "train_end": "2025-06-30T23:00:00Z",
+      "embargo_start": "2025-07-01T00:00:00Z",
+      "embargo_end": "2025-07-01T23:00:00Z",
+      "test_start": "2025-07-02T00:00:00Z",
+      "test_end": "2026-03-31T23:00:00Z",
+      "fold_type": "EXPANDING_TRAIN",
+      "purpose": "Most recent OOS window \u2014 do not use for model selection"
+    }
+  ],
+  "purge_rules": {
+    "embargo_hours": 24,
+    "purge_method": "CHRONOLOGICAL_GAP",
+    "label_overlap_forbidden": true,
+    "future_data_forbidden": true,
+    "causal_boundary": "All features must be computed from data available at or before the bar preceding the entry bar (t_feature <= t_issue < t_maturity). Triple-barrier labels use t_entry+1 OPEN as fill price."
+  },
+  "entry_intelligence": {
+    "research_targets": [
+      "EQR_binary_threshold_1.5",
+      "triple_barrier_label",
+      "mfe_regression",
+      "mae_regression"
+    ],
+    "tp_pct": 1.5,
+    "sl_pct": 0.75,
+    "horizon_hours": 24,
+    "note": "EQR is NOT a win probability. Barrier ratios are research hypotheses."
+  }
+}

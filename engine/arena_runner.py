@@ -20,6 +20,7 @@ import time
 import math
 import urllib.request
 import urllib.error
+import threading
 from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 import numpy as np
@@ -1101,5 +1102,32 @@ class ArenaRunner:
 
 
 
-# Global singleton instance
-arena_runner = ArenaRunner()
+class _LazyArenaRunner:
+    """Thread-safe forwarding proxy that creates the persistent runner on first use."""
+
+    def __init__(self):
+        object.__setattr__(self, "_instance", None)
+        object.__setattr__(self, "_lock", threading.Lock())
+
+    def _get_instance(self) -> ArenaRunner:
+        instance = object.__getattribute__(self, "_instance")
+        if instance is None:
+            with object.__getattribute__(self, "_lock"):
+                instance = object.__getattribute__(self, "_instance")
+                if instance is None:
+                    instance = ArenaRunner()
+                    object.__setattr__(self, "_instance", instance)
+        return instance
+
+    def __getattr__(self, name: str):
+        return getattr(self._get_instance(), name)
+
+    def __setattr__(self, name: str, value):
+        if name in {"_instance", "_lock"}:
+            object.__setattr__(self, name, value)
+            return
+        setattr(self._get_instance(), name, value)
+
+
+# Global singleton proxy; the default persistent paper-arena DB opens on first use.
+arena_runner = _LazyArenaRunner()

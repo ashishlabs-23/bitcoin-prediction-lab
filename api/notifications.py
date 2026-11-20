@@ -16,6 +16,7 @@ from urllib.parse import urlsplit
 
 import httpcore
 import httpx
+import pandas as pd
 from httpcore._backends.auto import AutoBackend
 import logging
 
@@ -641,12 +642,30 @@ class NotificationManager:
         latest_candle = engine.df_1h.iloc[-1]
         candle_ts = latest_candle["timestamp"]
 
-        # Freshness verification
+        # Freshness verification. Prefer the supplied market_data timestamp when present so
+        # stale payloads are rejected even if the engine's cached last candle is newer.
+        candle_age_sec = 0.0
         try:
             c_dt = candle_ts.tz_convert(timezone.utc) if getattr(candle_ts, "tz", None) else candle_ts.tz_localize(timezone.utc)
             candle_age_sec = (now_dt - c_dt).total_seconds()
         except Exception:
             candle_age_sec = 0.0
+
+        if isinstance(market_data, dict):
+            raw_ts = market_data.get("timestamp")
+            if raw_ts is not None:
+                try:
+                    ts_dt = pd.Timestamp(raw_ts).tz_convert(timezone.utc) if getattr(pd.Timestamp(raw_ts), "tzinfo", None) else pd.Timestamp(raw_ts).tz_localize(timezone.utc)
+                    candle_age_sec = (now_dt - ts_dt).total_seconds()
+                except Exception:
+                    pass
+            candles = market_data.get("candles") or []
+            if candles and isinstance(candles, list) and candles[-1].get("timestamp") is not None:
+                try:
+                    ts_dt = pd.Timestamp(candles[-1]["timestamp"]).tz_convert(timezone.utc) if getattr(pd.Timestamp(candles[-1]["timestamp"]), "tzinfo", None) else pd.Timestamp(candles[-1]["timestamp"]).tz_localize(timezone.utc)
+                    candle_age_sec = max(candle_age_sec, (now_dt - ts_dt).total_seconds())
+                except Exception:
+                    pass
 
         is_stale = candle_age_sec > 7200.0
         override_freshness = bool(market_data and market_data.get("override_freshness"))

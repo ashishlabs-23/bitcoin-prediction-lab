@@ -1,0 +1,160 @@
+{
+  "branch": "main",
+  "created_at": "2026-10-27T13:18:33.544058+00:00",
+  "excluded_root_directories": {
+    "scratch": "Contains ad hoc scripts with absolute workspace paths; no references from code, tests, or configuration were found."
+  },
+  "head": "25d483f4c3646661b57311de9d0b53d2be881adb",
+  "limitations": [
+    "The repository copy is the isolation boundary; this is not a kernel-level sandbox.",
+    "Native extensions or non-Python child processes are not intercepted by sitecustomize.",
+    "Protected-file before/after comparison detects unexpected changes but does not restore them."
+  ],
+  "mode": "run",
+  "network_log": "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\v32_54\\20261027_184759_981943\\qa_network.jsonl",
+  "network_policy": "only loopback ports bound by this QA run are reachable; external DNS and connections are blocked",
+  "protected_files_after": {
+    "C:\\Projects\\BTCognitive\\BTCognitive\\data\\prospective_entry_ledger.jsonl": {
+      "mtime_ns": 1792436858196944800,
+      "sha256": "91c3aed984002f611a59c78a2eb4c342c0970baebbd2e3d6df7973be7acf1dd7",
+      "size_bytes": 3385
+    },
+    "C:\\Projects\\BTCognitive\\BTCognitive\\data\\prospective_entry_ledger_v2.jsonl": {
+      "mtime_ns": 1792836244169141800,
+      "sha256": "e6e33e3c7beb4c255467e967fc819b85481b0afb1052c3ea7bd248c53f87b604",
+      "size_bytes": 12744
+    },
+    "C:\\Projects\\BTCognitive\\BTCognitive\\data\\prospective_shadow_v1.jsonl": {
+      "mtime_ns": 1792751047806047400,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    "C:\\Projects\\BTCognitive\\BTCognitive\\data\\raw\\ohlcv.parquet": {
+      "mtime_ns": 1793036540398291700,
+      "sha256": "c007cd613bec3012fa427d047b466d5e250bd4451b5062d311f387e8afd0ce3f",
+      "size_bytes": 2329745
+    },
+    "C:\\Projects\\BTCognitive\\BTCognitive\\data\\raw\\ohlcv_backfilled.parquet": {
+      "mtime_ns": 1792835712791875400,
+      "sha256": "1e722f33734a89e74764c02fde0552752cc1ea2eff62ca9046c9d6edf2347d5c",
+      "size_bytes": 2326699
+    },
+    "C:\\Projects\\BTCognitive\\BTCognitive\\data\\raw\\ohlcv_pre_backfill_backup.parquet": {
+      "mtime_ns": 1792835712797966600,
+      "sha256": "c4949e5b5695ffa172677681b15af2ea6167e73317c3496546f2286a6730b1c8",
+      "size_bytes": 2284681
+    }
+  },
+  "protected_files_before": {
+    "C:\\Projects\\BTCognitive\\BTCognitive\\data\\prospective_entry_ledger.jsonl": {
+      "mtime_ns": 1792436858196944800,
+      "sha256": "91c3aed984002f611a59c78a2eb4c342c0970baebbd2e3d6df7973be7acf1dd7",
+      "size_bytes": 3385
+    },
+    "C:\\Projects\\BTCognitive\\BTCognitive\\data\\prospective_entry_ledger_v2.jsonl": {
+      "mtime_ns": 1792836244169141800,
+      "sha256": "e6e33e3c7beb4c255467e967fc819b85481b0afb1052c3ea7bd248c53f87b604",
+      "size_bytes": 12744
+    },
+    "C:\\Projects\\BTCognitive\\BTCognitive\\data\\prospective_shadow_v1.jsonl": {
+      "mtime_ns": 1792751047806047400,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    "C:\\Projects\\BTCognitive\\BTCognitive\\data\\raw\\ohlcv.parquet": {
+      "mtime_ns": 1793036540398291700,
+      "sha256": "c007cd613bec3012fa427d047b466d5e250bd4451b5062d311f387e8afd0ce3f",
+      "size_bytes": 2329745
+    },
+    "C:\\Projects\\BTCognitive\\BTCognitive\\data\\raw\\ohlcv_backfilled.parquet": {
+      "mtime_ns": 1792835712791875400,
+      "sha256": "1e722f33734a89e74764c02fde0552752cc1ea2eff62ca9046c9d6edf2347d5c",
+      "size_bytes": 2326699
+    },
+    "C:\\Projects\\BTCognitive\\BTCognitive\\data\\raw\\ohlcv_pre_backfill_backup.parquet": {
+      "mtime_ns": 1792835712797966600,
+      "sha256": "c4949e5b5695ffa172677681b15af2ea6167e73317c3496546f2286a6730b1c8",
+      "size_bytes": 2284681
+    }
+  },
+  "protected_files_unchanged": true,
+  "pytest_command": [
+    "C:\\Projects\\BTCognitive\\BTCognitive\\.venv_win\\Scripts\\python.exe",
+    "-B",
+    "-m",
+    "pytest",
+    "tests/test_agent_a_security_regression.py::test_ssrf_hostname_allowlist",
+    "tests/test_agent_a_security_regression.py::test_rbac_admin_routes_require_authentication",
+    "tests/test_agent_a_security_regression.py::test_sheet_sync_no_sensitive_data_leakage",
+    "tests/test_experiment_integrity_v4.py::test_continuity_segmentation_identifies_all_dataset_gaps",
+    "tests/test_experiment_integrity_v4.py::test_features_reset_at_segment_boundary_no_cross_gap_contamination",
+    "tests/test_experiment_integrity_v4.py::test_forward_horizon_gap_exclusion_prevents_fake_labels",
+    "tests/test_stage8_data_experiments.py::test_ohlcv_completeness_and_outage_audit",
+    "tests/test_v32_17_empirical_remediation_and_first_passage.py::test_data_audit_gaps_and_continuity",
+    "tests/test_forecast_activation_and_readiness.py::test_runtime_readiness_all_checks_pass",
+    "tests/test_forecast_activation_and_readiness.py::test_short_horizon_forecast_retains_empirical_baseline_classification",
+    "tests/test_authorization_consistency.py::test_prediction_endpoints_fail_closed_as_baselines",
+    "tests/test_phase6_terminal_release_readiness.py::test_terminal_release_readiness_end_to_end",
+    "tests/test_stage12_causal_validation.py::test_production_fail_closed_safeguards",
+    "tests/test_scenario_freshness_and_contract_v7.py::test_supported_horizons_provenance_and_metadata",
+    "tests/test_scenario_freshness_and_contract_v7.py::test_custom_entry_valid_and_invalid",
+    "tests/test_scenario_freshness_and_contract_v7.py::test_api_route_scenario_preview_contract",
+    "tests/test_scenario_freshness_and_contract_v7.py::test_scenario_does_not_pollute_signal_gate",
+    "tests/test_scenario_planner_and_inference_v6.py::TestScenarioCalculationContract::test_live_market_scenario_preview",
+    "tests/test_scenario_planner_and_inference_v6.py::TestScenarioCalculationContract::test_custom_entry_anchor",
+    "tests/test_scenario_planner_and_inference_v6.py::TestScenarioCalculationContract::test_reject_invalid_custom_entry_prices",
+    "tests/test_scenario_planner_and_inference_v6.py::TestScenarioCalculationContract::test_supported_horizons_coverage",
+    "tests/test_scenario_planner_and_inference_v6.py::TestSignalSeparation::test_active_signal_remains_abstained_while_scenario_succeeds",
+    "tests/test_forecast_intelligence.py::test_get_prediction_intelligence_endpoints",
+    "tests/test_longitudinal_api.py::test_get_prediction_longitudinal_endpoint",
+    "tests/test_longitudinal_api.py::test_get_prediction_intelligence_health_longitudinal_fields",
+    "tests/test_longitudinal_dashboard.py::test_get_prediction_longitudinal_dashboard_payload",
+    "tests/test_longitudinal_status.py::test_longitudinal_status_report_structure",
+    "tests/test_stage10_shadow_validation.py::test_causal_timing_and_zero_future_leakage",
+    "tests/test_stage10_shadow_validation.py::test_ledger_tamper_evident_integrity",
+    "tests/test_stage10_shadow_validation.py::test_pipeline_idempotency_and_safe_restart",
+    "tests/test_stage10_shadow_validation.py::test_api_shadow_ledger_endpoint",
+    "tests/test_stage11_forward_validation.py::test_forward_collector_zero_backdated_records",
+    "tests/test_tier0_finite_horizon_verification.py::test_effective_sample_size_and_precision_gate",
+    "tests/test_tier0_finite_horizon_verification.py::test_canonical_neff_estimator_consistency_with_research_harness",
+    "tests/test_tier0_finite_horizon_verification.py::test_ai_prediction_engine_tier2_gating_enforcement",
+    "tests/test_v22_forecast_and_alerts.py::test_memory_stats_win_rate_strictly_isolates_directional_trades",
+    "tests/test_v22_forecast_and_alerts.py::test_forecast_out_of_sample_tournament_leaderboard",
+    "tests/test_v10_market_data_and_forecast_chart.py::test_15m_forecast_contract_mathematics",
+    "tests/test_v10_market_data_and_forecast_chart.py::test_api_forecast_latest_15m",
+    "tests/test_v11_strategy_discovery_and_cost_reconciliation.py::test_governance_invariants_preserved",
+    "tests/test_live_metric_reconciliation.py::test_live_metric_reconciliation_execution",
+    "tests/test_frontend_contracts.py::test_active_frontend_is_the_research_terminal_and_discloses_forecast_gate",
+    "tests/test_v19_beginner_ui_and_gates.py::TestV19BeginnerFrontendContracts::test_empirical_quantiles_properly_explained",
+    "tests/test_v28_entry_quality_and_meta_model.py::test_v28_calibrated_probabilities_normalization",
+    "tests/test_v32_23_forecast_smart_entry_recovery.py::test_v32_23_forecast_engine_explicit_baseline_contract",
+    "tests/test_readme_contract.py::test_readme_contract_presence",
+    "tests/test_v32_22_chart_and_forecast_integrity.py::test_v32_22_frontend_script_chart_fix_integrity",
+    "tests/test_v28_entry_quality_and_meta_model.py::test_v28_decision_gate_abstains_on_negative_expectancy",
+    "tests/test_terminal_routes.py::test_server_starts_monitor_when_frozen_inputs_are_unverified",
+    "tests/test_v14_reliability_and_security.py::test_v14_strategy_setup_preview_mode_invariants",
+    "tests/test_v15_prd_closure_and_terminal_reliability.py::test_v15_spot_comparator_endpoint_contract",
+    "tests/test_v20_release_and_gates.py::TestV20ReconciledTenGates::test_gate_09_market_freshness_policy_enforcement",
+    "tests/test_v21_hotfix_and_alerts.py::test_research_alert_trigger_on_fresh_condition",
+    "tests/test_v29_1_deployment_integrity.py::test_production_environment_docs_disabled",
+    "tests/test_v17_cost_aware_governance.py::TestApiSecurityAndLatency::test_health_is_lightweight_liveness",
+    "tests/test_v32_38_adaptive_market_intelligence.py::test_protected_files_isolation",
+    "tests/test_v32_39_prospective_l2_qualification.py::test_protected_files_isolation",
+    "tests/test_v32_48_integrated_analyse_and_tournament.py::test_matrix_f_protected_files_remain_bit_identical"
+  ],
+  "pytest_exit_code": 4,
+  "python_guard": "sitecustomize blocks write, replace, delete, copy, move, metadata changes, and removal of protected paths",
+  "report_directory": "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\v32_54\\20261027_184759_981943",
+  "repository_root": "C:\\Projects\\BTCognitive\\BTCognitive",
+  "review_required_dataset_override": true,
+  "sandbox_dataset_override": "data\\raw\\ohlcv.parquet",
+  "sandbox_dataset_override_sha256": "172a21c99a67b91198988efd7dfdf4a26035701dbb05bdd2d213b481ad6a6360",
+  "sandbox_parent": "C:\\Users\\Ashish\\AppData\\Local\\Temp\\btcognitive_v32_52_tbix5g_2",
+  "sandbox_root": "C:\\Users\\Ashish\\AppData\\Local\\Temp\\btcognitive_v32_52_tbix5g_2\\repository",
+  "source_absolute_path_references": [],
+  "subprocess_policy": "Python children and the sandbox frontend smoke build are allowed; only the exact Windows 'ver' platform probe may use a shell",
+  "tests_executed": true,
+  "verified_dataset_acquisition_status": "ACQUIRED_WITH_REVIEW_REQUIRED",
+  "verified_dataset_sha256": "172a21c99a67b91198988efd7dfdf4a26035701dbb05bdd2d213b481ad6a6360",
+  "verified_dataset_source": "C:\\Projects\\BTCognitive\\BTCognitive\\data\\research\\coinbase_btc_usd_hourly_verified_v2\\coinbase_btc_usd_hourly.parquet"
+}

@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BTCognitive — Analyse E2E Test Harness</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+  <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin=""></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin=""></script>
+</head>
+<body style="background: #0B0E14; color: #F8FAFC; margin: 0; padding: 0;">
+  <div id="harness-header" style="background: #111827; border-bottom: 1px solid #374151; padding: 8px 16px; font-family: monospace; font-size: 13px; display: flex; justify-content: space-between;">
+    <span>BTCognitive Analyse E2E Test Harness</span>
+    <span id="qa-scenario-badge" style="color: #38BDF8; font-weight: bold;">SCENARIO: ANALYSE_QUALIFYING_CANDIDATE</span>
+  </div>
+
+  <div id="root"></div>
+
+  <!-- QA Result Container -->
+  <div id="qa-results-container" style="display: none;">
+    <div id="qa-scenario-status">FAIL</div>
+    <pre id="qa-results-json">{
+  "scenario": "ANALYSE_QUALIFYING_CANDIDATE",
+  "started_at": "2026-10-29T12:51:18.035Z",
+  "button_clicked": false,
+  "click_timestamp": null,
+  "requests_intercepted": [],
+  "responses_received": [],
+  "analysis_stage_transitions": [],
+  "final_outcome": null,
+  "error_message": "btn-analyse-setup not found in DOM within 4s",
+  "simulated_attempts_created": 0,
+  "passed": false
+}</pre>
+  </div>
+
+  <script>
+    // Extract scenario from query parameter
+    const params = new URLSearchParams(window.location.search);
+    const scenario = params.get("scenario") || "ANALYSE_NORMAL";
+    document.getElementById("qa-scenario-badge").textContent = "SCENARIO: " + scenario;
+    window.__QA_SCENARIO__ = scenario;
+    window.__QA_RESULTS__ = {
+      scenario: scenario,
+      started_at: new Date().toISOString(),
+      button_clicked: false,
+      click_timestamp: null,
+      requests_intercepted: [],
+      responses_received: [],
+      analysis_stage_transitions: [],
+      final_outcome: null,
+      error_message: null,
+      simulated_attempts_created: 0,
+      passed: false
+    };
+
+    // Pre-flight Mock Interceptor for Coinbase REST & WS
+    const origFetch = window.fetch;
+    window.fetch = async function(url, options = {}) {
+      const urlStr = typeof url === "string" ? url : (url.url || "");
+      
+      // Intercept Coinbase candles
+      if (urlStr.includes("api.exchange.coinbase.com/products/BTC-USD/candles")) {
+        window.__QA_RESULTS__.requests_intercepted.push({ endpoint: "COINBASE_CANDLES", url: urlStr });
+        if (scenario === "ANALYSE_PROVIDER_UNAVAILABLE") {
+          return new Response(JSON.stringify([]), { status: 503, headers: { "Content-Type": "application/json" } });
+        }
+        // Fetch deterministic seed candles from local QA server
+        const res = await origFetch("/api/qa/seed-candles?scenario=" + scenario);
+        const data = await res.json();
+        // Coinbase REST format: [[time, low, high, open, close, volume], ...] in descending order
+        const cbCandles = data.map(c => [c.time, c.low, c.high, c.open, c.close, c.volume]).reverse();
+        return new Response(JSON.stringify(cbCandles), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+
+      // Intercept Analyse API calls to log telemetry
+      if (urlStr.includes("/api/tournament/analyse")) {
+        window.__QA_RESULTS__.requests_intercepted.push({
+          endpoint: "ANALYSE",
+          payload: options.body ? JSON.parse(options.body) : null
+        });
+      }
+
+      const resp = await origFetch(url, options);
+      if (urlStr.includes("/api/tournament/analyse")) {
+        const clone = resp.clone();
+        try {
+          const body = await clone.json();
+          window.__QA_RESULTS__.responses_received.push({ status: resp.status, body: body });
+        } catch(e) {}
+      }
+      return resp;
+    };
+
+    // Mock WebSocket for Coinbase feed
+    window.WebSocket = function(url) {
+      return {
+        readyState: 1, // OPEN
+        send: function() {},
+        close: function() {},
+        addEventListener: function() {},
+        removeEventListener: function() {}
+      };
+    };
+  </script>
+
+  <!-- Load Real Application Script -->
+  <script src="/app.js"></script>
+
+  <!-- Automated Scenario Driver -->
+  <script>
+    (async function runTestDriver() {
+      // Set hash route to smart entry
+      window.location.hash = "#/smart-entry";
+
+      // Wait for app mount and button presence
+      let btn = null;
+      for (let i = 0; i < 40; i++) {
+        await new Promise(r => setTimeout(r, 100));
+        btn = document.getElementById("btn-analyse-setup");
+        if (btn) break;
+      }
+
+      if (!btn) {
+        window.__QA_RESULTS__.error_message = "btn-analyse-setup not found in DOM within 4s";
+        finalize(false);
+        return;
+      }
+
+      // Allow 300ms for candle feed state propagation
+      await new Promise(r => setTimeout(r, 300));
+
+      // Execute scenario-specific click behavior
+      window.__QA_RESULTS__.button_clicked = true;
+      window.__QA_RESULTS__.click_timestamp = new Date().toISOString();
+
+      if (scenario === "ANALYSE_DOUBLE_CLICK") {
+        btn.click();
+        await new Promise(r => setTimeout(r, 20));
+        btn.click(); // rapid double-click
+      } else {
+        btn.click();
+      }
+
+      // Poll for completion or terminal state
+      let terminalStateReached = false;
+      for (let j = 0; j < 35; j++) {
+        await new Promise(r => setTimeout(r, 150));
+        const errEl = document.getElementById("analysis-error");
+        const outcomeEl = document.querySelector("#v32-43-smart-entry-view h2, #v32-43-smart-entry-view h3, [role='status']");
+        const statusText = document.body.innerText;
+
+        if (errEl && errEl.textContent.trim()) {
+          window.__QA_RESULTS__.error_message = errEl.textContent.trim();
+          terminalStateReached = true;
+          break;
+        }
+
+        if (statusText.includes("ENTRY CANDIDATE FOUND") ||
+            statusText.includes("NO QUALIFYING SETUP") ||
+            statusText.includes("ANALYSIS ABSTAINED") ||
+            statusText.includes("Analysis complete") ||
+            statusText.includes("Analysis did not start") ||
+            statusText.includes("Analysis request failed")) {
+          terminalStateReached = true;
+          break;
+        }
+      }
+
+      // Capture final rendered outcome
+      const bodyText = document.body.innerText;
+      if (bodyText.includes("ENTRY CANDIDATE FOUND")) {
+        window.__QA_RESULTS__.final_outcome = "ENTRY_CANDIDATE_FOUND";
+      } else if (bodyText.includes("NO QUALIFYING SETUP")) {
+        window.__QA_RESULTS__.final_outcome = "NO_QUALIFYING_SETUP";
+      } else if (bodyText.includes("ANALYSIS ABSTAINED")) {
+        window.__QA_RESULTS__.final_outcome = "ANALYSIS_ABSTAINED";
+      } else if (bodyText.includes("Analysis did not start")) {
+        window.__QA_RESULTS__.final_outcome = "BLOCKED_PREFLIGHT";
+      } else if (bodyText.includes("Analysis request failed")) {
+        window.__QA_RESULTS__.final_outcome = "ERROR_HANDLED";
+      } else {
+        window.__QA_RESULTS__.final_outcome = "TIMEOUT_OR_UNRESOLVED";
+      }
+
+      // Check invariant: zero simulated attempts created
+      const attemptsCount = document.querySelectorAll(".simulated-trade-card, #active-simulated-trade").length;
+      window.__QA_RESULTS__.simulated_attempts_created = attemptsCount;
+
+      // Evaluate scenario pass/fail
+      let passed = false;
+      switch (scenario) {
+        case "ANALYSE_NORMAL":
+          passed = (window.__QA_RESULTS__.final_outcome === "NO_QUALIFYING_SETUP" || window.__QA_RESULTS__.final_outcome === "ENTRY_CANDIDATE_FOUND") && attemptsCount === 0;
+          break;
+        case "ANALYSE_NO_ELIGIBLE_STRATEGY":
+          passed = (window.__QA_RESULTS__.final_outcome === "NO_QUALIFYING_SETUP" || window.__QA_RESULTS__.final_outcome === "ANALYSIS_ABSTAINED") && attemptsCount === 0;
+          break;
+        case "ANALYSE_GAPS":
+          passed = (window.__QA_RESULTS__.final_outcome === "BLOCKED_PREFLIGHT" || window.__QA_RESULTS__.final_outcome === "ERROR_HANDLED" || Boolean(window.__QA_RESULTS__.error_message)) && attemptsCount === 0;
+          break;
+        case "ANALYSE_DUPLICATE_OR_INVALID_OHLCV":
+          passed = (window.__QA_RESULTS__.final_outcome === "ERROR_HANDLED" || Boolean(window.__QA_RESULTS__.error_message)) && attemptsCount === 0;
+          break;
+        case "ANALYSE_STALE_DATA":
+          passed = (window.__QA_RESULTS__.final_outcome === "BLOCKED_PREFLIGHT" || window.__QA_RESULTS__.final_outcome === "ERROR_HANDLED" || Boolean(window.__QA_RESULTS__.error_message)) && attemptsCount === 0;
+          break;
+        case "ANALYSE_PROVIDER_UNAVAILABLE":
+          passed = (window.__QA_RESULTS__.final_outcome === "BLOCKED_PREFLIGHT" || Boolean(window.__QA_RESULTS__.error_message)) && !bodyText.includes("$80,000") && attemptsCount === 0;
+          break;
+        case "ANALYSE_MALFORMED_OR_MISSING_FORECAST":
+          passed = (window.__QA_RESULTS__.final_outcome !== "TIMEOUT_OR_UNRESOLVED") && attemptsCount === 0;
+          break;
+        case "ANALYSE_TIMEOUT_OR_SERVER_ERROR":
+          passed = (window.__QA_RESULTS__.final_outcome === "ERROR_HANDLED" || Boolean(window.__QA_RESULTS__.error_message)) && attemptsCount === 0;
+          break;
+        case "ANALYSE_DOUBLE_CLICK":
+          passed = (window.__QA_RESULTS__.requests_intercepted.filter(r => r.endpoint === "ANALYSE").length <= 1) && attemptsCount === 0;
+          break;
+        case "ANALYSE_QUALIFYING_CANDIDATE":
+          passed = (window.__QA_RESULTS__.final_outcome === "ENTRY_CANDIDATE_FOUND") && attemptsCount === 0;
+          break;
+        default:
+          passed = false;
+      }
+
+      window.__QA_RESULTS__.passed = passed;
+      finalize(passed);
+    })();
+
+    function finalize(passed) {
+      document.getElementById("qa-scenario-status").textContent = passed ? "PASS" : "FAIL";
+      document.getElementById("qa-results-json").textContent = JSON.stringify(window.__QA_RESULTS__, null, 2);
+      window.__QA_DONE__ = true;
+    }
+  </script>
+
+
+</body></html>

@@ -23,9 +23,11 @@ def test_multiscale_health_service_evaluation():
     report = multiscale_health_service.get_health_report()
 
     assert isinstance(report, MultiscaleHealthReport)
-    assert report.ridge_status == "PRODUCTION"
-    assert report.hawkes_status == "VALIDATED_SHADOW_MODEL"
-    assert report.overall_health == "HEALTHY"
+    assert report.ridge_status == "UNAVAILABLE"
+    assert report.hawkes_status == "UNAVAILABLE"
+    assert report.ridge_coverage is None
+    assert report.hawkes_coverage is None
+    assert report.overall_health == "UNAVAILABLE"
 
 
 def test_get_multiscale_health_endpoint():
@@ -33,6 +35,8 @@ def test_get_multiscale_health_endpoint():
     assert response.status_code == 200
 
     data = response.json()
-    assert data["ridge_status"] == "PRODUCTION"
-    assert data["hawkes_status"] == "VALIDATED_SHADOW_MODEL"
-    assert data["overall_health"] == "HEALTHY"
+    assert data["ridge_status"] == "UNAVAILABLE"
+    assert data["hawkes_status"] == "UNAVAILABLE"
+    assert data["ridge_coverage"] is None
+    assert data["hawkes_coverage"] is None
+    assert data["overall_health"] == "UNAVAILABLE"

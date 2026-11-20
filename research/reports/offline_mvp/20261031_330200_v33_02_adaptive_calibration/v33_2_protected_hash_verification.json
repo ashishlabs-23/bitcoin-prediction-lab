@@ -1,0 +1,93 @@
+{
+  "manifest_version": "1.4.0",
+  "milestone": "BTCognitive V33.2 - Adaptive Risk Calibration & Volatility-Shift Response",
+  "verification_timestamp_utc": "2026-10-31T14:02:00Z",
+  "lead_orchestrator": "Antigravity",
+  "operating_contract": "OFFLINE_RESEARCH_ONLY",
+  "governed_determination": "NO_IMPROVEMENT_OVER_C2",
+  "architecture_freeze_status": "ENTRY_AND_ANALYSIS_ARCHITECTURE_FROZEN (BASELINE_C2_RETAINED)",
+  "git_environment": {
+    "branch": "main",
+    "head_commit_sha": "25d483f4c3646661b57311de9d0b53d2be881adb",
+    "ahead_of_origin": 1,
+    "working_tree_policy": "PRESERVED_NO_DESTRUCTIVE_OPERATIONS"
+  },
+  "protected_dataset_registry": [
+    {
+      "relative_path": "data/raw/ohlcv_checkpoint_42233_bars.parquet",
+      "expected_sha256": "f5c15cb11b9d51cf0077c8f8052086382deb1d8577749cbab8d0134842c7a94f",
+      "actual_sha256": "f5c15cb11b9d51cf0077c8f8052086382deb1d8577749cbab8d0134842c7a94f",
+      "file_size_bytes": 2329800,
+      "row_count": 42233,
+      "hash_matched": true,
+      "source_lineage_status": "SOURCE_LINEAGE_VERIFIED",
+      "governance_classification": "EMPIRICALLY_APPROVED"
+    },
+    {
+      "relative_path": "data/raw/ohlcv_version_42326_bars.parquet",
+      "expected_sha256": "ba06fb533c0b53387136b001c142efc90b5e2ccfb37937dc509879a76c2a4057",
+      "actual_sha256": "ba06fb533c0b53387136b001c142efc90b5e2ccfb37937dc509879a76c2a4057",
+      "file_size_bytes": 2334866,
+      "row_count": 42326,
+      "hash_matched": true,
+      "source_lineage_status": "SOURCE_LINEAGE_VERIFIED",
+      "governance_classification": "EMPIRICALLY_APPROVED"
+    },
+    {
+      "relative_path": "data/processed/multi_regime_features.parquet",
+      "expected_sha256": "e37fcc1a896e5a8a60db337f8e49253eaf1d8d011c430e32a23a43d7de04205f",
+      "actual_sha256": "e37fcc1a896e5a8a60db337f8e49253eaf1d8d011c430e32a23a43d7de04205f",
+      "file_size_bytes": 3095866,
+      "row_count": 42233,
+      "hash_matched": true,
+      "source_lineage_status": "SYNTHETIC_DATA_CONFIRMED",
+      "governance_classification": "QUARANTINED_SYNTHETIC"
+    },
+    {
+      "relative_path": "data/raw/binance_funding_2022_2026.parquet",
+      "expected_sha256": "e90282de4f78ebde4b0e253cd71e50233d965062defa9f1b81be5b87da094436",
+      "actual_sha256": "e90282de4f78ebde4b0e253cd71e50233d965062defa9f1b81be5b87da094436",
+      "file_size_bytes": 145791,
+      "row_count": 5113,
+      "hash_matched": true,
+      "source_lineage_status": "SOURCE_LINEAGE_UNRESOLVED",
+      "governance_classification": "QUARANTINED_UNRESOLVED"
+    },
+    {
+      "relative_path": "data/raw/funding.parquet",
+      "expected_sha256": "f176186ec28c78feac7091fa8dcf1f202145ff3a2ea373426ca3a29ca27dfa66",
+      "actual_sha256": "f176186ec28c78feac7091fa8dcf1f202145ff3a2ea373426ca3a29ca27dfa66",
+      "file_size_bytes": 12625,
+      "row_count": 375,
+      "hash_matched": true,
+      "source_lineage_status": "SOURCE_LINEAGE_UNRESOLVED",
+      "governance_classification": "QUARANTINED_UNRESOLVED"
+    },
+    {
+      "relative_path": "data/prospective_forecast_ledger.jsonl",
+      "expected_sha256": "ee58b37c71c5c3ff322af3084d27b306eb0a445a8bd6e01a74b76d8168ccd491",
+      "actual_sha256": "ee58b37c71c5c3ff322af3084d27b306eb0a445a8bd6e01a74b76d8168ccd491",
+      "hash_matched": true,
+      "clean_blocks_resolved": 7,
+      "required_hurdle_blocks": 100,
+      "governed_status_string": "FROZEN — 7/100 — COLLECTOR_INACTIVE"
+    }
+  ],
+  "acceptance_test_suite_summary": {
+    "suite_path": "tests/test_v33_2_adaptive_calibration.py",
+    "total_tests": 6,
+    "passed": 6,
+    "failed": 0,
+    "warnings_count": 0,
+    "execution_time_seconds": 0.49,
+    "status": "PASS"
+  },
+  "governance_invariants": {
+    "live_trading": "DISABLED — ANALYSIS ONLY",
+    "model_authorization": "OFFLINE_RESEARCH_ONLY",
+    "directional_signals": "ZERO_SIGNALS_CREATED (RISK_INTELLIGENCE_ONLY)",
+    "point_in_time_delay": "168h_CAUSAL_DELAY_STRICTLY_ENFORCED",
+    "production_decision": "NO_IMPROVEMENT_OVER_C2 — BASELINE_C2_RETAINED_PRODUCTION_UNCHANGED"
+  }
+}
+

@@ -1,0 +1,137 @@
+{
+  "milestone": "BTCognitive V32.45 — Analyse, Tournament Backtest and Entry Acceptance Validation",
+  "audit_version": "1.0.0",
+  "timestamp_utc": "2026-10-26T03:58:00Z",
+  "repository": "https://github.com/ashishlabs-23/bitcoin-prediction-lab",
+  "git_commit_sha": "25d483f4c3646661b57311de9d0b53d2be881adb",
+  "overall_verdict": "WORKFLOW_VALIDATED_FOR_SHADOW",
+  "governance_mode": "OFFLINE_RESEARCH_ONLY",
+  "live_trading_status": "DISABLED",
+  "execution_authorization": "STRICT_NON_EXECUTION",
+  "button_wiring_verification": {
+    "btn_analyse_setup": {
+      "element_id": "btn-analyse-setup",
+      "api_endpoint": "POST /api/tournament/analyse",
+      "creates_trade": false,
+      "verified": true
+    },
+    "btn_run_tournament": {
+      "element_id": "btn-run-tournament",
+      "api_endpoint": "POST /api/tournament/run",
+      "creates_trade": false,
+      "verified": true
+    },
+    "btn_enter_simulated_trade": {
+      "element_id": "btn-enter-simulated-trade",
+      "api_endpoint": "POST /api/tournament/smart-entry/enter",
+      "creates_trade": true,
+      "requires_status": "SMART_ENTRY_AVAILABLE",
+      "verified": true
+    },
+    "btn_exit_now": {
+      "api_endpoint": "POST /api/tournament/smart-entry/attempts/{id}/exit",
+      "terminal_status": "USER_EXITED_EARLY",
+      "verified": true
+    },
+    "btn_partial_exit": {
+      "api_endpoint": "POST /api/tournament/smart-entry/attempts/{id}/partial-exit",
+      "event_type": "PARTIAL_EXIT",
+      "verified": true
+    }
+  },
+  "analyse_context_verification": {
+    "warmup_required_bars": 168,
+    "max_shortlisted_candidates": 2,
+    "stale_data_rejection": true,
+    "freshness_threshold_hours": 2.0,
+    "gap_detection_tolerance_seconds": 3660,
+    "sample_provenance": "HISTORICAL_WALKFORWARD_SCREENING",
+    "wilson_ci_confidence": "95%",
+    "always_visible_ai_forecast_panel": true,
+    "verified": true
+  },
+  "tournament_backtest_verification": {
+    "protocol_version": "WALK_FORWARD_CAUSAL_SPLIT_v1",
+    "protocol_hash": "a4d3ec17b8f32dae",
+    "dataset_hash": "e93f3810f3db5e95",
+    "date_window": {
+      "start_utc": "2024-01-01T00:00:00Z",
+      "end_utc": "2026-10-24T08:00:00Z"
+    },
+    "arms_evaluated": [
+      "Arm 1: Strategy alone",
+      "Arm 2: Strategy + AI forecast filter",
+      "Arm 3: Baseline comparator (Matched random / Buy & Hold)"
+    ],
+    "sequential_fallback_implemented": true,
+    "execution_source": "CACHED_WALK_FORWARD_EVALUATION",
+    "cache_hashes_matched": true,
+    "verified": true
+  },
+  "entry_eligibility_and_immutability": {
+    "level_immutability": "TP and SL locked at entry; never moved",
+    "anomaly_policy_frozen": true,
+    "forecast_snapshot_sealed_sha256": true,
+    "server_side_idempotency": true,
+    "duplicate_prevention": "Deduplicated by active tournament ID and idempotency key",
+    "restart_recovery": "Full recovery from JSONL ledger",
+    "verified": true
+  },
+  "outcome_lifecycle_coverage": {
+    "tested_statuses": [
+      "SUCCESS_TP_HIT",
+      "FAILURE_SL_HIT",
+      "EXITED_ANOMALY",
+      "USER_EXITED_EARLY",
+      "PARTIAL_EXIT",
+      "TIMEOUT_NO_TP",
+      "DATA_INVALID",
+      "UNRESOLVED_INTRABAR_ORDER"
+    ],
+    "monetary_dollar_pnl": 0.0,
+    "verified": true
+  },
+  "test_suite_execution_summary": {
+    "unit_and_integration_pytest": {
+      "total_tests": 35,
+      "passed": 35,
+      "failed": 0,
+      "duration_seconds": 15.73,
+      "suites": [
+        "tests/test_v32_43_strategy_tournament_and_smart_entry.py",
+        "tests/test_v32_44_smart_entry_independent_audit.py",
+        "tests/test_v32_45_workflow_acceptance.py"
+      ]
+    },
+    "frontend_node_tests": {
+      "status": "ALL_PASSED",
+      "polling_budget_req_per_min": 29.5,
+      "polling_limit_req_per_min": 60.0
+    },
+    "cdp_browser_qa": {
+      "status": "ALL_PASSED",
+      "viewports": ["desktop (1280x800)", "tablet (768x1024)", "mobile (375x667)"],
+      "screenshots_saved": [
+        "research/reports/artifacts/browser_qa/v32_45_smart_entry_desktop.png",
+        "research/reports/artifacts/browser_qa/v32_45_smart_entry_tablet.png",
+        "research/reports/artifacts/browser_qa/v32_45_smart_entry_mobile.png"
+      ]
+    }
+  },
+  "collector_runtime_readiness": {
+    "runner_lock": "INACTIVE",
+    "collector_pid": null,
+    "feed_status": "MARKET_DATA_STALE (~44h stale from 2026-10-24 08:00:00 UTC)",
+    "prospective_blocks_accumulated": 0,
+    "prospective_blocks_target": 100,
+    "fresh_live_feed": false,
+    "collector_reconfigured": false,
+    "shadow_preflight_procedure_prepared": true
+  },
+  "governed_decisions": {
+    "research_experiment": "RETAIN_BASELINE_CHALLENGER_RESEARCH_ONLY",
+    "prospective_evidence": "COLLECTING_PREFLIGHT_READY (0/100 blocks)",
+    "model_authorization": "OFFLINE_RESEARCH_ONLY",
+    "live_trading": "DISABLED"
+  }
+}

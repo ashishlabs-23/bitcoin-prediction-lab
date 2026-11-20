@@ -1,0 +1,164 @@
+{
+  "audit_version": "V32.44",
+  "document_id": "BTC-REP-V32.44-SMART-ENTRY-INDEPENDENT-AUDIT",
+  "execution_date": "2026-10-26",
+  "governance_status": "OFFLINE_RESEARCH_ONLY",
+  "economic_posture": "NO_GO_NO_VALIDATED_EDGE",
+  "live_trading_authorization": "PERMANENTLY_DISABLED",
+  "final_audit_status": "READY_FOR_PROSPECTIVE_SHADOW",
+  "source_and_runtime_audit": {
+    "trace_analyse_request": {
+      "is_read_only": true,
+      "creates_simulated_trade": false,
+      "regime_detection_source": "EXECUTED_CAUSAL_INDICATORS_ON_1H_CANDLES",
+      "required_warmup_bars": 168,
+      "shortlist_capacity": 2
+    },
+    "trace_tournament_backtest": {
+      "execution_source": "CACHED_WALK_FORWARD_EVALUATION",
+      "provenance_disclosure_verified": true,
+      "ad_hoc_reoptimization_performed": false,
+      "three_arm_comparison": [
+        "Arm 1: Strategy Alone",
+        "Arm 2: Strategy + AI Forecast Filter",
+        "Arm 3: Matched Baseline Comparator"
+      ]
+    },
+    "trace_enter_simulated_trade": {
+      "creates_attempt_on_action_only": true,
+      "frozen_attributes": [
+        "reference_entry_price",
+        "frozen_tp_price",
+        "frozen_sl_price",
+        "reward_risk_ratio",
+        "max_duration_hours",
+        "anomaly_policy",
+        "entry_forecast_snapshot",
+        "immutable_sha256"
+      ],
+      "immutable_across_forecast_shifts": true,
+      "forecast_reversal_behavior": "DIRECTION_CHANGE_ALERT_EMITTED_NO_LEVEL_MUTATION",
+      "idempotency_enforced": true,
+      "duplicate_requests_prevented": true
+    }
+  },
+  "seven_of_ten_rule_audit": {
+    "cold_start_policy": "STRICT_SEPARATION_BETWEEN_HISTORICAL_AND_PROSPECTIVE",
+    "evidence_sources": {
+      "prospective_simulation": {
+        "status": "COLLECTING",
+        "eligible_completed_attempts": 0,
+        "note": "Only 3 exploratory unit-test attempts in ledger, all exited early by operator. Zero completed TP/SL trades."
+      },
+      "historical_walkforward_screening": {
+        "status": "COLD_START_SCREENING_ONLY",
+        "registry_entries_evaluated": {
+          "TSMOM_DONCHIAN_24H_168H": {"passed": true, "tp_hits": 7, "total": 10, "wilson_ci_95": [0.397, 0.892]},
+          "ATR_VOLATILITY_BREAKOUT_12H": {"passed": true, "tp_hits": 8, "total": 10, "wilson_ci_95": [0.490, 0.943]},
+          "RANGE_BOLLINGER_REVERSION_20H": {"passed": false, "tp_hits": 6, "total": 10, "wilson_ci_95": [0.313, 0.832]},
+          "HTF_RANGE_EXPANSION_BREAKOUT": {"passed": false, "status": "INSUFFICIENT_EVIDENCE", "total": 4},
+          "BUY_AND_HOLD_BASELINE": {"passed": false, "status": "INSUFFICIENT_EVIDENCE", "total": 0},
+          "CHRONOS2_FOUNDATION": {"passed": false, "status": "QUARANTINED", "total": 0}
+        }
+      }
+    },
+    "denominator_accounting_defect_repaired": {
+      "prior_v32_43_behavior": "Included USER_EXITED_EARLY in denominator of strategy rule success rate",
+      "v32_44_repaired_behavior": "Strictly restricts denominator to eligible completed attempts (TP, SL, Anomaly, Timeout). Reports pending, user-exited, unresolved, and partial separately."
+    },
+    "epistemic_uncertainty_statement": "Passing 7/10 is an eligibility screen, NOT proof of a future 70% success probability. Under binomial assumptions, Wilson 95% CI is [39.7%, 89.2%]. Financial time-series serial dependence expands true uncertainty further."
+  },
+  "tournament_validity_audit": {
+    "selection_rule": "Candidate qualifies IF AND ONLY IF it passes 7/10 screen, achieves positive AI lift over strategy alone, AND beats matched baseline comparator.",
+    "all_candidates_failing_behavior": "Produces ABSTAIN. Being the highest-ranked candidate is not sufficient if all candidates fail.",
+    "intrabar_dual_touch_handling": "Flagged as UNRESOLVED_INTRABAR_ORDER without tick feed evidence.",
+    "calibration_claim_audit": "Candidate setup explicitly marked NOT_CALIBRATED. Directional forecast probability explicitly separated from TP-first target probability."
+  },
+  "defect_repair_ledger": [
+    {
+      "defect_id": "DEF-01",
+      "component": "engine/smart_entry_simulator.py",
+      "severity": "HIGH",
+      "description": "Duplicate entry requests created duplicate attempts due to timestamp inclusion in attempt hash without active attempt check.",
+      "remediation": "Implemented idempotency keying and active trade verification by (strategy_id, tournament_id). Duplicate requests now idempotently return existing active trade."
+    },
+    {
+      "defect_id": "DEF-02",
+      "component": "engine/smart_entry_simulator.py",
+      "severity": "MEDIUM",
+      "description": "Evaluation summary denominator included USER_EXITED_EARLY attempts in automated TP-first hit rate.",
+      "remediation": "Restricted denominator strictly to eligible completed attempts (TP_HIT, SL_HIT, EXITED_ANOMALY, TIMEOUT_NO_TP). Pending, user-exited, unresolved, and partial are reported separately."
+    },
+    {
+      "defect_id": "DEF-03",
+      "component": "engine/smart_entry_simulator.py",
+      "severity": "MEDIUM",
+      "description": "update_active_attempts completely omitted checking for qualifying anomaly exits.",
+      "remediation": "Added anomaly trigger evaluation in update_active_attempts and dedicated trigger_anomaly_exit method."
+    },
+    {
+      "defect_id": "DEF-04",
+      "component": "engine/regime_strategy_tournament.py",
+      "severity": "HIGH",
+      "description": "Tournament winner selection used arbitrary hardcoded threshold (> 0.52) rather than testing positive AI lift and beating matched baseline comparator.",
+      "remediation": "Replaced with strict 3-arm improvement rule: candidate must pass 7/10 screen, achieve positive AI lift over strategy alone, and beat baseline comparator, or ABSTAIN."
+    },
+    {
+      "defect_id": "DEF-05",
+      "component": "api/routes_tournament.py",
+      "severity": "MEDIUM",
+      "description": "post_enter_simulated_trade allowed entry when market data was unavailable (e.g. entry price <= 0) or when decision status was not SMART_ENTRY_AVAILABLE.",
+      "remediation": "Added validation blocking entry if decision is not SMART_ENTRY_AVAILABLE or if live market price is unavailable."
+    },
+    {
+      "defect_id": "DEF-06",
+      "component": "engine/regime_strategy_tournament.py",
+      "severity": "LOW",
+      "description": "MarketRegimeClassifier raised KeyError if close/high/low columns were absent in DataFrame.",
+      "remediation": "Added required columns verification returning UNKNOWN_OR_INVALID on missing columns."
+    }
+  ],
+  "automated_test_evidence": {
+    "v32_43_regression_suite": {
+      "file": "tests/test_v32_43_strategy_tournament_and_smart_entry.py",
+      "total_tests": 14,
+      "passed": 14,
+      "failed": 0
+    },
+    "v32_44_audit_suite": {
+      "file": "tests/test_v32_44_smart_entry_independent_audit.py",
+      "total_tests": 11,
+      "passed": 11,
+      "failed": 0
+    },
+    "frontend_verification": {
+      "file": "tests_frontend.js",
+      "status": "ALL_PASSED",
+      "polling_budget_rate": "29.5 req/min (server limiter: 60 req/min)"
+    },
+    "cdp_browser_qa": {
+      "file": "engine/run_v32_44_smart_entry_browser_qa.py",
+      "viewports_tested": ["desktop (1280x800)", "tablet (768x1024)", "mobile (375x667)"],
+      "status": "ALL_PASSED",
+      "screenshots_captured": [
+        "research/reports/artifacts/browser_qa/v32_44_smart_entry_desktop.png",
+        "research/reports/artifacts/browser_qa/v32_44_smart_entry_tablet.png",
+        "research/reports/artifacts/browser_qa/v32_44_smart_entry_mobile.png"
+      ]
+    }
+  },
+  "protected_files_status": {
+    "data/prospective_entry_ledger.jsonl": "PRISTINE_UNTOUCHED",
+    "data/prospective_shadow_v1.jsonl": "PRISTINE_UNTOUCHED",
+    "data/prospective_entry_ledger_v2.jsonl": "PRISTINE_UNTOUCHED",
+    "data/raw/ohlcv.parquet": "PRISTINE_UNTOUCHED",
+    "data/raw/ohlcv_pre_backfill_backup.parquet": "PRISTINE_UNTOUCHED"
+  },
+  "prospective_shadow_readiness": {
+    "collector_process_verified": "INACTIVE_READY_FOR_OPERATOR_AUTHORIZATION",
+    "feature_warmup_policy": "168_CLOSED_1H_CANDLES_REQUIRED",
+    "state_recovery": "VERIFIED_APPEND_ONLY_LEDGER_REPLAY",
+    "shutdown_procedure": "SIGTERM_ATOMIC_LOCK_RELEASE",
+    "confirmatory_gate_hurdle": "MINIMUM_100_NON_OVERLAPPING_PROSPECTIVE_BLOCKS"
+  }
+}

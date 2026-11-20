@@ -1,0 +1,108 @@
+{
+  "branch": "main",
+  "created_at": "2026-10-27T13:02:11.395561+00:00",
+  "excluded_root_directories": {
+    "scratch": "Contains ad hoc scripts with absolute workspace paths; no references from code, tests, or configuration were found."
+  },
+  "head": "25d483f4c3646661b57311de9d0b53d2be881adb",
+  "limitations": [
+    "The repository copy is the isolation boundary; this is not a kernel-level sandbox.",
+    "Native extensions or non-Python child processes are not intercepted by sitecustomize.",
+    "Protected-file before/after comparison detects unexpected changes but does not restore them."
+  ],
+  "mode": "run",
+  "network_log": "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\v32_54\\20261027_183141_034731\\qa_network.jsonl",
+  "network_policy": "only loopback ports bound by this QA run are reachable; external DNS and connections are blocked",
+  "protected_files_after": {
+    "C:\\Projects\\BTCognitive\\BTCognitive\\data\\prospective_entry_ledger.jsonl": {
+      "mtime_ns": 1792436858196944800,
+      "sha256": "91c3aed984002f611a59c78a2eb4c342c0970baebbd2e3d6df7973be7acf1dd7",
+      "size_bytes": 3385
+    },
+    "C:\\Projects\\BTCognitive\\BTCognitive\\data\\prospective_entry_ledger_v2.jsonl": {
+      "mtime_ns": 1792836244169141800,
+      "sha256": "e6e33e3c7beb4c255467e967fc819b85481b0afb1052c3ea7bd248c53f87b604",
+      "size_bytes": 12744
+    },
+    "C:\\Projects\\BTCognitive\\BTCognitive\\data\\prospective_shadow_v1.jsonl": {
+      "mtime_ns": 1792751047806047400,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    "C:\\Projects\\BTCognitive\\BTCognitive\\data\\raw\\ohlcv.parquet": {
+      "mtime_ns": 1793036540398291700,
+      "sha256": "c007cd613bec3012fa427d047b466d5e250bd4451b5062d311f387e8afd0ce3f",
+      "size_bytes": 2329745
+    },
+    "C:\\Projects\\BTCognitive\\BTCognitive\\data\\raw\\ohlcv_backfilled.parquet": {
+      "mtime_ns": 1792835712791875400,
+      "sha256": "1e722f33734a89e74764c02fde0552752cc1ea2eff62ca9046c9d6edf2347d5c",
+      "size_bytes": 2326699
+    },
+    "C:\\Projects\\BTCognitive\\BTCognitive\\data\\raw\\ohlcv_pre_backfill_backup.parquet": {
+      "mtime_ns": 1792835712797966600,
+      "sha256": "c4949e5b5695ffa172677681b15af2ea6167e73317c3496546f2286a6730b1c8",
+      "size_bytes": 2284681
+    }
+  },
+  "protected_files_before": {
+    "C:\\Projects\\BTCognitive\\BTCognitive\\data\\prospective_entry_ledger.jsonl": {
+      "mtime_ns": 1792436858196944800,
+      "sha256": "91c3aed984002f611a59c78a2eb4c342c0970baebbd2e3d6df7973be7acf1dd7",
+      "size_bytes": 3385
+    },
+    "C:\\Projects\\BTCognitive\\BTCognitive\\data\\prospective_entry_ledger_v2.jsonl": {
+      "mtime_ns": 1792836244169141800,
+      "sha256": "e6e33e3c7beb4c255467e967fc819b85481b0afb1052c3ea7bd248c53f87b604",
+      "size_bytes": 12744
+    },
+    "C:\\Projects\\BTCognitive\\BTCognitive\\data\\prospective_shadow_v1.jsonl": {
+      "mtime_ns": 1792751047806047400,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    "C:\\Projects\\BTCognitive\\BTCognitive\\data\\raw\\ohlcv.parquet": {
+      "mtime_ns": 1793036540398291700,
+      "sha256": "c007cd613bec3012fa427d047b466d5e250bd4451b5062d311f387e8afd0ce3f",
+      "size_bytes": 2329745
+    },
+    "C:\\Projects\\BTCognitive\\BTCognitive\\data\\raw\\ohlcv_backfilled.parquet": {
+      "mtime_ns": 1792835712791875400,
+      "sha256": "1e722f33734a89e74764c02fde0552752cc1ea2eff62ca9046c9d6edf2347d5c",
+      "size_bytes": 2326699
+    },
+    "C:\\Projects\\BTCognitive\\BTCognitive\\data\\raw\\ohlcv_pre_backfill_backup.parquet": {
+      "mtime_ns": 1792835712797966600,
+      "sha256": "c4949e5b5695ffa172677681b15af2ea6167e73317c3496546f2286a6730b1c8",
+      "size_bytes": 2284681
+    }
+  },
+  "protected_files_unchanged": true,
+  "pytest_command": [
+    "C:\\Projects\\BTCognitive\\BTCognitive\\.venv_win\\Scripts\\python.exe",
+    "-B",
+    "-m",
+    "pytest",
+    "tests/test_live_metric_reconciliation.py::test_live_metric_reconciliation_execution",
+    "tests/test_frontend_contracts.py::test_active_frontend_is_the_research_terminal_and_discloses_forecast_gate",
+    "tests/test_v19_beginner_ui_and_gates.py::TestV19BeginnerFrontendContracts::test_empirical_quantiles_properly_explained",
+    "tests/test_v28_entry_quality_and_meta_model.py::test_v28_calibrated_probabilities_normalization",
+    "tests/test_v32_23_forecast_smart_entry_recovery.py::test_v32_23_forecast_engine_explicit_baseline_contract",
+    "--timeout=120"
+  ],
+  "pytest_exit_code": 1,
+  "python_guard": "sitecustomize blocks write, replace, delete, copy, move, metadata changes, and removal of protected paths",
+  "report_directory": "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\v32_54\\20261027_183141_034731",
+  "repository_root": "C:\\Projects\\BTCognitive\\BTCognitive",
+  "review_required_dataset_override": true,
+  "sandbox_dataset_override": "data\\raw\\ohlcv.parquet",
+  "sandbox_dataset_override_sha256": "172a21c99a67b91198988efd7dfdf4a26035701dbb05bdd2d213b481ad6a6360",
+  "sandbox_parent": "C:\\Users\\Ashish\\AppData\\Local\\Temp\\btcognitive_v32_52_32c2n5vd",
+  "sandbox_root": "C:\\Users\\Ashish\\AppData\\Local\\Temp\\btcognitive_v32_52_32c2n5vd\\repository",
+  "source_absolute_path_references": [],
+  "subprocess_policy": "Python children and the sandbox frontend smoke build are allowed; only the exact Windows 'ver' platform probe may use a shell",
+  "tests_executed": true,
+  "verified_dataset_acquisition_status": "ACQUIRED_WITH_REVIEW_REQUIRED",
+  "verified_dataset_sha256": "172a21c99a67b91198988efd7dfdf4a26035701dbb05bdd2d213b481ad6a6360",
+  "verified_dataset_source": "C:\\Projects\\BTCognitive\\BTCognitive\\data\\research\\coinbase_btc_usd_hourly_verified_v2\\coinbase_btc_usd_hourly.parquet"
+}

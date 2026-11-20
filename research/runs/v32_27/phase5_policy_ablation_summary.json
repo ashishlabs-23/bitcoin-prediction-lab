@@ -1,0 +1,63 @@
+{
+  "evaluation_period": "2026-01-01 to 2026-10-25 (Authenticated Coinbase BTC-USD Hourly Holdout)",
+  "total_available_candidates": 130,
+  "variants": [
+    {
+      "variant_id": "V1_STRATEGY_ALONE",
+      "description": "TSMOM_DONCHIAN_24H_168H without AI filtering",
+      "trades_evaluated": 130,
+      "trades_taken": 130,
+      "mean_net_r_27bps": -0.3557,
+      "mean_net_r_87bps": -1.1119,
+      "positive_edge_demonstrated": false,
+      "drawdown_behavior": "Severe cumulative drawdown across holdout",
+      "governance_decision": "FAIL_CLOSED_NEGATIVE_EXPECTANCY"
+    },
+    {
+      "variant_id": "V2_STRATEGY_PLUS_DIRECTIONAL_GBDT",
+      "description": "Strategy filtered by directional-gbm-24h-v1 (p_up > 0.52)",
+      "trades_evaluated": 130,
+      "trades_taken": 38,
+      "mean_net_r_27bps": -0.3812,
+      "mean_net_r_87bps": -1.142,
+      "positive_edge_demonstrated": false,
+      "drawdown_behavior": "Reduced trade count but no statistical improvement (AUC 0.5136, BSS < 0)",
+      "governance_decision": "REJECTED_NO_SKILL_OVER_BASE_RATE"
+    },
+    {
+      "variant_id": "V3_STRATEGY_PLUS_CHRONOS_2_FILTER",
+      "description": "Strategy filtered by Chronos-2 zero-shot P10-P90 marginal quantile envelope",
+      "trades_evaluated": 130,
+      "trades_taken": "N/A (Theoretical mismatch)",
+      "mean_net_r_27bps": null,
+      "mean_net_r_87bps": null,
+      "positive_edge_demonstrated": false,
+      "drawdown_behavior": "Invalid: marginal quantile P(Price_{t+24} in [P10, P90]) != P(tau_TP < tau_SL)",
+      "governance_decision": "BLOCKED_THEORETICAL_AND_DEPENDENCY_MISMATCH"
+    },
+    {
+      "variant_id": "V4_STRATEGY_PLUS_CALIBRATED_META_MODEL",
+      "description": "Strategy filtered by calibrated tri-state outcome meta-model (EV_net > 0)",
+      "trades_evaluated": 130,
+      "trades_taken": 0,
+      "mean_net_r_27bps": 0.0,
+      "mean_net_r_87bps": 0.0,
+      "positive_edge_demonstrated": false,
+      "drawdown_behavior": "Protected capital: 100% abstention prevents -0.3557 R loss, but yields 0 edge",
+      "governance_decision": "NO_GO_EVIDENCE_GAP_NO_VALIDATED_EDGE"
+    },
+    {
+      "variant_id": "V5_STRATEGY_PLUS_META_MODEL_PLUS_CHRONOS",
+      "description": "Compound meta-model including Chronos features",
+      "trades_evaluated": 130,
+      "trades_taken": 0,
+      "mean_net_r_27bps": 0.0,
+      "mean_net_r_87bps": 0.0,
+      "positive_edge_demonstrated": false,
+      "drawdown_behavior": "Prerequisites not met (Phase 3 & Phase 4 failed positive edge hurdle)",
+      "governance_decision": "BLOCKED_PREREQUISITE_GATE_FAILED"
+    }
+  ],
+  "synthesis": "No tested configuration achieves statistically robust positive net expectancy after friction. The calibrated meta-model correctly abstains from all trades (saving -0.3557 R of loss at 27 bps and -1.1119 R at 87 bps), but cannot manufacture positive edge where underlying market structure does not provide it. Positive-edge research alerts must remain strictly disabled.",
+  "evaluated_at_utc": "2026-10-25T05:28:20.603145+00:00"
+}

@@ -620,7 +620,7 @@ def test_replay_counterfactual_lab_non_directional_symmetry():
     assert data.get("direction") == "NEUTRAL"
 
 
-def test_what_if_scenario_api_endpoint():
+def test_what_if_scenario_api_endpoint(monkeypatch):
     """
     Validation Contract 17:
     User-Defined Path Simulator endpoint (/api/arena/what-if-scenario):
@@ -633,6 +633,13 @@ def test_what_if_scenario_api_endpoint():
     """
     from fastapi.testclient import TestClient
     from api.server import app
+    from api.routes_arena import observatory
+
+    monkeypatch.setattr(
+        observatory,
+        "get_canonical_snapshot",
+        lambda: type("Snapshot", (), {"to_dict": lambda self: {"rv_5m": 0.0024}})(),
+    )
 
     client = TestClient(app)
     payload = {
@@ -670,13 +677,13 @@ def test_what_if_scenario_api_endpoint():
     assert pu is not None and pl is not None and p0 is not None
     assert abs(pu + pl + p0 - 1.0) < 1e-4
 
-    # Verify empirical conformal reference (no 'AI predicted' language)
+    # C2 is disabled; user-supplied path calculations have no calibrated reference.
     conf = data.get("empirical_conformal_reference", {})
-    assert "conformal_p90_upper" in conf
-    assert "conformal_p10_lower" in conf
-    assert "tp_to_conformal_ratio" in conf
-    assert "sl_to_conformal_ratio" in conf
-    assert "comparative_envelope_context" in conf
+    assert conf == {
+        "status": "UNAVAILABLE",
+        "reason": "C2 calibration is disabled; no calibrated reference bounds are available."
+    }
+    assert data["research_provenance"]["conformal_reference_source"] == "UNAVAILABLE"
 
     # Verify research provenance hashes
     prov = data.get("research_provenance", {})
@@ -837,7 +844,6 @@ def test_ai_prediction_engine_intent_disagreement_isolation():
     disag_long = ai_eng_long.get("intent_disagreement_analysis", {})
     assert disag_long.get("user_intent_direction") == "LONG"
     assert "GATED" in disag_long.get("ai_assessment_status", "")
-
 
 
 

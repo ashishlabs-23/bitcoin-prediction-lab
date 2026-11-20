@@ -535,8 +535,8 @@ class PredictionPipeline:
         macro_crisis_regimes = {"HIGH_UNCERTAINTY", "CRISIS", "BEAR_EXTREME"}
         macro_risk_ok = not any(r in l2.market_regime.upper() for r in macro_crisis_regimes)
 
-        c2_scale = 1.0 if macro_risk_ok else 0.0
-        c2_label = "CALIBRATED" if macro_risk_ok else "CRISIS"
+        c2_scale = 0.0
+        c2_label = "UNAVAILABLE"
 
         stop_dist = max(0.001, (abs(l4.target_contract.get("entry_price", l1.current_price) - l4.target_contract.get("sl_price", l1.current_price))) / l1.current_price)
         pos_size_usd = compute_position_size(account_nav, stop_dist)

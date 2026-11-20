@@ -4,10 +4,13 @@ from fastapi.testclient import TestClient
 from api import market_monitor_routes as routes
 
 
-def _app():
+def _app(gate=None):
     app = FastAPI()
-    app.state.research_gate = {"status": "BLOCKED_PROVENANCE_UNVERIFIED", "authorized": False,
-                               "reason": "Frozen inputs are not authenticated."}
+    app.state.research_gate = gate or {
+        "status": "BLOCKED_PROVENANCE_UNVERIFIED",
+        "authorized": False,
+        "reason": "Frozen inputs are not authenticated.",
+    }
     app.include_router(routes.router)
     return app
 
@@ -91,6 +94,26 @@ def test_monitor_health_can_be_ok_while_production_forecasts_are_blocked():
     assert body["research_authorized"] is False
     assert body["production_forecast_available"] is False
     assert body["trading_enabled"] is False
+
+
+def test_readiness_gate_cannot_override_offline_registry_authorization():
+    app = _app({
+        "status": "AUTHORIZED",
+        "authorized": True,
+        "authorization_status": "AUTHORIZED_FOR_PRODUCTION",
+        "research_edge_status": "VALIDATED_EDGE",
+        "trading_enabled": True,
+        "live_capital_authorized": True,
+    })
+    with TestClient(app) as client:
+        readiness = client.get("/api/readiness").json()
+
+    assert readiness["status"] == "OFFLINE_RESEARCH_ONLY"
+    assert readiness["authorization_status"] == "OFFLINE_RESEARCH_ONLY"
+    assert readiness["authorized"] is False
+    assert readiness["research_edge_status"] == "NO_GO_NO_VALIDATED_EDGE"
+    assert readiness["trading_enabled"] is False
+    assert readiness["live_capital_authorized"] is False
 
 
 def test_non_btc_usd_or_non_hourly_candle_request_fails_explicitly():

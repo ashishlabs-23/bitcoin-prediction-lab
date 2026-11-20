@@ -37,7 +37,7 @@ import os
 import math
 import logging
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any, Tuple, Sequence
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -62,10 +62,15 @@ def compute_diebold_mariano_hln(
     """
     Computes Diebold-Mariano test statistic with Harvey-Leybourne-Newbold (1997)
     finite-sample correction for h-step-ahead forecasts against Student's t_{T-1}.
+    Uses Bartlett triangular kernel w_k = 1 - k/h for k = 1, ..., h-1 to ensure
+    positive semi-definiteness of the long-run autocovariance estimator.
     
     d_t = (e_benchmark)^2 - (e_candidate)^2
     Positive DM indicates candidate has lower squared error than benchmark.
     """
+    if h < 1:
+        raise ValueError(f"Forecast horizon h must be >= 1, got {h}")
+
     T = len(e_benchmark)
     if T < 10:
         return 0.0, 1.0
@@ -73,17 +78,16 @@ def compute_diebold_mariano_hln(
     d = (e_benchmark ** 2) - (e_candidate ** 2)
     d_bar = float(np.mean(d))
 
-    # Sample autocovariance up to lag h-1
+    # Sample autocovariance up to lag h-1 with Bartlett triangular weights
     gamma_0 = float(np.var(d, ddof=0))
     gamma_sum = 0.0
     for lag in range(1, h):
         if lag < T:
+            weight = 1.0 - (lag / float(h))
             gamma_lag = float(np.mean((d[lag:] - d_bar) * (d[:-lag] - d_bar)))
-            gamma_sum += 2.0 * gamma_lag
+            gamma_sum += 2.0 * weight * gamma_lag
 
-    var_d = (gamma_0 + gamma_sum) / float(T)
-    if var_d <= 1e-12:
-        return 0.0, 1.0
+    var_d = max(1e-12, (gamma_0 + gamma_sum) / float(T))
 
     dm_stat = d_bar / math.sqrt(var_d)
 
@@ -98,6 +102,34 @@ def compute_diebold_mariano_hln(
     p_value = 2.0 * (1.0 - stats.t.cdf(abs(hln_stat), df=df))
 
     return round(float(hln_stat), 4), round(float(p_value), 5)
+
+
+def holm_bonferroni(p_values: Sequence[float]) -> List[float]:
+    """
+    Applies Holm-Bonferroni (1979) step-down procedure to control Family-Wise Error Rate (FWER).
+    
+    Given m hypotheses with p-values p_(1) <= p_(2) <= ... <= p_(m):
+    Adjusted p-values:
+        p_adj_(i) = min(1.0, max_{k <= i} ((m - k + 1) * p_(k)))
+    Preserves original input ordering.
+    """
+    m = len(p_values)
+    if m == 0:
+        return []
+    if m == 1:
+        return [float(min(1.0, max(0.0, p_values[0])))]
+
+    indexed_p = sorted(enumerate(p_values), key=lambda x: x[1])
+    adjusted = [0.0] * m
+    running_max = 0.0
+
+    for rank, (orig_idx, p_val) in enumerate(indexed_p):
+        k = rank + 1
+        step_adj = (m - k + 1) * p_val
+        running_max = max(running_max, step_adj)
+        adjusted[orig_idx] = float(min(1.0, max(0.0, running_max)))
+
+    return adjusted
 
 
 class PriceForecastEngine:

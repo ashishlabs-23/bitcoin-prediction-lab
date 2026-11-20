@@ -9,6 +9,7 @@ import math
 import pandas as pd
 from fastapi import APIRouter, Query
 
+from engine.data_mode import is_external_network_permitted
 from engine.feature_cache import feature_cache
 
 router = APIRouter(tags=["Market Feeds"])
@@ -20,12 +21,25 @@ def get_candles(
     limit: int = Query(150, ge=1, le=500),
 ):
     """
-    Returns validated historical OHLCV rows from the feature cache.
+    Returns historical OHLCV rows using the interval-specific data source.
 
-    The dedicated market-monitor router owns refreshed market endpoints; this
-    legacy endpoint is explicitly cache-only and never fills missing values.
+    The 15m interval uses the Coinbase adapter and returns DATA_UNAVAILABLE
+    when external access is disabled. The 1h interval reads from feature_cache.
     """
     if interval == "15m":
+        if not is_external_network_permitted():
+            return {
+                "status": "DATA_UNAVAILABLE",
+                "freshness_status": "UNAVAILABLE",
+                "symbol": "BTC-USD",
+                "interval": "15m",
+                "candles": [],
+                "count": 0,
+                "degraded": True,
+                "source": None,
+                "as_of_utc": None,
+                "reason": "15m candles require an external provider, which is disabled in offline mode.",
+            }
         from engine.coinbase_15m_adapter import coinbase_15m_adapter
         try:
             df_15m, meta = coinbase_15m_adapter.get_or_sync_15m_candles(target_count=limit)

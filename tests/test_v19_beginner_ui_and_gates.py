@@ -76,7 +76,8 @@ class TestV19BeginnerFrontendContracts:
         """P10/P50/P90 must be defined in expandable/tooltip context, and explicitly disclaimed as confidence intervals."""
         assert "P10" in app_js_content
         assert "P90" in app_js_content
-        assert "not a guaranteed envelope or calibrated confidence interval" in app_js_content.lower() or "not a calibrated confidence interval" in app_js_content.lower()
+        assert "not a calibrated confidence interval" in app_js_content.lower()
+        assert "excursion/path-containment envelope" in app_js_content.lower()
 
 
 # ---------------------------------------------------------------------------

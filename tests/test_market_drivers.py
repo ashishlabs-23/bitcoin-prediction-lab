@@ -36,6 +36,10 @@ def test_forecast_has_non_overlapping_ranges_and_no_trade_authorization():
     assert result["status"] == "EXPERIMENTAL_BASELINE"
     assert result["live_capital_authorized"] is False
     assert result["probability_pct"] is None
+    assert result["calibration_status"] == "UNAVAILABLE"
+    assert result["calibration_coverage_pct"] is None
+    assert result["central_interval_nominal_coverage_pct"] is None
+    assert result["backtest"]["interval_coverage_pct"] is None
     q = result["price_quantiles_usd"]
     assert 0 < q["p10"] <= q["p50"] <= q["p90"]
     assert result["sample_blocks"] >= 20

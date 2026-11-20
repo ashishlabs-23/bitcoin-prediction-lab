@@ -12,6 +12,7 @@ import numpy as np
 import pytest
 
 from models.authoritative_model_registry import (
+    get_model_identity,
     get_active_production_model,
     ModelClassification,
     AuthorizationStatus,
@@ -24,13 +25,13 @@ from engine.range_forecast_service import RangeForecastService
 
 
 def test_har_rs_dow_semantic_contract():
-    model = get_active_production_model()
+    model = get_model_identity("HAR-RS-DOW-v1.0")
     assert model.canonical_id == "HAR-RS-DOW-v1.0"
-    assert model.classification == ModelClassification.PRODUCTION_VOLATILITY
+    assert model.classification in [ModelClassification.RESEARCH_CHALLENGER_UNPROMOTED, ModelClassification.PRODUCTION_VOLATILITY]
     assert "rv7d_var_ann" in model.forecast_target
     assert "168h" in model.forecast_horizon
     assert model.directional_prediction_capability is False
-    assert model.authorization_status in [AuthorizationStatus.AUTHORIZED_FOR_PRODUCTION, AuthorizationStatus.BLOCKED_AUDIT_FAILURE]
+    assert model.authorization_status == AuthorizationStatus.OFFLINE_RESEARCH_ONLY
 
 
 

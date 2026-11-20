@@ -1,0 +1,25 @@
+{
+  "runner_version": "V30.5-SHADOW-FEED-RUNNER",
+  "last_cycle_timestamp_utc": "2026-10-27T03:28:21.596764+00:00",
+  "feed_status": "OFFLINE",
+  "latest_closed_1h_candle": null,
+  "latest_closed_4h_candle": "2026-10-26T04:00:00+00:00",
+  "active_unresolved_candidate_id": null,
+  "ledger_summary": {
+    "ledger_path": "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\v32_52\\20261027_082310_447603\\tmp\\pytest-of-unknown\\pytest-0\\test_feed_outage_graceful_offl0\\test_feed_shadow.jsonl",
+    "total_candidates": 0,
+    "total_outcomes": 0,
+    "pending_resolution": 0,
+    "registered_candidate_ids": [],
+    "resolved_candidate_ids": []
+  },
+  "last_cycle_details": {
+    "candles_fetched": 0,
+    "candles_added_to_storage": 0,
+    "resolved_outcome": null,
+    "emitted_candidate": null,
+    "notice": "Coinbase feed unreachable after 1 attempts: Connection refused"
+  },
+  "live_trading_authorization": "DISABLED \u2014 ANALYSIS ONLY",
+  "governance_status": "OFFLINE_RESEARCH_ONLY"
+}

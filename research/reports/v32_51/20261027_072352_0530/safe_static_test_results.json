@@ -1,0 +1,23 @@
+[
+  {
+    "step": "node_check",
+    "command": "node --check web\\app.js",
+    "duration_ms": 267,
+    "exit_code": 0,
+    "log": "node_check.log"
+  },
+  {
+    "step": "frontend_tests",
+    "command": "node tests_frontend.js",
+    "duration_ms": 450,
+    "exit_code": 0,
+    "log": "frontend_tests.log"
+  },
+  {
+    "step": "python_ast_changed_files",
+    "command": "read changed/untracked Python files and ast.parse; no imports/execution or pyc outputs",
+    "duration_ms": 5213,
+    "exit_code": 0,
+    "log": "python_ast_changed_files.log"
+  }
+]

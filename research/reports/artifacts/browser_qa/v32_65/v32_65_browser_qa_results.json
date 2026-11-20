@@ -1,0 +1,28 @@
+{
+  "timestamp_utc": "2026-10-29T19:11:14Z",
+  "base_url": "http://127.0.0.1:8096",
+  "data_mode": "fixture",
+  "tests": {
+    "test_01_chart_rendering": "PASSED",
+    "test_02_timeframe_integrity": "PASSED",
+    "test_03_indicators_parity": "PASSED",
+    "test_04_forecast_alignment": "PASSED",
+    "test_05_truthful_unavailability": "PASSED",
+    "test_06_analyse_workflow": "PASSED",
+    "test_07_responsive_viewports": "PASSED",
+    "test_08_network_isolation": "PASSED"
+  },
+  "screenshots": [
+    "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_65\\01_chart_deterministic_desktop.png",
+    "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_65\\02_timeframe_integrity.png",
+    "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_65\\03_indicators_overlay.png",
+    "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_65\\04_forecast_alignment_panel.png",
+    "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_65\\05_truthful_unavailability_state.png",
+    "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_65\\06_analyse_workflow_complete.png",
+    "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_65\\07_desktop_responsive.png",
+    "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_65\\08_mobile_responsive.png"
+  ],
+  "network_requests_count": 44,
+  "external_leaks_detected": false,
+  "overall_status": "PASSED"
+}

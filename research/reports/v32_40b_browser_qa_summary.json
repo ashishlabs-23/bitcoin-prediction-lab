@@ -1,0 +1,71 @@
+{
+  "timestamp_utc": "2026-10-25T15:13:05Z",
+  "test_port": 51442,
+  "viewports_verified": {
+    "landing_desktop": {
+      "width": 1280,
+      "height": 800,
+      "valid": true
+    },
+    "landing_tablet": {
+      "width": 768,
+      "height": 1024,
+      "valid": true
+    },
+    "landing_mobile": {
+      "width": 375,
+      "height": 667,
+      "valid": true
+    },
+    "how_it_works_desktop": {
+      "width": 1280,
+      "height": 800,
+      "valid": true
+    },
+    "how_it_works_tablet": {
+      "width": 768,
+      "height": 1024,
+      "valid": true
+    },
+    "how_it_works_mobile": {
+      "width": 375,
+      "height": 667,
+      "valid": true
+    }
+  },
+  "dom_assertions": {
+    "nav_how_it_works_visible": true,
+    "nav_smart_entry_absent": true,
+    "home_card_market_data": true,
+    "home_card_ai_forecasting": true,
+    "home_card_risk_uncertainty": true,
+    "home_card_market_intelligence": true,
+    "home_card_adaptive_monitoring": true,
+    "home_card_research_decision_gate": true,
+    "btn_market_data": true,
+    "btn_ai_forecasting": true,
+    "btn_risk_uncertainty": true,
+    "btn_market_intelligence": true,
+    "btn_adaptive_monitoring": true,
+    "btn_research_decision_gate": true,
+    "truthful_no_go_displayed": true,
+    "truthful_offline_research_displayed": true,
+    "truthful_trading_disabled_displayed": true,
+    "how_it_works_route_navigated": true,
+    "hiw_stage_01": true,
+    "hiw_stage_02": true,
+    "hiw_stage_03": true,
+    "hiw_stage_04": true,
+    "hiw_stage_05": true,
+    "hiw_stage_06": true
+  },
+  "screenshots_captured": [
+    "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\real_landing_desktop.png",
+    "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\real_landing_tablet.png",
+    "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\real_landing_mobile.png",
+    "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\real_how_it_works_desktop.png",
+    "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\real_how_it_works_tablet.png",
+    "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\real_how_it_works_mobile.png"
+  ],
+  "overall_status": "PASSED"
+}

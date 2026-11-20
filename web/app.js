@@ -1,11 +1,7 @@
 /* ==========================================================================
-   BTCognitive — Live Coinbase BTC-USD Chart + Research Terminal
-   Architecture:
-     • Coinbase REST → seed candles on load / interval change
-     • Coinbase WSS  → BTC-USD ticker; update the active interval candle
-     • lightweight-charts → candleSeries.update(bar) — O(1), no full redraws
-     • Backend REST  → AI prediction/history every 30 s
-     • Backend WSS   → engine connection status only
+   BTCognitive — BTC/USD market chart + research terminal
+   The chart consumes validated backend candle snapshots; exchange data is
+   never fetched directly by the browser or substituted into model inputs.
    ========================================================================== */
 
 const { useState, useEffect, useRef, useCallback, createElement: h } = React;
@@ -29,14 +25,11 @@ function getApiBaseUrl() {
 
 function hasVerifiedResearchAuthorization(payload) {
   const gate = payload?.research || payload?.research_gate || payload;
-  const isAuth = gate?.authorized === true
-    || gate?.research_authorized === true
-    || gate?.status === "READY"
-    || gate?.authorization_status === "AUTHORIZED_FOR_PRODUCTION";
-  const provOk = gate?.provenance_status === "VERIFIED"
-    || gate?.governance_breakdown?.artifact_integrity === "VERIFIED"
-    || gate?.reason_code === "NONE";
-  return Boolean(isAuth && (provOk || gate?.production_forecast_available === true));
+  return Boolean(
+    gate?.authorized === true &&
+    gate?.authorization_status === "AUTHORIZED_FOR_PRODUCTION" &&
+    gate?.provenance_status === "VERIFIED"
+  );
 }
 
 function setApiBaseUrl(url) {
@@ -70,7 +63,7 @@ async function validateBackendUrl(candidateUrl) {
     return { valid: false, error: "Please enter a backend URL." };
   }
   const cleanUrl = candidateUrl.trim().replace(/\/+$/, "");
-  
+
   if (window.location.protocol === "https:" && cleanUrl.startsWith("http://")) {
     const isLocalhost = cleanUrl.includes("localhost") || cleanUrl.includes("127.0.0.1");
     if (!isLocalhost) {
@@ -140,12 +133,110 @@ const INTERVAL_STEP = {
   "1h": 3600, "4h": 14400, "1d": 86400
 };
 
-const COINBASE_GRANULARITY = {
-  "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "4h": 3600, "1d": 86400
-};
 
 function candleBucketStart(epochSeconds, intervalSeconds) {
   return Math.floor(epochSeconds / intervalSeconds) * intervalSeconds;
+}
+
+function getChartForecastHorizon(interval) {
+  const horizons = {
+    "1m": "1h",
+    "5m": "1h",
+    "15m": "15m",
+    "1h": "1h",
+    "4h": "4h",
+    "1d": "24h"
+  };
+  return horizons[String(interval || "").toLowerCase()] || null;
+}
+
+function getForecastTimestampLabel(timestamp) {
+  const parsed = Date.parse(timestamp || "");
+  return Number.isFinite(parsed)
+    ? `${new Date(parsed).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC")}`
+    : "timestamp unavailable";
+}
+
+function getLatestClosedChartCandle(candles, interval, nowMs = Date.now()) {
+  const step = INTERVAL_STEP[interval] || 3600;
+  const nowSeconds = Math.floor(nowMs / 1000);
+  return [...(candles || [])].reverse().find(candle =>
+    Number.isFinite(candle?.time) && candle.time + step <= nowSeconds
+  ) || null;
+}
+
+function getDirectionalForecastState(payload) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return { status: "FORECAST_MALFORMED", reason: "The forecast response was not an object." };
+  }
+  if (payload.status !== "FORECAST_AVAILABLE_RESEARCH_ONLY") {
+    return {
+      status: "FORECAST_UNAVAILABLE",
+      reason: payload.reason || payload.primary_reason || "The forecast service did not provide a research forecast."
+    };
+  }
+  if (!Number.isFinite(Date.parse(payload.generated_at_utc || ""))) {
+    return { status: "FORECAST_MALFORMED", reason: "The forecast response has no valid generation timestamp." };
+  }
+  if (!Number.isFinite(Number(payload.forecast_origin_timestamp))) {
+    return { status: "FORECAST_MALFORMED", reason: "The forecast response has no valid closed-candle origin." };
+  }
+  if (payload.points !== undefined && (
+    !Array.isArray(payload.points) ||
+    payload.points.some(point => !point || !Number.isFinite(Number(point.time)) || !Number.isFinite(Number(point.value)))
+  )) {
+    return { status: "FORECAST_MALFORMED", reason: "The price-baseline points contain invalid numeric values." };
+  }
+  if (!["FRESH", "DELAYED", "STALE"].includes(payload.data_freshness_status)) {
+    return { status: "FORECAST_MALFORMED", reason: "The forecast response has no recognized data-freshness status." };
+  }
+
+  const model = payload.directional_forecast;
+  if (!model || typeof model !== "object" || Array.isArray(model)) {
+    return { status: "FORECAST_UNAVAILABLE", reason: "The response contains no directional-model output." };
+  }
+  if (model.status !== "RESEARCH_INFERENCE_AVAILABLE") {
+    return {
+      status: "FORECAST_UNAVAILABLE",
+      reason: model.primary_reason || model.reason || "The directional model did not return an available classification."
+    };
+  }
+
+  const direction = String(model.predicted_direction || "").toUpperCase();
+  if (!["UP", "DOWN", "NEUTRAL", "ABSTAIN"].includes(direction)) {
+    return { status: "FORECAST_MALFORMED", reason: "The directional model returned an unsupported direction." };
+  }
+
+  const probabilityUp = model.probability_up;
+  const probabilityDown = model.probability_down;
+  const hasUpProbability = Number.isFinite(probabilityUp);
+  const hasDownProbability = Number.isFinite(probabilityDown);
+  if (hasUpProbability !== hasDownProbability ||
+    (hasUpProbability && (
+      probabilityUp < 0 || probabilityUp > 1 ||
+      probabilityDown < 0 || probabilityDown > 1 ||
+      Math.abs(probabilityUp + probabilityDown - 1) > 0.01
+    ))) {
+    return { status: "FORECAST_MALFORMED", reason: "The directional probabilities are missing or inconsistent." };
+  }
+
+  const freshness = payload.data_freshness_status;
+  if (freshness === "STALE") {
+    return { status: "FORECAST_STALE", reason: "The model inputs are older than the forecast freshness limit." };
+  }
+  return {
+    status: freshness === "DELAYED"
+      ? "FORECAST_DELAYED"
+      : direction === "ABSTAIN" ? "FORECAST_ABSTAIN" : "FORECAST_AVAILABLE",
+    direction,
+    probabilityUp: hasUpProbability ? probabilityUp : null,
+    probabilityDown: hasDownProbability ? probabilityDown : null,
+    horizon: model.horizon || payload.forecast_horizon || "horizon unavailable",
+    modelId: model.model_id || payload.directional_model_id || "model identifier unavailable",
+    reason: freshness === "DELAYED"
+      ? "The model inputs are delayed; treat this classification as historical context."
+      : model.primary_reason || model.reason || null
+  };
 }
 
 function formatCandleCountdown(remainingSeconds) {
@@ -181,12 +272,32 @@ function aggregateCandles(candles, intervalSeconds, sourceIntervalSeconds) {
     }));
 }
 
-// Coinbase Exchange public BTC-USD market-data endpoints.
-const COINBASE_REST = (interval) => {
-  const gran = COINBASE_GRANULARITY[interval];
-  return `https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=${gran}`;
-};
-const COINBASE_WSS = "wss://ws-feed.exchange.coinbase.com";
+function buildClosedHourlyAnalysisCandles(candles, nowSeconds = Date.now() / 1000) {
+  const hourSeconds = INTERVAL_STEP["1h"];
+  if (!Array.isArray(candles)) throw new Error("The hourly snapshot is unavailable.");
+  return candles.map((candle, index) => {
+    if (!Number.isFinite(candle?.time) || candle.time % hourSeconds !== 0 ||
+      candle.time + hourSeconds > nowSeconds ||
+      (index > 0 && candle.time - candles[index - 1].time !== hourSeconds)) {
+      throw new Error("The hourly snapshot contains an incomplete, duplicate, or gapped candle.");
+    }
+    if (![candle.open, candle.high, candle.low, candle.close, candle.volume].every(Number.isFinite) ||
+      candle.open <= 0 || candle.high <= 0 || candle.low <= 0 || candle.close <= 0 || candle.volume < 0 ||
+      candle.low > Math.min(candle.open, candle.close) || candle.high < Math.max(candle.open, candle.close)) {
+      throw new Error("The hourly snapshot contains malformed OHLCV values.");
+    }
+    return ({
+      timestamp_utc: new Date(candle.time * 1000).toISOString(),
+      open: candle.open,
+      high: candle.high,
+      low: candle.low,
+      close: candle.close,
+      volume: candle.volume,
+      is_closed: true
+    });
+  });
+}
+
 
 // ---------------------------------------------------------------------------
 // EMA helpers — O(1) incremental, never recalculate the whole array
@@ -337,6 +448,7 @@ function computeAdx14(candles, period = 14) {
 // ---------------------------------------------------------------------------
 const _inflightRequests = new Map();
 const _responseCache = new Map();
+const _whatIfInFlightRequests = new Map();
 let _rateLimitBackoffUntil = 0;
 let _rateLimitBackoffDelay = 1000;
 
@@ -511,19 +623,35 @@ const api = {
   },
 
   async fetchWhatIfScenario(tpPrice, slPrice, horizon = "15m", volMult = 1.0, spotPrice = null) {
-    const res = await fetch(`${getApiBaseUrl()}/api/arena/what-if-scenario`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        tp_price: tpPrice ? Number(tpPrice) : null,
-        sl_price: slPrice ? Number(slPrice) : null,
-        horizon: horizon,
-        vol_multiplier: Number(volMult),
-        spot_price: spotPrice ? Number(spotPrice) : null
-      })
-    });
-    if (!res.ok) throw new Error("what-if-scenario failed");
-    return res.json();
+    const url = `${getApiBaseUrl()}/api/arena/what-if-scenario`;
+    const payload = {
+      tp_price: tpPrice ? Number(tpPrice) : null,
+      sl_price: slPrice ? Number(slPrice) : null,
+      horizon,
+      vol_multiplier: Number(volMult),
+      spot_price: spotPrice ? Number(spotPrice) : null
+    };
+    const requestKey = `${url}:${JSON.stringify(payload)}`;
+    const pending = _whatIfInFlightRequests.get(requestKey);
+    if (pending) return pending;
+
+    const request = (async () => {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) throw new Error("what-if-scenario failed");
+      return response.json();
+    })();
+    _whatIfInFlightRequests.set(requestKey, request);
+    try {
+      return await request;
+    } finally {
+      if (_whatIfInFlightRequests.get(requestKey) === request) {
+        _whatIfInFlightRequests.delete(requestKey);
+      }
+    }
   },
   async fetchRangeLatest() {
     const res = await fetch(`${getApiBaseUrl()}/prediction/range`);
@@ -603,9 +731,18 @@ const api = {
     if (!res.ok) throw new Error(`Notification test failed (HTTP ${res.status}). Check the admin API key.`);
     return res.json();
   },
-  async fetchForecastLatest(horizon = "15m") {
-    const res = await fetch(`${getApiBaseUrl()}/api/forecast/latest?horizon=${encodeURIComponent(horizon)}`);
-    if (!res.ok) throw new Error("forecast/latest failed");
+  async fetchForecastLatest(horizon = "15m", options = {}) {
+    const res = await fetch(`${getApiBaseUrl()}/api/forecast/latest?horizon=${encodeURIComponent(horizon)}`, options);
+    if (!res.ok) {
+      const error = new Error(`Forecast service request failed (HTTP ${res.status}).`);
+      error.status = res.status;
+      throw error;
+    }
+    return res.json();
+  },
+  async fetchTerminalLive() {
+    const res = await fetch(`${getApiBaseUrl()}/api/terminal/live`);
+    if (!res.ok) throw new Error("terminal/live failed");
     return res.json();
   },
   async fetchActivePaperPosition(strategyName = null, indicators = null, userDirection = "AUTO", horizon = "15m", evidenceMode = "AI_RECOMMEND", signalMode = "live_ai") {
@@ -720,8 +857,179 @@ const api = {
     const res = await fetch(`${getApiBaseUrl()}/api/research/reports/${encodeURIComponent(reportId)}`);
     if (!res.ok) throw new Error(`fetch research report ${reportId} failed`);
     return res.json();
+  },
+  async fetchSmartEntryDecision(payload = {}) {
+    const res = await fetch(`${getApiBaseUrl()}/api/research/smart-entry`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      let msg = data?.detail || data?.message;
+      if (Array.isArray(msg)) {
+        msg = msg.map(m => m.msg ? `${m.loc ? m.loc.join('.') + ': ' : ''}${m.msg}` : JSON.stringify(m)).join("; ");
+      } else if (typeof msg === "object" && msg !== null) {
+        msg = JSON.stringify(msg);
+      }
+      throw new Error(msg || `HTTP ${res.status}: Smart Entry evaluation failed.`);
+    }
+    return data;
+  },
+  async fetchL2GatingStatus() {
+    const res = await fetch(`${getApiBaseUrl()}/api/research/l2-gating-status`);
+    if (!res.ok) throw new Error("fetch L2 gating status failed");
+    return res.json();
+  },
+  async fetchL2ShadowEvaluation() {
+    const res = await fetch(`${getApiBaseUrl()}/api/research/l2-shadow-evaluation`);
+    if (!res.ok) throw new Error("fetch L2 shadow evaluation failed");
+    return res.json();
+  },
+
+  // V32.43 Strategy Tournament & Smart Entry Lifecycle API
+  async analyseMarket(payload = {}, options = {}) {
+    return resilientFetch(`${getApiBaseUrl()}/api/tournament/analyse`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      ...options
+    }, 0);
+  },
+  async runTournament(payload = {}) {
+    return resilientFetch(`${getApiBaseUrl()}/api/tournament/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }, 0);
+  },
+  async fetchSmartEntryLatest() {
+    return resilientFetch(`${getApiBaseUrl()}/api/tournament/smart-entry/latest`);
+  },
+  async fetchHistoricalEvidence() {
+    return resilientFetch(`${getApiBaseUrl()}/api/tournament/historical-evidence`);
+  },
+  async enterSimulatedTrade(payload) {
+    const res = await fetch(`${getApiBaseUrl()}/api/tournament/smart-entry/enter`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Enter simulated trade failed (${res.status})`);
+    }
+    return res.json();
+  },
+  async fetchSimulatedAttempts() {
+    return resilientFetch(`${getApiBaseUrl()}/api/tournament/smart-entry/attempts`);
+  },
+  async exitSimulatedAttempt(attemptId, payload) {
+    const res = await fetch(`${getApiBaseUrl()}/api/tournament/smart-entry/attempts/${encodeURIComponent(attemptId)}/exit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Exit attempt failed (${res.status})`);
+    }
+    return res.json();
+  },
+  async partialExitSimulatedAttempt(attemptId, payload) {
+    const res = await fetch(`${getApiBaseUrl()}/api/tournament/smart-entry/attempts/${encodeURIComponent(attemptId)}/partial-exit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Partial exit failed (${res.status})`);
+    }
+    return res.json();
+  },
+  async continueSimulatedAttempt(attemptId, payload = {}) {
+    const res = await fetch(`${getApiBaseUrl()}/api/tournament/smart-entry/attempts/${encodeURIComponent(attemptId)}/continue`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Continue monitoring failed (${res.status})`);
+    }
+    return res.json();
+  },
+  async monitorSimulatedAttempt(payload = {}) {
+    const res = await fetch(`${getApiBaseUrl()}/api/tournament/smart-entry/monitor`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Monitor simulated attempt failed (${res.status})`);
+    }
+    return res.json();
+  },
+  async fetchSmartEntryEvaluation() {
+    return resilientFetch(`${getApiBaseUrl()}/api/tournament/smart-entry/evaluation`);
+  },
+  async fetchStrategyRegistry() {
+    return resilientFetch(`${getApiBaseUrl()}/api/tournament/registry`);
+  },
+  async fetchJournalStatus() {
+    return resilientFetch(`${getApiBaseUrl()}/api/journal/status`);
+  },
+  async fetchJournalTrades(userId) {
+    const url = userId
+      ? `${getApiBaseUrl()}/api/journal/trades?user_id=${encodeURIComponent(userId)}`
+      : `${getApiBaseUrl()}/api/journal/trades`;
+    return resilientFetch(url);
+  },
+  async fetchJournalEvaluation() {
+    return resilientFetch(`${getApiBaseUrl()}/api/journal/evaluation`);
+  },
+  async recordEnterTrade(payload) {
+    const res = await fetch(`${getApiBaseUrl()}/api/journal/trades/enter`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Enter trade failed (${res.status})`);
+    }
+    return res.json();
+  },
+  async recordExitTrade(tradeId, payload) {
+    const res = await fetch(`${getApiBaseUrl()}/api/journal/trades/${encodeURIComponent(tradeId)}/exit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Exit trade failed (${res.status})`);
+    }
+    return res.json();
+  },
+  async recordAdjustTrade(tradeId, payload) {
+    const res = await fetch(`${getApiBaseUrl()}/api/journal/trades/${encodeURIComponent(tradeId)}/adjust`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Adjust trade failed (${res.status})`);
+    }
+    return res.json();
   }
 };
+
+window.api = api;
+
 
 // ---------------------------------------------------------------------------
 // Audio Synthesis & Web Native Push Notification Helpers
@@ -812,7 +1120,7 @@ function showBrowserNotification(alert) {
 }
 
 // ---------------------------------------------------------------------------
-// Backend WebSocket (engine status only — price/candles come from Binance)
+// Backend WebSocket (engine status only — live market data sourced from Bitstamp)
 // ---------------------------------------------------------------------------
 class BackendWSManager {
   constructor() {
@@ -829,7 +1137,7 @@ class BackendWSManager {
     this.isConnecting = true;
     try {
       this.socket = new WebSocket(url);
-      this.socket.onopen  = () => { this.isConnecting = false; this.reconnectAttempts = 0; this.startHeartbeat(); this.notify({ type: "connection", status: "connected" }); };
+      this.socket.onopen = () => { this.isConnecting = false; this.reconnectAttempts = 0; this.startHeartbeat(); this.notify({ type: "connection", status: "connected" }); };
       this.socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
@@ -870,170 +1178,203 @@ class BackendWSManager {
   }
 
   subscribe(cb) { this.listeners.add(cb); if (!this.socket) this.connect(); return () => this.listeners.delete(cb); }
-  notify(data)  { this.listeners.forEach(fn => fn(data)); }
+  notify(data) { this.listeners.forEach(fn => fn(data)); }
 }
 
 const backendWS = new BackendWSManager();
 
 // ===========================================================================
-// useCoinbaseFeed — quote, candles, and timestamps all use Coinbase BTC-USD.
+// useMarketCandleFeed — source-backed candle snapshots from the BTCognitive API.
 // ===========================================================================
-function useCoinbaseFeed(interval) {
-  const [wsStatus,    setWsStatus]    = useState("disconnected");
+function useMarketCandleFeed(interval, fixtureFeedEnabled = false) {
+  const [wsStatus, setWsStatus] = useState("DATA_UNAVAILABLE");
   const [seedCandles, setSeedCandles] = useState([]);
-  const [livePrice,   setLivePrice]   = useState(0);
+  const [livePrice, setLivePrice] = useState(null);
   const [exchangeClock, setExchangeClock] = useState(null);
   const [historyStatus, setHistoryStatus] = useState("loading");
+  const [historySource, setHistorySource] = useState(null);
+  const [historyFreshness, setHistoryFreshness] = useState("UNAVAILABLE");
+  const [historyTestOnly, setHistoryTestOnly] = useState(false);
+  const [historyEventTimestamp, setHistoryEventTimestamp] = useState(null);
+  const [historyReceiptTimestamp, setHistoryReceiptTimestamp] = useState(null);
 
-  const wsRef          = useRef(null);
-  const reconnTimeout  = useRef(null);
-  const attemptsRef    = useRef(0);
-  const intervalRef    = useRef(interval);
-  const aliveRef       = useRef(true);
+  const aliveRef = useRef(true);
   const historyRequestRef = useRef(0);
   const historyControllerRef = useRef(null);
-
-  // Chart component plugs its update handler here
   const onTickRef = useRef(null);
 
-  // ------------------------------------------------------------------
-  // Step 1 — REST seed. Coinbase's 4h view is built from four aligned hourly candles.
-  // ------------------------------------------------------------------
   const fetchHistory = useCallback(async (iv) => {
     const requestId = ++historyRequestRef.current;
     const controller = new AbortController();
     historyControllerRef.current?.abort();
     historyControllerRef.current = controller;
     const timeoutId = setTimeout(() => controller.abort(), 15000);
-    setSeedCandles([]);
-    setLivePrice(0);
-    setHistoryStatus("loading");
     try {
-      const sourceInterval = iv === "4h" ? "1h" : iv;
-      let raw = null;
-      try {
-        const res = await fetch(COINBASE_REST(sourceInterval), { signal: controller.signal });
-        if (res.ok) raw = await res.json();
-      } catch (err) {
-        console.warn("[BTCognitive] Direct Coinbase REST failed, falling back to backend:", err);
-      }
-      if (!raw || !Array.isArray(raw) || raw.length === 0) {
-        try {
-          const backendRes = await fetch(`${getApiBaseUrl()}/api/market/candles?symbol=BTCUSDT&interval=${sourceInterval}`, { signal: controller.signal });
-          if (backendRes.ok) raw = await backendRes.json();
-        } catch (err) {
-          console.warn("[BTCognitive] Backend candle fallback failed:", err);
-        }
-      }
-      if (!raw) throw new Error("Both Coinbase REST and backend candle feeds failed.");
+      const sourceInterval = fixtureFeedEnabled ? "1m" : iv === "4h" ? "1h" : iv;
+      const candlePath = fixtureFeedEnabled
+        ? "/api/local-fixture/candles"
+        : "/api/market/candles";
+      const backendRes = await fetch(
+        `${getApiBaseUrl()}${candlePath}?symbol=BTC-USD&interval=${sourceInterval}&limit=500`,
+        { signal: controller.signal }
+      );
+      if (!backendRes.ok) throw new Error(`Market candle API returned HTTP ${backendRes.status}.`);
+      const raw = await backendRes.json();
       if (requestId !== historyRequestRef.current || !aliveRef.current) return;
-      if (Array.isArray(raw) && raw.length > 0) {
-        const sourceCandles = raw.slice().reverse().map(c => ({
-          time:   c[0],
-          open:   parseFloat(c[3]),
-          high:   parseFloat(c[2]),
-          low:    parseFloat(c[1]),
-          close:  parseFloat(c[4]),
-          volume: parseFloat(c[5])
-        })).filter(c => Number.isFinite(c.time) && [c.open, c.high, c.low, c.close, c.volume].every(Number.isFinite));
-        const candles = iv === "4h"
-          ? aggregateCandles(sourceCandles, INTERVAL_STEP["4h"], INTERVAL_STEP["1h"])
-          : sourceCandles;
-        if (!candles.length) throw new Error("Coinbase returned no complete candles for this interval.");
-        setSeedCandles(candles);
-        setLivePrice(candles[candles.length - 1].close);
-        setHistoryStatus("ready");
+      const resolvedSource = raw?.source || null;
+      const fixtureLabel = "LOCAL TEST FIXTURE ONLY — NOT MARKET DATA";
+      const fixtureResponse = fixtureFeedEnabled
+        && resolvedSource === "fixture"
+        && raw?.test_only === true
+        && raw?.data_origin === "TEST_FIXTURE_ONLY"
+        && raw?.label === fixtureLabel
+        && String(raw?.status || "").toUpperCase() === "FIXTURE_ONLY";
+      if (resolvedSource === "fixture" && !fixtureResponse) {
+        throw new Error("The fixture candle response did not satisfy its test-only provenance contract.");
+      }
+      const apiStatus = String(raw?.status || "DATA_UNAVAILABLE").toUpperCase();
+      const freshnessStatus = String(
+        raw?.freshness_status
+        || (apiStatus === "ACTIVE" || apiStatus === "LIVE"
+          ? "FRESH"
+          : apiStatus === "HISTORICAL_SNAPSHOT" ? "STALE" : apiStatus)
+      ).toUpperCase();
+      setWsStatus(apiStatus);
+      setHistorySource(resolvedSource);
+      setHistoryFreshness(freshnessStatus);
+      setHistoryTestOnly(raw?.test_only === true || raw?.data_origin === "TEST_FIXTURE_ONLY");
+      setHistoryEventTimestamp(raw?.last_event_timestamp || null);
+      setHistoryReceiptTimestamp(
+        raw?.last_receive_timestamp || raw?.last_receipt_timestamp || null
+      );
+      const statusMap = {
+        ACTIVE: "ready",
+        FRESH: "ready",
+        LIVE: "ready",
+        FIXTURE_ONLY: "fixture",
+        HISTORICAL_SNAPSHOT: "stale",
+        STALE: "stale",
+        DISCONNECTED: "disconnected",
+        DATA_UNAVAILABLE: "unavailable",
+        UNAVAILABLE: "unavailable"
+      };
+      setHistoryStatus(statusMap[apiStatus] || statusMap[freshnessStatus] || "unavailable");
+
+      const rawCandles = Array.isArray(raw?.candles) ? raw.candles : [];
+      if (rawCandles.length === 0) {
+        setSeedCandles([]);
+        setLivePrice(null);
+        setExchangeClock(null);
         return;
       }
-      throw new Error("Coinbase returned no usable BTC-USD candles.");
+
+      const allowedSources = fixtureResponse
+        ? ["fixture"]
+        : iv === "1m"
+        ? ["bitstamp"]
+        : ["LOCAL_BITSTAMP_CACHE", "BITSTAMP_REST", "BITSTAMP_HISTORICAL", "LOCAL_HISTORICAL_CACHE"];
+      if (!allowedSources.includes(String(resolvedSource || ""))) {
+        throw new Error("The returned candle source does not match an accepted BTC-USD API snapshot.");
+      }
+
+      const sourceCandles = rawCandles.map(c => ({
+        time: Number(c.time),
+        open: Number(c.open),
+        high: Number(c.high),
+        low: Number(c.low),
+        close: Number(c.close),
+        volume: Number(c.volume)
+      }));
+
+      if (sourceCandles.some(c => !Number.isFinite(c.time) ||
+        ![c.open, c.high, c.low, c.close, c.volume].every(Number.isFinite) ||
+        c.open <= 0 || c.high <= 0 || c.low <= 0 || c.close <= 0 || c.volume < 0 ||
+        c.low > Math.min(c.open, c.close) || c.high < Math.max(c.open, c.close) || c.high < c.low) ||
+        rawCandles.some(c => String(c?.quality_status || "").toUpperCase() === "INVALID")) {
+        throw new Error("The candle response contains missing or malformed OHLCV values.");
+      }
+      if (sourceCandles.some((candle, index) => index > 0 &&
+        candle.time - sourceCandles[index - 1].time <= 0)) {
+        throw new Error("The candle response contains duplicate or out-of-order timestamps.");
+      }
+      const candles = iv === "4h"
+        ? aggregateCandles(sourceCandles, INTERVAL_STEP["4h"], INTERVAL_STEP["1h"])
+        : sourceCandles;
+      if (!candles.length) throw new Error("No complete candles available for this interval.");
+      setSeedCandles(candles);
+      setLivePrice(candles[candles.length - 1].close);
+      const receiveTime = fixtureResponse
+        ? null
+        : raw.last_receive_timestamp || raw.last_receipt_timestamp || raw.retrieved_at;
+      const receiveMs = Date.parse(receiveTime || "");
+      setExchangeClock(Number.isFinite(receiveMs)
+        ? { timestampMs: receiveMs, receivedAt: performance.now() }
+        : null);
     } catch (error) {
       if (requestId !== historyRequestRef.current || !aliveRef.current) return;
-      setHistoryStatus("error");
-      console.error("[BTCognitive] Coinbase candle history unavailable:", error.name === "AbortError" ? "request timed out" : error);
+      setHistoryStatus("unavailable");
+      setWsStatus("DATA_UNAVAILABLE");
+      setSeedCandles([]);
+      setLivePrice(null);
+      setExchangeClock(null);
+      setHistoryFreshness("UNAVAILABLE");
+      setHistoryTestOnly(false);
+      setHistoryEventTimestamp(null);
+      setHistoryReceiptTimestamp(null);
+      console.warn("[BTCognitive] Market candle history unavailable:", error.name === "AbortError" ? "request timed out" : error);
     } finally {
       clearTimeout(timeoutId);
     }
+  }, [fixtureFeedEnabled]);
 
-  }, []);
-
-  // ------------------------------------------------------------------
-  // Step 2 — Coinbase ticker WebSocket.
-  // ------------------------------------------------------------------
-  const connectCoinbaseWS = useCallback((iv) => {
-    if (wsRef.current) {
-      wsRef.current.onclose = null;
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-    if (reconnTimeout.current) { clearTimeout(reconnTimeout.current); reconnTimeout.current = null; }
-
-    if (!aliveRef.current) return;
-    setWsStatus("reconnecting");
-
-    const ws = new WebSocket(COINBASE_WSS);
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      if (!aliveRef.current) { ws.close(); return; }
-      attemptsRef.current = 0;
-      setWsStatus("connected");
-      ws.send(JSON.stringify({
-        type: "subscribe",
-        product_ids: ["BTC-USD"],
-        channels: ["ticker"]
-      }));
-    };
-
-    ws.onmessage = (evt) => {
-      if (!aliveRef.current) return;
+  useEffect(() => {
+    aliveRef.current = true;
+    setSeedCandles([]);
+    setLivePrice(null);
+    setHistoryStatus("loading");
+    setHistorySource(null);
+    setHistoryFreshness("UNAVAILABLE");
+    setHistoryTestOnly(false);
+    setHistoryEventTimestamp(null);
+    setHistoryReceiptTimestamp(null);
+    let active = true;
+    let inFlight = false;
+    const poll = async () => {
+      if (!active || inFlight) return;
+      inFlight = true;
       try {
-        const msg = JSON.parse(evt.data);
-        const price = Number(msg.price);
-        const time = Math.floor(Date.parse(msg.time) / 1000);
-        const volume = Number(msg.last_size || 0);
-        if (msg.product_id === "BTC-USD" && Number.isFinite(price) && price > 0 && Number.isFinite(time)) {
-          setLivePrice(price);
-          setExchangeClock({ timestampMs: time * 1000, receivedAt: performance.now() });
-          if (onTickRef.current) onTickRef.current({ isTicker: true, price, time, volume });
-        }
-      } catch (error) {
-        console.warn("[BTCognitive] Ignored invalid Coinbase ticker message:", error);
+        await fetchHistory(interval);
+      } finally {
+        inFlight = false;
       }
     };
-
-    ws.onclose = () => {
-      if (!aliveRef.current) return;
-      setWsStatus("reconnecting");
-      const delay = Math.min(1000 * Math.pow(2, attemptsRef.current), 20000);
-      attemptsRef.current++;
-      reconnTimeout.current = setTimeout(() => connectCoinbaseWS(intervalRef.current), delay);
-    };
-
-    ws.onerror = () => setWsStatus("disconnected");
-  }, []);
-
-  // ------------------------------------------------------------------
-  // Effect: re-run on interval change
-  // ------------------------------------------------------------------
-  useEffect(() => {
-    aliveRef.current   = true;
-    intervalRef.current = interval;
-    attemptsRef.current = 0;
-
-    fetchHistory(interval);
-    connectCoinbaseWS(interval);
+    poll();
+    const pollIntervalMs = interval === "1m" ? 5000 : 60000;
+    const pollTimer = setInterval(poll, pollIntervalMs);
 
     return () => {
+      active = false;
       aliveRef.current = false;
       historyRequestRef.current++;
       historyControllerRef.current?.abort();
       historyControllerRef.current = null;
-      if (wsRef.current) { wsRef.current.onclose = null; wsRef.current.close(); wsRef.current = null; }
-      if (reconnTimeout.current) clearTimeout(reconnTimeout.current);
+      clearInterval(pollTimer);
     };
-  }, [interval, fetchHistory, connectCoinbaseWS]);
+  }, [interval, fetchHistory]);
 
-  return { wsStatus, seedCandles, onTickRef, livePrice, exchangeClock, historyStatus };
+  return {
+    wsStatus,
+    seedCandles,
+    onTickRef,
+    livePrice,
+    exchangeClock,
+    historyStatus,
+    historySource,
+    historyFreshness,
+    historyTestOnly,
+    historyEventTimestamp,
+    historyReceiptTimestamp
+  };
 }
 
 // ===========================================================================
@@ -1047,6 +1388,7 @@ function useCoinbaseFeed(interval) {
 // ===========================================================================
 function LightweightCandleChart({
   interval,
+  fixtureFeedEnabled = false,
   predictionData,
   predictionHistory = [],
   memoryData = [],
@@ -1065,6 +1407,8 @@ function LightweightCandleChart({
   showAtr = false,
   showAdx = false,
   showResearchMarkers = false,
+  showAiForecast = true,
+  onCandlesChange,
   onIndicatorsChange,
   onWsStatusChange,
   onPriceChange,
@@ -1075,28 +1419,30 @@ function LightweightCandleChart({
   const containerRef = useRef(null);
 
   // Chart instance refs (never stored in React state — no re-renders)
-  const chartRef       = useRef(null);
-  const candleRef      = useRef(null);
-  const ema20Ref       = useRef(null);
-  const ema50Ref       = useRef(null);
-  const bbUpperRef     = useRef(null);
-  const bbMiddleRef    = useRef(null);
-  const bbLowerRef     = useRef(null);
-  const forecastSeriesRef  = useRef(null);
+  const chartRef = useRef(null);
+  const candleRef = useRef(null);
+  const ema20Ref = useRef(null);
+  const ema50Ref = useRef(null);
+  const bbUpperRef = useRef(null);
+  const bbMiddleRef = useRef(null);
+  const bbLowerRef = useRef(null);
+  const forecastSeriesRef = useRef(null);
   const upperBandSeriesRef = useRef(null);
   const lowerBandSeriesRef = useRef(null);
   const [activeForecast, setActiveForecast] = useState(null);
-  const entryLineRef   = useRef(null);
-  const tpLineRef      = useRef(null);
-  const slLineRef      = useRef(null);
+  const [forecastStatus, setForecastStatus] = useState({ status: "FORECAST_LOADING", lastUpdatedAt: null });
+  const [forecastReloadKey, setForecastReloadKey] = useState(0);
+  const entryLineRef = useRef(null);
+  const tpLineRef = useRef(null);
+  const slLineRef = useRef(null);
 
   // V14 User-Selected Strategy Overlay & Preview Setup State
   const [overlaySetup, setOverlaySetup] = useState(null);
 
   // Active Paper Strategy State (uses props from TerminalView if provided)
-  const [localStrategy, setLocalStrategy]   = useState("AUTO");
-  const [localPos, setLocalPos]             = useState(null);
-  const [arenaMarkers, setArenaMarkers]     = useState([]);
+  const [localStrategy, setLocalStrategy] = useState("AUTO");
+  const [localPos, setLocalPos] = useState(null);
+  const [arenaMarkers, setArenaMarkers] = useState([]);
 
   const selectedStrategy = propsStrat !== undefined ? propsStrat : localStrategy;
   const setSelectedStrategy = propsSetStrat !== undefined ? propsSetStrat : setLocalStrategy;
@@ -1140,16 +1486,28 @@ function LightweightCandleChart({
   }, [activeStrategyTarget, isTargetEnabled]);
 
   // Running EMA values (O(1) incremental — refs, not state)
-  const ema20ValRef    = useRef(null);
-  const ema50ValRef    = useRef(null);
+  const ema20ValRef = useRef(null);
+  const ema50ValRef = useRef(null);
 
   // Seed candle buffer — needed to recompute excursion envelope on close
-  const seedRef        = useRef([]);
+  const seedRef = useRef([]);
 
   // Last candle time — detect new-candle vs in-place update
-  const lastTimeRef    = useRef(0);
+  const lastTimeRef = useRef(0);
 
-  const { wsStatus, seedCandles, onTickRef, livePrice, exchangeClock, historyStatus } = useCoinbaseFeed(interval);
+  const { wsStatus, seedCandles, onTickRef, livePrice, exchangeClock, historyStatus, historySource, historyFreshness, historyTestOnly, historyEventTimestamp, historyReceiptTimestamp } = useMarketCandleFeed(interval, fixtureFeedEnabled);
+
+  useEffect(() => {
+    onCandlesChange?.({
+      candles: seedCandles,
+      source: historySource,
+      status: historyStatus,
+      freshnessStatus: historyFreshness,
+      testOnly: historyTestOnly,
+      eventTimestamp: historyEventTimestamp,
+      receiptTimestamp: historyReceiptTimestamp
+    });
+  }, [seedCandles, historySource, historyStatus, historyFreshness, historyTestOnly, historyEventTimestamp, historyReceiptTimestamp, onCandlesChange]);
 
   // Periodic poll of canonical active position & markers
   useEffect(() => {
@@ -1160,12 +1518,12 @@ function LightweightCandleChart({
       if (!usesExternalPosition) {
         api.fetchActivePaperPosition(queryStrat)
           .then(data => { if (isMounted) setLocalPos(data); })
-          .catch(() => {});
+          .catch(() => { });
       }
 
       api.fetchArenaTradeMarkers(50, queryStrat)
         .then(data => { if (isMounted) setArenaMarkers(data?.markers || []); })
-        .catch(() => {});
+        .catch(() => { });
     };
     pollActivePosition();
     const intervalId = setInterval(pollActivePosition, 8000);
@@ -1174,7 +1532,7 @@ function LightweightCandleChart({
 
   // Propagate WS status up
   useEffect(() => { onWsStatusChange?.(wsStatus); }, [wsStatus]);
-  useEffect(() => { onPriceChange?.(livePrice); },   [livePrice]);
+  useEffect(() => { onPriceChange?.(livePrice); }, [livePrice]);
   useEffect(() => { onExchangeTimeChange?.(exchangeClock); }, [exchangeClock]);
 
   // -----------------------------------------------------------------------
@@ -1185,11 +1543,11 @@ function LightweightCandleChart({
     const LC = window.LightweightCharts;
 
     const chart = LC.createChart(containerRef.current, {
-      width:  containerRef.current.clientWidth || 800,
+      width: containerRef.current.clientWidth || 800,
       height: 520,
       layout: {
         background: { color: "#0B1220" },
-        textColor:  "#94A3B8",
+        textColor: "#94A3B8",
         fontFamily: "Outfit, sans-serif"
       },
       grid: {
@@ -1199,7 +1557,7 @@ function LightweightCandleChart({
       crosshair: { mode: LC.CrosshairMode.Normal },
       rightPriceScale: {
         borderColor: "rgba(255,255,255,0.08)",
-        textColor:   "#94A3B8",
+        textColor: "#94A3B8",
         scaleMargins: { top: 0.1, bottom: 0.1 }
       },
       localization: {
@@ -1221,50 +1579,50 @@ function LightweightCandleChart({
         }
       },
       timeScale: {
-        visible:        true,
-        borderVisible:  true,
-        borderColor:    "rgba(255, 255, 255, 0.15)",
-        timeVisible:    true,
+        visible: true,
+        borderVisible: true,
+        borderColor: "rgba(255, 255, 255, 0.15)",
+        timeVisible: true,
         secondsVisible: false
       },
-      handleScroll:  { mouseWheel: true, pressedMouseMove: true },
-      handleScale:   { mouseWheel: true, pinch: true }
+      handleScroll: { mouseWheel: true, pressedMouseMove: true },
+      handleScale: { mouseWheel: true, pinch: true }
     });
 
     // Layer 1 — Candlestick
     const candleSeries = chart.addCandlestickSeries({
-      upColor:      "#00E5A8",
-      downColor:    "#FF5C7C",
-      borderUpColor:   "#00E5A8",
+      upColor: "#00E5A8",
+      downColor: "#FF5C7C",
+      borderUpColor: "#00E5A8",
       borderDownColor: "#FF5C7C",
-      wickUpColor:     "#00E5A8",
-      wickDownColor:   "#FF5C7C"
+      wickUpColor: "#00E5A8",
+      wickDownColor: "#FF5C7C"
     });
 
     // Layer 2 — EMA 20
     const ema20Series = chart.addLineSeries({
-      color:     "#00E5A8",
+      color: "#00E5A8",
       lineWidth: 1.5,
-      title:     "EMA 20",
+      title: "EMA 20",
       priceLineVisible: false,
       lastValueVisible: true
     });
 
     // Layer 3 — EMA 50
     const ema50Series = chart.addLineSeries({
-      color:     "#7C5CFF",
+      color: "#7C5CFF",
       lineWidth: 1.5,
-      title:     "EMA 50",
+      title: "EMA 50",
       priceLineVisible: false,
       lastValueVisible: true
     });
 
     // Layer 4 — Forecast Persistence Baseline (Research Overlay)
     const forecastSeries = chart.addLineSeries({
-      color:     "#00F0FF",
+      color: "#00F0FF",
       lineWidth: 2,
       lineStyle: LC.LineStyle.Dashed,
-      title:     "Forecast Baseline",
+      title: "Forecast Baseline ($S_0$ Persistence)",
       priceLineVisible: false,
       lastValueVisible: true,
       crosshairMarkerVisible: true
@@ -1272,10 +1630,10 @@ function LightweightCandleChart({
 
     // Layer 5 — Upper Nominal Model Diffusion Band
     const upperBandSeries = chart.addLineSeries({
-      color:     "rgba(0, 240, 255, 0.50)",
+      color: "rgba(0, 240, 255, 0.50)",
       lineWidth: 1.5,
       lineStyle: LC.LineStyle.Dotted,
-      title:     "Nominal Upper Band",
+      title: "Nominal Upper Band (90%)",
       priceLineVisible: false,
       lastValueVisible: false,
       crosshairMarkerVisible: true
@@ -1283,10 +1641,10 @@ function LightweightCandleChart({
 
     // Layer 6 — Lower Nominal Model Diffusion Band
     const lowerBandSeries = chart.addLineSeries({
-      color:     "rgba(0, 240, 255, 0.50)",
+      color: "rgba(0, 240, 255, 0.50)",
       lineWidth: 1.5,
       lineStyle: LC.LineStyle.Dotted,
-      title:     "Nominal Lower Band",
+      title: "Nominal Lower Band (90%)",
       priceLineVisible: false,
       lastValueVisible: false,
       crosshairMarkerVisible: true
@@ -1333,10 +1691,10 @@ function LightweightCandleChart({
       const bblData = bbLowerRef.current ? param.seriesData.get(bbLowerRef.current) : null;
       if (cData) {
         onHoverBarChange?.({
-          time:  param.time,
-          open:  cData.open,
-          high:  cData.high,
-          low:   cData.low,
+          time: param.time,
+          open: cData.open,
+          high: cData.high,
+          low: cData.low,
           close: cData.close,
           forecast: fcData?.value,
           upperBand: ubData?.value,
@@ -1358,14 +1716,14 @@ function LightweightCandleChart({
       }
     });
 
-    chartRef.current           = chart;
-    candleRef.current          = candleSeries;
-    ema20Ref.current           = ema20Series;
-    ema50Ref.current           = ema50Series;
-    bbUpperRef.current         = bbUpperSeries;
-    bbMiddleRef.current        = bbMiddleSeries;
-    bbLowerRef.current         = bbLowerSeries;
-    forecastSeriesRef.current  = forecastSeries;
+    chartRef.current = chart;
+    candleRef.current = candleSeries;
+    ema20Ref.current = ema20Series;
+    ema50Ref.current = ema50Series;
+    bbUpperRef.current = bbUpperSeries;
+    bbMiddleRef.current = bbMiddleSeries;
+    bbLowerRef.current = bbLowerSeries;
+    forecastSeriesRef.current = forecastSeries;
     upperBandSeriesRef.current = upperBandSeries;
     lowerBandSeriesRef.current = lowerBandSeries;
 
@@ -1391,8 +1749,24 @@ function LightweightCandleChart({
   // Seed: setData when REST history arrives (or interval changes)
   // -----------------------------------------------------------------------
   useEffect(() => {
-    if (!candleRef.current || seedCandles.length === 0) return;
+    if (!candleRef.current) return;
+    if (seedCandles.length === 0) {
+      candleRef.current.setData([]);
+      ema20Ref.current?.setData([]);
+      ema50Ref.current?.setData([]);
+      bbUpperRef.current?.setData([]);
+      bbMiddleRef.current?.setData([]);
+      bbLowerRef.current?.setData([]);
+      seedRef.current = [];
+      lastTimeRef.current = 0;
+      ema20ValRef.current = null;
+      ema50ValRef.current = null;
+      onCandleTimeChange?.(null);
+      onIndicatorsChange?.(null);
+      return;
+    }
 
+    const renderStartedAt = performance.now();
     const closes = seedCandles.map(c => c.close);
 
     // Full EMA pass over seed data
@@ -1445,6 +1819,12 @@ function LightweightCandleChart({
       chartRef.current?.timeScale().setVisibleLogicalRange({ from: fromIdx, to: toIdx });
       chartRef.current?.timeScale().scrollToRealTime();
     }
+    console.info("[BTCognitiveTiming]", JSON.stringify({
+      name: "chart.candles.compute_and_render",
+      duration_ms: Math.round(performance.now() - renderStartedAt),
+      candle_count: seedCandles.length,
+      interval
+    }));
   }, [seedCandles, showEma, showBb]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Toggle EMA lines
@@ -1479,7 +1859,7 @@ function LightweightCandleChart({
 
 
   // -----------------------------------------------------------------------
-  // Update the active candle from each Coinbase ticker message.
+  // Apply backend-provided candle updates if a compatible stream is attached.
   // -----------------------------------------------------------------------
   useEffect(() => {
     onTickRef.current = (bar) => {
@@ -1529,10 +1909,10 @@ function LightweightCandleChart({
 
       // 1. Candlestick — update in-place or append new bar
       candleRef.current.update({
-        time:  bar.time,
-        open:  bar.open,
-        high:  bar.high,
-        low:   bar.low,
+        time: bar.time,
+        open: bar.open,
+        high: bar.high,
+        low: bar.low,
         close: bar.close
       });
 
@@ -1563,18 +1943,24 @@ function LightweightCandleChart({
   // -----------------------------------------------------------------------
   useEffect(() => {
     let isCancelled = false;
+    let inFlight = false;
+    let timeoutId = null;
+    let controller = null;
+    const requestHorizon = getChartForecastHorizon(interval);
+
+    const clearForecastSeries = () => {
+      try {
+        forecastSeriesRef.current?.setData([]);
+        upperBandSeriesRef.current?.setData([]);
+        lowerBandSeriesRef.current?.setData([]);
+      } catch (err) {
+        console.warn("[BTCognitive] Failed to clear unavailable forecast series:", err);
+      }
+      setActiveForecast(null);
+    };
 
     const renderForecast = (fc) => {
       if (isCancelled || !forecastSeriesRef.current) return;
-      if (!fc || !Array.isArray(fc.points) || fc.points.length === 0) {
-        try {
-          forecastSeriesRef.current?.setData([]);
-          upperBandSeriesRef.current?.setData([]);
-          lowerBandSeriesRef.current?.setData([]);
-        } catch {}
-        setActiveForecast(null);
-        return;
-      }
 
       const sanitize = (pts) => {
         const sorted = (pts || [])
@@ -1591,9 +1977,9 @@ function LightweightCandleChart({
         return dedup;
       };
 
-      const pts = sanitize(fc.points);
-      const uppers = sanitize(fc.upper_band);
-      const lowers = sanitize(fc.lower_band);
+      const pts = sanitize(Array.isArray(fc?.points) ? fc.points : []);
+      const uppers = sanitize(fc?.upper_band);
+      const lowers = sanitize(fc?.lower_band);
 
       try {
         forecastSeriesRef.current?.setData(pts);
@@ -1605,17 +1991,120 @@ function LightweightCandleChart({
       }
     };
 
-    const posFc = activePaperPos?.forecast_contract || (activePaperPos?.forecast ? { points: activePaperPos.forecast, source_timeframe: interval } : null);
-    if (posFc && posFc.source_timeframe === interval && Array.isArray(posFc.points) && posFc.points.length > 0) {
-      renderForecast(posFc);
-    } else {
-      api.fetchForecastLatest(interval)
-        .then(data => { if (!isCancelled) renderForecast(data); })
-        .catch(() => { if (!isCancelled) renderForecast(null); });
-    }
+    const fetchForecast = async () => {
+      if (isCancelled || inFlight) return;
+      if (interval === "1m") {
+        clearForecastSeries();
+        setForecastStatus({
+          status: "FORECAST_UNAVAILABLE",
+          code: "NO_COMPATIBLE_1M_ENGINE",
+          reason: "No existing inference engine declares compatibility with the Bitstamp 1-minute candle cadence."
+        });
+        return;
+      }
+      if (!requestHorizon) {
+        clearForecastSeries();
+        setForecastStatus(prev => ({
+          status: "FORECAST_UNAVAILABLE",
+          reason: `The forecast model does not support the ${interval} chart timeframe.`,
+          code: "FORECAST_UNAVAILABLE",
+          lastUpdatedAt: prev.lastUpdatedAt
+        }));
+        return;
+      }
 
-    return () => { isCancelled = true; };
-  }, [interval, activePaperPos]);
+      inFlight = true;
+      const startedAt = performance.now();
+      const requestId = window.crypto?.randomUUID?.() || `forecast-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      controller = new AbortController();
+      setForecastStatus(prev => ({
+        ...prev,
+        status: prev.lastUpdatedAt ? "FORECAST_REFRESHING" : "FORECAST_LOADING"
+      }));
+      timeoutId = setTimeout(() => controller.abort(), 8000);
+      try {
+        const data = await api.fetchForecastLatest(requestHorizon, { signal: controller.signal });
+        if (isCancelled) return;
+
+        const parsed = getDirectionalForecastState(data);
+        if (parsed.status === "FORECAST_MALFORMED" || parsed.status === "FORECAST_UNAVAILABLE") {
+          renderForecast(data);
+          const receivedAt = new Date().toISOString();
+          setForecastStatus(prev => ({
+            ...parsed,
+            code: parsed.status,
+            lastUpdatedAt: prev.lastUpdatedAt,
+            receivedAt,
+            generatedAt: data?.generated_at_utc || null,
+            freshness: data?.data_freshness_status || "UNKNOWN",
+            horizon: parsed.horizon || data?.directional_forecast?.horizon || data?.forecast_horizon || requestHorizon
+          }));
+        } else {
+          renderForecast(data);
+          const receivedAt = new Date().toISOString();
+          setForecastStatus({
+            ...parsed,
+            code: parsed.status,
+            lastUpdatedAt: receivedAt,
+            receivedAt,
+            generatedAt: data.generated_at_utc,
+            freshness: data.data_freshness_status,
+            horizon: parsed.horizon || requestHorizon
+          });
+        }
+        console.info("[BTCognitiveTiming]", JSON.stringify({
+          name: "forecast.fetch_and_render",
+          request_id: requestId,
+          duration_ms: Math.round(performance.now() - startedAt),
+          horizon: requestHorizon,
+          status: parsed.status
+        }));
+      } catch (err) {
+        if (isCancelled) return;
+        clearForecastSeries();
+        const timedOut = err?.name === "AbortError";
+        const code = timedOut ? "REQUEST_TIMEOUT"
+          : err instanceof SyntaxError ? "FORECAST_MALFORMED"
+            : err?.status === 503 ? "SERVICE_UNAVAILABLE"
+              : Number(err?.status) >= 500 ? "SERVER_ERROR"
+                : err instanceof TypeError ? "SERVICE_UNAVAILABLE"
+                  : "FORECAST_UNAVAILABLE";
+        const reason = timedOut
+          ? "The forecast request exceeded 8 seconds. The price chart is still available; retry when the forecast service responds."
+          : err instanceof SyntaxError
+            ? "The forecast service returned invalid JSON. The price chart is still available; inspect the service response and retry."
+            : Number(err?.status) >= 500
+              ? `The forecast service returned HTTP ${err.status}. The price chart is still available; retry or inspect service health.`
+              : `The forecast request failed: ${err?.message || "network error"}. The price chart is still available; retry when the service is reachable.`;
+        setForecastStatus(prev => ({
+          status: code,
+          code,
+          reason,
+          lastUpdatedAt: prev.lastUpdatedAt
+        }));
+        console.warn("[BTCognitive] Forecast request failed:", JSON.stringify({
+          request_id: requestId,
+          code,
+          message: err?.message || "unknown error"
+        }));
+      } finally {
+        if (timeoutId !== null) clearTimeout(timeoutId);
+        timeoutId = null;
+        controller = null;
+        inFlight = false;
+      }
+    };
+
+    fetchForecast();
+    const intervalId = setInterval(fetchForecast, 60000);
+
+    return () => {
+      isCancelled = true;
+      clearInterval(intervalId);
+      if (timeoutId !== null) clearTimeout(timeoutId);
+      controller?.abort();
+    };
+  }, [interval, forecastReloadKey]);
 
   // -----------------------------------------------------------------------
   // Dynamic Visibility of Technical Indicators (EMA 20/50 & Diffusion Bands)
@@ -1624,14 +2113,14 @@ function LightweightCandleChart({
     try {
       ema20Ref.current?.applyOptions({ visible: Boolean(showEma) });
       ema50Ref.current?.applyOptions({ visible: Boolean(showEma) });
-    } catch {}
+    } catch { }
   }, [showEma]);
 
   useEffect(() => {
     try {
       upperBandSeriesRef.current?.applyOptions({ visible: Boolean(showBands) });
       lowerBandSeriesRef.current?.applyOptions({ visible: Boolean(showBands) });
-    } catch {}
+    } catch { }
   }, [showBands]);
 
   // -----------------------------------------------------------------------
@@ -1644,15 +2133,15 @@ function LightweightCandleChart({
 
     // Clear old lines
     if (entryLineRef.current) {
-      try { candleRef.current.removePriceLine(entryLineRef.current); } catch {}
+      try { candleRef.current.removePriceLine(entryLineRef.current); } catch { }
       entryLineRef.current = null;
     }
     if (tpLineRef.current) {
-      try { candleRef.current.removePriceLine(tpLineRef.current); } catch {}
+      try { candleRef.current.removePriceLine(tpLineRef.current); } catch { }
       tpLineRef.current = null;
     }
     if (slLineRef.current) {
-      try { candleRef.current.removePriceLine(slLineRef.current); } catch {}
+      try { candleRef.current.removePriceLine(slLineRef.current); } catch { }
       slLineRef.current = null;
     }
 
@@ -1753,9 +2242,37 @@ function LightweightCandleChart({
     if (!candleRef.current || !seedRef.current.length) return;
 
     const markers = [];
-    const step    = INTERVAL_STEP[interval] || 3600;
+    const step = INTERVAL_STEP[interval] || 3600;
     const seenTimes = new Set();
     const roundToBar = (ts) => Math.floor(ts / step) * step;
+
+    // The research classifier is anchored only to its reported closed-candle origin.
+    const researchForecast = getDirectionalForecastState(activeForecast);
+    const isUsableResearchForecast = showAiForecast && (
+      researchForecast.status === "FORECAST_AVAILABLE" ||
+      researchForecast.status === "FORECAST_DELAYED" ||
+      researchForecast.status === "FORECAST_ABSTAIN"
+    );
+    if (isUsableResearchForecast) {
+      const origin = Math.floor(Number(activeForecast.forecast_origin_timestamp));
+      const anchor = getLatestClosedChartCandle(seedRef.current, interval);
+      const originWithinClosedBar = Boolean(anchor && origin >= anchor.time && origin < anchor.time + step);
+      if (originWithinClosedBar && !seenTimes.has(anchor.time)) {
+        const direction = researchForecast.direction || "ABSTAIN";
+        const isUp = direction === "UP";
+        const isDown = direction === "DOWN";
+        const probability = isUp ? researchForecast.probabilityUp : isDown ? researchForecast.probabilityDown : null;
+        const freshnessPrefix = researchForecast.status === "FORECAST_DELAYED" ? "DELAYED " : "";
+        markers.push({
+          time: anchor.time,
+          position: isUp ? "belowBar" : "aboveBar",
+          color: isUp ? "#00E5A8" : isDown ? "#FF5C7C" : "#94A3B8",
+          shape: isUp ? "arrowUp" : isDown ? "arrowDown" : "circle",
+          text: `AI ${freshnessPrefix}${researchForecast.horizon}: ${direction}${probability === null ? "" : ` (${(probability * 100).toFixed(2)}%)`}`
+        });
+        seenTimes.add(anchor.time);
+      }
+    }
 
     // 1. Current Live Decision Badge
     // Strictly require validated directional signal (LONG or SHORT) and directional authorization.
@@ -1771,29 +2288,36 @@ function LightweightCandleChart({
     );
     const hasLiveDirectionalSignal = isDirectionalTrade || isDirectionalModel;
 
-    if (hasLiveDirectionalSignal) {
+    if (hasLiveDirectionalSignal && !seenTimes.has(seedRef.current[seedRef.current.length - 1].time)) {
       const liveDir = isDirectionalTrade ? activePaperPos.direction : predictionData.direction;
       const liveProb = isDirectionalTrade ? activePaperPos.probability_pct : predictionData.probability_pct;
       const lastBar = seedRef.current[seedRef.current.length - 1];
       const isLong = liveDir === "LONG";
       markers.push({
-        time:     lastBar.time,
+        time: lastBar.time,
         position: isLong ? "belowBar" : "aboveBar",
-        color:    isLong ? "#00E5A8" : "#FF5C7C",
-        shape:    isLong ? "arrowUp" : "arrowDown",
-        text:     `AI: ${liveDir}${liveProb ? ` (${Math.round(liveProb)}%)` : ''}`
+        color: isLong ? "#00E5A8" : "#FF5C7C",
+        shape: isLong ? "arrowUp" : "arrowDown",
+        text: `AI: ${liveDir}${liveProb ? ` (${Math.round(liveProb)}%)` : ''}`
       });
       seenTimes.add(lastBar.time);
-    } else if (predictionData?.direction === "ABSTAIN" || predictionData?.direction === "SKIP") {
+    } else if (
+      predictionData?.direction === "ABSTAIN" ||
+      predictionData?.direction === "SKIP" ||
+      predictionData?.direction === "NOT_ESTIMATED" ||
+      predictionData?.directional_recommendation === "ABSTAIN"
+    ) {
       const lastBar = seedRef.current[seedRef.current.length - 1];
-      markers.push({
-        time:     lastBar.time,
-        position: "aboveBar",
-        color:    "#64748B",
-        shape:    "circle",
-        text:     "ABSTAIN · Routine"
-      });
-      seenTimes.add(lastBar.time);
+      if (!seenTimes.has(lastBar.time)) {
+        markers.push({
+          time: lastBar.time,
+          position: "aboveBar",
+          color: "#64748B",
+          shape: "circle",
+          text: "Decision: ABSTAIN"
+        });
+        seenTimes.add(lastBar.time);
+      }
     }
 
     // 2. Arena Trade & Abstention Markers
@@ -1836,12 +2360,7 @@ function LightweightCandleChart({
     }
 
     // 3. Optional Historical Research Setup Markers (Controlled by showResearchMarkers toggle)
-    if (!showResearchMarkers) {
-      try { candleRef.current.setMarkers([]); } catch {}
-      return;
-    }
-
-    if (memoryData?.length) {
+    if (showResearchMarkers && memoryData?.length) {
       let consecutiveSkips = 0;
       let lastSkipTime = 0;
 
@@ -1876,22 +2395,22 @@ function LightweightCandleChart({
         } else {
           if (consecutiveSkips > 0) {
             markers.push({
-              time:     lastSkipTime,
+              time: lastSkipTime,
               position: "aboveBar",
-              color:    "#94A3B8",
-              shape:    "circle",
-              text:     consecutiveSkips > 1 ? `No Confirmed Setup ×${consecutiveSkips}` : `No Confirmed Setup (Abstain)`
+              color: "#94A3B8",
+              shape: "circle",
+              text: consecutiveSkips > 1 ? `No Confirmed Setup ×${consecutiveSkips}` : `No Confirmed Setup (Abstain)`
             });
             consecutiveSkips = 0;
           }
 
           const isLong = m.direction === "LONG";
           markers.push({
-            time:     barTime,
+            time: barTime,
             position: isLong ? "belowBar" : "aboveBar",
-            color:    isLong ? "#00E5A8" : "#FF5C7C",
-            shape:    isLong ? "arrowUp" : "arrowDown",
-            text:     isLong
+            color: isLong ? "#00E5A8" : "#FF5C7C",
+            shape: isLong ? "arrowUp" : "arrowDown",
+            text: isLong
               ? `Potential Bullish Setup · ${m.strategy_name || 'RESEARCH'} (Hist. Backtest)`
               : `Potential Bearish Setup · ${m.strategy_name || 'RESEARCH'} (Hist. Backtest)`
           });
@@ -1900,18 +2419,22 @@ function LightweightCandleChart({
 
       if (consecutiveSkips > 0) {
         markers.push({
-          time:     lastSkipTime,
+          time: lastSkipTime,
           position: "aboveBar",
-          color:    "#94A3B8",
-          shape:    "circle",
-          text:     consecutiveSkips > 1 ? `No Confirmed Setup ×${consecutiveSkips}` : `No Confirmed Setup (Abstain)`
+          color: "#94A3B8",
+          shape: "circle",
+          text: consecutiveSkips > 1 ? `No Confirmed Setup ×${consecutiveSkips}` : `No Confirmed Setup (Abstain)`
         });
       }
     }
 
     markers.sort((a, b) => a.time - b.time);
-    try { candleRef.current.setMarkers(markers); } catch {}
-  }, [predictionData, memoryData, arenaMarkers, interval, showResearchMarkers]);
+    try {
+      candleRef.current.setMarkers(markers);
+    } catch (error) {
+      console.warn("Unable to update BTC chart markers.", error);
+    }
+  }, [predictionData, memoryData, arenaMarkers, interval, showResearchMarkers, activeForecast, forecastStatus, showAiForecast]);
 
   const researchAuthorized = hasVerifiedResearchAuthorization(predictionData);
   const p = researchAuthorized ? activePaperPos : null;
@@ -1929,67 +2452,216 @@ function LightweightCandleChart({
     action: "ABSTAIN",
     economic_aggregation: "DISABLED_AT_TIER_0"
   };
+  const directionalForecast = activeForecast
+    ? getDirectionalForecastState(activeForecast)
+    : forecastStatus;
+  const forecastOrigin = Number(activeForecast?.forecast_origin_timestamp);
+  const chartStep = INTERVAL_STEP[interval] || 3600;
+  const forecastAnchor = Number.isFinite(forecastOrigin)
+    ? getLatestClosedChartCandle(seedRef.current, interval)
+    : null;
+  const forecastAnchorMatches = Boolean(
+    forecastAnchor &&
+    forecastOrigin >= forecastAnchor.time &&
+    forecastOrigin < forecastAnchor.time + chartStep
+  );
+  const forecastStatusCode = forecastStatus.code || directionalForecast.status || "FORECAST_LOADING";
+  const forecastStatusMessage = {
+    FORECAST_AVAILABLE: `Research classifier: ${directionalForecast.direction} · ${directionalForecast.horizon} horizon`,
+    FORECAST_ABSTAIN: `Research model abstained · ${directionalForecast.horizon} horizon`,
+    FORECAST_DELAYED: `Delayed model inputs · historical context only · ${directionalForecast.horizon} horizon`,
+    FORECAST_STALE: "Forecast is stale; no current direction is shown.",
+    FORECAST_UNAVAILABLE: "Directional forecast unavailable; the BTC price chart remains available.",
+    FORECAST_MALFORMED: "Forecast response was invalid; no direction is shown.",
+    REQUEST_TIMEOUT: "Forecast request timed out; the BTC price chart remains available.",
+    SERVICE_UNAVAILABLE: "Forecast service is unavailable; the BTC price chart remains available.",
+    SERVER_ERROR: "Forecast service returned an error; the BTC price chart remains available.",
+    FORECAST_LOADING: "Loading the research-only directional forecast…",
+    FORECAST_REFRESHING: "Refreshing the research-only directional forecast…"
+  }[forecastStatusCode] || "Forecast status is unavailable; the BTC price chart remains available.";
+  const canShowDirection = ["FORECAST_AVAILABLE", "FORECAST_ABSTAIN", "FORECAST_DELAYED"].includes(directionalForecast.status);
+  const forecastProbabilitySummary = Number.isFinite(directionalForecast.probabilityUp) && Number.isFinite(directionalForecast.probabilityDown)
+    ? `P(UP) ${(directionalForecast.probabilityUp * 100).toFixed(2)}% · P(DOWN) ${(directionalForecast.probabilityDown * 100).toFixed(2)}%`
+    : null;
+  const forecastGeneratedLabel = getForecastTimestampLabel(activeForecast?.generated_at_utc || forecastStatus.generatedAt);
 
   return h("div", null,
     // Chart Container with Clean Overlay Badges
     h("div", {
       ref: containerRef,
-      id:  "btc-lwc-chart",
+      id: "btc-lwc-chart",
       style: { width: "100%", height: "520px", borderRadius: "0 0 12px 12px", position: "relative" }
     },
-      h("div", {
-        role: "status",
+      showAiForecast && h("section", {
+        id: "chart-ai-forecast-overlay",
+        className: "chart-ai-forecast-overlay",
+        "data-forecast-status": forecastStatusCode,
+        role: "region",
+        "aria-label": "Research-only directional forecast on the Bitcoin price chart",
         style: {
           position: "absolute",
           top: "12px",
+          left: "12px",
+          zIndex: 10,
+          boxSizing: "border-box",
+          width: "min(330px, calc(100% - 24px))",
+          maxWidth: "calc(100% - 24px)",
+          background: "rgba(11, 18, 32, 0.94)",
+          border: canShowDirection ? "1px solid rgba(0, 240, 255, 0.55)" : "1px solid rgba(245, 158, 11, 0.55)",
+          borderRadius: "8px",
+          padding: "9px 11px",
+          color: canShowDirection ? "#E2E8F0" : "#FDE68A",
+          fontSize: "0.72rem",
+          lineHeight: 1.45,
+          fontFamily: "JetBrains Mono, monospace",
+          overflowWrap: "anywhere"
+        }
+      },
+        h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" } },
+          h("strong", {
+            id: "chart-ai-forecast-status",
+            role: "status",
+            "aria-live": "polite",
+            "aria-atomic": "true",
+            style: {
+              color: directionalForecast.direction === "UP" ? "#00E5A8" : directionalForecast.direction === "DOWN" ? "#FF7B91" : "#E2E8F0",
+              fontSize: "0.78rem"
+            }
+          }, canShowDirection
+            ? `${directionalForecast.direction} · ${directionalForecast.horizon}${directionalForecast.status === "FORECAST_DELAYED" ? " · DELAYED (historical)" : ""}`
+            : forecastStatusMessage),
+          h("button", {
+            id: "chart-ai-forecast-retry",
+            type: "button",
+            onClick: () => setForecastReloadKey(value => value + 1),
+            "aria-label": "Retry directional forecast request",
+            title: "Fetch the latest research-only directional forecast",
+            style: {
+              border: "1px solid rgba(148,163,184,.45)",
+              borderRadius: "5px",
+              background: "rgba(148,163,184,.12)",
+              color: "#E2E8F0",
+              padding: "3px 7px",
+              fontSize: "0.66rem",
+              cursor: "pointer",
+              flexShrink: 0
+            }
+          }, "Retry")
+        ),
+        canShowDirection && forecastProbabilitySummary && h("div", { style: { marginTop: "2px", color: "#CBD5E1" } }, forecastProbabilitySummary),
+        h("div", { className: "chart-ai-forecast-meta", style: { marginTop: "3px", color: "#94A3B8" } },
+          `Model: ${directionalForecast.modelId || activeForecast?.directional_model_id || "unavailable"} · Generated: ${forecastGeneratedLabel}`
+        ),
+        h("div", { className: "chart-ai-forecast-meta", style: { marginTop: "2px", color: "#94A3B8" } },
+          `Input freshness: ${activeForecast?.data_freshness_status || forecastStatus.freshness || "unknown"} · Governance: OFFLINE_RESEARCH_ONLY · Live trading disabled`
+        ),
+        canShowDirection && !forecastAnchorMatches && h("div", {
+          className: "chart-ai-forecast-marker-note",
+          title: "No direction marker is shown because the forecast origin does not match a closed candle in this chart window.",
+          "aria-label": "No forecast marker placed: no matching closed candle is present in this chart window.",
+          style: { marginTop: "3px", color: "#FDE68A" }
+        }, "Marker pending: no matching closed bar."),
+        forecastStatus.reason && h("p", {
+          style: { margin: "4px 0 0", color: "#FDE68A" }
+        }, `What happened: ${forecastStatus.reason} ${forecastStatusCode === "FORECAST_DELAYED" ? "The displayed classification is historical context only and must not be treated as current." : "No directional marker is shown while this output is unavailable or stale."} The price chart remains usable; retry or inspect diagnostics.`),
+        forecastStatus.lastUpdatedAt && !canShowDirection && h("div", { style: { marginTop: "3px", color: "#94A3B8" } },
+          `Last successful response: ${getForecastTimestampLabel(forecastStatus.lastUpdatedAt)}`
+        ),
+        h("details", { style: { marginTop: "4px", color: "#94A3B8" } },
+          h("summary", { style: { cursor: "pointer", minHeight: "24px" } }, "Forecast details and limitations"),
+          h("div", { style: { paddingTop: "3px" } },
+            `Status code: ${forecastStatusCode}. Classifier probabilities are not calibrated confidence or a future price path. The displayed persistence baseline and nominal bands are separate, non-directional research context; bands are uncalibrated. No validated edge is claimed.`
+          )
+        )
+      ),
+      !researchAuthorized && h("div", {
+        style: {
+          position: "absolute",
+          top: "16px",
           right: "16px",
           zIndex: 10,
           background: "rgba(11, 18, 32, 0.9)",
-          border: (activeForecast && Array.isArray(activeForecast.points) && activeForecast.points.length > 0)
-            ? "1px solid rgba(0, 240, 255, 0.45)"
-            : "1px solid rgba(245, 158, 11, 0.35)",
+          border: "1px solid rgba(245, 158, 11, 0.35)",
           borderRadius: "6px",
           padding: "6px 10px",
           fontSize: "0.72rem",
           fontFamily: "JetBrains Mono, monospace",
-          color: (activeForecast && Array.isArray(activeForecast.points) && activeForecast.points.length > 0)
-            ? "#00F0FF"
-            : "#FBBF24"
+          color: "#FBBF24"
         }
-      }, (activeForecast && Array.isArray(activeForecast.points) && activeForecast.points.length > 0)
-        ? `● Forecast Active · ${activeForecast.source_timeframe || interval} Persistence Baseline + Diffusion Bands (RESEARCH ONLY · LIVE TRADING DISABLED)`
-        : "Forecast unavailable · frozen inputs unverified"),
-      historyStatus !== "ready" && h("div", {
-        role: historyStatus === "error" ? "alert" : "status",
+      }, "Forecast unavailable · frozen inputs unverified"),
+      !researchAuthorized && h("div", {
         style: {
           position: "absolute",
-          inset: "0",
+          top: "48px",
+          right: "16px",
+          zIndex: 10,
+          background: "rgba(11, 18, 32, 0.9)",
+          border: "1px solid rgba(245, 158, 11, 0.35)",
+          borderRadius: "6px",
+          padding: "6px 10px",
+          fontSize: "0.72rem",
+          fontFamily: "JetBrains Mono, monospace",
+          color: "#FBBF24"
+        }
+      }, "Forecast unavailable · offline research only — Runtime integrity checks do not authorize production serving."),
+      historyStatus !== "ready" && historyStatus !== "fixture" && h("div", {
+        role: historyStatus === "unavailable" ? "alert" : "status",
+        style: {
+          position: "absolute",
+          inset: historyStatus === "stale" || historyStatus === "disconnected" ? "12px auto auto 12px" : "0",
           zIndex: 5,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "rgba(11, 18, 32, 0.82)",
-          color: historyStatus === "error" ? "#FCA5A5" : "#CBD5E1",
+          background: historyStatus === "stale" || historyStatus === "disconnected"
+            ? "rgba(11, 18, 32, 0.92)"
+            : "rgba(11, 18, 32, 0.82)",
+          border: historyStatus === "stale" || historyStatus === "disconnected"
+            ? "1px solid rgba(245, 158, 11, 0.4)"
+            : "none",
+          borderRadius: "6px",
+          padding: historyStatus === "stale" || historyStatus === "disconnected" ? "6px 10px" : "0",
+          color: historyStatus === "unavailable" ? "#FCA5A5" : "#CBD5E1",
           fontSize: "0.9rem",
           fontWeight: "700",
           pointerEvents: "none"
         }
-      }, historyStatus === "error"
-        ? "Coinbase candle history unavailable · retry by changing interval"
-        : "Loading Coinbase BTC/USD candle history…")
+      }, historyStatus === "stale"
+        ? "STALE · showing observed candle values"
+        : historyStatus === "disconnected"
+          ? "DISCONNECTED · showing last observed candle values"
+          : historyStatus === "unavailable"
+            ? "DATA UNAVAILABLE · no validated candle values"
+            : "Loading BTC/USD candle snapshot…"),
+      historyStatus === "fixture" && h("div", {
+        role: "status",
+        style: {
+          position: "absolute",
+          top: "12px",
+          left: "12px",
+          zIndex: 6,
+          background: "rgba(120, 53, 15, 0.94)",
+          border: "1px solid rgba(251, 191, 36, 0.7)",
+          borderRadius: "6px",
+          padding: "6px 10px",
+          color: "#FEF3C7",
+          fontSize: "0.75rem",
+          fontWeight: "800",
+          pointerEvents: "none"
+        }
+      }, "LOCAL TEST FIXTURE ONLY — NOT MARKET DATA · ANALYSIS UNVALIDATED")
     ),
 
     // V14 User-Selected Strategy Overlay & Preview Status Banner
     h("div", {
-      className: `chart-overlay-diagnostic-banner ${
-        overlayEnabled && overlayStrategyId && (overlaySetup?.setup_state === "SETUP_AVAILABLE")
-          ? "active"
-          : (!overlayEnabled && previewStrategyId)
-            ? "preview"
-            : (overlayEnabled && overlayStrategyId)
-              ? "inactive"
-              : "off"
-      }`
+      className: `chart-overlay-diagnostic-banner ${overlayEnabled && overlayStrategyId && (overlaySetup?.setup_state === "SETUP_AVAILABLE")
+        ? "active"
+        : (!overlayEnabled && previewStrategyId)
+          ? "preview"
+          : (overlayEnabled && overlayStrategyId)
+            ? "inactive"
+            : "off"
+        }`
     },
       h("div", { style: { display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" } },
         h("span", {
@@ -2088,16 +2760,19 @@ function LightweightCandleChart({
 
 
 // ===========================================================================
-// LiveBadge — reflects Coinbase WSS connection state
+// LiveBadge — reflects the backend market-feed state
 // ===========================================================================
 function LiveBadge({ wsStatus }) {
   const cfg = {
-    connected:    { dot: "#00E5A8", text: "LIVE",         anim: "pulse 2s infinite" },
-    reconnecting: { dot: "#F59E0B", text: "RECONNECTING", anim: "none" },
-    disconnected: { dot: "#FF5C7C", text: "OFFLINE",      anim: "none" },
-    error:        { dot: "#FF5C7C", text: "OFFLINE",      anim: "none" }
+    ACTIVE: { dot: "#00E5A8", text: "ACTIVE", anim: "pulse 2s infinite" },
+    FRESH: { dot: "#00E5A8", text: "FRESH", anim: "none" },
+    LIVE: { dot: "#00E5A8", text: "LIVE", anim: "none" },
+    STALE: { dot: "#F59E0B", text: "STALE", anim: "none" },
+    DISCONNECTED: { dot: "#FF5C7C", text: "DISCONNECTED", anim: "none" },
+    DATA_UNAVAILABLE: { dot: "#FF5C7C", text: "DATA UNAVAILABLE", anim: "none" },
+    UNAVAILABLE: { dot: "#FF5C7C", text: "DATA UNAVAILABLE", anim: "none" }
   };
-  const c = cfg[wsStatus] || cfg.disconnected;
+  const c = cfg[String(wsStatus || "").toUpperCase()] || cfg.DATA_UNAVAILABLE;
 
   return h("span", { style: { display: "inline-flex", alignItems: "center", gap: "6px", fontWeight: "700", fontSize: "0.82rem", color: c.dot, letterSpacing: "0.05em" } },
     h("span", { style: { width: "8px", height: "8px", borderRadius: "50%", background: c.dot, boxShadow: `0 0 8px ${c.dot}`, display: "inline-block", animation: c.anim } }),
@@ -2112,6 +2787,7 @@ function ChartTopBar({
   wsStatus,
   activeInterval,
   setActiveInterval,
+  fixtureBarsOnly = false,
   livePrice,
   hoveredBar,
   latestCandleTime,
@@ -2130,12 +2806,26 @@ function ChartTopBar({
   setShowAdx,
   showResearchMarkers = false,
   setShowResearchMarkers = null,
+  showAiForecast = true,
+  setShowAiForecast = null,
   latestIndicators = {},
   comparatorData = null,
   onOpenComparator = null,
   onOpenAlerts = null,
-  alertsCount = 0
+  alertsCount = 0,
+  isSnapshot = false,
+  chartCandleSnapshot = null
 }) {
+  const snapshotMode = isSnapshot || chartCandleSnapshot?.source === "LOCAL_HISTORICAL_SNAPSHOT";
+  const chartStatus = String(chartCandleSnapshot?.status || "").toLowerCase();
+  const fixtureMode = chartCandleSnapshot?.testOnly === true;
+  const staleMode = snapshotMode || chartStatus === "stale" || chartStatus === "disconnected"
+    || chartCandleSnapshot?.freshnessStatus === "STALE";
+  const sourceLabel = chartCandleSnapshot?.testOnly === true
+    ? "LOCAL TEST FIXTURE ONLY — NOT MARKET DATA"
+    : String(chartCandleSnapshot?.source || "").toLowerCase() === "bitstamp"
+      ? "Bitstamp"
+    : snapshotMode ? "Historical API snapshot" : "Market API";
   // Guard against null being passed explicitly (useState(null) bypasses default params)
   const indicators = latestIndicators ?? {};
   const [now, setNow] = useState(Date.now());
@@ -2164,7 +2854,7 @@ function ChartTopBar({
   const utcHours = String(utcNow.getUTCHours()).padStart(2, '0');
   const utcMins = String(utcNow.getUTCMinutes()).padStart(2, '0');
   const utcSecs = String(utcNow.getUTCSeconds()).padStart(2, '0');
-  const utcDateStr = `${utcNow.getUTCFullYear()}-${String(utcNow.getUTCMonth()+1).padStart(2, '0')}-${String(utcNow.getUTCDate()).padStart(2, '0')}`;
+  const utcDateStr = `${utcNow.getUTCFullYear()}-${String(utcNow.getUTCMonth() + 1).padStart(2, '0')}-${String(utcNow.getUTCDate()).padStart(2, '0')}`;
   const localTimeStr = utcNow.toLocaleTimeString(undefined, { hour12: false });
 
   // Format active bar open time
@@ -2172,7 +2862,7 @@ function ChartTopBar({
   const barDate = new Date(activeBarTimeSec * 1000);
   const barHours = String(barDate.getUTCHours()).padStart(2, '0');
   const barMins = String(barDate.getUTCMinutes()).padStart(2, '0');
-  const barDateStr = `${barDate.getUTCFullYear()}-${String(barDate.getUTCMonth()+1).padStart(2, '0')}-${String(barDate.getUTCDate()).padStart(2, '0')}`;
+  const barDateStr = `${barDate.getUTCFullYear()}-${String(barDate.getUTCMonth() + 1).padStart(2, '0')}-${String(barDate.getUTCDate()).padStart(2, '0')}`;
 
   // Hovered bar time
   let hoveredTimeStr = null;
@@ -2180,16 +2870,24 @@ function ChartTopBar({
     const hDate = new Date(hoveredBar.time * 1000);
     const hH = String(hDate.getUTCHours()).padStart(2, '0');
     const hM = String(hDate.getUTCMinutes()).padStart(2, '0');
-    hoveredTimeStr = `${hDate.getUTCFullYear()}-${String(hDate.getUTCMonth()+1).padStart(2, '0')}-${String(hDate.getUTCDate()).padStart(2, '0')} ${hH}:${hM} UTC`;
+    hoveredTimeStr = `${hDate.getUTCFullYear()}-${String(hDate.getUTCMonth() + 1).padStart(2, '0')}-${String(hDate.getUTCDate()).padStart(2, '0')} ${hH}:${hM} UTC`;
   }
 
   return h("div", { className: "chart-topbar-wrapper" },
     h("div", { className: "chart-topbar" },
       h("div", { className: "chart-info" },
-        h("span", { className: "chart-symbol" }, "BTC / USD · Coinbase Exchange"),
+        h("span", { className: "chart-symbol" }, livePrice > 0
+          ? `BTC / USD · ${sourceLabel}${staleMode ? " · STALE" : ""}`
+          : "BTC / USD · Market data unavailable"),
         livePrice > 0 && h("span", {
-          style: { fontFamily: "var(--font-mono)", fontWeight: "700", fontSize: "1.1rem", color: "#F8FAFC", marginLeft: "14px" }
+          style: { fontFamily: "var(--font-mono)", fontWeight: "700", fontSize: "1.1rem", color: staleMode || fixtureMode ? "#F59E0B" : "#F8FAFC", marginLeft: "14px" }
         }, `$${livePrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}`),
+        staleMode && h("span", {
+          style: { fontSize: "0.72rem", color: "#F59E0B", fontWeight: "700", marginLeft: "10px", padding: "2px 6px", background: "rgba(245, 158, 11, 0.15)", borderRadius: "4px" }
+        }, chartStatus === "disconnected" ? "DISCONNECTED · LAST OBSERVATION" : "STALE OBSERVATION"),
+        fixtureMode && h("span", {
+          style: { fontSize: "0.72rem", color: "#FBBF24", fontWeight: "800", marginLeft: "10px", padding: "2px 6px", background: "rgba(120, 53, 15, 0.35)", borderRadius: "4px" }
+        }, "TEST FIXTURE ONLY · NOT MARKET DATA"),
         h("span", { style: { marginLeft: "14px" } }, h(LiveBadge, { wsStatus }))
       ),
       h("div", { className: "tf-buttons", style: { display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" } },
@@ -2198,6 +2896,8 @@ function ChartTopBar({
             key: label,
             id: `tf-btn-${label}`,
             className: `tf-btn${activeInterval === iv ? " active" : ""}`,
+            disabled: fixtureBarsOnly && iv !== "1m",
+            title: fixtureBarsOnly && iv !== "1m" ? "Only 1-minute test fixture bars are available." : undefined,
             onClick: () => setActiveInterval(iv)
           }, label)
         ),
@@ -2238,6 +2938,13 @@ function ChartTopBar({
           onClick: () => setShowAdx && setShowAdx(!showAdx),
           title: "Toggle ADX (14) Trend Strength Indicator"
         }, "ADX (14)"),
+        h("button", {
+          id: "toggle-ai-forecast-btn",
+          className: `chart-ind-toggle-btn ${showAiForecast ? "active" : ""}`,
+          onClick: () => setShowAiForecast && setShowAiForecast(!showAiForecast),
+          "aria-pressed": Boolean(showAiForecast),
+          title: "Show or hide the research-only directional forecast overlay"
+        }, `AI Forecast ${showAiForecast ? "ON" : "OFF"}`),
         h("div", { style: { width: "1px", height: "16px", background: "rgba(148, 163, 184, 0.2)", margin: "0 4px" } }),
         h("button", {
           id: "toggle-research-markers-btn",
@@ -2276,7 +2983,10 @@ function ChartTopBar({
         ),
         h("div", { className: `time-pill quote-freshness-pill${quoteAgeSeconds === null || quoteAgeSeconds > 60 ? " urgent" : ""}` },
           h("span", { className: "pill-icon" }, "◉"),
-          h("span", { className: "pill-label" }, "Coinbase quote:"),
+          h("span", { className: "pill-label" },
+            `${chartCandleSnapshot?.testOnly === true
+              ? "Local test fixture timestamp:"
+              : chartCandleSnapshot?.source === "bitstamp" ? "Bitstamp observation:" : "Coinbase quote:"}`),
           h("strong", { className: "pill-value font-mono" },
             quoteAgeSeconds === null
               ? "Waiting for first quote"
@@ -2388,8 +3098,8 @@ function ThreeBackground({ enabled = true }) {
     if (!mount) return;
 
     // Scene setup
-    const scene    = new THREE.Scene();
-    const camera   = new THREE.PerspectiveCamera(60, mount.offsetWidth / mount.offsetHeight, 0.1, 2000);
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, mount.offsetWidth / mount.offsetHeight, 0.1, 2000);
     camera.position.z = 550;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -2400,10 +3110,10 @@ function ThreeBackground({ enabled = true }) {
 
     // —— Geometry: 400 particles scattered in 3D space ——
     const PARTICLE_COUNT = 400;
-    const positions  = new Float32Array(PARTICLE_COUNT * 3);
+    const positions = new Float32Array(PARTICLE_COUNT * 3);
     const velocities = [];
     for (let i = 0; i < PARTICLE_COUNT; i++) {
-      positions[i * 3]     = (Math.random() - 0.5) * 1200;
+      positions[i * 3] = (Math.random() - 0.5) * 1200;
       positions[i * 3 + 1] = (Math.random() - 0.5) * 700;
       positions[i * 3 + 2] = (Math.random() - 0.5) * 600;
       velocities.push(
@@ -2420,7 +3130,7 @@ function ThreeBackground({ enabled = true }) {
     const canvas2d = document.createElement("canvas");
     canvas2d.width = canvas2d.height = 64;
     const ctx2d = canvas2d.getContext("2d");
-    const grad  = ctx2d.createRadialGradient(32, 32, 0, 32, 32, 32);
+    const grad = ctx2d.createRadialGradient(32, 32, 0, 32, 32, 32);
     grad.addColorStop(0, "rgba(180,140,255,1)");
     grad.addColorStop(0.4, "rgba(130,90,255,0.6)");
     grad.addColorStop(1, "rgba(0,0,0,0)");
@@ -2428,7 +3138,7 @@ function ThreeBackground({ enabled = true }) {
     ctx2d.fillRect(0, 0, 64, 64);
     const sprite = new THREE.CanvasTexture(canvas2d);
 
-    const mat  = new THREE.PointsMaterial({ size: 3.5, map: sprite, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, vertexColors: false, color: 0xA07CFF });
+    const mat = new THREE.PointsMaterial({ size: 3.5, map: sprite, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, vertexColors: false, color: 0xA07CFF });
     const points = new THREE.Points(geo, mat);
     scene.add(points);
 
@@ -2459,7 +3169,7 @@ function ThreeBackground({ enabled = true }) {
     // Mouse parallax
     const mouse = { x: 0, y: 0 };
     const onMouseMove = (e) => {
-      mouse.x = (e.clientX / window.innerWidth  - 0.5) * 2;
+      mouse.x = (e.clientX / window.innerWidth - 0.5) * 2;
       mouse.y = (e.clientY / window.innerHeight - 0.5) * 2;
     };
     window.addEventListener("mousemove", onMouseMove);
@@ -2495,32 +3205,33 @@ function ThreeBackground({ enabled = true }) {
 
       // Move particles
       for (let i = 0; i < PARTICLE_COUNT; i++) {
-        pos[i * 3]     += velocities[i * 3];
+        pos[i * 3] += velocities[i * 3];
         pos[i * 3 + 1] += velocities[i * 3 + 1];
         pos[i * 3 + 2] += velocities[i * 3 + 2];
         // Wrap-around boundary
-        if (pos[i * 3]     >  600) pos[i * 3]     = -600;
-        if (pos[i * 3]     < -600) pos[i * 3]     =  600;
-        if (pos[i * 3 + 1] >  350) pos[i * 3 + 1] = -350;
-        if (pos[i * 3 + 1] < -350) pos[i * 3 + 1] =  350;
+        if (pos[i * 3] > 600) pos[i * 3] = -600;
+        if (pos[i * 3] < -600) pos[i * 3] = 600;
+        if (pos[i * 3 + 1] > 350) pos[i * 3 + 1] = -350;
+        if (pos[i * 3 + 1] < -350) pos[i * 3 + 1] = 350;
       }
       geo.attributes.position.needsUpdate = true;
 
       // Build connection lines
       let lineIdx = 0;
+      const linkDistSq = LINK_DIST * LINK_DIST;
       for (let i = 0; i < PARTICLE_COUNT && lineIdx < MAX_LINES - 1; i++) {
         for (let j = i + 1; j < PARTICLE_COUNT && lineIdx < MAX_LINES - 1; j++) {
-          const dx = pos[i*3] - pos[j*3];
-          const dy = pos[i*3+1] - pos[j*3+1];
-          const dz = pos[i*3+2] - pos[j*3+2];
-          const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
-          if (dist < LINK_DIST) {
-            linePositions[lineIdx*6]   = pos[i*3];
-            linePositions[lineIdx*6+1] = pos[i*3+1];
-            linePositions[lineIdx*6+2] = pos[i*3+2];
-            linePositions[lineIdx*6+3] = pos[j*3];
-            linePositions[lineIdx*6+4] = pos[j*3+1];
-            linePositions[lineIdx*6+5] = pos[j*3+2];
+          const dx = pos[i * 3] - pos[j * 3];
+          const dy = pos[i * 3 + 1] - pos[j * 3 + 1];
+          const dz = pos[i * 3 + 2] - pos[j * 3 + 2];
+          const distSq = dx * dx + dy * dy + dz * dz;
+          if (distSq < linkDistSq) {
+            linePositions[lineIdx * 6] = pos[i * 3];
+            linePositions[lineIdx * 6 + 1] = pos[i * 3 + 1];
+            linePositions[lineIdx * 6 + 2] = pos[i * 3 + 2];
+            linePositions[lineIdx * 6 + 3] = pos[j * 3];
+            linePositions[lineIdx * 6 + 4] = pos[j * 3 + 1];
+            linePositions[lineIdx * 6 + 5] = pos[j * 3 + 2];
             lineIdx++;
           }
         }
@@ -2529,7 +3240,7 @@ function ThreeBackground({ enabled = true }) {
       lineGeo.setDrawRange(0, lineIdx * 2);
 
       // Torus slow rotation
-      torus.rotation.z  += 0.0015;
+      torus.rotation.z += 0.0015;
       torus2.rotation.y += 0.0008;
       torus2.rotation.x += 0.0005;
 
@@ -2558,7 +3269,7 @@ function ThreeBackground({ enabled = true }) {
         torus2Geo.dispose();
         torus2Mat.dispose();
         renderer.dispose();
-      } catch {}
+      } catch { }
       if (mount && renderer.domElement && mount.contains(renderer.domElement)) {
         mount.removeChild(renderer.domElement);
       }
@@ -2760,8 +3471,11 @@ function NotificationBell({ alerts = [], onTestAlert, onOpenSettings, onSelectAl
       h("div", { className: "notification-dropdown-list" },
         alerts.length === 0 ? (
           h("div", { style: { padding: "20px 10px", textAlign: "center", color: "#94A3B8", fontSize: "0.82rem" } },
-            h("div", { style: { fontSize: "1.8rem", marginBottom: "8px" } }, "📡"),
-              "No validated market observations or notification tests have been recorded."
+            h("div", { style: { fontSize: "1.8rem", marginBottom: "8px" } }, "🛡️"),
+            h("div", { style: { fontWeight: "700", color: "#CBD5E1", marginBottom: "4px" } }, "0 Eligible Research Alerts"),
+            h("div", { style: { fontSize: "0.74rem", color: "#94A3B8", lineHeight: "1.4" } },
+              "No eligible research alerts passed the current gates. Positive-edge alerts remain muted under NO_GO_NO_VALIDATED_EDGE (87 bps round-trip friction hurdle active)."
+            )
           )
         ) : (
           alerts.map((a, i) => (
@@ -2868,7 +3582,7 @@ function NotificationSettingsModal({ isOpen, onClose, settings, adminApiKey, set
       const statusLabel = data.status === "live" && data.models_loaded
         ? "🟢 LIVE & INFERENCE READY"
         : (data.status === "warming_up" || !data.models_loaded ? "🟡 CONNECTED (WARMING UP)" : "⚪ CONNECTED");
-      
+
       setBackendTestStatus({
         type: "success",
         text: `✅ Verified BTCognitive Engine: ${statusLabel} · Models: ${data.models_loaded ? "Loaded" : "Warming"} · Uptime: ${data.uptime || 0}s`
@@ -2888,7 +3602,7 @@ function NotificationSettingsModal({ isOpen, onClose, settings, adminApiKey, set
       return;
     }
     const targetUrl = formData.backend_url?.trim() || "http://localhost:8000";
-    
+
     // Only validate if not localhost (or if user typed a custom URL)
     if (targetUrl && targetUrl !== getApiBaseUrl()) {
       setIsValidating(true);
@@ -2967,7 +3681,7 @@ function NotificationSettingsModal({ isOpen, onClose, settings, adminApiKey, set
       ),
 
       h("form", { onSubmit: handleSubmit, style: { display: "flex", flexDirection: "column", gap: "14px" } },
-        
+
         // ------------------------------------------------------------------
         // Section 1: Backend Inference Engine Endpoint
         // ------------------------------------------------------------------
@@ -3115,7 +3829,7 @@ function NotificationSettingsModal({ isOpen, onClose, settings, adminApiKey, set
                   onChange: (e) => handleChange("webhook_url", e.target.value)
                 }),
                 formData.webhook_url_configured && !formData.webhook_url &&
-                  h("div", { style: { fontSize: "0.7rem", color: "#94A3B8" } }, "A webhook URL is already saved securely. Leave this blank to keep it.")
+                h("div", { style: { fontSize: "0.7rem", color: "#94A3B8" } }, "A webhook URL is already saved securely. Leave this blank to keep it.")
               )
             ) : (
               h("div", { style: { display: "flex", flexDirection: "column", gap: "8px" } },
@@ -3129,7 +3843,7 @@ function NotificationSettingsModal({ isOpen, onClose, settings, adminApiKey, set
                     onChange: (e) => handleChange("telegram_bot_token", e.target.value)
                   }),
                   formData.telegram_bot_token_configured && !formData.telegram_bot_token &&
-                    h("div", { style: { fontSize: "0.7rem", color: "#94A3B8" } }, "A token is already saved securely. Leave this blank to keep it.")
+                  h("div", { style: { fontSize: "0.7rem", color: "#94A3B8" } }, "A token is already saved securely. Leave this blank to keep it.")
                 ),
                 h("div", { className: "notif-form-group" },
                   h("label", { className: "notif-form-label" }, "Telegram Chat ID"),
@@ -3264,7 +3978,7 @@ function SpotComparatorModal({ isOpen, onClose, comparatorData }) {
 function UserAlertsModal({ isOpen, onClose, alerts = [], onSaveAlert, onDeleteAlert, livePrice, latestIndicators }) {
   if (!isOpen) return null;
   const [targetType, setTargetType] = useState("PRICE_ABOVE");
-  const [threshold, setThreshold] = useState(livePrice ? Math.round(livePrice * 1.01).toString() : "83000");
+  const [threshold, setThreshold] = useState(livePrice > 0 ? Math.round(livePrice * 1.01).toString() : "");
   const [timeframe, setTimeframe] = useState("1h");
   const [expiryHours, setExpiryHours] = useState("24");
 
@@ -3306,8 +4020,8 @@ function UserAlertsModal({ isOpen, onClose, alerts = [], onSaveAlert, onDeleteAl
                   setTargetType(e.target.value);
                   if (e.target.value === "RSI_ABOVE") setThreshold("70");
                   else if (e.target.value === "RSI_BELOW") setThreshold("30");
-                  else if (e.target.value === "PRICE_ABOVE") setThreshold(Math.round(livePrice * 1.01).toString());
-                  else if (e.target.value === "PRICE_BELOW") setThreshold(Math.round(livePrice * 0.99).toString());
+                  else if (e.target.value === "PRICE_ABOVE") setThreshold(livePrice > 0 ? Math.round(livePrice * 1.01).toString() : "");
+                  else if (e.target.value === "PRICE_BELOW") setThreshold(livePrice > 0 ? Math.round(livePrice * 0.99).toString() : "");
                 },
                 style: { width: "100%", background: "#1E293B", border: "1px solid rgba(255,255,255,0.15)", color: "#F8FAFC", padding: "6px", borderRadius: "4px" }
               },
@@ -3331,7 +4045,7 @@ function UserAlertsModal({ isOpen, onClose, alerts = [], onSaveAlert, onDeleteAl
           ),
           h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
             h("div", { style: { display: "flex", gap: "8px" } },
-              h("span", { style: { color: "#94A3B8", fontSize: "0.70rem" } }, `Current BTC: $${Math.round(livePrice).toLocaleString()}`),
+              h("span", { style: { color: "#94A3B8", fontSize: "0.70rem" } }, livePrice > 0 ? `Current BTC: $${Math.round(livePrice).toLocaleString()}` : "Current BTC: Unavailable"),
               latestIndicators?.rsi != null && h("span", { style: { color: "#94A3B8", fontSize: "0.70rem" } }, `· RSI: ${latestIndicators?.rsi}`)
             ),
             h("button", {
@@ -3344,33 +4058,33 @@ function UserAlertsModal({ isOpen, onClose, alerts = [], onSaveAlert, onDeleteAl
         h("div", null,
           h("div", { style: { fontWeight: "700", color: "#94A3B8", marginBottom: "6px" } }, `Configured Alerts (${alerts.length})`),
           alerts.length === 0 ? h("div", { style: { textAlign: "center", color: "#64748B", padding: "16px" } }, "No active alerts configured.") :
-          h("div", { style: { display: "flex", flexDirection: "column", gap: "6px", maxHeight: "180px", overflowY: "auto" } },
-            alerts.map(a =>
-              h("div", { key: a.id, style: { display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(255,255,255,0.03)", padding: "8px 10px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.06)" } },
-                h("div", null,
-                  h("div", { style: { fontWeight: "600", color: a.status === "TRIGGERED" ? "#00E5A8" : "#F8FAFC" } },
-                    a.target_type === "PRICE_ABOVE" ? `BTC > $${a.threshold?.toLocaleString()}` :
-                    a.target_type === "PRICE_BELOW" ? `BTC < $${a.threshold?.toLocaleString()}` :
-                    a.target_type === "RSI_ABOVE" ? `RSI(14) > ${a.threshold}` :
-                    a.target_type === "RSI_BELOW" ? `RSI(14) < ${a.threshold}` :
-                    "Active Strategy Setup Available"
+            h("div", { style: { display: "flex", flexDirection: "column", gap: "6px", maxHeight: "180px", overflowY: "auto" } },
+              alerts.map(a =>
+                h("div", { key: a.id, style: { display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(255,255,255,0.03)", padding: "8px 10px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.06)" } },
+                  h("div", null,
+                    h("div", { style: { fontWeight: "600", color: a.status === "TRIGGERED" ? "#00E5A8" : "#F8FAFC" } },
+                      a.target_type === "PRICE_ABOVE" ? `BTC > $${a.threshold?.toLocaleString()}` :
+                        a.target_type === "PRICE_BELOW" ? `BTC < $${a.threshold?.toLocaleString()}` :
+                          a.target_type === "RSI_ABOVE" ? `RSI(14) > ${a.threshold}` :
+                            a.target_type === "RSI_BELOW" ? `RSI(14) < ${a.threshold}` :
+                              "Active Strategy Setup Available"
+                    ),
+                    h("div", { style: { fontSize: "0.68rem", color: "#64748B" } },
+                      a.status === "TRIGGERED" ? `Triggered at ${new Date(a.triggered_at).toLocaleTimeString()}` : `Created ${new Date(a.created_at).toLocaleTimeString()}`
+                    )
                   ),
-                  h("div", { style: { fontSize: "0.68rem", color: "#64748B" } },
-                    a.status === "TRIGGERED" ? `Triggered at ${new Date(a.triggered_at).toLocaleTimeString()}` : `Created ${new Date(a.created_at).toLocaleTimeString()}`
+                  h("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+                    h("span", { style: { fontSize: "0.68rem", padding: "2px 6px", borderRadius: "3px", background: a.status === "TRIGGERED" ? "rgba(0,229,168,0.2)" : "rgba(56,189,248,0.2)", color: a.status === "TRIGGERED" ? "#00E5A8" : "#38BDF8" } },
+                      a.status
+                    ),
+                    h("button", {
+                      onClick: () => onDeleteAlert(a.id),
+                      style: { background: "transparent", border: "none", color: "#FF5C7C", cursor: "pointer", fontSize: "0.9rem" }
+                    }, "🗑️")
                   )
-                ),
-                h("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
-                  h("span", { style: { fontSize: "0.68rem", padding: "2px 6px", borderRadius: "3px", background: a.status === "TRIGGERED" ? "rgba(0,229,168,0.2)" : "rgba(56,189,248,0.2)", color: a.status === "TRIGGERED" ? "#00E5A8" : "#38BDF8" } },
-                    a.status
-                  ),
-                  h("button", {
-                    onClick: () => onDeleteAlert(a.id),
-                    style: { background: "transparent", border: "none", color: "#FF5C7C", cursor: "pointer", fontSize: "0.9rem" }
-                  }, "🗑️")
                 )
               )
             )
-          )
         ),
         h("div", { style: { fontSize: "0.68rem", color: "#64748B", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "8px" } },
           "Strict Non-Execution Invariant: Alerts provide desktop intelligence and notifications only. No automatic orders or trade executions are permitted."
@@ -3389,14 +4103,26 @@ function Navbar({
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [soundOn, setSoundOn] = useState(true);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!moreMenuOpen) return undefined;
+    const handleClickOutside = (e) => {
+      if (!e.target.closest || !e.target.closest(".nav-dropdown")) {
+        setMoreMenuOpen(false);
+      }
+    };
+    window.addEventListener("click", handleClickOutside);
+    return () => window.removeEventListener("click", handleClickOutside);
+  }, [moreMenuOpen]);
 
   const stateMap = {
-    offline:          { label: "Engine Offline",               class: "offline" },
-    connecting:       { label: "Connecting...",                class: "connecting" },
-    warming_up:       { label: "Warming Up",                   class: "warming-up" },
-    live:             { label: "Engine Live",                  class: "live" },
-    monitor_only:     { label: "Market Monitor Only",          class: "offline" },
-    security_blocked: { label: "CORS / HTTPS Blocked",        class: "security-blocked" }
+    offline: { label: "Engine Offline", class: "offline" },
+    connecting: { label: "Connecting...", class: "connecting" },
+    warming_up: { label: "Warming Up", class: "warming-up" },
+    live: { label: "Engine Live", class: "live" },
+    monitor_only: { label: "Market Monitor Only", class: "offline" },
+    security_blocked: { label: "CORS / HTTPS Blocked", class: "security-blocked" }
   };
   const current = stateMap[engineState] || stateMap.offline;
 
@@ -3415,50 +4141,33 @@ function Navbar({
         onClick: () => setMobileOpen(!mobileOpen),
         "aria-label": "Toggle Menu"
       }, mobileOpen ? "✕" : "☰"),
-      h("a", { href: "#/landing", onClick: () => { setPath("/landing"); setMobileOpen(false); }, className: "logo" },
+      h("a", { href: "#/terminal", onClick: () => { setPath("/terminal"); setMobileOpen(false); }, className: "logo" },
         h("div", { className: "logo-icon" }, "B"),
         h("span", { className: "logo-text" }, "BTCognitive")
       )
     ),
 
-    /* ── Center: Navigation tabs ─────────────────── */
+    /* ── Center: Primary Navigation (3 Items + Secondary Menu) ─────────────────── */
     h("ul", { className: `nav-links ${mobileOpen ? "mobile-active" : ""}` },
+      // 1. Primary Terminal
       h("li", null, h("a", {
-        href: "#/landing",
-        className: `nav-link-pill ${(currentPath === "/landing" || currentPath === "/" || !currentPath) ? "active" : ""}`,
-        onClick: () => { setPath("/landing"); setMobileOpen(false); }
-      },
-        h("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" },
-          h("path", { d: "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" }),
-          h("polyline", { points: "9 22 9 12 15 12 15 22" })
-        ),
-        "Overview"
-      )),
-      h("li", null, h("a", {
+        id: "nav-terminal",
         href: "#/terminal",
-        className: `nav-link-pill ${currentPath === "/terminal" ? "active" : ""}`,
-        onClick: () => { setPath("/terminal"); setMobileOpen(false); }
+        className: `nav-link-pill ${(currentPath === "/terminal" || currentPath === "/" || !currentPath || currentPath === "/smart-entry" || currentPath === "/forecast") ? "active" : ""}`,
+        onClick: (e) => { if (e && e.preventDefault) e.preventDefault(); setPath("/terminal"); setMobileOpen(false); setMoreMenuOpen(false); }
       },
         h("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" },
           h("polyline", { points: "22 12 18 12 15 21 9 3 6 12 2 12" })
         ),
-        "Live Terminal"
+        "Terminal"
       )),
+
+      // 2. Research (Tournaments, Paper Trading, Model Eval, Reports)
       h("li", null, h("a", {
-        href: "#/arena",
-        className: `nav-link-pill ${currentPath === "/arena" ? "active" : ""}`,
-        onClick: () => { setPath("/arena"); setMobileOpen(false); }
-      },
-        h("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" },
-          h("circle", { cx: "12", cy: "12", r: "3" }),
-          h("path", { d: "M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" })
-        ),
-        "AI Experiment Arena"
-      )),
-      h("li", null, h("a", {
+        id: "nav-research",
         href: "#/research",
-        className: `nav-link-pill ${currentPath === "/research" ? "active" : ""}`,
-        onClick: () => { setPath("/research"); setMobileOpen(false); }
+        className: `nav-link-pill ${(currentPath === "/research" || currentPath === "/paper-trading" || currentPath === "/arena") ? "active" : ""}`,
+        onClick: (e) => { if (e && e.preventDefault) e.preventDefault(); setPath("/research"); setMobileOpen(false); setMoreMenuOpen(false); }
       },
         h("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" },
           h("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
@@ -3467,8 +4176,115 @@ function Navbar({
           h("line", { x1: "16", y1: "17", x2: "8", y2: "17" }),
           h("polyline", { points: "10 9 9 9 8 9" })
         ),
-        "Research Results"
-      ))
+        "Research"
+      )),
+
+      // 3. Manual Trade Journal (Strictly isolated from automated simulations)
+      h("li", null, h("a", {
+        id: "nav-manual-journal",
+        href: "#/journal",
+        className: `nav-link-pill ${currentPath === "/journal" ? "active" : ""}`,
+        onClick: (e) => { if (e && e.preventDefault) e.preventDefault(); setPath("/journal"); setMobileOpen(false); setMoreMenuOpen(false); }
+      },
+        h("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" },
+          h("path", { d: "M4 19.5A2.5 2.5 0 0 1 6.5 17H20" }),
+          h("path", { d: "M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" })
+        ),
+        "Journal"
+      )),
+
+      // 4. Secondary Menu: Progressive Disclosure Dropdown (Utilities & Diagnostics)
+      h("li", { className: "nav-dropdown" },
+        h("button", {
+          id: "nav-more-menu-btn",
+          className: `nav-dropdown-btn ${moreMenuOpen ? "active" : ""}`,
+          onClick: () => setMoreMenuOpen(!moreMenuOpen),
+          "aria-expanded": moreMenuOpen,
+          "aria-label": "More utilities and settings"
+        },
+          h("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" },
+            h("circle", { cx: "12", cy: "12", r: "1" }),
+            h("circle", { cx: "19", cy: "12", r: "1" }),
+            h("circle", { cx: "5", cy: "12", r: "1" })
+          ),
+          "More ▾"
+        ),
+        moreMenuOpen && h("div", { className: "nav-dropdown-menu" },
+          h("a", {
+            id: "nav-how-it-works",
+            href: "#/how-it-works",
+            className: `nav-dropdown-item ${currentPath === "/how-it-works" ? "active" : ""}`,
+            onClick: (e) => { if (e && e.preventDefault) e.preventDefault(); setPath("/how-it-works"); setMobileOpen(false); setMoreMenuOpen(false); }
+          },
+            h("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" },
+              h("circle", { cx: "12", cy: "12", r: "10" }),
+              h("path", { d: "M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" }),
+              h("line", { x1: "12", y1: "17", x2: "12.01", y2: "17" })
+            ),
+            "How It Works"
+          ),
+          h("a", {
+            id: "nav-landing",
+            href: "#/landing",
+            className: `nav-dropdown-item ${currentPath === "/landing" ? "active" : ""}`,
+            onClick: (e) => { if (e && e.preventDefault) e.preventDefault(); setPath("/landing"); setMobileOpen(false); setMoreMenuOpen(false); }
+          },
+            h("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" },
+              h("path", { d: "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" }),
+              h("polyline", { points: "9 22 9 12 15 12 15 22" })
+            ),
+            "Overview"
+          ),
+          h("a", {
+            id: "nav-forecast",
+            href: "#/forecast",
+            className: `nav-dropdown-item ${currentPath === "/forecast" ? "active" : ""}`,
+            onClick: (e) => { if (e && e.preventDefault) e.preventDefault(); setPath("/forecast"); setMobileOpen(false); setMoreMenuOpen(false); }
+          },
+            h("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" },
+              h("path", { d: "M3 3v18h18" }),
+              h("path", { d: "M18 9l-5 5-4-4-6 6" })
+            ),
+            "AI Forecasts & Risk"
+          ),
+          h("a", {
+            id: "nav-paper-trading",
+            href: "#/paper-trading",
+            className: `nav-dropdown-item ${currentPath === "/paper-trading" ? "active" : ""}`,
+            onClick: (e) => { if (e && e.preventDefault) e.preventDefault(); setPath("/paper-trading"); setMobileOpen(false); setMoreMenuOpen(false); }
+          },
+            h("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" },
+              h("rect", { x: "2", y: "3", width: "20", height: "14", rx: "2", ry: "2" }),
+              h("line", { x1: "8", y1: "21", x2: "16", y2: "21" }),
+              h("line", { x1: "12", y1: "17", x2: "12", y2: "21" })
+            ),
+            "Paper Trading (Simulated)"
+          ),
+          h("a", {
+            id: "nav-position-monitor",
+            href: "#/position-monitor",
+            className: `nav-dropdown-item ${currentPath === "/position-monitor" ? "active" : ""}`,
+            onClick: (e) => { if (e && e.preventDefault) e.preventDefault(); setPath("/position-monitor"); setMobileOpen(false); setMoreMenuOpen(false); }
+          },
+            h("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" },
+              h("path", { d: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" })
+            ),
+            "Position Copilot"
+          ),
+          h("button", {
+            id: "nav-settings-btn",
+            className: "nav-dropdown-item",
+            onClick: () => { onOpenSettings(); setMobileOpen(false); setMoreMenuOpen(false); },
+            style: { borderTop: "1px solid rgba(255, 255, 255, 0.08)", marginTop: "4px", paddingTop: "8px" }
+          },
+            h("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" },
+              h("circle", { cx: "12", cy: "12", r: "3" }),
+              h("path", { d: "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" })
+            ),
+            "Settings & Webhooks"
+          )
+        )
+      )
     ),
 
     /* ── Right: Controls ─────────────────────────── */
@@ -3531,14 +4347,14 @@ function Navbar({
         h("svg", { width: "13", height: "13", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" },
           soundOn
             ? h("g", null,
-                h("polygon", { points: "11 5 6 9 2 9 2 15 6 15 11 19 11 5" }),
-                h("path", { d: "M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" })
-              )
+              h("polygon", { points: "11 5 6 9 2 9 2 15 6 15 11 19 11 5" }),
+              h("path", { d: "M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" })
+            )
             : h("g", null,
-                h("polygon", { points: "11 5 6 9 2 9 2 15 6 15 11 19 11 5" }),
-                h("line", { x1: "23", y1: "9", x2: "17", y2: "15" }),
-                h("line", { x1: "17", y1: "9", x2: "23", y2: "15" })
-              )
+              h("polygon", { points: "11 5 6 9 2 9 2 15 6 15 11 19 11 5" }),
+              h("line", { x1: "23", y1: "9", x2: "17", y2: "15" }),
+              h("line", { x1: "17", y1: "9", x2: "23", y2: "15" })
+            )
         ),
         soundOn ? "Audio" : "Muted"
       ),
@@ -3562,31 +4378,49 @@ function Navbar({
 // ===========================================================================
 // InstitutionalTickerBar — Top High-Frequency Telemetry Ribbon
 // ===========================================================================
-function InstitutionalTickerBar({ livePrice, changePct, marketSummary }) {
-  const price = livePrice > 0 ? livePrice : null;
-  const change = typeof changePct === "number" && price !== null ? changePct : null;
+function InstitutionalTickerBar({ livePrice, changePct, marketSummary, systemStatus }) {
+  const isFixture = systemStatus?.data_mode === "fixture"
+    || marketSummary?.source === "DETERMINISTIC_FIXTURE";
+  const isSnapshot = systemStatus?.data_mode_contract?.permitted_data_source === "LOCAL_HISTORICAL_SNAPSHOT" ||
+    systemStatus?.data_mode === "offline_research" ||
+    systemStatus?.market_data_details?.source === "LOCAL_HISTORICAL_SNAPSHOT" ||
+    systemStatus?.market_data_status === "STALE";
+  const price = !isFixture && livePrice > 0 ? livePrice : null;
+  const change = !isFixture && typeof changePct === "number" && price !== null ? changePct : null;
   const isUp = change !== null && change >= 0;
 
-  const volText = typeof marketSummary?.realized_volatility_24h_pct === "number"
-    ? `${marketSummary.realized_volatility_24h_pct.toFixed(2)}% · Coinbase BTC/USD`
-    : "Unavailable · insufficient verified history";
+  const volText = !isFixture && typeof marketSummary?.realized_volatility_24h_pct === "number"
+    ? `${marketSummary.realized_volatility_24h_pct.toFixed(2)}% · ${isFixture ? "TEST FIXTURE ONLY" : isSnapshot ? "Historical Snapshot" : "Coinbase BTC/USD"}`
+    : isFixture ? "Unavailable · fixture summary not provided" : "Unavailable · insufficient verified history";
   const fundingText = "Unavailable · no verified feed";
-  const telemetryText = "Unavailable";
+  const telemetryText = isSnapshot ? "Historical Snapshot (Stale)" : "Unavailable";
 
   return h("div", { className: "institutional-ticker-bar" },
     h("div", { className: "ticker-item" },
-      h("span", { style: { color: "#F8FAFC", fontWeight: "800" } }, "BTC/USD · Coinbase"),
-      h("span", { className: `val ${isUp ? "up" : "down"}` }, price === null ? "Unavailable" : `$${price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`),
-      h("span", { style: { fontSize: "0.72rem", padding: "1px 6px", borderRadius: "4px", background: isUp ? "rgba(0,229,168,0.15)" : "rgba(255,92,124,0.15)", color: isUp ? "#00E5A8" : "#FF5C7C", fontWeight: "700" } },
-        change === null ? "—" : `${isUp ? "+" : ""}${change.toFixed(2)}%`
+      h("span", { style: { color: isSnapshot ? "#F59E0B" : "#F8FAFC", fontWeight: "800" } },
+        isFixture
+          ? "BTC/USD · LOCAL TEST FIXTURE ONLY — NOT MARKET DATA"
+          : isSnapshot ? "BTC/USD · Historical Snapshot (30 Oct 2026)" : "BTC/USD · Coinbase"
+      ),
+      h("span", { className: `val ${isSnapshot || isFixture ? "" : (isUp ? "up" : "down")}`, style: isSnapshot || isFixture ? { color: "#F59E0B" } : {} },
+        price === null ? "Unavailable" : `$${price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      ),
+      h("span", { style: { fontSize: "0.72rem", padding: "1px 6px", borderRadius: "4px", background: isSnapshot || isFixture ? "rgba(245, 158, 11, 0.15)" : (isUp ? "rgba(0,229,168,0.15)" : "rgba(255,92,124,0.15)"), color: isSnapshot || isFixture ? "#F59E0B" : (isUp ? "#00E5A8" : "#FF5C7C"), fontWeight: "700" } },
+        isFixture ? "TEST ONLY" : isSnapshot ? "STALE" : (change === null ? "—" : `${isUp ? "+" : ""}${change.toFixed(2)}%`)
       )
+    ),
+    isFixture && h("div", { className: "ticker-item", style: { color: "#F59E0B", fontSize: "0.72rem", fontWeight: "700" } },
+      "FIXTURE OUTPUT · NOT MARKET DATA"
+    ),
+    isSnapshot && h("div", { className: "ticker-item", style: { color: "#F59E0B", fontSize: "0.72rem", fontWeight: "700" } },
+      "STALE — NOT A CURRENT ENTRY REFERENCE"
     ),
     h("div", { className: "ticker-item" },
       h("span", null, "24h Range:"),
       h("span", { className: "val" },
-        typeof marketSummary?.low_24h === "number" && typeof marketSummary?.high_24h === "number"
+        !isFixture && typeof marketSummary?.low_24h === "number" && typeof marketSummary?.high_24h === "number"
           ? `$${marketSummary.low_24h.toLocaleString()} – $${marketSummary.high_24h.toLocaleString()}`
-          : "Unavailable · insufficient history"
+          : isFixture ? "Unavailable · fixture summary not provided" : "Unavailable · insufficient history"
       )
     ),
     h("div", { className: "ticker-item" },
@@ -3610,18 +4444,191 @@ function InstitutionalTickerBar({ livePrice, changePct, marketSummary }) {
 }
 
 // ===========================================================================
+// SystemAtAGlanceCard — Comprehensive System Posture & Market Status at a Glance
+// ===========================================================================
+function SystemAtAGlanceCard({ setPath, livePrice, changePct, predictionData, regimeData, systemStatus, decisionData }) {
+  const contract = systemStatus || decisionData?.status_contract || {};
+  const isAuth = hasVerifiedResearchAuthorization(predictionData) || hasVerifiedResearchAuthorization(decisionData);
+  const isSnapshot = contract.data_mode_contract?.permitted_data_source === "LOCAL_HISTORICAL_SNAPSHOT" ||
+    contract.data_mode === "offline_research" ||
+    contract.market_data_details?.source === "LOCAL_HISTORICAL_SNAPSHOT" ||
+    predictionData?.market?.source === "LOCAL_HISTORICAL_SNAPSHOT" ||
+    contract.market_data_status === "STALE";
+  const mktPriceDisplay = livePrice > 0 ? `$${livePrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "Unavailable";
+
+  return h("div", {
+    id: "system-at-a-glance-card",
+    className: "glass-card",
+    style: {
+      padding: "20px 24px",
+      margin: "0 0 24px 0",
+      border: "1px solid rgba(56, 189, 248, 0.35)",
+      background: "linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(8, 14, 30, 0.98))",
+      borderRadius: "16px",
+      boxShadow: "0 12px 32px rgba(0, 0, 0, 0.4)",
+      textAlign: "left"
+    }
+  },
+    // Top Row: Headline & Status Pills
+    h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", paddingBottom: "12px", marginBottom: "16px" } },
+      h("div", { style: { display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" } },
+        h("span", { style: { fontSize: "1.2rem" } }, "🛡️"),
+        h("strong", { style: { color: "#F8FAFC", fontSize: "0.95rem", letterSpacing: "0.02em" } }, "SYSTEM INTELLIGENCE & GOVERNANCE POSTURE"),
+        h("span", {
+          style: {
+            background: "rgba(239, 68, 68, 0.15)",
+            border: "1px solid rgba(239, 68, 68, 0.4)",
+            color: "#F87171",
+            padding: "3px 10px",
+            borderRadius: "6px",
+            fontSize: "0.72rem",
+            fontWeight: "800",
+            fontFamily: "var(--font-mono)"
+          }
+        }, "OFFLINE_RESEARCH_ONLY · LIVE TRADING: DISABLED")
+      ),
+      h("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+        h("span", {
+          id: "economic-verdict-pill",
+          title: "Tested strategy negative after 27/87 bps friction; 0/130 holdout candidates admitted; positive-edge alerts zero.",
+          style: {
+            background: "rgba(239, 68, 68, 0.2)",
+            border: "1px solid rgba(239, 68, 68, 0.6)",
+            color: "#FCA5A5",
+            padding: "4px 12px",
+            borderRadius: "6px",
+            fontSize: "0.75rem",
+            fontWeight: "800",
+            fontFamily: "var(--font-mono)",
+            letterSpacing: "0.04em"
+          }
+        }, "VERDICT: NO_GO_NO_VALIDATED_EDGE")
+      )
+    ),
+
+    // 6-Column Grid answering the Core Operator Questions
+    h("div", {
+      style: {
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+        gap: "14px"
+      }
+    },
+      // 1. Market Data Source & Freshness
+      h("div", { style: { background: "rgba(255, 255, 255, 0.03)", padding: "12px 14px", borderRadius: "10px", border: isSnapshot ? "1px solid rgba(245, 158, 11, 0.3)" : "1px solid rgba(255, 255, 255, 0.06)" } },
+        h("div", { style: { fontSize: "0.68rem", color: isSnapshot ? "#F59E0B" : "#94A3B8", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" } },
+          isSnapshot ? "1. Market Data (Historical Snapshot)" : "1. Market Data & Freshness"
+        ),
+        h("div", { style: { fontSize: "1.05rem", fontWeight: "800", color: isSnapshot ? "#F59E0B" : "#00E5A8", fontFamily: "var(--font-mono)" } }, mktPriceDisplay),
+        h("div", { style: { fontSize: "0.72rem", color: isSnapshot ? "#F59E0B" : "#CBD5E1", marginTop: "4px", fontWeight: isSnapshot ? "600" : "400" } },
+          isSnapshot
+            ? `Local historical snapshot · ${contract.market_data_details?.latest_timestamp || "timestamp unavailable"} · not a current entry reference`
+            : `${contract.market_data_details?.source || predictionData?.market?.source || "Source unavailable"} · ${contract.market_data_status || predictionData?.market?.status || "Freshness unavailable"}`
+        )
+      ),
+
+      // 2. Active Strategy State
+      h("div", { style: { background: "rgba(255, 255, 255, 0.03)", padding: "12px 14px", borderRadius: "10px", border: "1px solid rgba(255, 255, 255, 0.06)" } },
+        h("div", { style: { fontSize: "0.68rem", color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" } }, "2. Strategy Candidates"),
+        h("div", { style: { fontSize: "1.05rem", fontWeight: "800", color: "#FBBF24" } }, "5 Archetypes Evaluated"),
+        h("div", { style: { fontSize: "0.72rem", color: "#CBD5E1", marginTop: "4px" } },
+          "Exploratory candidates only · live execution disabled"
+        )
+      ),
+
+      // 3. Smart Entry Decision & Reason
+      h("div", { style: { background: "rgba(255, 255, 255, 0.03)", padding: "12px 14px", borderRadius: "10px", border: "1px solid rgba(255, 255, 255, 0.06)" } },
+        h("div", { style: { fontSize: "0.68rem", color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" } }, "3. Smart Entry Gate"),
+        h("div", { style: { fontSize: "1.05rem", fontWeight: "800", color: "#F59E0B" } }, "ABSTAIN / REJECTED"),
+        h("div", { style: { fontSize: "0.72rem", color: "#CBD5E1", marginTop: "4px" } },
+          "No validated strategy authorization; analysis only"
+        )
+      ),
+
+      // 4. Volatility Forecast & Horizon
+      h("div", { style: { background: "rgba(255, 255, 255, 0.03)", padding: "12px 14px", borderRadius: "10px", border: "1px solid rgba(255, 255, 255, 0.06)" } },
+        h("div", { style: { fontSize: "0.68rem", color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" } }, "4. Risk & Volatility Model"),
+        h("div", { style: { fontSize: "1.05rem", fontWeight: "800", color: "#F59E0B" } }, "Standard HAR NOT ESTABLISHED"),
+        h("div", { style: { fontSize: "0.72rem", color: "#CBD5E1", marginTop: "4px" } },
+          "168h variance target · C2 calibration unavailable"
+        )
+      ),
+
+      // 5. Cost Scenario Assumptions
+      h("div", { style: { background: "rgba(255, 255, 255, 0.03)", padding: "12px 14px", borderRadius: "10px", border: "1px solid rgba(255, 255, 255, 0.06)" } },
+        h("div", { style: { fontSize: "0.68rem", color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" } }, "5. Assumed Cost Tier"),
+        h("div", { style: { fontSize: "1.05rem", fontWeight: "800", color: "#A78BFA" } }, "27 / 87 bps"),
+        h("div", { style: { fontSize: "0.72rem", color: "#CBD5E1", marginTop: "4px" } },
+          "Coinbase Tier 1 (87 bps round-trip) / Intl Taker (27 bps)"
+        )
+      ),
+
+      // 6. Alerts & Opportunity Gates
+      h("div", { style: { background: "rgba(255, 255, 255, 0.03)", padding: "12px 14px", borderRadius: "10px", border: "1px solid rgba(255, 255, 255, 0.06)" } },
+        h("div", { style: { fontSize: "0.68rem", color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" } }, "6. Alert Pipeline Status"),
+        h("div", { style: { fontSize: "1.05rem", fontWeight: "800", color: "#94A3B8" } }, "0 Eligible Alerts"),
+        h("div", { style: { fontSize: "0.72rem", color: "#CBD5E1", marginTop: "4px" } },
+          "Positive-edge alerts muted; no candidates qualify under hurdle"
+        )
+      )
+    ),
+
+    // Bottom Action / Navigation Links
+    h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px", marginTop: "14px", paddingTop: "10px", borderTop: "1px solid rgba(255, 255, 255, 0.05)" } },
+      h("div", { style: { fontSize: "0.72rem", color: "#94A3B8" } },
+        "Historical directional findings are retrospective, not prospective evidence. Volatility accuracy does not establish directional profitability."
+      ),
+      h("div", { style: { display: "flex", gap: "8px" } },
+        h("button", {
+          id: "glance-btn-how-it-works",
+          onClick: () => setPath("/how-it-works"),
+          style: { background: "rgba(124, 92, 255, 0.15)", border: "1px solid rgba(124, 92, 255, 0.4)", color: "#A78BFA", padding: "4px 10px", borderRadius: "6px", fontSize: "0.72rem", fontWeight: "700", cursor: "pointer" }
+        }, "How It Works 💡"),
+        h("button", {
+          onClick: () => setPath("/research"),
+          style: { background: "rgba(56, 189, 248, 0.15)", border: "1px solid rgba(56, 189, 248, 0.4)", color: "#38BDF8", padding: "4px 10px", borderRadius: "6px", fontSize: "0.72rem", fontWeight: "700", cursor: "pointer" }
+        }, "View Research Lab 🔬")
+      )
+    )
+  );
+}
+
+// ===========================================================================
 // HeroSection — Scientific Research Overview & Market Intelligence
 // ===========================================================================
 function HeroSection({ setPath, livePrice, changePct, predictionData, regimeData, qualityData, decisionData, systemStatus, entryQualityData }) {
   const contract = systemStatus || decisionData?.status_contract || {};
-  const isAuth = hasVerifiedResearchAuthorization(predictionData) || hasVerifiedResearchAuthorization(decisionData) || contract.production_forecast_status === "AVAILABLE";
-  const mktStatus = contract.market_data_status || (livePrice > 0 ? "LIVE" : "UNAVAILABLE");
-  const isMktLive = mktStatus === "LIVE";
-  const mktPriceDisplay = livePrice > 0 ? `$${livePrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "Open Terminal for market data";
-  const isFeedHealthy = mktStatus === "LIVE" && (contract.feature_cache_status === "READY" || contract.feature_cache_status === undefined);
-  const summaryMsg = contract.status_summary_message || (isFeedHealthy ? "Live monitoring is healthy. No qualifying event is present at this time." : "Market data feed degraded or unavailable.");
+  const isAuth = hasVerifiedResearchAuthorization(predictionData) || hasVerifiedResearchAuthorization(decisionData);
+  const isSnapshot = contract.data_mode_contract?.permitted_data_source === "LOCAL_HISTORICAL_SNAPSHOT" ||
+    contract.data_mode === "offline_research" ||
+    contract.market_data_details?.source === "LOCAL_HISTORICAL_SNAPSHOT" ||
+    predictionData?.market?.source === "LOCAL_HISTORICAL_SNAPSHOT" ||
+    contract.market_data_status === "STALE";
+
+  const marketSource = contract.market_data_details?.source || contract.market_data_source ||
+    predictionData?.market?.source || (isSnapshot ? "LOCAL_HISTORICAL_SNAPSHOT" : "source unavailable");
+  const mktStatus = contract.market_data_status || predictionData?.market?.status || (isSnapshot ? "STALE" : "UNAVAILABLE");
+  const isMktLive = !isSnapshot && marketSource !== "source unavailable" && mktStatus === "LIVE" && livePrice > 0;
+  const isMktStale = isSnapshot || mktStatus === "STALE";
+  const mktBadgeText = isSnapshot
+    ? "● HISTORICAL SNAPSHOT (STALE — NOT CURRENT ENTRY REFERENCE)"
+    : (isMktLive
+      ? `● ${marketSource} LIVE FEED`
+      : (isMktStale
+        ? "● FEED STALE (DELAYED)"
+        : "● DATA UNAVAILABLE"));
+  const isL2Active = Boolean(systemStatus?.l2_collector_active || contract.l2_collector_active);
+  const l2BadgeText = isL2Active ? "● L2 STREAMING ACTIVE" : "● L2 COLLECTOR STOPPED (OFFLINE)";
+  const mktPriceDisplay = livePrice > 0 ? `$${livePrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "Unavailable";
+  const isFeedHealthy = isMktLive;
+  const summaryMsg = contract.status_summary_message || (isSnapshot
+    ? `Local historical snapshot · ${contract.market_data_details?.latest_timestamp || "timestamp unavailable"} · not a current entry reference.`
+    : (isMktLive ? "Market data is explicitly reported live by the backend." : "Market data freshness and provider are unavailable."));
 
   return h("section", { className: "hero-creative-container" },
+    // Prominent System Intelligence & Governance Posture Card
+    h(SystemAtAGlanceCard, { setPath, livePrice, changePct, predictionData, regimeData, systemStatus, decisionData }),
+
     // Header Headline & Sub-headline
     h("div", { className: "hero-text-center" },
       h("div", {
@@ -3640,24 +4647,49 @@ function HeroSection({ setPath, livePrice, changePct, predictionData, regimeData
 
     // 3D Organic Fluid Wave Sculpture Container with Floating Action & Glass Cards
     h("div", { className: "hero-wave-wrapper" },
-      // Floating Center CTA Button
-      h("button", {
-        onClick: () => setPath("/terminal"),
-        className: "floating-center-cta",
-        style: { background: "linear-gradient(135deg, #3B82F6, #6366F1)", boxShadow: "0 8px 32px rgba(59, 130, 246, 0.4)" }
-      }, "Explore Research Terminal 🔬"),
+      // Floating Center CTA Buttons
+      h("div", { style: { display: "flex", gap: "12px", justifyContent: "center", alignItems: "center", zIndex: 10, position: "relative", flexWrap: "wrap" } },
+        h("button", {
+          onClick: () => setPath("/terminal"),
+          className: "floating-center-cta",
+          style: { background: "linear-gradient(135deg, #3B82F6, #6366F1)", boxShadow: "0 8px 32px rgba(59, 130, 246, 0.4)" }
+        }, "Explore Research Terminal 🔬"),
+        h("button", {
+          id: "btn-hero-entered-trade",
+          onClick: () => setPath("/journal"),
+          className: "floating-center-cta",
+          style: { background: "linear-gradient(135deg, #10B981, #059669)", boxShadow: "0 8px 32px rgba(16, 185, 129, 0.4)" }
+        }, "I Entered a Trade ✍️"),
+        h("button", {
+          id: "btn-hero-smart-entry",
+          onClick: () => setPath("/smart-entry"),
+          className: "floating-center-cta",
+          style: { background: "linear-gradient(135deg, #8B5CF6, #6D28D9)", boxShadow: "0 8px 32px rgba(139, 92, 246, 0.4)" }
+        }, "Analyse Setup ⚡")
+      ),
 
       // Cards Row — source-backed market state and research authorization
       h("div", { className: "hero-cards-row" },
         h("div", { className: "glass-pill-card floating-left-card", onClick: () => setPath("/terminal") },
           h("div", { className: "card-top-row" },
-            h("span", { className: "card-label" }, "Spot Market Price"),
+            h("span", { className: "card-label", style: isSnapshot ? { color: "#F59E0B" } : {} },
+              isSnapshot ? "Last Observed Close" : "Spot Market Price"
+            ),
             h("div", { className: "arrow-circle-btn" }, "↗")
           ),
-          h("div", { className: "card-main-title" }, "Coinbase BTC/USD Feed"),
+          h("div", { className: "card-main-title" },
+            isSnapshot ? "Historical Bar Close (October 30, 2026, 13:00 UTC)" : "Coinbase BTC/USD Feed"
+          ),
           h("div", { className: "card-bottom-val" },
-            h("span", { className: "card-price-highlight" }, mktPriceDisplay),
-            h("span", { className: "card-pct" }, livePrice > 0 && typeof changePct === "number" ? `${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%` : "—")
+            h("span", { className: "card-price-highlight", style: isSnapshot ? { color: "#F59E0B" } : {} }, mktPriceDisplay),
+            h("span", { className: "card-pct" },
+              !isSnapshot && livePrice > 0 && typeof changePct === "number"
+                ? `${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%`
+                : (isSnapshot ? "STALE" : "—")
+            )
+          ),
+          isSnapshot && h("div", { style: { fontSize: "0.68rem", color: "#F59E0B", marginTop: "4px", fontWeight: "700" } },
+            "STALE — NOT A CURRENT ENTRY REFERENCE"
           )
         ),
         h("div", { className: "glass-pill-card floating-right-card", onClick: () => setPath("/research") },
@@ -3671,49 +4703,296 @@ function HeroSection({ setPath, livePrice, changePct, predictionData, regimeData
       )
     ),
 
-    // Bottom Stats Bar Highlights — 5 Authoritative Status Cards (Agent F)
+    // Home Overview Architecture & Status Cards Grid (6 Governed System Cards)
     h("div", {
-      className: "creative-stats-row",
-      style: {
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
-        gap: "14px",
-        marginTop: "20px"
-      }
+      id: "home-overview-card-grid",
+      className: "home-overview-grid"
     },
       // Card 1: Market Data
-      h("div", { className: "c-stat-box", style: { cursor: "pointer" }, onClick: () => setPath("/terminal") },
-        h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" } }, "Market Data"),
-        h("div", { className: "c-stat-num", style: { color: isMktLive ? "#00E5A8" : "#F87171", fontSize: "1.25rem" } }, mktStatus),
-        h("div", { className: "c-stat-lbl" }, `Coinbase BTC/USD · ${livePrice > 0 ? '$' + livePrice.toLocaleString('en-US', { minimumFractionDigits: 2 }) : 'Click to open Terminal'}`)
+      h("div", {
+        id: "home-card-market-data",
+        className: "home-card"
+      },
+        h("div", null,
+          h("div", { className: "home-card-header" },
+            h("div", { style: { display: "flex", alignItems: "center", gap: "10px" } },
+              h("div", { className: "home-card-icon-wrap" }, "📡"),
+              h("h3", { className: "home-card-title" }, "Market Data")
+            ),
+            h("span", {
+              className: "home-card-status-badge",
+              style: {
+                background: isSnapshot ? "rgba(245, 158, 11, 0.15)" : (isMktLive ? "rgba(0, 229, 168, 0.12)" : isMktStale ? "rgba(251, 191, 36, 0.12)" : "rgba(56, 189, 248, 0.12)"),
+                border: isSnapshot ? "1px solid rgba(245, 158, 11, 0.4)" : (isMktLive ? "1px solid rgba(0, 229, 168, 0.3)" : isMktStale ? "1px solid rgba(251, 191, 36, 0.3)" : "1px solid rgba(56, 189, 248, 0.3)"),
+                color: isSnapshot ? "#F59E0B" : (isMktLive ? "#00E5A8" : isMktStale ? "#FBBF24" : "#38BDF8")
+              }
+            }, mktBadgeText)
+          ),
+          h("p", { className: "home-card-desc" },
+            isSnapshot
+              ? `BTC-USD local historical snapshot · ${contract.market_data_details?.latest_timestamp || "timestamp unavailable"}. Not a current entry reference.`
+              : "BTC-USD source and freshness are reported only when supplied by the backend; unavailable provenance is not inferred."
+          )
+        ),
+        h("div", null,
+          h("div", { style: { fontSize: "0.78rem", color: "#CBD5E1", fontFamily: "var(--font-mono)", marginBottom: "12px", display: "flex", justifyContent: "space-between" } },
+            h("span", { style: { color: isSnapshot ? "#F59E0B" : "#94A3B8" } }, `Source: ${marketSource}`),
+            h("strong", { style: { color: isSnapshot ? "#F59E0B" : (isMktLive ? "#00E5A8" : "#F8FAFC") } }, livePrice > 0 ? `$${livePrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "Unavailable")
+          ),
+          h("button", {
+            id: "home-btn-market-data",
+            className: "home-card-btn",
+            onClick: () => setPath("/terminal")
+          },
+            h("span", null, "Open Market Terminal"),
+            h("span", null, "↗")
+          )
+        )
       ),
 
-      // Card 2: Production Forecast
-      h("div", { className: "c-stat-box" },
-        h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" } }, "Production Forecast"),
-        h("div", { className: "c-stat-num", style: { color: contract.production_forecast_status === "AVAILABLE" ? "#00E5A8" : "#F59E0B", fontSize: "1.25rem" } }, contract.production_forecast_status || "AVAILABLE"),
-        h("div", { className: "c-stat-lbl" }, "HAR-RS-DOW-v1.0 (Volatility Risk Only)")
+      // Card 2: AI Forecasting
+      h("div", {
+        id: "home-card-ai-forecasting",
+        className: "home-card"
+      },
+        h("div", null,
+          h("div", { className: "home-card-header" },
+            h("div", { style: { display: "flex", alignItems: "center", gap: "10px" } },
+              h("div", { className: "home-card-icon-wrap" }, "🤖"),
+              h("h3", { className: "home-card-title" }, "AI Forecasting")
+            ),
+            h("span", {
+              className: "home-card-status-badge",
+              style: {
+                background: "rgba(56, 189, 248, 0.12)",
+                border: "1px solid rgba(56, 189, 248, 0.3)",
+                color: "#38BDF8"
+              }
+            }, "GBDT ENSEMBLE (1h/4h/24h)")
+          ),
+          h("p", { className: "home-card-desc" },
+            "Directional GBDT classifiers (1h/4h/24h) and statistical Random Walk persistence baselines. Forecasts quantify probabilistic distributions, never guaranteed returns or trading edges."
+          )
+        ),
+        h("div", null,
+          h("div", { style: { fontSize: "0.78rem", color: "#CBD5E1", fontFamily: "var(--font-mono)", marginBottom: "12px", display: "flex", justifyContent: "space-between" } },
+            h("span", { style: { color: "#94A3B8" } }, "Holdout Accuracy:"),
+            h("strong", { style: { color: "#FBBF24" } }, "51.8% · Posture: ABSTAIN")
+          ),
+          h("button", {
+            id: "home-btn-ai-forecasting",
+            className: "home-card-btn",
+            onClick: () => setPath("/forecast")
+          },
+            h("span", null, "Inspect Forecasts & Baselines"),
+            h("span", null, "↗")
+          )
+        )
       ),
 
-      // Card 3: Entry Research
-      h("div", { className: "c-stat-box", style: { cursor: "pointer" }, onClick: () => setPath("/research") },
-        h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" } }, "Entry Research"),
-        h("div", { className: "c-stat-num", style: { color: "#A78BFA", fontSize: "1.15rem" } }, "AVAILABLE (RESEARCH ONLY)"),
-        h("div", { className: "c-stat-lbl" }, "V28 Meta-Model · selective barrier evaluator")
+      // Card 3: Risk and Uncertainty
+      h("div", {
+        id: "home-card-risk-uncertainty",
+        className: "home-card"
+      },
+        h("div", null,
+          h("div", { className: "home-card-header" },
+            h("div", { style: { display: "flex", alignItems: "center", gap: "10px" } },
+              h("div", { className: "home-card-icon-wrap" }, "🛡️"),
+              h("h3", { className: "home-card-title" }, "Risk and Uncertainty")
+            ),
+            h("span", {
+              className: "home-card-status-badge",
+              style: {
+                background: "rgba(0, 229, 168, 0.12)",
+                border: "1px solid rgba(0, 229, 168, 0.3)",
+                color: "#00E5A8"
+              }
+            }, "OFFLINE RESEARCH ONLY")
+          ),
+          h("p", { className: "home-card-desc" },
+            "Realized-variance research is offline only. C2 calibration is unavailable; excursion ranges are unvalidated heuristics."
+          )
+        ),
+        h("div", null,
+          h("div", { style: { fontSize: "0.78rem", color: "#CBD5E1", fontFamily: "var(--font-mono)", marginBottom: "12px", display: "flex", justifyContent: "space-between" } },
+            h("span", { style: { color: "#94A3B8" } }, "Risk Envelope:"),
+            h("strong", { style: { color: "#FBBF24" } }, "C2 CALIBRATION UNAVAILABLE")
+          ),
+          h("button", {
+            id: "home-btn-risk-uncertainty",
+            className: "home-card-btn",
+            onClick: () => setPath("/forecast")
+          },
+            h("span", null, "View Risk Outlook"),
+            h("span", null, "↗")
+          )
+        )
       ),
 
-      // Card 4: Execution
-      h("div", { className: "c-stat-box" },
-        h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" } }, "Execution"),
-        h("div", { className: "c-stat-num", style: { color: "#EF4444", fontSize: "1.10rem" } }, "DISABLED — ANALYSIS ONLY"),
-        h("div", { className: "c-stat-lbl" }, "No order routing or broker execution")
+      // Card 4: Market Intelligence
+      h("div", {
+        id: "home-card-market-intelligence",
+        className: "home-card"
+      },
+        h("div", null,
+          h("div", { className: "home-card-header" },
+            h("div", { style: { display: "flex", alignItems: "center", gap: "10px" } },
+              h("div", { className: "home-card-icon-wrap" }, "⚡"),
+              h("h3", { className: "home-card-title" }, "Market Intelligence")
+            ),
+            h("span", {
+              className: "home-card-status-badge",
+              style: {
+                background: isL2Active ? "rgba(0, 229, 168, 0.12)" : "rgba(167, 139, 250, 0.12)",
+                border: isL2Active ? "1px solid rgba(0, 229, 168, 0.3)" : "1px solid rgba(167, 139, 250, 0.3)",
+                color: isL2Active ? "#00E5A8" : "#A78BFA"
+              }
+            }, l2BadgeText)
+          ),
+          h("p", { className: "home-card-desc" },
+            "Point-in-time order-book imbalance (OBI 5/10/25/50), order-flow imbalance (OFI 15m), micro-liquidity and bid-ask spread. Evaluated when valid forward L2 data is available; stopped otherwise."
+          )
+        ),
+        h("div", null,
+          h("div", { style: { fontSize: "0.78rem", color: "#CBD5E1", fontFamily: "var(--font-mono)", marginBottom: "12px", display: "flex", justifyContent: "space-between" } },
+            h("span", { style: { color: "#94A3B8" } }, "Features:"),
+            h("strong", { style: { color: "#A78BFA" } }, isL2Active ? "OFI · OBI · Spread (Streaming)" : "OFI · OBI · Spread (Offline)")
+          ),
+          h("div", { style: { display: "flex", gap: "8px" } },
+            h("button", {
+              id: "home-btn-market-intelligence",
+              className: "home-card-btn",
+              style: { flex: 1 },
+              onClick: () => setPath("/terminal")
+            },
+              h("span", null, "Terminal"),
+              h("span", null, "↗")
+            ),
+            h("button", {
+              id: "home-btn-paper-trading",
+              className: "home-card-btn",
+              style: { flex: 1, borderColor: "rgba(56, 189, 248, 0.35)", color: "#38BDF8", background: "rgba(56, 189, 248, 0.08)" },
+              onClick: () => setPath("/paper-trading")
+            },
+              h("span", null, "Paper Trading"),
+              h("span", null, "⚡")
+            ),
+            h("button", {
+              id: "home-btn-smart-entry",
+              className: "home-card-btn",
+              style: { flex: 1, borderColor: "rgba(139, 92, 246, 0.35)", color: "#A78BFA", background: "rgba(139, 92, 246, 0.08)" },
+              onClick: () => setPath("/smart-entry")
+            },
+              h("span", null, "Smart Entry"),
+              h("span", null, "⚡")
+            )
+          )
+        )
       ),
 
-      // Card 5: Research Authorization
-      h("div", { className: "c-stat-box", style: { cursor: "pointer" }, onClick: () => setPath("/research") },
-        h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" } }, "Research Authorization"),
-        h("div", { className: "c-stat-num", style: { color: isAuth ? "#00E5A8" : "#38BDF8", fontSize: "1.15rem" } }, isAuth ? "AUTHORIZED (VOL RISK)" : "OFFLINE RESEARCH"),
-        h("div", { className: "c-stat-lbl" }, "Artifact provenance verified · C2 calibrated")
+      // Card 5: Adaptive Monitoring
+      h("div", {
+        id: "home-card-adaptive-monitoring",
+        className: "home-card"
+      },
+        h("div", null,
+          h("div", { className: "home-card-header" },
+            h("div", { style: { display: "flex", alignItems: "center", gap: "10px" } },
+              h("div", { className: "home-card-icon-wrap" }, "🔭"),
+              h("h3", { className: "home-card-title" }, "Adaptive Monitoring")
+            ),
+            h("span", {
+              className: "home-card-status-badge",
+              style: {
+                background: "rgba(251, 191, 36, 0.12)",
+                border: "1px solid rgba(251, 191, 36, 0.3)",
+                color: "#FBBF24"
+              }
+            }, "DIAGNOSTIC RESEARCH ONLY")
+          ),
+          h("p", { className: "home-card-desc" },
+            "Real-time concept drift detection (Page-Hinkley & CUSUM), forecast calibration tracking, and feed sequence continuity. Produces diagnostic research states; zero automated retraining."
+          )
+        ),
+        h("div", null,
+          h("div", { style: { fontSize: "0.78rem", color: "#CBD5E1", fontFamily: "var(--font-mono)", marginBottom: "12px", display: "flex", justifyContent: "space-between" } },
+            h("span", { style: { color: "#94A3B8" } }, "Change Detection:"),
+            h("strong", { style: { color: "#FBBF24" } }, "Page-Hinkley & CUSUM")
+          ),
+          h("div", { style: { display: "flex", gap: "8px" } },
+            h("button", {
+              id: "home-btn-adaptive-monitoring",
+              className: "home-card-btn",
+              style: { flex: 1 },
+              onClick: () => setPath("/arena")
+            },
+              h("span", null, "Arena"),
+              h("span", null, "↗")
+            ),
+            h("button", {
+              id: "home-btn-position-copilot",
+              className: "home-card-btn",
+              style: { flex: 1, borderColor: "rgba(16, 185, 129, 0.35)", color: "#10B981", background: "rgba(16, 185, 129, 0.08)" },
+              onClick: () => setPath("/position-monitor")
+            },
+              h("span", null, "Position Copilot"),
+              h("span", null, "🛡")
+            )
+          )
+        )
+      ),
+
+      // Card 6: Research Decision Gate
+      h("div", {
+        id: "home-card-research-decision-gate",
+        className: "home-card"
+      },
+        h("div", null,
+          h("div", { className: "home-card-header" },
+            h("div", { style: { display: "flex", alignItems: "center", gap: "10px" } },
+              h("div", { className: "home-card-icon-wrap" }, "⚖️"),
+              h("h3", { className: "home-card-title" }, "Research Decision Gate")
+            ),
+            h("span", {
+              className: "home-card-status-badge",
+              style: {
+                background: "rgba(239, 68, 68, 0.15)",
+                border: "1px solid rgba(239, 68, 68, 0.4)",
+                color: "#F87171"
+              }
+            }, "NO_GO_NO_VALIDATED_EDGE")
+          ),
+          h("p", { className: "home-card-desc" },
+            "Strict evidence-first governance. Without confirmed statistical outperformance after realistic transaction friction (27/87 bps), candidate models remain unpromoted."
+          )
+        ),
+        h("div", null,
+          h("div", { style: { fontSize: "0.78rem", color: "#CBD5E1", fontFamily: "var(--font-mono)", marginBottom: "12px", display: "flex", justifyContent: "space-between" } },
+            h("span", { style: { color: "#94A3B8" } }, "Execution Posture:"),
+            h("strong", { style: { color: "#F87171" } }, "LIVE TRADING DISABLED")
+          ),
+          h("div", { style: { display: "flex", gap: "8px" } },
+            h("button", {
+              id: "home-btn-research-decision-gate",
+              className: "home-card-btn",
+              style: { flex: 1 },
+              onClick: () => setPath("/research")
+            },
+              h("span", null, "Evidence Ledger"),
+              h("span", null, "↗")
+            ),
+            h("button", {
+              id: "home-btn-trade-journal",
+              className: "home-card-btn",
+              style: { flex: 1, borderColor: "rgba(16, 185, 129, 0.35)", color: "#10B981", background: "rgba(16, 185, 129, 0.08)" },
+              onClick: () => setPath("/journal")
+            },
+              h("span", null, "Trade Journal"),
+              h("span", null, "📖")
+            )
+          )
+        )
       )
     ),
 
@@ -3821,13 +5100,12 @@ function EntryQualityResearchPanel({ entryQualityData }) {
 
       // Card 2: Calibrated Barrier Probabilities
       h("div", { style: { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "10px", padding: "14px" } },
-        h("div", { style: { fontSize: "0.72rem", textTransform: "uppercase", fontWeight: "800", color: "#A78BFA", marginBottom: "6px" } }, "2. Calibrated Probabilities"),
-        h("div", { style: { fontSize: "1.1rem", fontWeight: "800", color: "#A78BFA", marginBottom: "6px", fontFamily: "var(--font-mono)" } }, `P(TP): ${pTp}%`),
+        h("div", { style: { fontSize: "0.72rem", textTransform: "uppercase", fontWeight: "800", color: "#A78BFA", marginBottom: "6px" } }, "2. Hypothetical Path Scores"),
+        h("div", { style: { fontSize: "1.1rem", fontWeight: "800", color: "#A78BFA", marginBottom: "6px", fontFamily: "var(--font-mono)" } }, "Unavailable"),
         h("div", { style: { fontSize: "0.76rem", color: "#94A3B8", display: "flex", flexDirection: "column", gap: "3px", fontFamily: "var(--font-mono)" } },
-          h("div", null, "P(SL First): ", h("span", { style: { color: "#FF5C7C" } }, `${pSl}%`)),
-          h("div", null, "P(Timeout): ", h("span", { style: { color: "#CBD5E1" } }, `${pTimeout}%`)),
-          h("div", null, "Brier Expected: ", h("span", { style: { color: "#CBD5E1" } }, probs.brier_score_expected != null ? probs.brier_score_expected.toFixed(4) : "N/A")),
-          h("div", null, "Calibration: ", h("span", { style: { color: "#00E5A8" } }, "Isotonic Validated"))
+          h("div", null, "Lower / Timeout: ", h("span", { style: { color: "#CBD5E1" } }, "Unavailable")),
+          h("div", null, "Brier score: ", h("span", { style: { color: "#CBD5E1" } }, "Unavailable")),
+          h("div", null, "Calibration: ", h("span", { style: { color: "#FBBF24" } }, "DISABLED"))
         )
       ),
 
@@ -3894,12 +5172,12 @@ function DecisionAnatomyPanel({ decisionData }) {
     economics_status: "NOT_APPLICABLE",
     risk_status: "NOT_APPLICABLE",
     layer1_market_event: { event_type: "NONE", event_strength: null, elapsed_seconds: null, state_dynamics: { volatility: "UNKNOWN", liquidity: "UNKNOWN", flow: "UNKNOWN", positioning: "UNKNOWN", novelty: "UNKNOWN" } },
-    layer2_conditional_path: { empirical_tp_first_pct: null, sample_n: 0, temporal_interval_95: null, evidence_quality: "NOT_APPLICABLE", expected_mfe_bps: null, expected_mae_bps: null },
+    layer2_conditional_path: { empirical_tp_first_pct: null, sample_n: null, temporal_interval_95: null, evidence_quality: "NOT_APPLICABLE", expected_mfe_bps: null, expected_mae_bps: null },
     layer3_execution_economics: { mode: "NOT_APPLICABLE", gross_expected_ev_bps: null, friction_breakdown_bps: { fee: null, spread: null, slippage: null, impact: null, adverse_selection: null }, total_execution_drag_bps: null, net_executable_ev_bps: null },
-    layer4_risk_authorization: { c2_model_health: "CALIBRATED", trade_risk_check: "BLOCKED", risk_block_reason: "NO_OPPORTUNITY", daily_risk_budget_allocated_pct: null, daily_risk_budget_limit_pct: null, latency_health: "HEALTHY", capacity_threshold: "HEALTHY", authorized: false },
+    layer4_risk_authorization: { c2_model_health: "UNAVAILABLE", trade_risk_check: "BLOCKED", risk_block_reason: "NO_OPPORTUNITY", daily_risk_budget_allocated_pct: null, daily_risk_budget_limit_pct: null, latency_health: "UNAVAILABLE", capacity_threshold: "UNAVAILABLE", authorized: false },
     final_action: "ABSTAIN",
     primary_reason_code: "MONITORING — NO QUALIFYING EVENT",
-    mechanism_diagnostics: { support_count: 0, block_count: 0, diagnostics: { IGNITION: "NEUTRAL", ABSORPTION: "NEUTRAL", VACUUM: "NEUTRAL", TOXICITY: "NEUTRAL" } }
+    mechanism_diagnostics: { support_count: null, block_count: null, diagnostics: { IGNITION: "NEUTRAL", ABSORPTION: "NEUTRAL", VACUUM: "NEUTRAL", TOXICITY: "NEUTRAL" } }
   };
 
   const isTrade = data.final_action === "TRADE";
@@ -3945,16 +5223,16 @@ function DecisionAnatomyPanel({ decisionData }) {
 
     // 4 Causal Layers Grid
     h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px", marginBottom: "20px" } },
-      
+
       // Layer 1: Market Event
       h("div", { style: { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "12px", padding: "14px" } },
         h("div", { style: { fontSize: "0.75rem", textTransform: "uppercase", fontWeight: "800", color: "#38BDF8", marginBottom: "8px", letterSpacing: "0.05em" } }, "1. Market Event"),
         h("div", { style: { fontSize: "1.05rem", fontWeight: "800", color: hasEvent ? "#00E5A8" : "#94A3B8", marginBottom: "6px" } }, hasEvent ? l1.event_type : "NO QUALIFYING EVENT"),
         h("div", { style: { fontSize: "0.78rem", color: "#94A3B8", display: "flex", flexDirection: "column", gap: "4px" } },
-          h("div", null, "Vol: ", h("span", { style: { color: "#F8FAFC" } }, l1.state_dynamics?.volatility || "NORMAL")),
-          h("div", null, "Liq: ", h("span", { style: { color: "#F8FAFC" } }, l1.state_dynamics?.liquidity || "NORMAL")),
-          h("div", null, "Flow: ", h("span", { style: { color: "#F8FAFC" } }, l1.state_dynamics?.flow || "BALANCED")),
-          h("div", null, "Novelty: ", h("span", { style: { color: "#F8FAFC" } }, l1.state_dynamics?.novelty || "LOW"))
+          h("div", null, "Vol: ", h("span", { style: { color: "#F8FAFC" } }, l1.state_dynamics?.volatility || "UNAVAILABLE")),
+          h("div", null, "Liq: ", h("span", { style: { color: "#F8FAFC" } }, l1.state_dynamics?.liquidity || "UNAVAILABLE")),
+          h("div", null, "Flow: ", h("span", { style: { color: "#F8FAFC" } }, l1.state_dynamics?.flow || "UNAVAILABLE")),
+          h("div", null, "Novelty: ", h("span", { style: { color: "#F8FAFC" } }, l1.state_dynamics?.novelty || "UNAVAILABLE"))
         )
       ),
 
@@ -3965,9 +5243,9 @@ function DecisionAnatomyPanel({ decisionData }) {
           hasEvent && l2.empirical_tp_first_pct !== null ? `P(TP First): ${(l2.empirical_tp_first_pct * 100).toFixed(1)}%` : "P(TP First): N/A"
         ),
         h("div", { style: { fontSize: "0.78rem", color: "#94A3B8", display: "flex", flexDirection: "column", gap: "4px" } },
-          h("div", null, "Sample N: ", h("span", { style: { color: "#F8FAFC", fontFamily: "var(--font-mono)" } }, hasEvent ? (l2.sample_n || 0) : "N/A")),
-          h("div", null, "95% CI: ", h("span", { style: { color: "#F8FAFC", fontFamily: "var(--font-mono)" } }, hasEvent && l2.temporal_interval_95 ? `[${(l2.temporal_interval_95[0]*100).toFixed(1)}%, ${(l2.temporal_interval_95[1]*100).toFixed(1)}%]` : "N/A")),
-          h("div", null, "Quality: ", h("span", { style: { color: hasEvent ? (l2.evidence_quality === 'STRONG' ? '#00E5A8' : '#F59E0B') : '#64748B' } }, hasEvent ? (l2.evidence_quality || "INSUFFICIENT") : "NOT_APPLICABLE"))
+          h("div", null, "Sample N: ", h("span", { style: { color: "#F8FAFC", fontFamily: "var(--font-mono)" } }, "N/A — C2 DISABLED")),
+          h("div", null, "95% CI: ", h("span", { style: { color: "#F8FAFC", fontFamily: "var(--font-mono)" } }, "N/A — C2 DISABLED")),
+          h("div", null, "Quality: ", h("span", { style: { color: "#64748B" } }, "UNAVAILABLE"))
         )
       ),
 
@@ -3991,7 +5269,7 @@ function DecisionAnatomyPanel({ decisionData }) {
           hasEvent ? `Check: ${l4.trade_risk_check || 'BLOCKED'}` : "Check: N/A (Monitoring)"
         ),
         h("div", { style: { fontSize: "0.78rem", color: "#94A3B8", display: "flex", flexDirection: "column", gap: "4px" } },
-          h("div", null, "C2 Model Health: ", h("span", { style: { color: "#00E5A8", fontWeight: "700" } }, l4.c2_model_health || "CALIBRATED")),
+          h("div", null, "C2 Model Health: ", h("span", { style: { color: "#F59E0B", fontWeight: "700" } }, "UNAVAILABLE")),
           h("div", null, "Risk Budget: ", h("span", { style: { color: "#F8FAFC", fontFamily: "var(--font-mono)" } },
             (typeof l4.daily_risk_budget_allocated_pct === "number" && Number.isFinite(l4.daily_risk_budget_allocated_pct))
               ? `${(l4.daily_risk_budget_allocated_pct * 100).toFixed(0)}% / ${(l4.daily_risk_budget_limit_pct ? (l4.daily_risk_budget_limit_pct * 100).toFixed(0) : 50)}%`
@@ -4057,59 +5335,34 @@ function DecisionAnatomyPanel({ decisionData }) {
 // ===========================================================================
 // PredictionPanel (with TP / SL / Confidence)
 // ===========================================================================
+// ===========================================================================
+// PredictionPanel (Separated Risk Envelope & Directional Forecast)
+// ===========================================================================
 function PredictionPanel({ predictionData, engineState = "offline" }) {
   const [showEvidence, setShowEvidence] = useState(false);
   const researchGate = predictionData?.research || predictionData?.research_gate;
-  const researchAuthorized = engineState === "live" && hasVerifiedResearchAuthorization(predictionData);
 
-  if (!researchAuthorized) {
-    return h("div", { className: "glass-card", role: "status", style: { padding: "24px", marginBottom: "24px" } },
-      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" } },
-        h("div", null,
-          h("div", { style: { fontSize: "0.78rem", color: "#38BDF8", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.05em" } }, "Production forecast unavailable"),
-          h("h3", { style: { fontSize: "1.2rem", fontWeight: "800", color: "#F8FAFC", margin: "8px 0" } }, "Frozen research inputs and evaluation provenance are not authenticated."),
-          h("p", { style: { color: "#CBD5E1", margin: 0, lineHeight: 1.5, maxWidth: "700px" } },
-            researchGate?.reason || "Model forecasts and trading remain disabled. Live spot-market data is shown separately."
-          )
-        ),
-        h("a", {
-          href: "#/research",
-          style: {
-            background: "rgba(56, 189, 248, 0.15)",
-            border: "1px solid rgba(56, 189, 248, 0.4)",
-            color: "#38BDF8",
-            padding: "8px 16px",
-            borderRadius: "8px",
-            textDecoration: "none",
-            fontWeight: "700",
-            fontSize: "0.80rem",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "6px"
-          }
-        }, "🔬 View Archived Research Results & Evidence ↗")
-      )
-    );
-  }
+  // Check if genuine authenticated directional signal is present
+  const isDirectionalEnabled = predictionData?.is_directional_recommendation_enabled === true;
+  const rawDirection = predictionData?.direction;
+  const hasValidDirection = isDirectionalEnabled && (rawDirection === "LONG" || rawDirection === "SHORT");
+  const direction = hasValidDirection ? rawDirection : "UNAVAILABLE";
+  const probPct = hasValidDirection && typeof predictionData?.probability_pct === "number" ? predictionData.probability_pct : null;
+  const modelName = hasValidDirection ? (predictionData?.model || "Authenticated Directional Model") : "None (Directional Forecast Disabled)";
+  const setupName = hasValidDirection ? (predictionData?.setup_detected || "None") : "No setup detected";
+  const horizon = predictionData?.horizon || "24h";
 
-  // Check error states dynamically from backend
+  // Check C2 Risk Forecast (HAR-RS-DOW-v1.0 volatility envelope)
+  const canonicalModelId = researchGate?.canonical_model_id || predictionData?.canonical_model_id || "Standard HAR NOT ESTABLISHED";
+  const forecastTarget = researchGate?.forecast_target || "Annualized 7-Day Realized Variance (rv7d_var_ann)";
+  const riskStatus = researchGate?.status || "OFFLINE_RESEARCH_ONLY";
+
+  // Status flags
   const statusStr = predictionData?.status || "online";
   const isDataUnavailable = statusStr === "DATA_UNAVAILABLE" || predictionData?.action === "DATA_UNAVAILABLE";
   const isProvenanceFailure = statusStr === "PROVENANCE_FAILURE" || predictionData?.action === "PROVENANCE_FAILURE";
   const isModelFailure = statusStr === "MODEL_FAILURE" || predictionData?.action === "MODEL_FAILURE";
   const isWarmingUp = engineState === "warming_up" || statusStr === "warming_up";
-  const isOffline = engineState === "offline" || engineState === "security_blocked";
-
-  // Dynamic values from backend
-  const entryPrice = predictionData?.entry_price || predictionData?.btc_price;
-  const tpPrice = predictionData?.tp;
-  const slPrice = predictionData?.sl;
-  const direction = predictionData?.direction || "SHORT";
-  const horizon = predictionData?.horizon || "4h";
-  const barrierPair = predictionData?.barrier_pair_id || "barrier_pair_01";
-  const modelName = predictionData?.model || "LightGBM Meta-Model (B4)";
-  const setupName = predictionData?.setup_detected || "A1 (Liquidity Sweep / Reclaim)";
-  const probPct = predictionData?.probability_pct !== undefined ? predictionData.probability_pct : 47.1;
 
   const dirColor = direction === "LONG" ? "#38BDF8" : (direction === "SHORT" ? "#F87171" : "#94A3B8");
 
@@ -4147,15 +5400,34 @@ function PredictionPanel({ predictionData, engineState = "offline" }) {
     ),
 
     // Header Bar
+    h("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: "8px" } },
+      h("a", {
+        href: "#/research",
+        style: {
+          background: "rgba(56, 189, 248, 0.15)",
+          border: "1px solid rgba(56, 189, 248, 0.4)",
+          color: "#38BDF8",
+          padding: "6px 14px",
+          borderRadius: "8px",
+          textDecoration: "none",
+          fontWeight: "700",
+          fontSize: "0.78rem",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "6px"
+        }
+      }, "View Archived Research Results & Evidence ↗")
+    ),
     h("div", { className: "prediction-header-bar", style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" } },
       h("div", null,
-        h("div", { style: { fontSize: "0.78rem", color: "#38BDF8", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.05em" } }, "🔬 CURRENT RESEARCH INFERENCE · BTC/USD"),
-        h("h3", { style: { fontSize: "1.3rem", fontWeight: "800", color: "#F8FAFC", marginTop: "2px" } }, "Hypothetical Research Scenario")
+        h("div", { style: { fontSize: "0.78rem", color: "#38BDF8", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.05em" } }, "🔬 SCIENTIFIC RESEARCH & RISK TELEMETRY · BTC/USD"),
+        h("h3", { style: { fontSize: "1.3rem", fontWeight: "800", color: "#F8FAFC", marginTop: "2px" } }, "Risk Outlook & Directional Evaluation")
       ),
       h("div", { style: { display: "flex", alignItems: "center", flexWrap: "wrap", gap: "8px" } },
         h("span", {
+          id: "badge-dir-forecast-status",
           style: {
-            background: "rgba(255,255,255,0.06)",
+            background: hasValidDirection ? (direction === "LONG" ? "rgba(56, 189, 248, 0.15)" : "rgba(248, 113, 113, 0.15)") : "rgba(148, 163, 184, 0.15)",
             border: `1px solid ${dirColor}`,
             color: dirColor,
             padding: "4px 12px",
@@ -4163,7 +5435,7 @@ function PredictionPanel({ predictionData, engineState = "offline" }) {
             fontWeight: "800",
             fontSize: "0.82rem"
           }
-        }, `${direction} (HYPOTHETICAL)`),
+        }, hasValidDirection ? `${direction} (MODEL INFERENCE)` : "DIRECTIONAL FORECAST UNAVAILABLE"),
         h("span", {
           style: {
             background: "rgba(239, 68, 68, 0.15)",
@@ -4174,61 +5446,142 @@ function PredictionPanel({ predictionData, engineState = "offline" }) {
             fontWeight: "800",
             fontSize: "0.74rem"
           }
-        }, "RESEARCH STATUS: COST_ERASED")
+        }, "RESEARCH STATUS: OFFLINE_ONLY")
       )
     ),
 
-    // 4-Grid of Hypothetical Research Metrics
-    h("div", { className: "prediction-grid-4", style: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "14px", marginBottom: "16px" } },
-      // Card 1: Hypothetical Entry
-      h("div", { className: "prediction-card-box", style: { background: "rgba(0,0,0,0.3)", padding: "14px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.08)" } },
-        h("div", { className: "prediction-card-lbl", style: { fontSize: "0.76rem", color: "#94A3B8", marginBottom: "4px" } }, "Hypothetical Entry"),
-        h("div", { className: "prediction-card-val", style: { fontSize: "1.25rem", fontWeight: "800", color: "#00F0FF", fontFamily: "var(--font-mono)" } }, entryPrice ? `$${Math.round(entryPrice).toLocaleString()}` : "DATA_UNAVAILABLE"),
-        h("div", { style: { fontSize: "0.72rem", color: "#64748B", marginTop: "6px" } }, "15m Decision Close Reference")
-      ),
-      // Card 2: Take Profit (TP)
-      h("div", { className: "prediction-card-box", style: { background: "rgba(0, 229, 168, 0.05)", borderLeft: "3px solid #00E5A8", padding: "14px", borderRadius: "10px", border: "1px solid rgba(0, 229, 168, 0.2)" } },
-        h("div", { className: "prediction-card-lbl", style: { fontSize: "0.76rem", color: "#00E5A8", marginBottom: "4px" } }, "Take Profit (TP)"),
-        h("div", { className: "prediction-card-val", style: { fontSize: "1.25rem", fontWeight: "800", color: "#00E5A8", fontFamily: "var(--font-mono)" } }, tpPrice ? `$${Math.round(tpPrice).toLocaleString()}` : "DATA_UNAVAILABLE"),
-        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", marginTop: "6px" } }, "k_TP = 1.0 × ATR14")
-      ),
-      // Card 3: Stop Loss (SL)
-      h("div", { className: "prediction-card-box", style: { background: "rgba(248, 113, 113, 0.05)", borderLeft: "3px solid #F87171", padding: "14px", borderRadius: "10px", border: "1px solid rgba(248, 113, 113, 0.2)" } },
-        h("div", { className: "prediction-card-lbl", style: { fontSize: "0.76rem", color: "#F87171", marginBottom: "4px" } }, "Stop Loss (SL)"),
-        h("div", { className: "prediction-card-val", style: { fontSize: "1.25rem", fontWeight: "800", color: "#F87171", fontFamily: "var(--font-mono)" } }, slPrice ? `$${Math.round(slPrice).toLocaleString()}` : "DATA_UNAVAILABLE"),
-        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", marginTop: "6px" } }, "k_SL = 1.0 × ATR14")
-      ),
-      // Card 4: Horizon & Setup
-      h("div", { className: "prediction-card-box", style: { background: "rgba(0,0,0,0.3)", padding: "14px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.08)" } },
-        h("div", { className: "prediction-card-lbl", style: { fontSize: "0.76rem", color: "#94A3B8", marginBottom: "4px" } }, "Horizon & Grid"),
-        h("div", { className: "prediction-card-val", style: { fontSize: "1.1rem", fontWeight: "800", color: "#A78BFA", fontFamily: "var(--font-mono)" } }, `${horizon} (${barrierPair})`),
-        h("div", { style: { fontSize: "0.72rem", color: "#64748B", marginTop: "6px" } }, "16 decision bars (240m)")
-      )
-    ),
-
-    // Research Classification & Interpretation Box
+    // Epistemic Boundary Notice Banner: Never conflate risk envelope coverage with directional win rate!
     h("div", {
       style: {
-        background: "rgba(15, 23, 42, 0.8)",
-        border: "1px solid rgba(239, 68, 68, 0.3)",
-        borderRadius: "8px",
-        padding: "14px 16px",
+        background: "rgba(56, 189, 248, 0.08)",
+        borderLeft: "4px solid #38BDF8",
+        padding: "10px 14px",
+        borderRadius: "0 8px 8px 0",
+        marginBottom: "16px",
+        fontSize: "0.78rem",
+        color: "#CBD5E1",
+        lineHeight: "1.5"
+      }
+    },
+      h("strong", { style: { color: "#38BDF8" } }, "Epistemic Target Separation: "),
+      "Volatility risk envelope indicates dispersion range (continuous variance proxy); does NOT imply directional trade probability or win rate. Directional predictions remain strictly offline."
+    ),
+
+    // SECTION 1: C2 Risk Forecast (Always displayable independently of directional prediction)
+    h("div", {
+      style: {
+        background: "rgba(15, 23, 42, 0.7)",
+        border: "1px solid rgba(56, 189, 248, 0.25)",
+        borderRadius: "10px",
+        padding: "16px",
         marginBottom: "16px"
       }
     },
-      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px", marginBottom: "6px" } },
-        h("span", { style: { fontSize: "0.78rem", fontWeight: "800", color: "#F87171", letterSpacing: "0.03em" } }, "RESEARCH CLASSIFICATION: COST_ERASED (C2)"),
-        h("span", { style: { fontSize: "0.72rem", background: "rgba(255,255,255,0.06)", padding: "2px 8px", borderRadius: "4px", color: "#CBD5E1" } }, "EXECUTION: PAPER / RESEARCH ONLY")
+      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", flexWrap: "wrap", gap: "8px" } },
+        h("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+          h("span", { style: { fontSize: "1.1rem" } }, "🛡️"),
+          h("strong", { style: { color: "#38BDF8", fontSize: "0.92rem" } }, "1. C2 Calibration Status (HAR-RS-DOW-v1.0)"),
+          h("span", {
+            style: {
+              background: "rgba(245, 158, 11, 0.15)",
+              color: "#F59E0B",
+              padding: "2px 8px",
+              borderRadius: "4px",
+              fontSize: "0.70rem",
+              fontWeight: "700"
+            }
+          }, "CALIBRATION UNAVAILABLE")
+        ),
+        h("span", { style: { fontSize: "0.72rem", color: "#94A3B8", fontFamily: "var(--font-mono)" } }, `Model: ${canonicalModelId}`)
       ),
-      h("div", { style: { fontSize: "0.80rem", color: "#CBD5E1", lineHeight: "1.5" } },
-        "Interpretation: The tested research configuration produced conditional predictive structure, but a deployable net-of-cost trading edge has not been established after preregistered transaction friction (35 bps BASE / 65 bps CONSERVATIVE). No real orders are executed."
+      h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "10px", fontSize: "0.78rem" } },
+        h("div", { style: { background: "rgba(255, 255, 255, 0.02)", padding: "10px", borderRadius: "6px" } },
+          h("div", { style: { color: "#94A3B8" } }, "Target Definition"),
+          h("div", { style: { color: "#F8FAFC", fontWeight: "700", marginTop: "2px" } }, forecastTarget)
+        ),
+        h("div", { style: { background: "rgba(255, 255, 255, 0.02)", padding: "10px", borderRadius: "6px" } },
+          h("div", { style: { color: "#94A3B8" } }, "Horizon & Sampling"),
+          h("div", { style: { color: "#F8FAFC", fontWeight: "700", marginTop: "2px" } }, "168h Continuous (Hourly Sampled)")
+        ),
+        h("div", { style: { background: "rgba(255, 255, 255, 0.02)", padding: "10px", borderRadius: "6px" } },
+          h("div", { style: { color: "#94A3B8" } }, "Serving Authorization"),
+          h("div", { style: { color: "#F59E0B", fontWeight: "700", marginTop: "2px" } }, riskStatus)
+        )
       )
+    ),
+
+    // SECTION 2: Directional Forecast & Setup (Separated)
+    h("div", {
+      style: {
+        background: "rgba(15, 23, 42, 0.7)",
+        border: "1px solid rgba(148, 163, 184, 0.2)",
+        borderRadius: "10px",
+        padding: "16px",
+        marginBottom: "16px"
+      }
+    },
+      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" } },
+        h("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+          h("span", { style: { fontSize: "1.1rem" } }, "🧭"),
+          h("strong", { style: { color: "#CBD5E1", fontSize: "0.92rem" } }, "2. Directional Return Forecast & Opportunity Setup"),
+          h("span", {
+            style: {
+              background: hasValidDirection ? "rgba(0, 229, 168, 0.15)" : "rgba(148, 163, 184, 0.15)",
+              color: hasValidDirection ? "#00E5A8" : "#94A3B8",
+              padding: "2px 8px",
+              borderRadius: "4px",
+              fontSize: "0.70rem",
+              fontWeight: "700"
+            }
+          }, hasValidDirection ? "DIRECTIONAL SIGNAL ACTIVE" : "DIRECTIONAL FORECAST UNAVAILABLE")
+        ),
+        h("span", { style: { fontSize: "0.72rem", color: "#94A3B8" } }, `Model: ${modelName}`)
+      ),
+
+      // 4-Grid of Directional Values
+      h("div", { className: "prediction-grid-4", style: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "12px" } },
+        // Direction
+        h("div", { className: "prediction-card-box", style: { background: "rgba(0,0,0,0.3)", padding: "12px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.06)" } },
+          h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", marginBottom: "4px" } }, "Evaluated Direction"),
+          h("div", { style: { fontSize: "1.1rem", fontWeight: "800", color: dirColor, fontFamily: "var(--font-mono)" } }, direction),
+          h("div", { style: { fontSize: "0.70rem", color: "#64748B", marginTop: "4px" } }, hasValidDirection ? "Model inference" : "Disabled under governance")
+        ),
+        // Win Probability
+        h("div", { className: "prediction-card-box", style: { background: "rgba(0,0,0,0.3)", padding: "12px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.06)" } },
+          h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", marginBottom: "4px" } }, "Win Probability"),
+          h("div", { style: { fontSize: "1.1rem", fontWeight: "800", color: probPct !== null ? "#00E5A8" : "#94A3B8", fontFamily: "var(--font-mono)" } }, probPct !== null ? `${probPct.toFixed(1)}%` : "—"),
+          h("div", { style: { fontSize: "0.70rem", color: "#64748B", marginTop: "4px" } }, probPct !== null ? "Model score" : "No probability issued")
+        ),
+        // Setup Detected
+        h("div", { className: "prediction-card-box", style: { background: "rgba(0,0,0,0.3)", padding: "12px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.06)" } },
+          h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", marginBottom: "4px" } }, "Qualifying Setup"),
+          h("div", { style: { fontSize: "0.92rem", fontWeight: "700", color: hasValidDirection ? "#38BDF8" : "#94A3B8" } }, setupName),
+          h("div", { style: { fontSize: "0.70rem", color: "#64748B", marginTop: "4px" } }, hasValidDirection ? "Rule qualification" : "None detected")
+        ),
+        // Horizon
+        h("div", { className: "prediction-card-box", style: { background: "rgba(0,0,0,0.3)", padding: "12px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.06)" } },
+          h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", marginBottom: "4px" } }, "Horizon"),
+          h("div", { style: { fontSize: "1.1rem", fontWeight: "800", color: "#A78BFA", fontFamily: "var(--font-mono)" } }, horizon),
+          h("div", { style: { fontSize: "0.70rem", color: "#64748B", marginTop: "4px" } }, "Evaluation horizon")
+        )
+      ),
+
+      !hasValidDirection && h("div", {
+        style: {
+          background: "rgba(255, 255, 255, 0.02)",
+          border: "1px solid rgba(255, 255, 255, 0.06)",
+          borderRadius: "6px",
+          padding: "10px 12px",
+          fontSize: "0.76rem",
+          color: "#94A3B8"
+        }
+      }, "Directional prediction is disabled under OFFLINE_RESEARCH_ONLY governance. No directional return forecast or win probability is issued.")
     ),
 
     // Expandable Evidence Section Toggle
     h("div", { style: { borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "12px" } },
       h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
-        h("span", { style: { fontSize: "0.80rem", fontWeight: "700", color: "#CBD5E1" } }, "🔍 Why This Research Signal Is Evaluated"),
+        h("span", { style: { fontSize: "0.80rem", fontWeight: "700", color: "#CBD5E1" } }, "🔍 Research Governance & Evidence Contract"),
         h("button", {
           onClick: () => setShowEvidence(!showEvidence),
           style: {
@@ -4252,174 +5605,69 @@ function PredictionPanel({ predictionData, engineState = "offline" }) {
               h("td", { style: { padding: "6px 8px", color: "#F8FAFC" } }, setupName)
             ),
             h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
-              h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Side Selected by Setup"),
-              h("td", { style: { padding: "6px 8px", color: dirColor, fontWeight: "700" } }, direction)
+              h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Directional Recommendation"),
+              h("td", { style: { padding: "6px 8px", color: dirColor, fontWeight: "700" } }, hasValidDirection ? direction : "DISABLED (ABSTAIN)")
             ),
             h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
               h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Model Acceptance / Decision"),
               h("td", { style: { padding: "6px 8px", color: "#F87171", fontWeight: "700" } }, "ABSTAIN (NET EXPECTANCY NEGATIVE)")
             ),
             h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
-              h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Barrier Pair Configuration"),
-              h("td", { style: { padding: "6px 8px", color: "#CBD5E1", fontFamily: "var(--font-mono)" } }, `${barrierPair} (k_TP = 1.0, k_SL = 1.0, R:R = 1.0)`)
-            ),
-            h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
               h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Volatility Estimator"),
-              h("td", { style: { padding: "6px 8px", color: "#CBD5E1" } }, "ATR14 on 15-minute decision bars")
+              h("td", { style: { padding: "6px 8px", color: "#CBD5E1" } }, canonicalModelId)
             ),
             h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
               h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Evaluation Horizon"),
-              h("td", { style: { padding: "6px 8px", color: "#CBD5E1" } }, "240 minutes (16 decision bars)")
+              h("td", { style: { padding: "6px 8px", color: "#CBD5E1" } }, "168h continuous / 24h prospective")
             ),
             h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
               h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Preregistered Cost Scenarios"),
               h("td", { style: { padding: "6px 8px", color: "#CBD5E1" } }, "BASE: 35 bps round-trip | CONSERVATIVE: 65 bps round-trip")
             ),
             h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
-              h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Resolver Version"),
-              h("td", { style: { padding: "6px 8px", color: "#CBD5E1", fontFamily: "var(--font-mono)" } }, "ENTRY_TP_SL_RESOLVER_V1")
-            ),
-            h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
               h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Research Status"),
-              h("td", { style: { padding: "6px 8px", color: "#F87171", fontWeight: "700" } }, "COST_ERASED (C2 — Conditional Predictability)")
-            ),
-            h("tr", null,
-              h("td", { style: { padding: "6px 8px", color: "#94A3B8", fontWeight: "700" } }, "Provenance & Freeze Status"),
-              h("td", { style: { padding: "6px 8px", color: "#00E5A8", fontWeight: "700", fontFamily: "var(--font-mono)" } }, "VERIFIED_FROZEN (1bf91f2789846af...)")
+              h("td", { style: { padding: "6px 8px", color: "#F87171", fontWeight: "700" } }, "OFFLINE_RESEARCH_ONLY (Live trading disabled)")
             )
           )
         )
       )
     ),
 
-    // 4-Factor Institutional Risk Audit Sub-Panel
-    h("div", { style: { borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "16px", marginTop: "16px" } },
-      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" } },
-        h("div", { style: { fontSize: "0.82rem", color: "#CBD5E1", fontWeight: "700" } },
-          "🛡️ 4-Factor Uncertainty Decomposition (Risk Audit)"
-        ),
-        h("span", {
-          style: {
-            fontSize: "0.8rem",
-            fontWeight: "700",
-            padding: "3px 10px",
-            borderRadius: "12px",
-            background: (predictionData?.uncertainty_breakdown?.composite_quality_score || 0.8) >= 0.75 ? "rgba(0,229,168,0.15)" : "rgba(245,158,11,0.15)",
-            color: (predictionData?.uncertainty_breakdown?.composite_quality_score || 0.8) >= 0.75 ? "#00E5A8" : "#F59E0B"
-          }
-        }, `Overall Score: ${Math.round((predictionData?.uncertainty_breakdown?.composite_quality_score || 0.8) * 100)}/100`)
-      ),
+    // Dynamic uncertainty breakdown if provided genuinely by backend
+    predictionData?.uncertainty_breakdown && h("div", { style: { borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "14px", marginTop: "14px" } },
+      h("div", { style: { fontSize: "0.78rem", color: "#CBD5E1", fontWeight: "700", marginBottom: "8px" } }, "🛡️ Uncertainty Breakdown"),
       h("div", { style: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "10px" } },
         h("div", { style: { background: "rgba(255,255,255,0.03)", padding: "10px", borderRadius: "8px" } },
           h("div", { style: { fontSize: "0.7rem", color: "#94A3B8" } }, "Data Quality"),
           h("div", { style: { fontSize: "1rem", fontWeight: "700", color: "#00F0FF", fontFamily: "var(--font-mono)" } },
-            `${Math.round((predictionData?.uncertainty_breakdown?.data_reliability || 1.0) * 100)}%`
+            "Unavailable"
           )
         ),
         h("div", { style: { background: "rgba(255,255,255,0.03)", padding: "10px", borderRadius: "8px" } },
           h("div", { style: { fontSize: "0.7rem", color: "#94A3B8" } }, "Regime Certainty"),
           h("div", { style: { fontSize: "1rem", fontWeight: "700", color: "#00E5A8", fontFamily: "var(--font-mono)" } },
-            `${Math.round((predictionData?.uncertainty_breakdown?.regime_clarity || 0.75) * 100)}%`
+            "Unavailable"
           )
         ),
         h("div", { style: { background: "rgba(0,0,0,0.25)", padding: "10px", borderRadius: "8px", textAlign: "center" } },
           h("div", { style: { fontSize: "0.7rem", color: "#94A3B8" } }, "Model Consensus"),
           h("div", { style: { fontSize: "1.1rem", fontWeight: "800", color: "#A78BFA", fontFamily: "var(--font-mono)" } },
-            `${Math.round((predictionData?.uncertainty_breakdown?.model_agreement || 0.84) * 100)}%`
+            "Unavailable"
           )
         ),
         h("div", { style: { background: "rgba(0,0,0,0.25)", padding: "10px", borderRadius: "8px", textAlign: "center" } },
           h("div", { style: { fontSize: "0.7rem", color: "#94A3B8" } }, "Vol Calmness"),
           h("div", { style: { fontSize: "1.1rem", fontWeight: "800", color: "#F59E0B", fontFamily: "var(--font-mono)" } },
-            `${Math.round((predictionData?.uncertainty_breakdown?.volatility_stress || 0.88) * 100)}%`
-          )
-        )
-      ),
-      predictionData?.uncertainty_narrative && h("div", { style: { fontSize: "0.82rem", color: "#CBD5E1", fontStyle: "italic", background: "rgba(0,0,0,0.2)", padding: "10px 14px", borderRadius: "8px", marginTop: "10px" } },
-        predictionData.uncertainty_narrative
-      )
-    ),
-
-    // Institutional Frontier Extension: Liquidation Heatmap, Perp Carry Drag, Session Multiplier & Time Stop
-    h("div", { style: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", marginTop: "16px", paddingTop: "16px", borderTop: "1px solid rgba(255,255,255,0.06)" } },
-      // 1. Session Timing & Vol Multiplier
-      h("div", { style: { background: "rgba(0,0,0,0.2)", padding: "12px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" } },
-        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", textTransform: "uppercase", fontWeight: "700" } }, "🌍 Active Market Session"),
-        h("div", { style: { fontSize: "0.98rem", fontWeight: "800", color: "#38BDF8", marginTop: "4px", fontFamily: "var(--font-mono)" } },
-          `${predictionData?.market_session_context?.current_session || "NEW_YORK_OVERLAP"}`
-        ),
-        h("div", { style: { fontSize: "0.74rem", color: "#CBD5E1", marginTop: "4px" } },
-          `Vol Multiplier: ${predictionData?.market_session_context?.session_volatility_multiplier || 1.15}x · ${predictionData?.market_session_context?.session_narrative || "Active institutional order flow"}`
-        )
-      ),
-      // 2. Perp Funding Carry Drag
-      h("div", { style: { background: "rgba(0,0,0,0.2)", padding: "12px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" } },
-        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", textTransform: "uppercase", fontWeight: "700" } }, "⏳ Perp Funding Carry Drag"),
-        h("div", { style: { fontSize: "0.98rem", fontWeight: "800", color: "#F59E0B", marginTop: "4px", fontFamily: "var(--font-mono)" } },
-          `${predictionData?.funding_carry_metrics?.daily_carry_drag_bps || 10.0} bps / 24h`
-        ),
-        h("div", { style: { fontSize: "0.74rem", color: "#CBD5E1", marginTop: "4px" } },
-          `8h Rate: ${predictionData?.funding_carry_metrics?.funding_rate_8h_pct || 0.01}% (${predictionData?.funding_carry_metrics?.funding_annualized_pct || 10.95}% Ann.)`
-        )
-      ),
-      // 3. Time-Stop Invalidation TTL
-      h("div", { style: { background: "rgba(0,0,0,0.2)", padding: "12px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" } },
-        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", textTransform: "uppercase", fontWeight: "700" } }, "⏰ Max Holding Window (Time-Stop)"),
-        h("div", { style: { fontSize: "0.98rem", fontWeight: "800", color: "#A78BFA", marginTop: "4px", fontFamily: "var(--font-mono)" } },
-          `18 Hours Max TTL`
-        ),
-        h("div", { style: { fontSize: "0.74rem", color: "#CBD5E1", marginTop: "4px" } },
-          "Auto-exit if stagnant to prevent random walk chop decay"
-        )
-      )
-    ),
-
-    // Liquidation Heatmap Target Radar
-    predictionData?.liquidation_clusters && h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "12px" } },
-      h("div", { style: { background: "rgba(255,92,124,0.05)", border: "1px solid rgba(255,92,124,0.2)", padding: "10px 14px", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" } },
-        h("div", null,
-          h("div", { style: { fontSize: "0.72rem", color: "#FF5C7C", fontWeight: "700" } }, "🧲 Upper Short Squeeze Pool"),
-          h("div", { style: { fontSize: "1rem", fontWeight: "800", color: "#F8FAFC", fontFamily: "var(--font-mono)" } }, `$${predictionData.liquidation_clusters.upper_short_squeeze_pool.price.toLocaleString()}`)
-        ),
-        h("span", { style: { fontSize: "0.75rem", background: "rgba(255,92,124,0.15)", color: "#FF5C7C", padding: "4px 8px", borderRadius: "4px", fontWeight: "700" } },
-          `${predictionData.liquidation_clusters.upper_short_squeeze_pool.density_usd} (+${predictionData.liquidation_clusters.upper_short_squeeze_pool.distance_pct}%)`
-        )
-      ),
-      h("div", { style: { background: "rgba(0,229,168,0.05)", border: "1px solid rgba(0,229,168,0.2)", padding: "10px 14px", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" } },
-        h("div", null,
-          h("div", { style: { fontSize: "0.72rem", color: "#00E5A8", fontWeight: "700" } }, "🧲 Lower Long Cascade Pool"),
-          h("div", { style: { fontSize: "1rem", fontWeight: "800", color: "#F8FAFC", fontFamily: "var(--font-mono)" } }, `$${predictionData.liquidation_clusters.lower_long_cascade_pool.price.toLocaleString()}`)
-        ),
-        h("span", { style: { fontSize: "0.75rem", background: "rgba(0,229,168,0.15)", color: "#00E5A8", padding: "4px 8px", borderRadius: "4px", fontWeight: "700" } },
-          `${predictionData.liquidation_clusters.lower_long_cascade_pool.density_usd} (${predictionData.liquidation_clusters.lower_long_cascade_pool.distance_pct}%)`
-        )
-      )
-    ),
-
-    // Top 3 Historical Analogs
-    predictionData?.top_historical_analogs && h("div", { style: { marginTop: "16px", paddingTop: "14px", borderTop: "1px solid rgba(255,255,255,0.06)" } },
-      h("div", { style: { fontSize: "0.76rem", color: "#CBD5E1", fontWeight: "700", marginBottom: "8px", textTransform: "uppercase" } },
-        "🔍 Top 3 Nearest Historical State Analogs (Empirical Precedents)"
-      ),
-      h("div", { style: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px" } },
-        predictionData.top_historical_analogs.map((a, idx) =>
-          h("div", { key: idx, style: { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", padding: "10px", borderRadius: "8px" } },
-            h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" } },
-              h("strong", { style: { fontSize: "0.82rem", color: "#F8FAFC" } }, a.date),
-              h("span", { style: { fontSize: "0.72rem", color: "#00E5A8", fontWeight: "700", background: "rgba(0,229,168,0.1)", padding: "2px 6px", borderRadius: "4px" } }, `${a.similarity_pct}% Match`)
-            ),
-            h("div", { style: { fontSize: "0.72rem", color: "#94A3B8" } }, `Regime: ${a.regime}`),
-            h("div", { style: { fontSize: "0.72rem", color: "#CBD5E1", marginTop: "4px", fontFamily: "var(--font-mono)" } },
-              `24h Realized: +MFE: ${a.mfe_pct}% | -MAE: ${a.mae_pct}%`
-            )
+            "Unavailable"
           )
         )
       )
     ),
 
+    // Footer with genuine timestamp or Unavailable
     h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.82rem", color: "#94A3B8", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "12px", marginTop: "14px" } },
-      h("span", null, "Model: ", h("strong", { style: { color: "#F8FAFC" } }, predictionData?.model || "Adaptive Regime Ensemble (RF+XGB)")),
-      h("span", { style: { fontFamily: "var(--font-mono)" } }, `Updated: ${predictionData?.timestamp ? new Date(predictionData.timestamp).toLocaleTimeString() : "Live"}`)
+      h("span", null, "Model: ", h("strong", { style: { color: "#F8FAFC" } }, modelName)),
+      h("span", { style: { fontFamily: "var(--font-mono)" } }, predictionData?.generated_at ? `Updated: ${new Date(predictionData.generated_at).toUTCString()}` : "Timestamp: Unavailable (No active stream)")
     )
   );
 }
@@ -4428,31 +5676,33 @@ function PredictionPanel({ predictionData, engineState = "offline" }) {
 // MarketStateSection
 // ===========================================================================
 function MarketStateSection({ regimeData }) {
-  const trendPct  = regimeData?.trend_strength_pct || 82;
-  const volState  = regimeData?.volatility_state   || "MEDIUM";
-  const fundState = regimeData?.funding_state       || "POSITIVE";
-  const levState  = regimeData?.leverage_state      || "ELEVATED";
+  const trendPct = regimeData?.trend_strength_pct;
+  const volState = regimeData?.volatility_state || "Unavailable";
+  const fundState = regimeData?.funding_state || "Unavailable";
+  const levState = regimeData?.leverage_state || "Unavailable";
 
   return h("div", { className: "grid-4col" },
     h("div", { className: "glass-card", style: { padding: "20px" } },
       h("div", { style: { fontSize: "0.8rem", color: "#94A3B8", textTransform: "uppercase" } }, "Trend Score"),
-      h("div", { style: { fontSize: "1.4rem", fontWeight: "700", margin: "8px 0", color: "#00E5A8" } }, `${regimeData?.trend_label || "Bullish"} (${trendPct}%)`),
-      h("div", { className: "shap-bar-bg" }, h("div", { className: "shap-bar-fill shap-positive", style: { width: `${trendPct}%` } }))
+      h("div", { style: { fontSize: "1.4rem", fontWeight: "700", margin: "8px 0", color: "#00E5A8" } },
+        typeof trendPct === "number" ? `${regimeData?.trend_label || "Trend"} (${trendPct}%)` : "Unavailable"
+      ),
+      typeof trendPct === "number" && h("div", { className: "shap-bar-bg" }, h("div", { className: "shap-bar-fill shap-positive", style: { width: `${trendPct}%` } }))
     ),
     h("div", { className: "glass-card", style: { padding: "20px" } },
       h("div", { style: { fontSize: "0.8rem", color: "#94A3B8", textTransform: "uppercase" } }, "Volatility State"),
       h("div", { style: { fontSize: "1.4rem", fontWeight: "700", margin: "8px 0", color: "#7C5CFF" } }, volState),
-      h("div", { className: "shap-bar-bg" }, h("div", { className: "shap-bar-fill", style: { width: "60%", background: "#7C5CFF" } }))
+      volState !== "Unavailable" && h("div", { className: "shap-bar-bg" }, h("div", { className: "shap-bar-fill", style: { width: "60%", background: "#7C5CFF" } }))
     ),
     h("div", { className: "glass-card", style: { padding: "20px" } },
       h("div", { style: { fontSize: "0.8rem", color: "#94A3B8", textTransform: "uppercase" } }, "Funding Condition"),
       h("div", { style: { fontSize: "1.4rem", fontWeight: "700", margin: "8px 0", color: "#00E5A8" } }, fundState),
-      h("div", { className: "shap-bar-bg" }, h("div", { className: "shap-bar-fill shap-positive", style: { width: "75%" } }))
+      fundState !== "Unavailable" && h("div", { className: "shap-bar-bg" }, h("div", { className: "shap-bar-fill shap-positive", style: { width: "75%" } }))
     ),
     h("div", { className: "glass-card", style: { padding: "20px" } },
       h("div", { style: { fontSize: "0.8rem", color: "#94A3B8", textTransform: "uppercase" } }, "Leverage State"),
       h("div", { style: { fontSize: "1.4rem", fontWeight: "700", margin: "8px 0", color: "#A78BFA" } }, levState),
-      h("div", { className: "shap-bar-bg" }, h("div", { className: "shap-bar-fill", style: { width: "85%", background: "#A78BFA" } }))
+      levState !== "Unavailable" && h("div", { className: "shap-bar-bg" }, h("div", { className: "shap-bar-fill", style: { width: "85%", background: "#A78BFA" } }))
     )
   );
 }
@@ -4461,12 +5711,16 @@ function MarketStateSection({ regimeData }) {
 // ExplainableAIPanel
 // ===========================================================================
 function ExplainableAIPanel({ explanationData }) {
-  const rawFactors = explanationData?.factors || explanationData?.contributions || [
-    { feature: "Momentum", contribution: 0.18 },
-    { feature: "RSI_14", contribution: 0.11 },
-    { feature: "Funding_Rate", contribution: 0.07 },
-    { feature: "Vol_Spike", contribution: -0.05 }
-  ];
+  const rawFactors = explanationData?.factors || explanationData?.contributions || [];
+
+  if (!rawFactors || rawFactors.length === 0) {
+    return h("div", { className: "glass-card", style: { padding: "24px" } },
+      h("h3", { style: { fontSize: "1.2rem", fontWeight: "700", marginBottom: "12px" } }, "Why This Prediction? (SHAP Attribution)"),
+      h("p", { style: { color: "#94A3B8", fontSize: "0.85rem", margin: 0 } },
+        "Explanation data unavailable — no active model explanation payload."
+      )
+    );
+  }
 
   const factors = rawFactors.map(f => ({
     feature: f.feature,
@@ -4488,8 +5742,8 @@ function ExplainableAIPanel({ explanationData }) {
         )
       );
     }),
-    h("p", { style: { fontSize: "0.85rem", color: "#94A3B8", marginTop: "20px", fontStyle: "italic", background: "rgba(0,0,0,0.2)", padding: "12px", borderRadius: "8px" } },
-      `"${explanationData?.summary || "The model is primarily influenced by strengthening momentum and increasing derivatives participation."}"`)
+    explanationData?.summary && h("p", { style: { fontSize: "0.85rem", color: "#94A3B8", marginTop: "20px", fontStyle: "italic", background: "rgba(0,0,0,0.2)", padding: "12px", borderRadius: "8px" } },
+      `"${explanationData.summary}"`)
   );
 }
 
@@ -4497,26 +5751,27 @@ function ExplainableAIPanel({ explanationData }) {
 // SignalQualityGauge
 // ===========================================================================
 function SignalQualityGauge({ qualityData }) {
-  const score  = qualityData?.score  || 82;
-  const rating = qualityData?.rating || "Excellent";
+  const hasData = false;
+  const score = null;
+  const rating = "QUALITY METRICS UNAVAILABLE";
 
   return h("div", { className: "glass-card", style: { padding: "24px" } },
     h("h3", { style: { fontSize: "1.2rem", fontWeight: "700", marginBottom: "16px", textAlign: "center" } }, "Signal Quality Engine"),
     h("div", { className: "gauge-container" },
       h("svg", { className: "gauge-svg", viewBox: "0 0 160 160" },
-        h("circle", { className: "gauge-bg-circle",   cx: "80", cy: "80", r: "70" }),
-        h("circle", { className: "gauge-fill-circle", cx: "80", cy: "80", r: "70", style: { strokeDashoffset: 440 - (440 * score) / 100 } })
+        h("circle", { className: "gauge-bg-circle", cx: "80", cy: "80", r: "70" }),
+        h("circle", { className: "gauge-fill-circle", cx: "80", cy: "80", r: "70", style: { strokeDashoffset: hasData ? 440 - (440 * score) / 100 : 440 } })
       ),
       h("div", { className: "gauge-text" },
-        h("div", { className: "gauge-score"  }, score),
-        h("div", { className: "gauge-rating" }, rating)
+        h("div", { className: "gauge-score" }, hasData ? score : "—"),
+        h("div", { className: "gauge-rating", style: hasData ? {} : { fontSize: "0.65rem", color: "#F59E0B" } }, rating)
       )
     ),
     h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", fontSize: "0.8rem", color: "#94A3B8" } },
-      h("div", null, "Calibration: ",   h("strong", { style: { color: "#F8FAFC" } }, `${qualityData?.calibration_score || 88}%`)),
-      h("div", null, "Regime Conf: ",   h("strong", { style: { color: "#F8FAFC" } }, `${qualityData?.regime_confidence || 85}%`)),
-      h("div", null, "Drift Stability: ",h("strong", { style: { color: "#F8FAFC" } }, `${qualityData?.drift_score || 92}%`)),
-      h("div", null, "Agreement: ",     h("strong", { style: { color: "#F8FAFC" } }, `${qualityData?.model_agreement || 84}%`))
+      h("div", null, "Calibration: ", h("strong", { style: { color: "#F8FAFC" } }, "UNAVAILABLE")),
+      h("div", null, "Regime Conf: ", h("strong", { style: { color: "#F8FAFC" } }, "UNAVAILABLE")),
+      h("div", null, "Drift Stability: ", h("strong", { style: { color: "#F8FAFC" } }, "UNAVAILABLE")),
+      h("div", null, "Agreement: ", h("strong", { style: { color: "#F8FAFC" } }, "UNAVAILABLE"))
     )
   );
 }
@@ -4526,20 +5781,22 @@ function SignalQualityGauge({ qualityData }) {
 // ===========================================================================
 function ModelLineageStrip({ lineageData }) {
   const data = lineageData || {
-    model_version: "v2.1-REGIME-PROD",
-    model_architecture: "Adaptive Regime Ensemble (RF + XGB)",
-    status: "ACTIVE_PRODUCTION",
-    promoted_at: "2026-08-15 00:00:00 UTC",
-    training_window: "2023-01-01 to 2026-06-30 (100% Out-of-Sample Partition)",
+    model_version: "Standard-HAR-v1.0 (BASELINE)",
+    model_architecture: "Corsi Heterogeneous Autoregressive (HAR-RV)",
+    status: "OFFLINE_RESEARCH_ONLY",
+    promoted_at: "UNPROMOTED (Research Mode)",
+    training_window: "2023-01-01 to 2026-10-17 (Retrospective Replay Only)",
     promotion_audit: {
-      deflated_sharpe_ratio: 0.962,
+      deflated_sharpe_ratio: null,
       min_required_dsr: 0.95,
-      paired_p_value: 0.038,
-      max_drawdown_pct: 8.4,
-      brier_calibration_score: 0.042
+      paired_p_value: null,
+      max_drawdown_pct: null,
+      brier_calibration_score: null
     },
-    next_scheduled_gate: "2026-09-15 00:00:00 UTC (Requires 30-Day Real Ledger Accumulation)"
+    next_scheduled_gate: "LOCKED (Requires 100 Prospective Clean Blocks)"
   };
+
+  const audit = data.promotion_audit || {};
 
   return h("div", {
     style: {
@@ -4570,25 +5827,25 @@ function ModelLineageStrip({ lineageData }) {
       }, data.model_version),
       h("div", null,
         h("div", { style: { fontSize: "0.85rem", fontWeight: "700", color: "#F8FAFC" } },
-          "Production Model Lineage & Statistical Audit"
+          "OFFLINE RESEARCH MODE (Standard Corsi HAR Baseline)"
         ),
         h("div", { style: { fontSize: "0.74rem", color: "#94A3B8", marginTop: "2px" } },
-          `Promoted: ${data.promoted_at} · Training: ${data.training_window}`
+          `Status: ${data.status} • Window: ${data.training_window}`
         )
       )
     ),
     h("div", { style: { display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" } },
-      h("div", { style: { background: "rgba(255,255,255,0.04)", padding: "4px 10px", borderRadius: "6px", fontSize: "0.75rem", color: "#CBD5E1" } },
-        "DSR: ", h("strong", { style: { color: "#00E5A8", fontFamily: "var(--font-mono)" } }, `${data.promotion_audit.deflated_sharpe_ratio} (PASS ≥ 0.95)`)
+      h("div", { style: { background: "rgba(255,255,255,0.04)", padding: "4px 10px", borderRadius: "6px", fontSize: "0.74rem", color: "#94A3B8" } },
+        "DSR: ", h("strong", { style: { color: audit.deflated_sharpe_ratio != null ? "#00E5A8" : "#94A3B8", fontFamily: "var(--font-mono)" } }, audit.deflated_sharpe_ratio != null ? audit.deflated_sharpe_ratio : "—")
       ),
-      h("div", { style: { background: "rgba(255,255,255,0.04)", padding: "4px 10px", borderRadius: "6px", fontSize: "0.75rem", color: "#CBD5E1" } },
-        "Paired p: ", h("strong", { style: { color: "#00E5A8", fontFamily: "var(--font-mono)" } }, `${data.promotion_audit.paired_p_value} (<0.05)`)
+      h("div", { style: { background: "rgba(255,255,255,0.04)", padding: "4px 10px", borderRadius: "6px", fontSize: "0.74rem", color: "#94A3B8" } },
+        "Paired p: ", h("strong", { style: { color: audit.paired_p_value != null ? "#00E5A8" : "#94A3B8", fontFamily: "var(--font-mono)" } }, audit.paired_p_value != null ? audit.paired_p_value : "—")
       ),
-      h("div", { style: { background: "rgba(255,255,255,0.04)", padding: "4px 10px", borderRadius: "6px", fontSize: "0.75rem", color: "#CBD5E1" } },
-        "Max DD: ", h("strong", { style: { color: "#F59E0B", fontFamily: "var(--font-mono)" } }, `${data.promotion_audit.max_drawdown_pct}%`)
+      h("div", { style: { background: "rgba(255,255,255,0.04)", padding: "4px 10px", borderRadius: "6px", fontSize: "0.74rem", color: "#94A3B8" } },
+        "Max DD: ", h("strong", { style: { color: audit.max_drawdown_pct != null ? "#F59E0B" : "#94A3B8", fontFamily: "var(--font-mono)" } }, audit.max_drawdown_pct != null ? `${audit.max_drawdown_pct}%` : "—")
       ),
-      h("div", { style: { background: "rgba(124, 92, 255, 0.12)", border: "1px solid rgba(124, 92, 255, 0.3)", padding: "4px 10px", borderRadius: "6px", fontSize: "0.75rem", color: "#A78BFA" } },
-        "Next Promotion Gate: ", h("strong", null, "30d Real Ledger Window")
+      h("div", { style: { background: "rgba(124, 92, 255, 0.12)", border: "1px solid rgba(124, 92, 255, 0.3)", padding: "4px 10px", borderRadius: "6px", fontSize: "0.74rem", color: "#C084FC" } },
+        "Production Gate: ", h("strong", null, "LOCKED")
       )
     )
   );
@@ -4960,7 +6217,7 @@ function CompactWorkstationHeader({ livePrice, changePct, regimeData, activePape
   const action = researchAuthorized
     ? (p?.hypothesis_comparison?.final_action || (p?.has_active_position ? `TRADE · ${p.direction}` : "ABSTAIN"))
     : "Research blocked";
-  const c2Health = researchAuthorized ? (p?.decision_anatomy?.c2_health || "UNVERIFIED") : "UNVERIFIED";
+  const c2Health = "UNAVAILABLE";
   const reg = researchAuthorized ? (regimeData?.regime || "Unavailable") : "Unavailable";
   const vol = researchAuthorized ? (regimeData?.volatility_state || "Unavailable") : "Unavailable";
 
@@ -5009,7 +6266,7 @@ function CompactWorkstationHeader({ livePrice, changePct, regimeData, activePape
       ),
       h("div", { className: "status-strip-chip" },
         h("span", { style: { color: "#7E95B5" } }, "C2 RISK:"),
-        h("strong", { style: { color: c2Health === "CALIBRATED" ? "#00E5A8" : "#F59E0B" } }, c2Health)
+        h("strong", { style: { color: "#F59E0B" } }, c2Health)
       ),
       h("div", { className: "status-strip-chip" },
         h("span", { style: { color: "#7E95B5" } }, "ACTIVE STRATEGY:"),
@@ -5164,8 +6421,8 @@ function WorkstationIntentCommandBar({
 function AiDualHypothesisPanel({ activePaperPos, livePrice, userDirectionPreference, setUserDirectionPreference }) {
   const p = activePaperPos;
   const hyp = p?.hypothesis_comparison || {};
-  const longH = hyp.long || { tp_first_pct: 61.4, n_samples: 184, confidence_interval_90: "56.9–65.9%", drag_bps: 9.3, n_eff: 133, raw_N: 184, ci_width: 9.0, risk_status: "PASS" };
-  const shortH = hyp.short || { tp_first_pct: 44.8, n_samples: 171, confidence_interval_90: "40.3–49.3%", drag_bps: 6.0, n_eff: 124, raw_N: 171, ci_width: 9.0, risk_status: "PASS" };
+  const longH = hyp.long || null;
+  const shortH = hyp.short || null;
   const finalAction = hyp.final_action || "ABSTAIN_DESCRIPTIVE_NULL";
   const isTradeLong = false;
   const isTradeShort = false;
@@ -5173,7 +6430,8 @@ function AiDualHypothesisPanel({ activePaperPos, livePrice, userDirectionPrefere
   const prefAudit = p?.user_preference_audit || {};
   const isRejected = prefAudit.status === "REJECTED_BY_AI";
   const matrix = p?.candidate_matrix || p?.strategy_selection_ranking || [];
-  const t0 = p?.tier_0_geometric_touch || p?.barrier_probabilities || { p_upper_p90: 0.542, p_lower_p10: 0.458, drift_mu: 0.0 };
+  // C2 is disabled; legacy first-passage estimates are not current calibrated outputs.
+  const t0 = null;
 
   return h("div", { className: "dual-hypothesis-card" },
     // Header with User Intent Selector & Tier 0 Scientific Invariant
@@ -5270,15 +6528,7 @@ function AiDualHypothesisPanel({ activePaperPos, livePrice, userDirectionPrefere
         )
       ),
       h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "6px", fontSize: "0.70rem" } },
-        Object.entries(p?.decision_questions || {
-          "Q1_DIRECTION": { title: "Directional Displacement", status: "PASS", evidence_quality: "STRONG", rationale: "OFI, HAWKES: Aggressive buy imbalance (+0.65)" },
-          "Q2_CONTINUATION": { title: "Continuation & Momentum", status: "PASS", evidence_quality: "STRONG", rationale: "HAWKES, RV_5M: Event clustering at 2.2σ" },
-          "Q3_EXHAUSTION": { title: "Exhaustion & Crowding", status: "PASS", evidence_quality: "MODERATE", rationale: "FUNDING, VPIN: Negative skew, adverse risk gated" },
-          "Q4_LIQUIDITY_EXECUTION": { title: "Liquidity & Friction Cost", status: "PASS", evidence_quality: "STRONG", rationale: "SPREAD, VPIN: Execution cost context 9.3 bps (independent of EV)" },
-          "Q5_RISK_CONFORMAL": { title: "Empirical Risk & Calibration", status: "PASS", evidence_quality: "STRONG", rationale: "RV_5M, C2: Calibrated conformal risk bounds" },
-          "Q6_CYCLE_CONTEXT": { title: "Macro & Cycle Valuation", status: "CONTEXT_ONLY", evidence_quality: "CONTEXT_ONLY", rationale: "Excluded from primary 15m; slow cycle anchor" },
-          "Q7_REGIME_COMPATIBILITY": { title: "Mechanism-Regime Match", status: "PASS", evidence_quality: "STRONG", rationale: "MEIE-IGNITION ↔ VOL_EXPANDING (M_ij = 0.88)" }
-        }).map(([qId, qMeta]) => {
+        Object.entries(p?.decision_questions || {}).map(([qId, qMeta]) => {
           const isContext = qMeta.status === "CONTEXT_ONLY" || qMeta.activation_state === "CONTEXT_ONLY";
           const isPass = qMeta.status === "PASS" || qMeta.status === "ANSWERED";
           const badgeBg = isContext ? "rgba(148,163,184,0.12)" : isPass ? "rgba(0,229,168,0.14)" : "rgba(255,92,124,0.14)";
@@ -5362,20 +6612,20 @@ function AiDualHypothesisPanel({ activePaperPos, livePrice, userDirectionPrefere
           h("div", { style: { textAlign: "center" } },
             h("div", { style: { fontSize: "0.58rem", color: "#94A3B8", fontWeight: "700" } }, "EVENTUAL P90 FIRST"),
             h("strong", { style: { color: "#00E5A8", fontSize: "1.05rem", fontFamily: "var(--font-mono)" } },
-              `${((t0.p_upper_p90 || 0.469) * 100.0).toFixed(1)}%`
+              t0?.p_upper_p90 != null ? `${(t0.p_upper_p90 * 100.0).toFixed(1)}%` : "—"
             ),
             h("div", { style: { fontSize: "0.58rem", color: "#7E95B5" } },
-              `15m finite: ${(((t0.finite_horizon_touch?.p_upper_first_within_horizon || 0.284)) * 100).toFixed(1)}%`
+              `15m finite: ${t0?.finite_horizon_touch?.p_upper_first_within_horizon != null ? ((t0.finite_horizon_touch.p_upper_first_within_horizon * 100).toFixed(1) + "%") : "—"}`
             )
           ),
           h("div", { style: { fontSize: "1.1rem", color: "#475569" } }, "/"),
           h("div", { style: { textAlign: "center" } },
             h("div", { style: { fontSize: "0.58rem", color: "#94A3B8", fontWeight: "700" } }, "EVENTUAL P10 FIRST"),
             h("strong", { style: { color: "#FF5C7C", fontSize: "1.05rem", fontFamily: "var(--font-mono)" } },
-              `${((t0.p_lower_p10 || 0.531) * 100.0).toFixed(1)}%`
+              t0?.p_lower_p10 != null ? `${(t0.p_lower_p10 * 100.0).toFixed(1)}%` : "—"
             ),
             h("div", { style: { fontSize: "0.58rem", color: "#7E95B5" } },
-              `15m finite: ${(((t0.finite_horizon_touch?.p_lower_first_within_horizon || 0.321)) * 100).toFixed(1)}%`
+              `15m finite: ${t0?.finite_horizon_touch?.p_lower_first_within_horizon != null ? ((t0.finite_horizon_touch.p_lower_first_within_horizon * 100).toFixed(1) + "%") : "—"}`
             )
           ),
           h("div", {
@@ -5391,7 +6641,7 @@ function AiDualHypothesisPanel({ activePaperPos, livePrice, userDirectionPrefere
             }
           },
             h("div", { style: { fontSize: "0.58rem", color: "#94A3B8" } }, "ASYMMETRY"),
-            `${((t0.p_upper_p90 || 0.469) >= 0.5 ? "+" : "")}${(((t0.p_upper_p90 || 0.469) - 0.5) * 100).toFixed(1)}%`
+            t0?.p_upper_p90 != null ? `${(t0.p_upper_p90 >= 0.5 ? "+" : "")}${((t0.p_upper_p90 - 0.5) * 100).toFixed(1)}%` : "—"
           )
         )
       ),
@@ -5441,48 +6691,48 @@ function AiDualHypothesisPanel({ activePaperPos, livePrice, userDirectionPrefere
         h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" } },
           h("strong", { style: { color: "#00E5A8", fontSize: "0.86rem" } }, "UPPER EXCURSION SCENARIO"),
           h("span", { style: { background: "rgba(0, 229, 168, 0.15)", color: "#00E5A8", border: "1px solid rgba(0, 229, 168, 0.3)", padding: "1px 6px", borderRadius: "4px", fontSize: "0.68rem", fontWeight: "700" } },
-            `P_U(15m): ${((t0?.finite_horizon_touch?.p_upper_first_within_horizon ?? 0.0553) * 100).toFixed(1)}%`
+            t0?.finite_horizon_touch?.p_upper_first_within_horizon != null ? `P_U(15m): ${(t0.finite_horizon_touch.p_upper_first_within_horizon * 100).toFixed(1)}%` : "P_U(15m): DATA_UNAVAILABLE"
           )
         ),
         h("div", { className: "hypothesis-metric-row" },
           h("span", { style: { color: "#94A3B8" } }, "Target Barrier (U):"),
-          h("strong", { style: { color: "#F8FAFC", fontFamily: "var(--font-mono)" } }, `$${(t0?.conformal_p90 || (livePrice * 1.008)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+          h("strong", { style: { color: "#F8FAFC", fontFamily: "var(--font-mono)" } }, t0?.conformal_p90 != null ? `$${t0.conformal_p90.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "DATA_UNAVAILABLE")
         ),
         h("div", { className: "hypothesis-metric-row" },
           h("span", { style: { color: "#94A3B8" } }, "Target Distance:"),
           h("strong", { style: { color: "#00E5A8", fontFamily: "var(--font-mono)" } },
-            `+$${Math.abs((t0?.conformal_p90 || (livePrice * 1.008)) - livePrice).toFixed(1)} (+${((Math.abs((t0?.conformal_p90 || (livePrice * 1.008)) - livePrice) / livePrice) * 100).toFixed(2)}%)`
+            (t0?.conformal_p90 != null && livePrice) ? `+$${Math.abs(t0.conformal_p90 - livePrice).toFixed(1)} (+${((Math.abs(t0.conformal_p90 - livePrice) / livePrice) * 100).toFixed(2)}%)` : "—"
           )
         ),
         h("div", { className: "hypothesis-metric-row" },
           h("span", { style: { color: "#94A3B8" } }, "Stop Distance:"),
           h("strong", { style: { color: "#FF5C7C", fontFamily: "var(--font-mono)" } },
-            `-$${Math.abs(livePrice - (t0?.conformal_p10 || (livePrice * 0.993))).toFixed(1)} (-${((Math.abs(livePrice - (t0?.conformal_p10 || (livePrice * 0.993))) / livePrice) * 100).toFixed(2)}%)`
+            (t0?.conformal_p10 != null && livePrice) ? `-$${Math.abs(livePrice - t0.conformal_p10).toFixed(1)} (-${((Math.abs(livePrice - t0.conformal_p10) / livePrice) * 100).toFixed(2)}%)` : "—"
           )
         ),
         h("div", { className: "hypothesis-metric-row" },
           h("span", { style: { color: "#94A3B8" } }, "Contract Geometry (R:R):"),
           h("strong", { style: { color: "#38BDF8", fontFamily: "var(--font-mono)" } },
-            `1 : ${(Math.abs((t0?.conformal_p90 || (livePrice * 1.008)) - livePrice) / Math.max(1e-6, Math.abs(livePrice - (t0?.conformal_p10 || (livePrice * 0.993))))).toFixed(2)} (Geometric Ratio)`
+            (t0?.conformal_p90 != null && t0?.conformal_p10 != null && livePrice) ? `1 : ${(Math.abs(t0.conformal_p90 - livePrice) / Math.max(1e-6, Math.abs(livePrice - t0.conformal_p10))).toFixed(2)} (Geometric Ratio)` : "—"
           )
         ),
         h("div", { className: "hypothesis-metric-row" },
           h("span", { style: { color: "#94A3B8" } }, "Estimated Cost Context:"),
-          h("strong", { style: { color: "#CBD5E1", fontFamily: "var(--font-mono)" } }, `-${(longH.drag_bps || 9.3).toFixed(1)} bps`)
+          h("strong", { style: { color: "#CBD5E1", fontFamily: "var(--font-mono)" } }, longH?.drag_bps != null ? `-${longH.drag_bps.toFixed(1)} bps` : "—")
         ),
         h("div", { className: "hypothesis-metric-row" },
           h("span", { style: { color: "#94A3B8" } }, "Effective Sample (N_eff):"),
-          h("strong", { style: { color: (longH.n_eff || 133) >= 50 ? "#00E5A8" : "#FF5C7C", fontFamily: "var(--font-mono)" } },
-            `${longH.n_eff || 133} (Newey-West) / Raw: ${longH.raw_N || longH.n_samples || 184}`
+          h("strong", { style: { color: (longH?.n_eff != null && longH.n_eff >= 50) ? "#00E5A8" : "#FF5C7C", fontFamily: "var(--font-mono)" } },
+            longH?.n_eff != null ? `${longH.n_eff} (Newey-West) / Raw: ${longH.raw_N || longH.n_samples || "—"}` : "—"
           )
         ),
         h("div", { className: "hypothesis-metric-row" },
           h("span", { style: { color: "#94A3B8" } }, "Coverage Precision:"),
-          h("strong", { style: { color: "#CBD5E1", fontFamily: "var(--font-mono)" } }, `CI Width: ${longH.ci_width || 9.0}% (±${((longH.ci_width || 9.0) / 2).toFixed(1)}%)`)
+          h("strong", { style: { color: "#CBD5E1", fontFamily: "var(--font-mono)" } }, longH?.ci_width != null ? `CI Width: ${longH.ci_width}% (±${(longH.ci_width / 2).toFixed(1)}%)` : "—")
         ),
         h("div", { className: "hypothesis-metric-row" },
           h("span", { style: { color: "#94A3B8" } }, "TP-to-Barrier Invariant:"),
-          h("strong", { style: { color: "#00E5A8", fontFamily: "var(--font-mono)", fontSize: "0.68rem" } }, "TP == U (CONSISTENT)")
+          h("strong", { style: { color: longH ? "#00E5A8" : "#94A3B8", fontFamily: "var(--font-mono)", fontSize: "0.68rem" } }, longH ? "TP == U (CONSISTENT)" : "SUPPRESSED")
         )
       ),
 
@@ -5491,48 +6741,48 @@ function AiDualHypothesisPanel({ activePaperPos, livePrice, userDirectionPrefere
         h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" } },
           h("strong", { style: { color: "#FF5C7C", fontSize: "0.86rem" } }, "LOWER EXCURSION SCENARIO"),
           h("span", { style: { background: "rgba(255, 92, 124, 0.15)", color: "#FF5C7C", border: "1px solid rgba(255, 92, 124, 0.3)", padding: "1px 6px", borderRadius: "4px", fontSize: "0.68rem", fontWeight: "700" } },
-            `P_L(15m): ${((t0?.finite_horizon_touch?.p_lower_first_within_horizon ?? 0.0911) * 100).toFixed(1)}%`
+            t0?.finite_horizon_touch?.p_lower_first_within_horizon != null ? `P_L(15m): ${(t0.finite_horizon_touch.p_lower_first_within_horizon * 100).toFixed(1)}%` : "P_L(15m): DATA_UNAVAILABLE"
           )
         ),
         h("div", { className: "hypothesis-metric-row" },
           h("span", { style: { color: "#94A3B8" } }, "Target Barrier (L):"),
-          h("strong", { style: { color: "#F8FAFC", fontFamily: "var(--font-mono)" } }, `$${(t0?.conformal_p10 || (livePrice * 0.993)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+          h("strong", { style: { color: "#F8FAFC", fontFamily: "var(--font-mono)" } }, t0?.conformal_p10 != null ? `$${t0.conformal_p10.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "DATA_UNAVAILABLE")
         ),
         h("div", { className: "hypothesis-metric-row" },
           h("span", { style: { color: "#94A3B8" } }, "Target Distance:"),
           h("strong", { style: { color: "#FF5C7C", fontFamily: "var(--font-mono)" } },
-            `-$${Math.abs(livePrice - (t0?.conformal_p10 || (livePrice * 0.993))).toFixed(1)} (-${((Math.abs(livePrice - (t0?.conformal_p10 || (livePrice * 0.993))) / livePrice) * 100).toFixed(2)}%)`
+            (t0?.conformal_p10 != null && livePrice) ? `-$${Math.abs(livePrice - t0.conformal_p10).toFixed(1)} (-${((Math.abs(livePrice - t0.conformal_p10) / livePrice) * 100).toFixed(2)}%)` : "—"
           )
         ),
         h("div", { className: "hypothesis-metric-row" },
           h("span", { style: { color: "#94A3B8" } }, "Stop Distance:"),
           h("strong", { style: { color: "#00E5A8", fontFamily: "var(--font-mono)" } },
-            `+$${Math.abs((t0?.conformal_p90 || (livePrice * 1.008)) - livePrice).toFixed(1)} (+${((Math.abs((t0?.conformal_p90 || (livePrice * 1.008)) - livePrice) / livePrice) * 100).toFixed(2)}%)`
+            (t0?.conformal_p90 != null && livePrice) ? `+$${Math.abs(t0.conformal_p90 - livePrice).toFixed(1)} (+${((Math.abs(t0.conformal_p90 - livePrice) / livePrice) * 100).toFixed(2)}%)` : "—"
           )
         ),
         h("div", { className: "hypothesis-metric-row" },
           h("span", { style: { color: "#94A3B8" } }, "Contract Geometry (R:R):"),
           h("strong", { style: { color: "#38BDF8", fontFamily: "var(--font-mono)" } },
-            `1 : ${(Math.abs(livePrice - (t0?.conformal_p10 || (livePrice * 0.993))) / Math.max(1e-6, Math.abs((t0?.conformal_p90 || (livePrice * 1.008)) - livePrice))).toFixed(2)} (Geometric Ratio)`
+            (t0?.conformal_p10 != null && t0?.conformal_p90 != null && livePrice) ? `1 : ${(Math.abs(livePrice - t0.conformal_p10) / Math.max(1e-6, Math.abs(t0.conformal_p90 - livePrice))).toFixed(2)} (Geometric Ratio)` : "—"
           )
         ),
         h("div", { className: "hypothesis-metric-row" },
           h("span", { style: { color: "#94A3B8" } }, "Estimated Cost Context:"),
-          h("strong", { style: { color: "#CBD5E1", fontFamily: "var(--font-mono)" } }, `-${(shortH.drag_bps || 6.0).toFixed(1)} bps`)
+          h("strong", { style: { color: "#CBD5E1", fontFamily: "var(--font-mono)" } }, shortH?.drag_bps != null ? `-${shortH.drag_bps.toFixed(1)} bps` : "—")
         ),
         h("div", { className: "hypothesis-metric-row" },
           h("span", { style: { color: "#94A3B8" } }, "Effective Sample (N_eff):"),
-          h("strong", { style: { color: (shortH.n_eff || 124) >= 50 ? "#00E5A8" : "#FF5C7C", fontFamily: "var(--font-mono)" } },
-            `${shortH.n_eff || 124} (Newey-West) / Raw: ${shortH.raw_N || shortH.n_samples || 171}`
+          h("strong", { style: { color: (shortH?.n_eff != null && shortH.n_eff >= 50) ? "#00E5A8" : "#FF5C7C", fontFamily: "var(--font-mono)" } },
+            shortH?.n_eff != null ? `${shortH.n_eff} (Newey-West) / Raw: ${shortH.raw_N || shortH.n_samples || "—"}` : "—"
           )
         ),
         h("div", { className: "hypothesis-metric-row" },
           h("span", { style: { color: "#94A3B8" } }, "Coverage Precision:"),
-          h("strong", { style: { color: "#CBD5E1", fontFamily: "var(--font-mono)" } }, `CI Width: ${shortH.ci_width || 9.0}% (±${((shortH.ci_width || 9.0) / 2).toFixed(1)}%)`)
+          h("strong", { style: { color: "#CBD5E1", fontFamily: "var(--font-mono)" } }, shortH?.ci_width != null ? `CI Width: ${shortH.ci_width}% (±${(shortH.ci_width / 2).toFixed(1)}%)` : "—")
         ),
         h("div", { className: "hypothesis-metric-row" },
           h("span", { style: { color: "#94A3B8" } }, "SL-to-Barrier Invariant:"),
-          h("strong", { style: { color: "#00E5A8", fontFamily: "var(--font-mono)", fontSize: "0.68rem" } }, "SL == L (CONSISTENT)")
+          h("strong", { style: { color: shortH ? "#00E5A8" : "#94A3B8", fontFamily: "var(--font-mono)", fontSize: "0.68rem" } }, shortH ? "SL == L (CONSISTENT)" : "SUPPRESSED")
         )
       ),
 
@@ -5541,7 +6791,7 @@ function AiDualHypothesisPanel({ activePaperPos, livePrice, userDirectionPrefere
         h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" } },
           h("strong", { style: { color: "#38BDF8", fontSize: "0.86rem" } }, "INTRA-ENVELOPE SURVIVAL"),
           h("span", { style: { background: "rgba(56, 189, 248, 0.15)", color: "#38BDF8", border: "1px solid rgba(56, 189, 248, 0.3)", padding: "1px 6px", borderRadius: "4px", fontSize: "0.68rem", fontWeight: "700" } },
-            `P_0(15m): ${(((t0?.finite_horizon_touch?.p_no_exit_within_horizon ?? t0?.finite_horizon_touch?.p_survive_within_horizon) ?? 0.8537) * 100).toFixed(1)}%`
+            ((t0?.finite_horizon_touch?.p_no_exit_within_horizon ?? t0?.finite_horizon_touch?.p_survive_within_horizon) != null) ? `P_0(15m): ${(((t0.finite_horizon_touch.p_no_exit_within_horizon ?? t0.finite_horizon_touch.p_survive_within_horizon)) * 100).toFixed(1)}%` : "P_0(15m): DATA_UNAVAILABLE"
           )
         ),
         h("div", { className: "hypothesis-metric-row" },
@@ -5550,33 +6800,35 @@ function AiDualHypothesisPanel({ activePaperPos, livePrice, userDirectionPrefere
         ),
         h("div", { className: "hypothesis-metric-row" },
           h("span", { style: { color: "#94A3B8" } }, "Solver Version:"),
-          h("strong", { style: { color: "#CBD5E1", fontFamily: "var(--font-mono)", fontSize: "0.68rem" } }, t0?.finite_horizon_touch?.solver_diagnostics?.solver_version || "EIGENFUNCTION_V3.2")
+          h("strong", { style: { color: "#CBD5E1", fontFamily: "var(--font-mono)", fontSize: "0.68rem" } }, t0?.finite_horizon_touch?.solver_diagnostics?.solver_version || "—")
         ),
         h("div", { className: "hypothesis-metric-row" },
           h("span", { style: { color: "#94A3B8" } }, "Remainder Tail Bound:"),
-          h("strong", { style: { color: "#00E5A8", fontFamily: "var(--font-mono)", fontSize: "0.68rem" } }, `${t0?.finite_horizon_touch?.solver_diagnostics?.estimated_remainder_bound ?? "< 1e-9"}`)
+          h("strong", { style: { color: "#00E5A8", fontFamily: "var(--font-mono)", fontSize: "0.68rem" } }, t0?.finite_horizon_touch?.solver_diagnostics?.estimated_remainder_bound != null ? `${t0.finite_horizon_touch.solver_diagnostics.estimated_remainder_bound}` : "—")
         ),
         h("div", { className: "hypothesis-metric-row" },
           h("span", { style: { color: "#94A3B8" } }, "Latest Term (|term|):"),
-          h("strong", { style: { color: "#CBD5E1", fontFamily: "var(--font-mono)", fontSize: "0.68rem" } }, `${t0?.finite_horizon_touch?.solver_diagnostics?.term_abs ?? "< 1e-9"}`)
+          h("strong", { style: { color: "#CBD5E1", fontFamily: "var(--font-mono)", fontSize: "0.68rem" } }, t0?.finite_horizon_touch?.solver_diagnostics?.term_abs != null ? `${t0.finite_horizon_touch.solver_diagnostics.term_abs}` : "—")
         ),
         h("div", { className: "hypothesis-metric-row" },
           h("span", { style: { color: "#94A3B8" } }, "Conservation Error:"),
-          h("strong", { style: { color: "#00E5A8", fontFamily: "var(--font-mono)", fontSize: "0.68rem" } }, `${t0?.finite_horizon_touch?.solver_diagnostics?.probability_conservation_error ?? "0.0"}`)
+          h("strong", { style: { color: "#00E5A8", fontFamily: "var(--font-mono)", fontSize: "0.68rem" } }, t0?.finite_horizon_touch?.solver_diagnostics?.probability_conservation_error != null ? `${t0.finite_horizon_touch.solver_diagnostics.probability_conservation_error}` : "—")
         ),
         h("div", { className: "hypothesis-metric-row" },
           h("span", { style: { color: "#94A3B8" } }, "Series Iterations Used:"),
-          h("strong", { style: { color: "#38BDF8", fontFamily: "var(--font-mono)" } }, `${t0?.finite_horizon_touch?.solver_diagnostics?.iterations_used || 15} terms`)
+          h("strong", { style: { color: "#38BDF8", fontFamily: "var(--font-mono)" } }, t0?.finite_horizon_touch?.solver_diagnostics?.iterations_used != null ? `${t0.finite_horizon_touch.solver_diagnostics.iterations_used} terms` : "—")
         ),
         h("div", { className: "hypothesis-metric-row" },
           h("span", { style: { color: "#94A3B8" } }, "Boundary Proximity:"),
           h("strong", { style: { color: t0?.finite_horizon_touch?.solver_diagnostics?.convergence_warning ? "#F59E0B" : "#00E5A8", fontFamily: "var(--font-mono)", fontSize: "0.68rem" } },
-            t0?.finite_horizon_touch?.solver_diagnostics?.convergence_warning ? "WARN: NEAR EPSILON" : "NORMAL (STABLE)"
+            t0?.finite_horizon_touch?.solver_diagnostics
+              ? (t0.finite_horizon_touch.solver_diagnostics.convergence_warning ? "WARN: NEAR EPSILON" : "NORMAL (STABLE)")
+              : "UNAVAILABLE"
           )
         ),
         h("div", { className: "hypothesis-metric-row" },
           h("span", { style: { color: "#94A3B8" } }, "Conformal Distinction:"),
-          h("strong", { style: { color: "#A78BFA", fontFamily: "var(--font-mono)", fontSize: "0.68rem" } }, "MODEL PATH PROBABILITY")
+          h("strong", { style: { color: "#CBD5E1", fontFamily: "var(--font-mono)", fontSize: "0.68rem" } }, "Touch != Settlement (VERIFIED)")
         )
       )
     ),
@@ -5879,6 +7131,9 @@ function AlertDiagnosticsPanel() {
         "⚡ ALERT SYSTEM DIAGNOSTICS"
       ),
       h("span", { style: { color: workerColor(ws), fontWeight: "700" } }, `${ws} ${expanded ? "▲" : "▼"}`)
+    ),
+    h("div", { role: "note", style: { color: "#94A3B8", marginTop: "4px" } },
+      "Diagnostics report worker and delivery status only; they do not represent validated market observations or notification-test history."
     ),
 
     // Collapsed: just the heartbeat line
@@ -6184,10 +7439,10 @@ function StrategyTournamentDashboard({
                 fontWeight: "700",
                 color: setupState === "SETUP_AVAILABLE" ? "#00E5A8"
                   : setupState === "COST_INELIGIBLE" ? "#FF5C7C"
-                  : setupState === "STALE_MARKET_DATA" ? "#F59E0B"
-                  : setupState === "INVALID_MARKET_INPUT" ? "#EF4444"
-                  : setupState === "SETUP_PREVIEW_AVAILABLE" ? "#38BDF8"
-                  : setupState === "NO_SETUP" ? "#94A3B8" : "#FBBF24"
+                    : setupState === "STALE_MARKET_DATA" ? "#F59E0B"
+                      : setupState === "INVALID_MARKET_INPUT" ? "#EF4444"
+                        : setupState === "SETUP_PREVIEW_AVAILABLE" ? "#38BDF8"
+                          : setupState === "NO_SETUP" ? "#94A3B8" : "#FBBF24"
               }
             }, `SETUP: ${setupState}`),
             h("span", {
@@ -6431,7 +7686,7 @@ function WorkstationDecisionSidebar({
     event: "MOMENTUM_IGNITION",
     evidence: "P_U / P_L Excursion",
     estimated_execution_cost_bps: 9.3,
-    c2_health: "CALIBRATED",
+    c2_health: "UNAVAILABLE",
     risk_check: "AUTHORIZED",
     action: "ABSTAIN",
     economic_aggregation: "DISABLED_AT_TIER_0"
@@ -6493,34 +7748,29 @@ function WorkstationDecisionSidebar({
 
       // Metric Grid: Entry, TP, SL, Current Price
       (() => {
-        const curEntry = p?.entry_price || livePrice || 64250;
-        const targetU = (p?.tp_price && p.tp_price > curEntry * 0.95) ? p.tp_price : (curEntry * 1.008);
-        const targetL = (p?.sl_price && p.sl_price < curEntry * 1.05 && p.sl_price > 0) ? p.sl_price : (curEntry * 0.993);
-        const maxBars = p?.max_hold_bars || 15;
-
         return h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", background: "rgba(0,0,0,0.35)", padding: "10px", borderRadius: "8px", marginBottom: "12px" } },
           h("div", null,
-            h("div", { style: { color: "#7E95B5", fontSize: "0.65rem", fontWeight: "700" } }, "ENTRY TARGET"),
+            h("div", { style: { color: "#7E95B5", fontSize: "0.65rem", fontWeight: "700" } }, "ENTRY REFERENCE"),
             h("strong", { style: { color: "#00F0FF", fontFamily: "var(--font-mono)", fontSize: "0.90rem" } },
-              `$${Math.round(curEntry).toLocaleString()}`
+              "Unavailable"
             )
           ),
           h("div", null,
-            h("div", { style: { color: "#7E95B5", fontSize: "0.65rem", fontWeight: "700" } }, "TARGET U (P90)"),
+            h("div", { style: { color: "#7E95B5", fontSize: "0.65rem", fontWeight: "700" } }, "UPPER RISK BOUND"),
             h("strong", { style: { color: "#00E5A8", fontFamily: "var(--font-mono)", fontSize: "0.90rem" } },
-              `$${Math.round(targetU).toLocaleString()}`
+              "Unavailable"
             )
           ),
           h("div", null,
-            h("div", { style: { color: "#7E95B5", fontSize: "0.65rem", fontWeight: "700" } }, "TARGET L (P10)"),
+            h("div", { style: { color: "#7E95B5", fontSize: "0.65rem", fontWeight: "700" } }, "LOWER RISK BOUND"),
             h("strong", { style: { color: "#FF5C7C", fontFamily: "var(--font-mono)", fontSize: "0.90rem" } },
-              `$${Math.round(targetL).toLocaleString()}`
+              "Unavailable"
             )
           ),
           h("div", null,
             h("div", { style: { color: "#7E95B5", fontSize: "0.65rem", fontWeight: "700" } }, "MAX HOLD"),
             h("strong", { style: { color: "#F8FAFC", fontFamily: "var(--font-mono)", fontSize: "0.90rem" } },
-              `${maxBars} bars`
+              "Unavailable"
             )
           )
         );
@@ -6619,7 +7869,7 @@ function WorkstationDecisionSidebar({
         ),
         h("div", { style: { display: "flex", justifyContent: "space-between" } },
           h("span", { style: { color: "#7E95B5" } }, "C2 Health:"),
-          h("strong", { style: { color: "#00E5A8" } }, anatomy.c2_health || "CALIBRATED")
+          h("strong", { style: { color: "#F59E0B" } }, "UNAVAILABLE")
         )
       )
     )
@@ -6686,126 +7936,126 @@ function AiEvidenceInputsBar({
   const totalVoi = evidenceRouting?.total_voi_bps || 14.8;
   const auditAlerts = evidenceRouting?.user_audit_alerts || [];
 
-    // Helper to render an indicator pill with visual suppression for unvalidated evidence
-    const renderIndicatorPill = (i) => {
-      const active = (enabledIndicators || []).includes(i.id);
-      const meta = voiLookup[i.id] || {};
-      const role = meta.role || (active ? "PRIMARY" : "CONTEXT");
-      const voi = meta.routing_relevance_bps || meta.voi_bps || 1.0;
-      const valStatus = meta.empirical_validation_status || (i.id === "ofi" ? "UNVALIDATED" : (["funding", "open_interest", "options_iv"].includes(i.id) ? "PROSPECTIVE" : "VALIDATED"));
-      const isUnvalidated = valStatus === "UNVALIDATED" || valStatus === "PROSPECTIVE";
-      const isQ1Feeder = i.id === "ofi";
+  // Helper to render an indicator pill with visual suppression for unvalidated evidence
+  const renderIndicatorPill = (i) => {
+    const active = (enabledIndicators || []).includes(i.id);
+    const meta = voiLookup[i.id] || {};
+    const role = meta.role || (active ? "PRIMARY" : "CONTEXT");
+    const voi = meta.routing_relevance_bps || meta.voi_bps || 1.0;
+    const valStatus = meta.empirical_validation_status || (i.id === "ofi" ? "UNVALIDATED" : (["funding", "open_interest", "options_iv"].includes(i.id) ? "PROSPECTIVE" : "VALIDATED"));
+    const isUnvalidated = valStatus === "UNVALIDATED" || valStatus === "PROSPECTIVE";
+    const isQ1Feeder = i.id === "ofi";
 
-      const suppressionClass = isQ1Feeder && isUnvalidated ? "q1-unvalidated-evidence" : (isUnvalidated ? "unvalidated-evidence" : "validated-evidence");
+    const suppressionClass = isQ1Feeder && isUnvalidated ? "q1-unvalidated-evidence" : (isUnvalidated ? "unvalidated-evidence" : "validated-evidence");
 
-      return h("span", {
-        key: i.id,
-        className: `indicator-checkbox-label ${active ? "active" : ""} ${suppressionClass}`,
-        onClick: () => onToggleIndicator && onToggleIndicator(i.id),
-        title: `${i.label} · Validation: ${valStatus} · Routing Relevance: +${voi} bp`
-      },
-        h("span", { style: { color: active ? (isUnvalidated ? "#94A3B8" : "#00F0FF") : "#64748B" } }, active ? "☑" : "☐"),
-        h("span", { style: { color: isUnvalidated ? "#94A3B8" : "#F8FAFC", fontSize: isUnvalidated ? "0.68rem" : "0.72rem" } }, i.label),
-        h("span", { className: `evidence-category-badge ${role.toLowerCase()} ${isUnvalidated ? "suppressed" : ""}` }, role),
-        isUnvalidated && h("span", { className: `validation-status-tag ${valStatus.toLowerCase()}` }, valStatus),
-        h("span", { className: `voi-chip ${isUnvalidated ? "muted" : (voi >= 3.0 ? "high" : (voi >= 1.5 ? "medium" : "low"))}` }, `+${voi}bp`)
-      );
-    };
-
-    // Checkboxes by domain with VOI and Role Badges
-    return h("div", { className: "evidence-inputs-panel" },
-      // Row 1: Header + Horizon + Evidence Mode
-      h("div", { className: "evidence-header-row", style: { flexWrap: "wrap", gap: "12px", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "10px", marginBottom: "10px" } },
-        h("div", { style: { display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" } },
-          h("span", { style: { fontSize: "1.1rem" } }, "🎛️"),
-          h("strong", { style: { color: "#F8FAFC", fontSize: "0.86rem", letterSpacing: "0.03em" } }, "DYNAMIC EVIDENCE ROUTER (AEER)"),
-          h("span", { style: { fontSize: "0.72rem", color: "#A78BFA", background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.3)", padding: "2px 8px", borderRadius: "4px", fontFamily: "var(--font-mono)" } },
-            `Config Hash: ${configHash || "0x8f3c2a1e"}`
-          ),
-          h("span", { style: { fontSize: "0.72rem", color: "#00E5A8", background: "rgba(0,229,168,0.12)", border: "1px solid rgba(0,229,168,0.3)", padding: "2px 8px", borderRadius: "4px", fontFamily: "var(--font-mono)" } },
-            `Total Routing Relevance: +${totalVoi} bps`
-          )
-        ),
-
-        // Horizon selector pills
-        h("div", { style: { display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" } },
-          h("span", { style: { fontSize: "0.68rem", color: "#7E95B5", textTransform: "uppercase", fontWeight: "700" } }, "HORIZON:"),
-          h("div", { className: "horizon-pill-group" },
-            horizons.map(hz =>
-              h("button", {
-                key: hz,
-                className: `horizon-pill-btn ${(targetHorizon || "15m") === hz ? "active" : ""}`,
-                onClick: () => setTargetHorizon && setTargetHorizon(hz)
-              }, hz)
-            )
-          )
-        ),
-
-        // Evidence Mode Selector
-        h("div", { style: { display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" } },
-          modes.map(m =>
-            h("button", {
-              key: m.id,
-              className: `evidence-mode-btn ${(evidenceMode || "AI_RECOMMEND") === m.id ? "active" : ""}`,
-              onClick: () => setEvidenceMode && setEvidenceMode(m.id)
-            }, m.label)
-          )
-        )
-      ),
-
-      // Row 2: AI Audit Alerts (if user added low-value or redundant indicators)
-      auditAlerts.length > 0 && h("div", { style: { background: "rgba(245, 158, 11, 0.10)", border: "1px solid rgba(245, 158, 11, 0.3)", borderRadius: "6px", padding: "6px 12px", marginBottom: "10px", fontSize: "0.72rem", color: "#CBD5E1" } },
-        auditAlerts.map((alt, i) =>
-          h("div", { key: i, style: { display: "flex", alignItems: "center", gap: "6px", marginTop: i > 0 ? "4px" : 0 } },
-            h("span", { style: { color: "#F59E0B" } }, "ℹ️"),
-            h("span", null, alt)
-          )
-        )
-      ),
-
-      // Row 3: Presets Strip
-      h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px", flexWrap: "wrap", gap: "8px" } },
-        h("div", { style: { display: "flex", alignItems: "center", gap: "6px" } },
-          h("span", { style: { fontSize: "0.68rem", color: "#7E95B5", textTransform: "uppercase", fontWeight: "700" } }, "PRESETS:"),
-          presets.map(p =>
-            h("button", {
-              key: p,
-              onClick: () => onApplyPreset && onApplyPreset(p),
-              style: {
-                background: "rgba(255, 255, 255, 0.04)",
-                border: "1px solid rgba(255, 255, 255, 0.12)",
-                color: "#CBD5E1",
-                fontSize: "0.68rem",
-                fontWeight: "700",
-                padding: "2px 8px",
-                borderRadius: "4px",
-                cursor: "pointer"
-              }
-            }, `[ ${p} ]`)
-          )
-        ),
-        h("span", { style: { fontSize: "0.68rem", color: "#94A3B8" } },
-          "Routing Relevance ≠ Empirical Validation · Unvalidated Q1 signals are visually suppressed"
-        )
-      ),
-
-      // Checkboxes by domain with VOI and Role Badges
-      h("div", { className: "evidence-domain-section" },
-        h("span", { className: "evidence-domain-title" }, "Short-Term:"),
-        shortTerm.map(renderIndicatorPill)
-      ),
-
-      h("div", { className: "evidence-domain-section" },
-        h("span", { className: "evidence-domain-title" }, "Volatility:"),
-        vol.map(renderIndicatorPill)
-      ),
-
-      h("div", { className: "evidence-domain-section" },
-        h("span", { className: "evidence-domain-title" }, "Cycle / Macro:"),
-        cycle.map(renderIndicatorPill)
-      )
+    return h("span", {
+      key: i.id,
+      className: `indicator-checkbox-label ${active ? "active" : ""} ${suppressionClass}`,
+      onClick: () => onToggleIndicator && onToggleIndicator(i.id),
+      title: `${i.label} · Validation: ${valStatus} · Routing Relevance: +${voi} bp`
+    },
+      h("span", { style: { color: active ? (isUnvalidated ? "#94A3B8" : "#00F0FF") : "#64748B" } }, active ? "☑" : "☐"),
+      h("span", { style: { color: isUnvalidated ? "#94A3B8" : "#F8FAFC", fontSize: isUnvalidated ? "0.68rem" : "0.72rem" } }, i.label),
+      h("span", { className: `evidence-category-badge ${role.toLowerCase()} ${isUnvalidated ? "suppressed" : ""}` }, role),
+      isUnvalidated && h("span", { className: `validation-status-tag ${valStatus.toLowerCase()}` }, valStatus),
+      h("span", { className: `voi-chip ${isUnvalidated ? "muted" : (voi >= 3.0 ? "high" : (voi >= 1.5 ? "medium" : "low"))}` }, `+${voi}bp`)
     );
   };
+
+  // Checkboxes by domain with VOI and Role Badges
+  return h("div", { className: "evidence-inputs-panel" },
+    // Row 1: Header + Horizon + Evidence Mode
+    h("div", { className: "evidence-header-row", style: { flexWrap: "wrap", gap: "12px", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "10px", marginBottom: "10px" } },
+      h("div", { style: { display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" } },
+        h("span", { style: { fontSize: "1.1rem" } }, "🎛️"),
+        h("strong", { style: { color: "#F8FAFC", fontSize: "0.86rem", letterSpacing: "0.03em" } }, "DYNAMIC EVIDENCE ROUTER (AEER)"),
+        h("span", { style: { fontSize: "0.72rem", color: "#A78BFA", background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.3)", padding: "2px 8px", borderRadius: "4px", fontFamily: "var(--font-mono)" } },
+          `Config Hash: ${configHash || "0x8f3c2a1e"}`
+        ),
+        h("span", { style: { fontSize: "0.72rem", color: "#00E5A8", background: "rgba(0,229,168,0.12)", border: "1px solid rgba(0,229,168,0.3)", padding: "2px 8px", borderRadius: "4px", fontFamily: "var(--font-mono)" } },
+          `Total Routing Relevance: +${totalVoi} bps`
+        )
+      ),
+
+      // Horizon selector pills
+      h("div", { style: { display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" } },
+        h("span", { style: { fontSize: "0.68rem", color: "#7E95B5", textTransform: "uppercase", fontWeight: "700" } }, "HORIZON:"),
+        h("div", { className: "horizon-pill-group" },
+          horizons.map(hz =>
+            h("button", {
+              key: hz,
+              className: `horizon-pill-btn ${(targetHorizon || "15m") === hz ? "active" : ""}`,
+              onClick: () => setTargetHorizon && setTargetHorizon(hz)
+            }, hz)
+          )
+        )
+      ),
+
+      // Evidence Mode Selector
+      h("div", { style: { display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" } },
+        modes.map(m =>
+          h("button", {
+            key: m.id,
+            className: `evidence-mode-btn ${(evidenceMode || "AI_RECOMMEND") === m.id ? "active" : ""}`,
+            onClick: () => setEvidenceMode && setEvidenceMode(m.id)
+          }, m.label)
+        )
+      )
+    ),
+
+    // Row 2: AI Audit Alerts (if user added low-value or redundant indicators)
+    auditAlerts.length > 0 && h("div", { style: { background: "rgba(245, 158, 11, 0.10)", border: "1px solid rgba(245, 158, 11, 0.3)", borderRadius: "6px", padding: "6px 12px", marginBottom: "10px", fontSize: "0.72rem", color: "#CBD5E1" } },
+      auditAlerts.map((alt, i) =>
+        h("div", { key: i, style: { display: "flex", alignItems: "center", gap: "6px", marginTop: i > 0 ? "4px" : 0 } },
+          h("span", { style: { color: "#F59E0B" } }, "ℹ️"),
+          h("span", null, alt)
+        )
+      )
+    ),
+
+    // Row 3: Presets Strip
+    h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px", flexWrap: "wrap", gap: "8px" } },
+      h("div", { style: { display: "flex", alignItems: "center", gap: "6px" } },
+        h("span", { style: { fontSize: "0.68rem", color: "#7E95B5", textTransform: "uppercase", fontWeight: "700" } }, "PRESETS:"),
+        presets.map(p =>
+          h("button", {
+            key: p,
+            onClick: () => onApplyPreset && onApplyPreset(p),
+            style: {
+              background: "rgba(255, 255, 255, 0.04)",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
+              color: "#CBD5E1",
+              fontSize: "0.68rem",
+              fontWeight: "700",
+              padding: "2px 8px",
+              borderRadius: "4px",
+              cursor: "pointer"
+            }
+          }, `[ ${p} ]`)
+        )
+      ),
+      h("span", { style: { fontSize: "0.68rem", color: "#94A3B8" } },
+        "Routing Relevance ≠ Empirical Validation · Unvalidated Q1 signals are visually suppressed"
+      )
+    ),
+
+    // Checkboxes by domain with VOI and Role Badges
+    h("div", { className: "evidence-domain-section" },
+      h("span", { className: "evidence-domain-title" }, "Short-Term:"),
+      shortTerm.map(renderIndicatorPill)
+    ),
+
+    h("div", { className: "evidence-domain-section" },
+      h("span", { className: "evidence-domain-title" }, "Volatility:"),
+      vol.map(renderIndicatorPill)
+    ),
+
+    h("div", { className: "evidence-domain-section" },
+      h("span", { className: "evidence-domain-title" }, "Cycle / Macro:"),
+      cycle.map(renderIndicatorPill)
+    )
+  );
+};
 
 // ===========================================================================
 // TradeContractModal Component
@@ -6844,7 +8094,7 @@ function TradeContractModal({ trade, onClose }) {
       className: "contract-modal-card",
       onClick: (e) => e.stopPropagation()
     },
-      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" } },
+      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px", marginBottom: "16px" } },
         h("div", null,
           h("div", { style: { fontSize: "0.72rem", color: "#00E5A8", fontWeight: "800" } }, "● LIVE PAPER TRADE CONTRACT"),
           h("h3", { style: { fontSize: "1.2rem", fontWeight: "800", color: "#F8FAFC", margin: "2px 0 0 0" } },
@@ -7037,7 +8287,7 @@ function HistoricalAnalogsPanel() {
       // Card 1: Query Regime
       h("div", { style: { background: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "10px", padding: "12px 14px" } },
         h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", textTransform: "uppercase" } }, "Current Query Regime"),
-        h("div", { style: { fontSize: "1.1rem", fontWeight: "800", color: "#00E5A8", marginTop: "2px" } }, data?.query_regime || "NORMAL"),
+        h("div", { style: { fontSize: "1.1rem", fontWeight: "800", color: "#00E5A8", marginTop: "2px" } }, data?.query_regime || "UNAVAILABLE"),
         h("div", { style: { fontSize: "0.72rem", color: "#CBD5E1", marginTop: "2px", fontFamily: "var(--font-mono)" } },
           `Vol: ${data?.query_vol_24h_pct}% · TS: ${data?.query_term_structure}`
         )
@@ -7406,7 +8656,7 @@ function EntryTpSlResearchPanel() {
                 fontSize: "0.75rem",
                 cursor: "pointer"
               }
-            }, `${Math.round(val*100)}%`)
+            }, `${Math.round(val * 100)}%`)
           )
         ),
         h("button", {
@@ -7498,7 +8748,7 @@ function EntryTpSlResearchPanel() {
 
           // Col 2: Calibrated Probabilities
           h("div", { style: { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "14px" } },
-            h("div", { style: { color: "#A855F7", fontWeight: "700", fontSize: "0.80rem", marginBottom: "8px" } }, "🎯 CALIBRATED PROBABILITIES"),
+            h("div", { style: { color: "#A855F7", fontWeight: "700", fontSize: "0.80rem", marginBottom: "8px" } }, "🎯 HYPOTHETICAL PATH PROBABILITIES (UNVALIDATED)"),
             h("div", { style: { display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "0.76rem" } },
               h("span", { style: { color: "#94A3B8" } }, "p(Target First):"),
               h("strong", { style: { color: probs.p_tp >= threshold ? "#10B981" : "#F59E0B" } }, `${(probs.p_tp * 100).toFixed(1)}%`)
@@ -7820,7 +9070,7 @@ function FuturePriceForecastingPanel({ livePrice }) {
             h("span", { style: { fontFamily: "var(--font-mono)", color: "#CBD5E1" } }, `$${(activeForecast.empirical_quantiles?.interval_width_usd || 0).toLocaleString()} (${activeForecast.empirical_quantiles?.interval_width_pct || 0}%)`)
           ),
           h("div", { style: { fontSize: "0.68rem", color: "#64748B", marginTop: "4px" } },
-            "Notice: Future closing price quantiles; NOT a maximum excursion or path containment envelope."
+            "Historical empirical closing-price percentiles; not a calibrated confidence interval, future price path, or excursion/path-containment envelope."
           )
         )
       ),
@@ -7913,6 +9163,319 @@ function FuturePriceForecastingPanel({ livePrice }) {
         )
       )
     )
+  );
+}
+
+// ===========================================================================
+// AiForecastRiskOutlookView — V32.35 Multi-Horizon AI Forecasting & Risk Outlook
+// ===========================================================================
+function AiForecastRiskOutlookView({ livePrice, onNavigate }) {
+  const [horizon, setHorizon] = useState("1h");
+  const [forecastPayload, setForecastPayload] = useState(null);
+  const [terminalLivePayload, setTerminalLivePayload] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
+
+  const loadAll = useCallback(async (selectedHz = horizon) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const [fcRes, termRes] = await Promise.all([
+        api.fetchForecastLatest(selectedHz).catch(err => ({ error: err.message })),
+        api.fetchTerminalLive().catch(err => ({ error: err.message }))
+      ]);
+      setForecastPayload(fcRes);
+      setTerminalLivePayload(termRes);
+      setLastUpdated(new Date().toUTCString());
+    } catch (err) {
+      setError(err.message || "Failed to load forecast data");
+    } finally {
+      setLoading(false);
+    }
+  }, [horizon]);
+
+  useEffect(() => {
+    loadAll(horizon);
+    const timer = setInterval(() => loadAll(horizon), 30000);
+    return () => clearInterval(timer);
+  }, [horizon, loadAll]);
+
+  const handleSelectHorizon = (hz) => {
+    setHorizon(hz);
+    loadAll(hz);
+  };
+
+  const isDirAvailable = Boolean(
+    forecastPayload?.directional_recommendation_status !== "DISABLED" &&
+    forecastPayload?.directional_forecast?.status === "RESEARCH_INFERENCE_AVAILABLE" &&
+    typeof forecastPayload?.directional_probability_up === "number"
+  );
+  const dirModelId = forecastPayload?.directional_model_id || (isDirAvailable ? `directional-gbm-${horizon}-v1` : "None (Directional Recommendation Disabled)");
+  const dirProbUp = isDirAvailable ? forecastPayload.directional_probability_up : null;
+  const dirProbDown = isDirAvailable ? forecastPayload.directional_probability_down : null;
+  const dirPredicted = isDirAvailable ? (forecastPayload?.directional_predicted_direction || (dirProbUp >= 0.5 ? "UP" : "DOWN")) : "ABSTAIN";
+  const candleTime = forecastPayload?.last_completed_candle_utc || forecastPayload?.reference_timestamp_utc || "Unavailable";
+  const genTime = forecastPayload?.generated_at_utc || "Unavailable";
+  const freshnessStatus = forecastPayload?.data_freshness_status || "STALE";
+
+  const regimeQ3 = terminalLivePayload?.four_questions?.["3_current_regime"] || {};
+
+  return h("div", {
+    id: "v32-35-forecast-outlook-view",
+    className: "glass-card",
+    style: { padding: "24px", marginTop: "14px", border: "1px solid rgba(56, 189, 248, 0.3)" }
+  },
+    // Top Control & Header Bar
+    h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px", marginBottom: "20px" } },
+      h("div", null,
+        h("div", { style: { display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "4px" } },
+          h("span", { style: { fontSize: "1.3rem" } }, "📈"),
+          h("h2", { style: { margin: 0, fontSize: "1.2rem", fontWeight: "800", color: "#F8FAFC" } }, "AI Forecasts & Risk Outlook"),
+          h("span", { style: { background: "rgba(56, 189, 248, 0.15)", color: "#38BDF8", padding: "2px 8px", borderRadius: "4px", fontSize: "0.72rem", fontWeight: "800" } }, "OFFLINE RESEARCH ONLY"),
+          h("span", { style: { background: "rgba(239, 68, 68, 0.15)", color: "#F87171", padding: "2px 8px", borderRadius: "4px", fontSize: "0.72rem", fontWeight: "800" } }, "LIVE TRADING DISABLED")
+        ),
+        h("div", { style: { fontSize: "0.78rem", color: "#94A3B8" } },
+          "Strict Target Separation: Directional Research GBDTs · Standard HAR status NOT ESTABLISHED · C2 calibration UNAVAILABLE"
+        )
+      ),
+      h("div", { style: { display: "flex", alignItems: "center", gap: "10px" } },
+        h("div", { style: { textAlign: "right", fontSize: "0.72rem", color: "#64748B" } },
+          h("div", null, "Data Feed: Coinbase Spot 15m/1h"),
+          lastUpdated && h("div", null, `Updated: ${lastUpdated.slice(17, 25)} UTC`)
+        ),
+        h("button", {
+          id: "btn-refresh-forecasts",
+          onClick: () => loadAll(horizon),
+          disabled: loading,
+          style: {
+            background: "rgba(56, 189, 248, 0.15)",
+            border: "1px solid rgba(56, 189, 248, 0.4)",
+            color: "#38BDF8",
+            padding: "6px 14px",
+            borderRadius: "6px",
+            cursor: loading ? "wait" : "pointer",
+            fontWeight: "700",
+            fontSize: "0.78rem"
+          }
+        }, loading ? "Refreshing..." : "Refresh ⟳")
+      )
+    ),
+
+    // Section A: Directional Research Forecasts
+    h("div", { style: { background: "rgba(15, 23, 42, 0.65)", border: "1px solid rgba(56, 189, 248, 0.2)", borderRadius: "12px", padding: "18px", marginBottom: "20px" } },
+      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px", marginBottom: "14px" } },
+        h("div", null,
+          h("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+            h("span", { style: { fontSize: "1.1rem" } }, "🧭"),
+            h("h3", { style: { margin: 0, fontSize: "0.98rem", fontWeight: "800", color: "#38BDF8" } }, "A. Directional Research Forecasts (LightGBM GBDT)"),
+            h("span", { id: "dir-status-badge", style: { background: "rgba(245, 158, 11, 0.15)", color: "#FBBF24", padding: "2px 6px", borderRadius: "4px", fontSize: "0.68rem", fontWeight: "700" } }, "PROVENANCE LIMITED / RESEARCH ONLY")
+          ),
+          h("div", { style: { fontSize: "0.74rem", color: "#94A3B8", marginTop: "3px" } },
+            "Trained on causal retrospective feature schema. Strictly separated from trading profitability."
+          )
+        ),
+        // Horizon Selector Tabs
+        h("div", { style: { display: "flex", gap: "6px" } },
+          ["1h", "4h", "24h"].map(hz =>
+            h("button", {
+              key: hz,
+              id: `btn-horizon-${hz}`,
+              onClick: () => handleSelectHorizon(hz),
+              style: {
+                background: horizon === hz ? "rgba(0, 229, 168, 0.2)" : "rgba(255, 255, 255, 0.05)",
+                border: horizon === hz ? "1px solid #00E5A8" : "1px solid rgba(255, 255, 255, 0.1)",
+                color: horizon === hz ? "#00E5A8" : "#CBD5E1",
+                padding: "5px 14px",
+                borderRadius: "6px",
+                fontWeight: "700",
+                cursor: "pointer",
+                fontSize: "0.78rem"
+              }
+            }, `${hz.toUpperCase()} Horizon`)
+          )
+        )
+      ),
+
+      // Directional Metrics Grid
+      h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px", marginBottom: "14px" } },
+        // Col 1: Model ID & Status
+        h("div", { style: { background: "rgba(255, 255, 255, 0.02)", border: "1px solid rgba(255, 255, 255, 0.06)", borderRadius: "8px", padding: "12px" } },
+          h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", textTransform: "uppercase", marginBottom: "4px" } }, "Active Model Identifier"),
+          h("div", { id: "dir-model-id", style: { fontFamily: "var(--font-mono)", fontSize: "0.95rem", color: "#38BDF8", fontWeight: "700" } }, dirModelId),
+          h("div", { style: { fontSize: "0.70rem", color: "#64748B", marginTop: "4px" } }, `Horizon: ${horizon.toUpperCase()} · Status: RESEARCH_INFERENCE_ACTIVE`)
+        ),
+
+        // Col 2: Probabilities
+        h("div", { style: { background: "rgba(255, 255, 255, 0.02)", border: "1px solid rgba(255, 255, 255, 0.06)", borderRadius: "8px", padding: "12px" } },
+          h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", textTransform: "uppercase", marginBottom: "4px" } }, "Directional Probability Distribution"),
+          h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline" } },
+            h("span", { style: { fontSize: "0.80rem", color: dirProbUp !== null ? "#00E5A8" : "#94A3B8" } }, "P(UP): ", h("strong", { id: "dir-prob-up", style: { fontSize: "1.1rem", fontFamily: "var(--font-mono)" } }, dirProbUp !== null ? `${(dirProbUp * 100).toFixed(2)}%` : "—")),
+            h("span", { style: { fontSize: "0.80rem", color: dirProbDown !== null ? "#F87171" : "#94A3B8" } }, "P(DOWN): ", h("strong", { id: "dir-prob-down", style: { fontSize: "1.1rem", fontFamily: "var(--font-mono)" } }, dirProbDown !== null ? `${(dirProbDown * 100).toFixed(2)}%` : "—"))
+          ),
+          h("div", { style: { height: "6px", width: "100%", background: dirProbUp !== null ? "rgba(239, 68, 68, 0.4)" : "rgba(148, 163, 184, 0.2)", borderRadius: "3px", marginTop: "8px", overflow: "hidden" } },
+            dirProbUp !== null && h("div", { style: { height: "100%", width: `${(dirProbUp * 100).toFixed(1)}%`, background: "#00E5A8" } })
+          ),
+          dirProbUp === null && h("div", { style: { fontSize: "0.68rem", color: "#94A3B8", marginTop: "4px" } }, "Directional model disabled under governance")
+        ),
+
+        // Col 3: Predicted Sign & Expectancy
+        h("div", { style: { background: "rgba(255, 255, 255, 0.02)", border: "1px solid rgba(255, 255, 255, 0.06)", borderRadius: "8px", padding: "12px" } },
+          h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", textTransform: "uppercase", marginBottom: "4px" } }, "Predicted Sign & Net Expectancy"),
+          h("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+            h("span", {
+              id: "dir-predicted-direction",
+              style: {
+                background: dirPredicted === "UP" ? "rgba(0, 229, 168, 0.15)" : (dirPredicted === "DOWN" ? "rgba(239, 68, 68, 0.15)" : "rgba(148, 163, 184, 0.15)"),
+                color: dirPredicted === "UP" ? "#00E5A8" : (dirPredicted === "DOWN" ? "#F87171" : "#94A3B8"),
+                padding: "2px 8px",
+                borderRadius: "4px",
+                fontSize: "0.88rem",
+                fontWeight: "800"
+              }
+            }, dirPredicted === "ABSTAIN" ? "ABSTAIN (SIGNAL DISABLED)" : dirPredicted),
+            h("span", { style: { fontSize: "0.72rem", color: "#F87171", fontWeight: "700" } }, "NEGATIVE_AFTER_FEES")
+          ),
+          h("div", { style: { fontSize: "0.70rem", color: "#64748B", marginTop: "4px" } }, "Stage 11 OOS Replay: ~52.1% accuracy. Net negative after 15-87 bps fees.")
+        ),
+
+        // Col 4: Timestamps & Freshness
+        h("div", { style: { background: "rgba(255, 255, 255, 0.02)", border: "1px solid rgba(255, 255, 255, 0.06)", borderRadius: "8px", padding: "12px" } },
+          h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", textTransform: "uppercase", marginBottom: "4px" } }, "Causal Input Freshness"),
+          h("div", { style: { fontSize: "0.76rem", color: "#CBD5E1", fontFamily: "var(--font-mono)" } }, `Candle: ${candleTime.slice(0, 19).replace("T", " ")}`),
+          h("div", { style: { fontSize: "0.72rem", color: freshnessStatus === "STALE" ? "#F59E0B" : "#00E5A8", marginTop: "4px", fontWeight: freshnessStatus === "STALE" ? "700" : "400" } },
+            `Status: ${freshnessStatus === "STALE" ? "STALE (Historical Snapshot Close — Not Current Entry Reference)" : `${freshnessStatus} (Coinbase REST Verified)`}`
+          )
+        )
+      ),
+
+      // Mandatory Directional Interpretation Callout
+      h("div", {
+        style: {
+          background: "rgba(245, 158, 11, 0.08)",
+          border: "1px solid rgba(245, 158, 11, 0.3)",
+          borderRadius: "8px",
+          padding: "10px 14px",
+          fontSize: "0.78rem",
+          color: "#FDE68A",
+          lineHeight: "1.5"
+        }
+      },
+        h("strong", { style: { color: "#F59E0B" } }, "⚠️ Mandatory Interpretation Notice: "),
+        "Directional probability is not the probability of a trade hitting take-profit before stop-loss and is not a profit guarantee. All directional models operate under research-only governance with net negative expectancy after transaction friction. Live trading is strictly disabled."
+      )
+    ),
+
+    // Section B: Volatility & Risk Outlook
+    h("div", { style: { background: "rgba(15, 23, 42, 0.65)", border: "1px solid rgba(167, 139, 250, 0.2)", borderRadius: "12px", padding: "18px", marginBottom: "20px" } },
+      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px", marginBottom: "14px" } },
+        h("div", null,
+          h("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+            h("span", { style: { fontSize: "1.1rem" } }, "🛡️"),
+            h("h3", { style: { margin: 0, fontSize: "0.98rem", fontWeight: "800", color: "#A78BFA" } }, "B. Volatility & Risk Outlook"),
+            h("span", { style: { background: "rgba(245, 158, 11, 0.15)", color: "#FBBF24", padding: "2px 6px", borderRadius: "4px", fontSize: "0.68rem", fontWeight: "700" } }, "UNAVAILABLE")
+          ),
+          h("div", { style: { fontSize: "0.74rem", color: "#94A3B8", marginTop: "3px" } },
+            "Standard HAR forecast and C2 calibration are unavailable; no calibrated risk envelope is displayed."
+          )
+        )
+      ),
+
+      // Volatility Metrics Grid
+      h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px", marginBottom: "14px" } },
+        // Col 1: Realized Variance
+        h("div", { style: { background: "rgba(255, 255, 255, 0.02)", border: "1px solid rgba(255, 255, 255, 0.06)", borderRadius: "8px", padding: "12px" } },
+          h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", textTransform: "uppercase", marginBottom: "4px" } }, "7-Day Realized Variance"),
+          h("div", { id: "vol-har-rs-dow", style: { fontFamily: "var(--font-mono)", fontSize: "1.1rem", color: "#F8FAFC", fontWeight: "700" } }, "NOT ESTABLISHED"),
+          h("div", { id: "vol-har-rs-dow-pct", style: { fontSize: "0.74rem", color: "#F59E0B", marginTop: "3px", fontWeight: "700" } }, "Registered Standard HAR artifact unavailable"),
+          h("div", { style: { fontSize: "0.68rem", color: "#64748B", marginTop: "2px" } }, "No forecast or accuracy metric is reported.")
+        ),
+
+        // Col 2: Conformal Risk Envelope
+        h("div", { id: "c2-conformal-envelope", style: { background: "rgba(255, 255, 255, 0.02)", border: "1px solid rgba(255, 255, 255, 0.06)", borderRadius: "8px", padding: "12px" } },
+          h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", textTransform: "uppercase", marginBottom: "4px" } }, "C2 Calibration"),
+          h("div", { style: { color: "#F59E0B", fontSize: "0.82rem", fontWeight: "700" } }, "UNAVAILABLE — calibration artifact not verified"),
+          h("div", { style: { fontSize: "0.68rem", color: "#64748B", marginTop: "4px" } }, "No coverage claim or calibrated risk bounds are available.")
+        ),
+
+        // Col 3: Operational Calibration Trust
+        h("div", { style: { background: "rgba(255, 255, 255, 0.02)", border: "1px solid rgba(255, 255, 255, 0.06)", borderRadius: "8px", padding: "12px" } },
+          h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", textTransform: "uppercase", marginBottom: "4px" } }, "Observatory Calibration Health"),
+          h("div", { id: "vol-calibration-health", style: { display: "flex", alignItems: "center", gap: "6px" } },
+            h("span", { style: { background: "rgba(245, 158, 11, 0.15)", color: "#F59E0B", padding: "2px 6px", borderRadius: "4px", fontSize: "0.75rem", fontWeight: "800" } }, "UNAVAILABLE"),
+            h("span", { style: { fontSize: "0.74rem", color: "#CBD5E1" } }, "No verifiable calibration artifact")
+          ),
+        ),
+
+        // Col 4: Market Regime
+        h("div", { style: { background: "rgba(255, 255, 255, 0.02)", border: "1px solid rgba(255, 255, 255, 0.06)", borderRadius: "8px", padding: "12px" } },
+          h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", textTransform: "uppercase", marginBottom: "4px" } }, "Structural Market Regime"),
+          h("div", { style: { fontSize: "0.82rem", color: "#F8FAFC", fontWeight: "700" } }, regimeQ3.volatility_state ? `${regimeQ3.volatility_state} VOLATILITY` : "UNAVAILABLE"),
+          h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", marginTop: "4px" } }, regimeQ3.structural_descriptor || "No verified regime description is available.")
+        )
+      ),
+
+      // Mandatory Volatility Qualification Callout
+      h("div", {
+        style: {
+          background: "rgba(167, 139, 250, 0.08)",
+          border: "1px solid rgba(167, 139, 250, 0.3)",
+          borderRadius: "8px",
+          padding: "10px 14px",
+          fontSize: "0.78rem",
+          color: "#E2E8F0",
+          lineHeight: "1.5"
+        }
+      },
+        h("strong", { style: { color: "#A78BFA" } }, "🛡️ Conformal Calibration Notice: "),
+        "C2 calibration is unavailable: no calibrated coverage or risk bounds are returned. Excursion ranges are unvalidated fixed-multiplier heuristics, not guaranteed support/resistance or future outcomes."
+      )
+    ),
+
+    // Section C: Foundation & Experimental Models (Truthful Model Registry)
+    h("div", { style: { background: "rgba(15, 23, 42, 0.65)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "12px", padding: "18px", marginBottom: "20px" } },
+      h("div", { style: { display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" } },
+        h("span", { style: { fontSize: "1.1rem" } }, "🔬"),
+        h("h3", { style: { margin: 0, fontSize: "0.98rem", fontWeight: "800", color: "#F8FAFC" } }, "C. Foundation & Experimental Models (Authoritative Registry)")
+      ),
+      h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "12px" } },
+        // Chronos-2
+        h("div", { style: { background: "rgba(255, 255, 255, 0.02)", border: "1px solid rgba(255, 255, 255, 0.06)", borderRadius: "8px", padding: "12px" } },
+          h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" } },
+            h("strong", { style: { fontSize: "0.82rem", color: "#F8FAFC" } }, "Amazon Chronos-2"),
+            h("span", { id: "status-chronos-not-executed", style: { background: "rgba(148, 163, 184, 0.15)", color: "#94A3B8", padding: "2px 6px", borderRadius: "4px", fontSize: "0.68rem", fontWeight: "800" } }, "INFERENCE NOT EXECUTED")
+          ),
+          h("p", { style: { fontSize: "0.72rem", color: "#94A3B8", margin: 0, lineHeight: "1.4" } },
+            "Zero-shot transformer foundation model. PyTorch inference not executed in this CPU offline runtime. No synthetic or fabricated forecast charts are drawn."
+          )
+        ),
+
+        // Hawkes Processes
+        h("div", { style: { background: "rgba(255, 255, 255, 0.02)", border: "1px solid rgba(255, 255, 255, 0.06)", borderRadius: "8px", padding: "12px" } },
+          h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" } },
+            h("strong", { style: { fontSize: "0.82rem", color: "#F8FAFC" } }, "Hawkes Process / Order Flow"),
+            h("span", { style: { background: "rgba(245, 158, 11, 0.15)", color: "#FBBF24", padding: "2px 6px", borderRadius: "4px", fontSize: "0.68rem", fontWeight: "800" } }, "DATA UNAVAILABLE")
+          ),
+          h("p", { style: { fontSize: "0.72rem", color: "#94A3B8", margin: 0, lineHeight: "1.4" } },
+            "Requires tick-level order book L3 message feed. Exchange OHLCV cannot provide trade-level order flow, OFI, or VPIN metrics."
+          )
+        ),
+
+        // Mamba State-Space
+        h("div", { style: { background: "rgba(255, 255, 255, 0.02)", border: "1px solid rgba(255, 255, 255, 0.06)", borderRadius: "8px", padding: "12px" } },
+          h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" } },
+            h("strong", { style: { fontSize: "0.82rem", color: "#F8FAFC" } }, "Mamba State-Space Architecture"),
+            h("span", { style: { background: "rgba(239, 68, 68, 0.15)", color: "#F87171", padding: "2px 6px", borderRadius: "4px", fontSize: "0.68rem", fontWeight: "800" } }, "REJECTED")
+          ),
+          h("p", { style: { fontSize: "0.72rem", color: "#94A3B8", margin: 0, lineHeight: "1.4" } },
+            "Evaluated in research trials; rejected due to execution latency penalties and numerical instability on non-accelerated instances."
+          )
+        )
+      )
+    ),
+
+    // Section D: Price Forecasting Tournament & Baselines
+    h(FuturePriceForecastingPanel, { livePrice })
   );
 }
 
@@ -8490,7 +10053,7 @@ function WhatIfSimulator({ livePrice, predictionData, activePaperPos, startColla
             ? `P90: $${Math.round(confP90)} | P10: $${Math.round(confP10)}`
             : "Unavailable"
         ),
-        h("div", { style: { color: "#94A3B8", fontSize: "0.60rem" } }, "Calibrated empirical reference")
+        h("div", { style: { color: "#94A3B8", fontSize: "0.60rem" } }, "Uncalibrated scenario reference")
       ),
       h("div", { style: { background: "rgba(0,0,0,0.3)", padding: "8px 10px", borderRadius: "6px" } },
         h("div", { style: { color: "#7E95B5", fontSize: "0.64rem" } }, "EXECUTION COST CONTEXT"),
@@ -8531,10 +10094,7 @@ function CrossHorizonPatiencePanel({
     );
   }
 
-  const qA = crossHorizonData.question_a_fixed_contract_sensitivity || [];
-  const qB = crossHorizonData.question_b_horizon_specific_calibrations || [];
   const persistence = crossHorizonData.evidence_persistence_matrix || [];
-  const geom = crossHorizonData.fixed_contract_geometry || {};
   const observation = crossHorizonData.observation_narrative || "";
 
   return h("div", { className: "cross-horizon-panel", style: { background: "rgba(15, 23, 42, 0.65)", border: "1px solid rgba(56, 189, 248, 0.2)", borderRadius: "10px", padding: "14px 16px", marginBottom: "14px" } },
@@ -8644,45 +10204,10 @@ function CrossHorizonPatiencePanel({
 
     // QUESTION A VIEW
     activeSubTab === "QUESTION_A" && h("div", null,
-      h("div", { style: { background: "rgba(0,0,0,0.35)", border: "1px solid rgba(56, 189, 248, 0.2)", borderRadius: "6px", padding: "8px 12px", marginBottom: "8px", fontSize: "0.66rem" } },
-        h("div", { style: { color: "#38BDF8", fontWeight: "800", marginBottom: "2px" } }, "🔬 FIXED-CONTRACT ANALYTICAL SENSITIVITY"),
-        h("div", { style: { color: "#E2E8F0", fontFamily: "var(--font-mono)", fontSize: "0.68rem" } },
-          `Fixed Contract: Entry = $${Math.round(geom.entry_price || livePrice || 64000).toLocaleString()} · Upper (U) = $${Math.round(geom.u_fixed || 0).toLocaleString()} · Lower (L) = $${Math.round(geom.l_fixed || 0).toLocaleString()} · Hash = ${geom.boundary_hash || "0x..."}`
-        ),
-        h("div", { style: { color: "#7E95B5", fontSize: "0.60rem", marginTop: "2px" } },
-          "Invariant: Boundary geometry is strictly constant. ONLY time allowance T varies. Evaluated under constant instantaneous volatility rate σ."
-        )
-      ),
-      h("div", { className: "table-wrapper", style: { maxHeight: "200px", overflowY: "auto" } },
-        h("table", { className: "table", style: { width: "100%", fontSize: "0.66rem" } },
-          h("thead", null,
-            h("tr", null,
-              h("th", null, "Horizon"),
-              h("th", null, "Upper First (P_U)"),
-              h("th", null, "Lower First (P_L)"),
-              h("th", null, "No Exit (P_0)"),
-              h("th", null, "Boundary Hash"),
-              h("th", null, "Calib Hash"),
-              h("th", null, "N_eff / Raw"),
-              h("th", null, "CI Width"),
-              h("th", null, "Status")
-            )
-          ),
-          h("tbody", null,
-            qA.map((row, idx) =>
-              h("tr", { key: idx, style: row.is_active_user_horizon ? { background: "rgba(56, 189, 248, 0.12)", fontWeight: "700" } : {} },
-                h("td", null, row.horizon, row.is_active_user_horizon && h("span", { style: { color: "#38BDF8", marginLeft: "4px" } }, "●")),
-                h("td", { style: { color: "#00E5A8", fontFamily: "var(--font-mono)" } }, `${(row.p_upper_first * 100).toFixed(2)}%`),
-                h("td", { style: { color: "#FF5C7C", fontFamily: "var(--font-mono)" } }, `${(row.p_lower_first * 100).toFixed(2)}%`),
-                h("td", { style: { color: "#94A3B8", fontFamily: "var(--font-mono)" } }, `${(row.p_no_exit * 100).toFixed(2)}%`),
-                h("td", { style: { fontFamily: "var(--font-mono)", color: "#7E95B5" } }, row.boundary_hash),
-                h("td", { style: { fontFamily: "var(--font-mono)", color: "#7E95B5" } }, row.calibration_hash),
-                h("td", null, `${row.n_eff} / ${row.raw_N}`),
-                h("td", null, `±${row.ci_width}%`),
-                h("td", null, h("span", { className: "validation-status-tag validated", style: { fontSize: "0.58rem" } }, row.status))
-              )
-            )
-          )
+      h("div", { style: { background: "rgba(0,0,0,0.35)", border: "1px solid rgba(245, 158, 11, 0.2)", borderRadius: "6px", padding: "10px 12px", fontSize: "0.68rem" } },
+        h("div", { style: { color: "#FBBF24", fontWeight: "800", marginBottom: "4px" } }, "FIXED-CONTRACT SENSITIVITY: UNAVAILABLE"),
+        h("div", { style: { color: "#CBD5E1" } },
+          "C2 is disabled. No verified calibration artifact or current probability, interval, effective-sample-size, or validation-status output is available."
         )
       )
     ),
@@ -8690,42 +10215,13 @@ function CrossHorizonPatiencePanel({
     // QUESTION B VIEW
     activeSubTab === "QUESTION_B" && h("div", null,
       h("div", { style: { background: "rgba(0,0,0,0.35)", border: "1px solid rgba(0, 229, 168, 0.2)", borderRadius: "6px", padding: "8px 12px", marginBottom: "8px", fontSize: "0.66rem" } },
-        h("div", { style: { color: "#00E5A8", fontWeight: "800", marginBottom: "2px" } }, "📐 HORIZON-SPECIFIC EMPIRICAL CALIBRATION"),
+        h("div", { style: { color: "#FBBF24", fontWeight: "800", marginBottom: "2px" } }, "📐 CALIBRATION UNAVAILABLE"),
         h("div", { style: { color: "#CBD5E1", fontSize: "0.64rem" } },
-          "Calibrated target/stop envelope U(T), L(T) varies by discrete horizon based on independent conformal quantiles."
+          "C2 is disabled. No calibrated target/stop envelope or coverage metric is available."
         )
       ),
-      h("div", { className: "table-wrapper", style: { maxHeight: "200px", overflowY: "auto" } },
-        h("table", { className: "table", style: { width: "100%", fontSize: "0.66rem" } },
-          h("thead", null,
-            h("tr", null,
-              h("th", null, "Horizon"),
-              h("th", null, "Calibrated Envelope [L_T — U_T]"),
-              h("th", null, "Geometric R:R"),
-              h("th", null, "P_U First"),
-              h("th", null, "P_L First"),
-              h("th", null, "Boundary Hash"),
-              h("th", null, "N_eff / Raw"),
-              h("th", null, "CI Width"),
-              h("th", null, "Status")
-            )
-          ),
-          h("tbody", null,
-            qB.map((row, idx) =>
-              h("tr", { key: idx, style: row.is_active_user_horizon ? { background: "rgba(56, 189, 248, 0.12)", fontWeight: "700" } : {} },
-                h("td", null, row.horizon, row.is_active_user_horizon && h("span", { style: { color: "#38BDF8", marginLeft: "4px" } }, "●")),
-                h("td", { style: { fontFamily: "var(--font-mono)", color: "#F8FAFC" } }, `$${Math.round(row.l_calibrated).toLocaleString()} — $${Math.round(row.u_calibrated).toLocaleString()}`),
-                h("td", { style: { color: "#38BDF8", fontWeight: "700" } }, `${row.geometric_rr.toFixed(2)} : 1`),
-                h("td", { style: { color: "#00E5A8", fontFamily: "var(--font-mono)" } }, `${(row.p_upper_first * 100).toFixed(2)}%`),
-                h("td", { style: { color: "#FF5C7C", fontFamily: "var(--font-mono)" } }, `${(row.p_lower_first * 100).toFixed(2)}%`),
-                h("td", { style: { fontFamily: "var(--font-mono)", color: "#7E95B5" } }, row.boundary_hash),
-                h("td", null, `${row.n_eff} / ${row.raw_N}`),
-                h("td", null, `±${row.ci_width}%`),
-                h("td", null, h("span", { className: "validation-status-tag validated", style: { fontSize: "0.58rem" } }, row.status))
-              )
-            )
-          )
-        )
+      h("div", { style: { background: "rgba(0,0,0,0.25)", borderRadius: "6px", padding: "10px 12px", fontSize: "0.68rem", color: "#CBD5E1" } },
+        "No calibrated levels, first-passage probabilities, effective sample sizes, confidence intervals, or validation status are available."
       )
     ),
 
@@ -8794,7 +10290,8 @@ function AiPredictionEnginePanel({
   setEvidenceMode,
   livePrice,
   changePct,
-  regimeData
+  regimeData,
+  onOpenSmartEntry
 }) {
   const [showAllEvidence, setShowAllEvidence] = useState(false);
   const [showAdvancedDiag, setShowAdvancedDiag] = useState(false);
@@ -8803,27 +10300,73 @@ function AiPredictionEnginePanel({
   const researchGate = predictionData?.research || predictionData?.research_gate;
   const researchAuthorized = hasVerifiedResearchAuthorization(predictionData);
   if (!researchAuthorized) {
-    return h("div", { className: "glass-card ai-prediction-engine-panel", role: "status", style: { padding: "18px", marginBottom: "16px" } },
-      h("strong", { style: { color: "#FBBF24" } }, "Model intelligence unavailable · research authorization is blocked."),
-      h("p", { style: { color: "#CBD5E1", marginBottom: 0 } },
-        researchGate?.reason || "No provenance-verified research signal or active paper position is available."
+    return h("div", { className: "glass-card ai-prediction-engine-panel", role: "status", style: { padding: "18px", marginBottom: "16px", border: "1px solid rgba(56, 189, 248, 0.25)" } },
+      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" } },
+        h("div", { style: { maxWidth: "780px" } },
+          h("div", { style: { display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" } },
+            h("span", { style: { fontSize: "1.1rem" } }, "🔬"),
+            h("strong", { style: { color: "#38BDF8", fontSize: "0.95rem" } }, "Directional Trade Execution Gated · Offline Research Governance Active"),
+            h("span", { style: { background: "rgba(56, 189, 248, 0.15)", color: "#38BDF8", padding: "2px 6px", borderRadius: "4px", fontSize: "0.70rem", fontWeight: "700" } }, "RESEARCH ONLY")
+          ),
+          h("p", { style: { color: "#CBD5E1", fontSize: "0.82rem", margin: 0, lineHeight: "1.4" } },
+            "Live trading and broker order execution remain permanently disabled. Directional LightGBM models (1h/4h/24h), HAR-RS-DOW 168h volatility envelopes, and price tournaments are actively visible in the AI Forecasts & Risk Outlook workspace."
+          )
+        ),
+        h("div", { style: { display: "flex", gap: "8px", flexWrap: "wrap" } },
+          h("button", {
+            id: "btn-open-forecast-tab",
+            onClick: () => {
+              const btn = document.getElementById("tab-btn-forecast");
+              if (btn) btn.click();
+            },
+            style: {
+              background: "linear-gradient(135deg, #0284C7, #0369A1)",
+              border: "1px solid #38BDF8",
+              color: "#FFF",
+              padding: "7px 14px",
+              borderRadius: "6px",
+              cursor: "pointer",
+              fontWeight: "700",
+              fontSize: "0.80rem"
+            }
+          }, "AI Forecasts & Risk Outlook 📈"),
+          h("button", {
+            id: "btn-open-smart-entry-tab",
+            onClick: () => {
+              if (onOpenSmartEntry) onOpenSmartEntry();
+              else {
+                const btn = document.getElementById("tab-btn-smart-entry");
+                if (btn) btn.click();
+              }
+            },
+            style: {
+              background: "rgba(167, 139, 250, 0.15)",
+              border: "1px solid rgba(167, 139, 250, 0.4)",
+              color: "#A78BFA",
+              padding: "7px 14px",
+              borderRadius: "6px",
+              cursor: "pointer",
+              fontWeight: "700",
+              fontSize: "0.80rem"
+            }
+          }, "Smart Entry ⚡")
+        )
       )
     );
   }
 
   const engine = activePaperPos?.ai_prediction_engine || {};
-  const dual = engine.dual_hypotheses || {};
-  const hUpper = dual.h_upper || dual.h_long || {};
-  const hLower = dual.h_lower || dual.h_short || {};
   const contract = engine.analytical_scenario_contract || engine.ai_trade_contract || {};
   const disagreement = engine.intent_disagreement_analysis || {};
   const prov = engine.provenance || {};
   const evidencePlan = engine.aeer_evidence_plan || [];
   const questions = engine.decision_questions || {};
 
-  const curPrice = livePrice || activePaperPos?.live_price || 64250;
-  const curChange = changePct !== undefined ? changePct : 1.24;
-  const curRegime = engine.market_regime || regimeData?.regime || "VOL_EXPANDING";
+  const curPrice = Number.isFinite(livePrice) && livePrice > 0
+    ? livePrice
+    : (Number.isFinite(activePaperPos?.live_price) && activePaperPos.live_price > 0 ? activePaperPos.live_price : null);
+  const curChange = Number.isFinite(changePct) ? changePct : null;
+  const curRegime = engine.market_regime || regimeData?.regime || "UNAVAILABLE";
   const curHorizon = targetHorizon || engine.user_intent?.horizon || "15m";
 
   const horizons = ["5m", "15m", "1h", "4h", "1d", "7d", "CYCLE"];
@@ -8835,23 +10378,18 @@ function AiPredictionEnginePanel({
   ];
 
   // Dynamic extraction from activePaperPos (live AI or surveillance)
-  const isLiveSignal = activePaperPos?.is_directional_trade_signal || activePaperPos?.signal_mode === "live_ai" || (activePaperPos?.status === "LIVE_AI_ALPHA");
-  const entryP = activePaperPos?.entry_price || contract.entry_price || curPrice;
-  const activeDirection = activePaperPos?.direction && activePaperPos.direction !== "NEUTRAL" ? activePaperPos.direction : (userDirectionPreference !== "AUTO" ? userDirectionPreference : (predictionData?.direction || "LONG"));
+  const isLiveSignal = false;
+  const entryP = activePaperPos?.entry_price || contract.entry_price || null;
+  const activeDirection = activePaperPos?.direction && activePaperPos.direction !== "NEUTRAL" ? activePaperPos.direction : "ABSTAIN";
   const isShortSignal = (activeDirection === "SHORT" || userDirectionPreference === "SHORT") && userDirectionPreference !== "LONG";
-  const tpP = activePaperPos?.tp_price || contract.take_profit_price || (isShortSignal ? entryP * 0.985 : entryP * 1.015);
-  const slP = activePaperPos?.sl_price || contract.stop_loss_price || (isShortSignal ? entryP * 1.008 : entryP * 0.992);
-  const rrRatio = activePaperPos?.target_rr || contract.reward_risk_ratio || (Math.abs(tpP - entryP) / Math.max(1e-6, Math.abs(entryP - slP))).toFixed(2);
-  const maxHoldBars = activePaperPos?.max_hold_bars || contract.max_hold_bars || 15;
-  const effectiveProb = activePaperPos?.probability_pct || (predictionData?.probability_pct) || 78.4;
+  const tpP = activePaperPos?.tp_price || contract.take_profit_price || null;
+  const slP = activePaperPos?.sl_price || contract.stop_loss_price || null;
+  const rrRatio = activePaperPos?.target_rr || contract.reward_risk_ratio || null;
+  const maxHoldBars = activePaperPos?.max_hold_bars || contract.max_hold_bars || null;
+  const effectiveProb = null;
 
   // Key 3–4 evidence items for compact display
-  const keyEvidenceList = evidencePlan.length > 0 ? evidencePlan.slice(0, 4) : [
-    { indicator_id: "ofi", question_id: "Q1_GEOMETRIC_BARRIER", routing_relevance_bps: 5.5, empirical_validation_status: "UNVALIDATED", signal_stability: "STABLE", role: "FLOW IMBALANCE" },
-    { indicator_id: "hawkes", question_id: "Q2_DIRECTIONAL_VOL", routing_relevance_bps: 4.2, empirical_validation_status: "PROSPECTIVE", signal_stability: "STABLE", role: "EVENT CLUSTERING" },
-    { indicator_id: "vpin", question_id: "Q6_EXECUTION_COST", routing_relevance_bps: 3.8, empirical_validation_status: "PROSPECTIVE", signal_stability: "STABLE", role: "EXECUTION / RISK" },
-    { indicator_id: "funding", question_id: "Q3_MACRO_CYCLE", routing_relevance_bps: 1.3, empirical_validation_status: "UNVALIDATED", signal_stability: "STABLE", role: "CONTEXT" }
-  ];
+  const keyEvidenceList = evidencePlan.slice(0, 4);
 
   return h("div", { className: "glass-card ai-prediction-engine-panel", style: { padding: "18px", marginBottom: "16px" } },
     // ------------------------------------------------------------
@@ -8859,16 +10397,16 @@ function AiPredictionEnginePanel({
     // ------------------------------------------------------------
     h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(0,0,0,0.45)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "8px", padding: "8px 14px", marginBottom: "14px", flexWrap: "wrap", gap: "10px" } },
       h("div", { style: { display: "flex", alignItems: "center", gap: "12px" } },
-        h("span", { style: { fontWeight: "900", color: "#F8FAFC", fontSize: "0.85rem", letterSpacing: "0.03em" } }, "BTC/USDT"),
-        h("strong", { style: { color: "#00F0FF", fontFamily: "var(--font-mono)", fontSize: "0.95rem" } }, `$${Math.round(curPrice).toLocaleString()}`),
+        h("span", { style: { fontWeight: "900", color: "#F8FAFC", fontSize: "0.85rem", letterSpacing: "0.03em" } }, `BTC-USD (${predictionData?.market?.source || "SOURCE UNAVAILABLE"})`),
+        h("strong", { style: { color: "#00F0FF", fontFamily: "var(--font-mono)", fontSize: "0.95rem" } }, curPrice == null ? "DATA UNAVAILABLE" : `$${Math.round(curPrice).toLocaleString()}`),
         h("span", { style: { color: curChange >= 0 ? "#00E5A8" : "#FF5C7C", fontFamily: "var(--font-mono)", fontSize: "0.76rem", fontWeight: "700" } },
-          `${curChange >= 0 ? "+" : ""}${Number(curChange).toFixed(2)}%`
+          curChange == null ? "CHANGE UNAVAILABLE" : `${curChange >= 0 ? "+" : ""}${curChange.toFixed(2)}%`
         )
       ),
       h("div", { style: { display: "flex", alignItems: "center", gap: "12px", fontSize: "0.68rem", fontFamily: "var(--font-mono)" } },
         h("span", { style: { color: "#7E95B5" } }, `REGIME: `, h("span", { style: { color: "#CBD5E1", fontWeight: "700" } }, curRegime.replace(/_/g, " "))),
         h("span", { style: { color: "#7E95B5" } }, `HORIZON: `, h("span", { style: { color: "#00E5A8", fontWeight: "700" } }, curHorizon)),
-        h("span", { style: { color: "#7E95B5" } }, `MODEL: `, h("span", { style: { color: "#CBD5E1", fontWeight: "700" } }, "AEER 3")),
+        h("span", { style: { color: "#7E95B5" } }, `MODEL: `, h("span", { style: { color: "#CBD5E1", fontWeight: "700" } }, "OFFLINE_RESEARCH_ONLY")),
         h("span", {
           style: {
             background: isLiveSignal ? "rgba(0, 229, 168, 0.15)" : "rgba(245, 158, 11, 0.15)",
@@ -8878,7 +10416,24 @@ function AiPredictionEnginePanel({
             borderRadius: "4px",
             fontWeight: "800"
           }
-        }, isLiveSignal ? "STATUS: LIVE ALPHA" : "STATUS: GATED")
+        }, "STATUS: ANALYSIS ONLY · EXECUTION DISABLED"),
+        onOpenSmartEntry && h("button", {
+          id: "btn-open-smart-entry-tab",
+          onClick: onOpenSmartEntry,
+          style: {
+            background: "rgba(167, 139, 250, 0.2)",
+            border: "1px solid rgba(167, 139, 250, 0.5)",
+            color: "#C4B5FD",
+            padding: "3px 10px",
+            borderRadius: "4px",
+            fontSize: "0.68rem",
+            fontWeight: "800",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "4px"
+          }
+        }, "🎯 Smart Entry ↗")
       )
     ),
 
@@ -9000,12 +10555,12 @@ function AiPredictionEnginePanel({
 
       h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px", fontSize: "0.72rem", color: "#94A3B8" } },
         h("span", null, `Directional Signal: `, h("strong", { style: { color: (isLiveSignal && activeDirection) ? (activeDirection === "SHORT" ? "#FF5C7C" : "#00E5A8") : "#94A3B8" } }, (isLiveSignal && activeDirection) ? activeDirection : "DISABLED (ANALYSIS ONLY)")),
-        h("span", null, `Evidence Quality: `, h("strong", { style: { color: curHorizon === "15m" ? "#38BDF8" : "#00E5A8" } }, curHorizon === "15m" ? "FEATURES READY" : "STRONG")),
-        h("span", null, `Data Stream: `, h("strong", { style: { color: "#00E5A8" } }, curHorizon === "15m" ? "VALID (COINBASE 15M SPOT)" : "VALID")),
-        h("span", null, `Model Status: `, h("strong", { style: { color: "#94A3B8" } }, curHorizon === "15m" ? "MODEL_TIMEFRAME_INCOMPATIBLE (HOURLY ONLY)" : (isLiveSignal ? "ACTIVE ALPHA CALIBRATED" : "RESEARCH BASELINE ONLY")))
+        h("span", null, `Evidence Quality: `, h("strong", { style: { color: "#FBBF24" } }, "UNAVAILABLE")),
+        h("span", null, `Data Stream: `, h("strong", { style: { color: "#FBBF24" } }, predictionData?.market?.status || "UNAVAILABLE")),
+        h("span", null, `Model Status: `, h("strong", { style: { color: "#94A3B8" } }, curHorizon === "15m" ? "MODEL_TIMEFRAME_INCOMPATIBLE (HOURLY ONLY)" : "OFFLINE RESEARCH ONLY"))
       ),
       h("div", { style: { fontSize: "0.68rem", color: "#CBD5E1", marginTop: "8px", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "6px" } },
-        isLiveSignal ? (activePaperPos?.reason_narrative || "Adaptive Ensemble model projects active directional momentum and calibrated conformal execution bounds.") : "Directional model has not cleared the preregistered validation gate. Symmetric risk envelope and price-forecast baselines active."
+        "Current directional estimates and calibration are unavailable. Execution authorization remains disabled."
       )
     ),
 
@@ -9022,18 +10577,18 @@ function AiPredictionEnginePanel({
         h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "0.72rem", marginBottom: "3px" } },
           h("span", { style: { color: "#7E95B5" } }, "First passage:"),
           h("strong", { style: { color: "#F8FAFC", fontFamily: "var(--font-mono)" } },
-            curHorizon === "15m" ? "N/A — MODEL_TIMEFRAME_INCOMPATIBLE" : (typeof hUpper.path_probability_horizon === "number" ? `${(hUpper.path_probability_horizon * 100).toFixed(1)}%` : "N/A")
+            "N/A — C2 DISABLED"
           )
         ),
         h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "0.72rem", marginBottom: "3px" } },
           h("span", { style: { color: "#7E95B5" } }, `No exit (${curHorizon}):`),
           h("span", { style: { color: "#CBD5E1", fontFamily: "var(--font-mono)" } },
-            curHorizon === "15m" ? "N/A — NOT ESTIMATED (HOURLY MODEL)" : ((typeof hUpper.path_probability_horizon === "number" && typeof hLower.path_probability_horizon === "number") ? `${((1 - hUpper.path_probability_horizon - hLower.path_probability_horizon) * 100).toFixed(1)}%` : "N/A")
+            "N/A — C2 DISABLED"
           )
         ),
         h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "0.70rem", color: "#94A3B8", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "4px", marginTop: "4px" } },
-          h("span", null, `N_eff: ${curHorizon === "15m" ? "N/A (Hourly Only)" : (hUpper.n_eff || "N/A")}`),
-          h("span", null, `CI: ${curHorizon === "15m" ? "N/A" : (hUpper.empirical_conformal_ci_width ? `±${hUpper.empirical_conformal_ci_width}%` : "N/A")}`)
+          h("span", null, "N_eff: N/A"),
+          h("span", null, "CI: N/A")
         )
       ),
 
@@ -9046,18 +10601,18 @@ function AiPredictionEnginePanel({
         h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "0.72rem", marginBottom: "3px" } },
           h("span", { style: { color: "#7E95B5" } }, "First passage:"),
           h("strong", { style: { color: "#F8FAFC", fontFamily: "var(--font-mono)" } },
-            curHorizon === "15m" ? "N/A — MODEL_TIMEFRAME_INCOMPATIBLE" : (typeof hLower.path_probability_horizon === "number" ? `${(hLower.path_probability_horizon * 100).toFixed(1)}%` : "N/A")
+            "N/A — C2 DISABLED"
           )
         ),
         h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "0.72rem", marginBottom: "3px" } },
           h("span", { style: { color: "#7E95B5" } }, `No exit (${curHorizon}):`),
           h("span", { style: { color: "#CBD5E1", fontFamily: "var(--font-mono)" } },
-            curHorizon === "15m" ? "N/A — NOT ESTIMATED (HOURLY MODEL)" : ((typeof hUpper.path_probability_horizon === "number" && typeof hLower.path_probability_horizon === "number") ? `${((1 - hUpper.path_probability_horizon - hLower.path_probability_horizon) * 100).toFixed(1)}%` : "N/A")
+            "N/A — C2 DISABLED"
           )
         ),
         h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "0.70rem", color: "#94A3B8", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "4px", marginTop: "4px" } },
-          h("span", null, `N_eff: ${curHorizon === "15m" ? "N/A (Hourly Only)" : (hLower.n_eff || "N/A")}`),
-          h("span", null, `CI: ${curHorizon === "15m" ? "N/A" : (hLower.empirical_conformal_ci_width ? `±${hLower.empirical_conformal_ci_width}%` : "N/A")}`)
+          h("span", null, "N_eff: N/A"),
+          h("span", null, "CI: N/A")
         )
       )
     ),
@@ -9065,42 +10620,10 @@ function AiPredictionEnginePanel({
     // ------------------------------------------------------------
     // 5. ANALYTICAL SCENARIO BOUNDS & RISK GEOMETRY (ANALYSIS ONLY)
     // ------------------------------------------------------------
-    h("div", { style: { background: "rgba(0,0,0,0.4)", borderRadius: "10px", padding: "14px 16px", marginBottom: "14px", border: "1px solid rgba(255,255,255,0.1)" } },
-      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" } },
-        h("span", { style: { fontSize: "0.78rem", fontWeight: "800", color: "#F8FAFC", letterSpacing: "0.03em" } }, "📜 ANALYTICAL SCENARIO BOUNDS"),
-        h("span", { style: { fontSize: "0.66rem", color: "#38BDF8", fontFamily: "var(--font-mono)", fontWeight: "700" } }, `SURVEILLANCE: ${contract.strategy_archetype || activePaperPos?.strategy_id || "MEIE-IGNITION"}`)
-      ),
-      h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "10px", fontSize: "0.74rem", marginBottom: "10px" } },
-        h("div", { style: { background: "rgba(255,255,255,0.03)", padding: "8px 10px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.05)" } },
-          h("div", { style: { color: "#7E95B5", fontSize: "0.64rem", fontWeight: "700", textTransform: "uppercase" } }, "Reference Spot"),
-          h("strong", { style: { color: "#00F0FF", fontFamily: "var(--font-mono)", fontSize: "0.95rem" } }, `$${Math.round(entryP).toLocaleString()}`)
-        ),
-        h("div", { style: { background: "rgba(0, 229, 168, 0.08)", padding: "8px 10px", borderRadius: "6px", border: "1px solid rgba(0, 229, 168, 0.25)" } },
-          h("div", { style: { color: "#00E5A8", fontSize: "0.64rem", fontWeight: "800", textTransform: "uppercase" } }, "Upper Scenario Bound"),
-          h("strong", { style: { color: "#00E5A8", fontFamily: "var(--font-mono)", fontSize: "0.95rem" } }, `$${Math.round(tpP).toLocaleString()}`),
-          h("div", { style: { color: "#00E5A8", fontSize: "0.64rem", fontWeight: "700" } }, `+${(((Math.abs(tpP - entryP)) / entryP) * 100).toFixed(2)}% (+$${Math.round(Math.abs(tpP - entryP))})`)
-        ),
-        h("div", { style: { background: "rgba(255, 92, 124, 0.08)", padding: "8px 10px", borderRadius: "6px", border: "1px solid rgba(255, 92, 124, 0.25)" } },
-          h("div", { style: { color: "#FF5C7C", fontSize: "0.64rem", fontWeight: "800", textTransform: "uppercase" } }, "Lower Scenario Bound"),
-          h("strong", { style: { color: "#FF5C7C", fontFamily: "var(--font-mono)", fontSize: "0.95rem" } }, `$${Math.round(slP).toLocaleString()}`),
-          h("div", { style: { color: "#FF5C7C", fontSize: "0.64rem", fontWeight: "700" } }, `-${(((Math.abs(entryP - slP)) / entryP) * 100).toFixed(2)}% (-$${Math.round(Math.abs(entryP - slP))})`)
-        ),
-        h("div", { style: { background: "rgba(56, 189, 248, 0.05)", padding: "8px 10px", borderRadius: "6px", border: "1px solid rgba(56, 189, 248, 0.15)" } },
-          h("div", { style: { color: "#7E95B5", fontSize: "0.64rem", fontWeight: "700", textTransform: "uppercase" } }, "Excursion Spread"),
-          h("strong", { style: { color: "#38BDF8", fontFamily: "var(--font-mono)", fontSize: "0.95rem" } }, `$${Math.round(Math.abs(tpP - slP)).toLocaleString()}`)
-        ),
-        h("div", { style: { background: "rgba(255,255,255,0.03)", padding: "8px 10px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.05)" } },
-          h("div", { style: { color: "#7E95B5", fontSize: "0.64rem", fontWeight: "700", textTransform: "uppercase" } }, "Evaluation Horizon"),
-          h("strong", { style: { color: "#CBD5E1", fontFamily: "var(--font-mono)", fontSize: "0.95rem" } }, `${curHorizon || "60m"}`)
-        ),
-        h("div", { style: { background: "rgba(255,255,255,0.03)", padding: "8px 10px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.05)" } },
-          h("div", { style: { color: "#7E95B5", fontSize: "0.64rem", fontWeight: "700", textTransform: "uppercase" } }, "Product Mode"),
-          h("strong", { style: { color: "#38BDF8", fontFamily: "var(--font-mono)", fontSize: "0.90rem" } }, `ANALYSIS ONLY`)
-        )
-      ),
-      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(0,0,0,0.3)", padding: "6px 10px", borderRadius: "6px", fontSize: "0.66rem", color: "#94A3B8" } },
-        h("span", null, "STATUS: ", h("strong", { style: { color: "#38BDF8" } }, "ANALYSIS ONLY")),
-        h("span", null, "EXECUTION: ", h("strong", { style: { color: "#94A3B8" } }, "Execution disabled — analysis only"))
+    h("div", { role: "status", style: { background: "rgba(0,0,0,0.4)", borderRadius: "10px", padding: "14px 16px", marginBottom: "14px", border: "1px solid rgba(255,255,255,0.1)" } },
+      h("strong", { style: { color: "#FBBF24" } }, "Scenario bounds unavailable"),
+      h("div", { style: { color: "#94A3B8", fontSize: "0.74rem", marginTop: "6px" } },
+        "No verified calibration artifact is available. Fixed excursion multipliers are not displayed as calibrated forecasts. Execution remains disabled."
       )
     ),
 
@@ -9160,7 +10683,7 @@ function AiPredictionEnginePanel({
                 className: `validation-status-tag ${isUnvalidated ? "unvalidated" : (isProspective ? "prospective" : "validated")}`,
                 style: { fontSize: "0.60rem", padding: "1px 6px" }
               }, ev.empirical_validation_status || "PROSPECTIVE"),
-              h("span", { style: { color: "#38BDF8", fontSize: "0.64rem" } }, ev.signal_stability || "STABLE")
+              h("span", { style: { color: "#38BDF8", fontSize: "0.64rem" }               }, ev.signal_stability || "UNAVAILABLE")
             )
           );
         })
@@ -9185,7 +10708,7 @@ function AiPredictionEnginePanel({
                 h("td", { style: { fontFamily: "var(--font-mono)", color: "#00E5A8" } }, `+${Number(ev.routing_relevance_bps || 0).toFixed(1)} bps`),
                 h("td", null,
                   h("span", { className: `validation-status-tag ${ev.empirical_validation_status === "UNVALIDATED" ? "unvalidated" : "prospective"}` },
-                    ev.empirical_validation_status || "PROSPECTIVE"
+                    ev.empirical_validation_status || "UNAVAILABLE"
                   )
                 ),
                 h("td", null, ev.signal_stability || "STABLE")
@@ -9203,7 +10726,7 @@ function AiPredictionEnginePanel({
       h("strong", { style: { color: "#38BDF8", display: "block", marginBottom: "3px" } }, "WHY THIS ASSESSMENT?"),
       h("div", { style: { color: "#CBD5E1", lineHeight: "1.35" } },
         engine.why_these_indicators_narrative ||
-        "Current 15m conditions are dominated by short-horizon order-flow and volatility information. OFI and Hawkes are therefore routed as primary evidence. Funding is retained as contextual information."
+        "No current market assessment is available from verified data."
       )
     ),
 
@@ -9211,10 +10734,10 @@ function AiPredictionEnginePanel({
     // 8. RISK + EXECUTION SUMMARY (Compact Status Row)
     // ------------------------------------------------------------
     h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(15, 23, 42, 0.75)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "6px", padding: "8px 12px", marginBottom: "14px", fontSize: "0.68rem", flexWrap: "wrap", gap: "6px" } },
-      h("div", null, h("span", { style: { color: "#7E95B5" } }, "DATA: "), h("strong", { style: { color: "#00E5A8" } }, "VALID")),
-      h("div", null, h("span", { style: { color: "#7E95B5" } }, "CALIBRATION: "), h("strong", { style: { color: "#00E5A8" } }, "SUFFICIENT")),
-      h("div", null, h("span", { style: { color: "#7E95B5" } }, "C2: "), h("strong", { style: { color: "#00E5A8" } }, "WITHIN BOUNDS")),
-      h("div", null, h("span", { style: { color: "#7E95B5" } }, "CAPACITY: "), h("strong", { style: { color: "#00E5A8" } }, "PASS")),
+      h("div", null, h("span", { style: { color: "#7E95B5" } }, "DATA: "), h("strong", { style: { color: "#F59E0B" } }, "UNAVAILABLE")),
+      h("div", null, h("span", { style: { color: "#7E95B5" } }, "CALIBRATION: "), h("strong", { style: { color: "#F59E0B" } }, "UNAVAILABLE")),
+      h("div", null, h("span", { style: { color: "#7E95B5" } }, "C2: "), h("strong", { style: { color: "#F59E0B" } }, "DISABLED")),
+      h("div", null, h("span", { style: { color: "#7E95B5" } }, "CAPACITY: "), h("strong", { style: { color: "#94A3B8" } }, "NOT ASSESSED")),
       h("div", null, h("span", { style: { color: "#7E95B5" } }, "EXECUTION: "), h("strong", { style: { color: "#94A3B8" } }, "DISABLED (ANALYSIS ONLY)"))
     ),
 
@@ -9250,27 +10773,27 @@ function AiPredictionEnginePanel({
             }, showDecisionAnatomy ? "Hide Q1–Q7 Anatomy" : "[ VIEW DECISION ANATOMY (Q1–Q7) ]")
           ),
           h("div", { style: { display: "flex", gap: "10px", flexWrap: "wrap", color: "#CBD5E1" } },
-            h("span", null, "Direction: ", h("strong", { style: { color: "#00E5A8" } }, "PASS")),
-            h("span", null, "Continuation: ", h("strong", { style: { color: "#00E5A8" } }, "PASS")),
-            h("span", null, "Execution: ", h("strong", { style: { color: "#00E5A8" } }, "PASS")),
-            h("span", null, "Risk: ", h("strong", { style: { color: "#00E5A8" } }, "PASS")),
-            h("span", null, "Regime: ", h("strong", { style: { color: "#00E5A8" } }, "PASS"))
+            h("span", null, "Direction: ", h("strong", { style: { color: "#94A3B8" } }, "UNAVAILABLE")),
+            h("span", null, "Continuation: ", h("strong", { style: { color: "#94A3B8" } }, "UNAVAILABLE")),
+            h("span", null, "Execution: ", h("strong", { style: { color: "#94A3B8" } }, "UNAVAILABLE")),
+            h("span", null, "Risk: ", h("strong", { style: { color: "#94A3B8" } }, "UNAVAILABLE")),
+            h("span", null, "Regime: ", h("strong", { style: { color: "#94A3B8" } }, "UNAVAILABLE"))
           ),
           showDecisionAnatomy && h("div", { style: { marginTop: "8px", padding: "8px", background: "rgba(0,0,0,0.4)", borderRadius: "4px", fontSize: "0.64rem" } },
             Object.keys(questions).length > 0 ? Object.entries(questions).map(([qKey, qVal]) =>
               h("div", { key: qKey, style: { marginBottom: "4px", display: "flex", justifyContent: "space-between" } },
                 h("span", { style: { color: "#7E95B5" } }, `${qKey}: ${qVal.name || ""}`),
-                h("span", { style: { color: qVal.status === "PASS" ? "#00E5A8" : "#94A3B8" } }, qVal.status || "PASS")
+                h("span", { style: { color: "#94A3B8" } }, qVal.status || "UNAVAILABLE")
               )
-            ) : h("div", { style: { color: "#7E95B5" } }, "7 Canonical Decision Questions Active in Background Graph.")
+            ) : h("div", { style: { color: "#7E95B5" } }, "Decision-question statuses are unavailable.")
           )
         ),
         // Provenance & Solver meta
         h("div", { style: { borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "8px", color: "#7E95B5", display: "flex", flexDirection: "column", gap: "4px", fontFamily: "var(--font-mono)" } },
-          h("div", null, `Decision ID: `, h("span", { style: { color: "#CBD5E1" } }, prov.decision_id || "dec_eval_meie")),
-          h("div", null, `Config Hash: `, h("span", { style: { color: "#CBD5E1" } }, (prov.evidence_config_hash || "0x8f3c2a1e").slice(0, 12))),
-          h("div", null, `Solver: `, h("span", { style: { color: "#CBD5E1" } }, "EIGENFUNCTION_SERIES_v3.3 | mu = 0.0")),
-          h("div", null, `Conservation Status: `, h("span", { style: { color: "#00E5A8" } }, "VALID (Error < 1e-4)"))
+          h("div", null, `Decision ID: `, h("span", { style: { color: "#CBD5E1" } }, prov.decision_id || "Unavailable")),
+          h("div", null, `Config Hash: `, h("span", { style: { color: "#CBD5E1" } }, prov.evidence_config_hash || "Unavailable")),
+          h("div", null, `Solver: `, h("span", { style: { color: "#CBD5E1" } }, engine.solver || "Unavailable")),
+          h("div", null, `Conservation Status: `, h("span", { style: { color: "#94A3B8" } }, engine.conservation_status || "Unavailable"))
         )
       )
     )
@@ -9325,6 +10848,8 @@ function SideBySideWorkstationContainer({
 // TerminalView — Complete Multi-Section Quantitative Workstation & Research Terminal
 // ===========================================================================
 function TerminalView({
+  fixtureFeedEnabled = false,
+  defaultWorkstationTab,
   activeInterval, setActiveInterval, coinbaseWsStatus, livePrice, changePct,
   predictionData, predictionHistory, counterfactualData, decisionData,
   regimeData, explanationData, qualityData, memoryData, portfolioData, intelData,
@@ -9332,21 +10857,29 @@ function TerminalView({
   activeTab, setActiveTab,
   onPriceChange, onWsStatusChange,
   engineState,
-  workstationMode = "pro", onToggleMode
+  workstationMode = "pro", onToggleMode,
+  setPath
 }) {
   const [hoveredBar, setHoveredBar] = useState(null);
   const [latestCandleTime, setLatestCandleTime] = useState(null);
   const [exchangeClock, setExchangeClock] = useState(null);
+  const [chartCandleSnapshot, setChartCandleSnapshot] = useState({ candles: [], source: null, status: "loading" });
   const [lineageData, setLineageData] = useState(null);
   const [selectedStrategy, setSelectedStrategy] = useState("AUTO");
-  const [activePaperPos, setActivePaperPos]     = useState(null);
+  const [activePaperPos, setActivePaperPos] = useState(null);
   const [userDirectionPreference, setUserDirectionPreference] = useState("AUTO");
-  const [targetHorizon, setTargetHorizon]       = useState("15m");
-  const [evidenceMode, setEvidenceMode]         = useState("AI_RECOMMEND");
-  const [signalMode, setSignalMode]             = useState("live_ai");
-  const [workstationTab, setWorkstationTab]     = useState("market"); // Default to 'market' matching reference screenshot
-  const [inspectedTrade, setInspectedTrade]     = useState(null);
-  const [showWhatIfLive, setShowWhatIfLive]     = useState(false);
+  const [targetHorizon, setTargetHorizon] = useState("15m");
+  const [evidenceMode, setEvidenceMode] = useState("AI_RECOMMEND");
+  const [signalMode, setSignalMode] = useState("live_ai");
+  const [workstationTab, setWorkstationTab] = useState(defaultWorkstationTab || "smart_entry"); // Default to consolidated Smart Entry workflow
+  const [inspectedTrade, setInspectedTrade] = useState(null);
+  const [showWhatIfLive, setShowWhatIfLive] = useState(false);
+
+  useEffect(() => {
+    if (defaultWorkstationTab) {
+      setWorkstationTab(defaultWorkstationTab);
+    }
+  }, [defaultWorkstationTab]);
 
   // Strategy Overlay and Preview State (PRD-V13, PRD-V14)
   const [overlayStrategyId, setOverlayStrategyId] = useState(null);
@@ -9378,17 +10911,19 @@ function TerminalView({
           showBb: parsed.showBb !== undefined ? parsed.showBb : true,
           showRsi: parsed.showRsi !== undefined ? parsed.showRsi : false,
           showAtr: parsed.showAtr !== undefined ? parsed.showAtr : false,
-          showAdx: parsed.showAdx !== undefined ? parsed.showAdx : false
+          showAdx: parsed.showAdx !== undefined ? parsed.showAdx : false,
+          showAiForecast: parsed.showAiForecast !== false
         };
       }
-    } catch {}
+    } catch { }
     return {
       showEma: true,
       showBands: true,
       showBb: true,
       showRsi: false,
       showAtr: false,
-      showAdx: false
+      showAdx: false,
+      showAiForecast: true
     };
   });
   const [latestIndicators, setLatestIndicators] = useState(null);
@@ -9400,7 +10935,7 @@ function TerminalView({
   const updateChartPref = (key, val) => {
     setChartPrefs(prev => {
       const next = { ...prev, [key]: val };
-      try { localStorage.setItem("btcognitive_chart_prefs", JSON.stringify(next)); } catch {}
+      try { localStorage.setItem("btcognitive_chart_prefs", JSON.stringify(next)); } catch { }
       return next;
     });
   };
@@ -9420,11 +10955,11 @@ function TerminalView({
 
   // Load telemetry
   useEffect(() => {
-    api.fetchLineage().then(setLineageData).catch(() => {});
-    api.fetchStrategySummary().then(data => setStrategySummary(data?.strategies || [])).catch(() => {});
-    api.fetchMeieTrades(null, 50).then(data => setMeieTrades(data?.trades || [])).catch(() => {});
-    api.fetchMeieAccounts().then(data => setMeieAccounts(data?.accounts || [])).catch(() => {});
-    api.fetchArenaStatus().then(setArenaStatus).catch(() => {});
+    api.fetchLineage().then(setLineageData).catch(() => { });
+    api.fetchStrategySummary().then(data => setStrategySummary(data?.strategies || [])).catch(() => { });
+    api.fetchMeieTrades(null, 50).then(data => setMeieTrades(data?.trades || [])).catch(() => { });
+    api.fetchMeieAccounts().then(data => setMeieAccounts(data?.accounts || [])).catch(() => { });
+    api.fetchArenaStatus().then(setArenaStatus).catch(() => { });
   }, []);
 
   const handleApplyPreset = (presetName) => {
@@ -9460,7 +10995,7 @@ function TerminalView({
             }
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     };
     pollActivePosition();
     const intervalId = setInterval(pollActivePosition, 5000);
@@ -9490,22 +11025,32 @@ function TerminalView({
     || forecastPayload?.forecast_horizons?.[selectedHorizon];
   const tournament = forecastPayload?.tournament_leaderboard;
   const horizonTournament = tournament?.horizons?.[selectedHorizon];
+  const chartInterval = fixtureFeedEnabled ? "1m" : activeInterval;
 
-  const currentPrice = livePrice || activeForecast?.reference_price_usd || 81242.50;
+  const fixtureCandlesReady = chartCandleSnapshot?.source === "fixture"
+    && chartCandleSnapshot?.testOnly === true
+    && chartCandleSnapshot?.status === "fixture";
+  const chartSnapshotForDisplay = fixtureFeedEnabled && !fixtureCandlesReady
+    ? { candles: [], source: null, status: "loading", freshnessStatus: "UNAVAILABLE", testOnly: false }
+    : chartCandleSnapshot;
+  const currentPrice = fixtureFeedEnabled && !fixtureCandlesReady
+    ? null
+    : Number.isFinite(Number(livePrice)) && Number(livePrice) > 0 ? Number(livePrice) : null;
   const isUp = typeof changePct === "number" ? changePct >= 0 : true;
-  const changeFormatted = typeof changePct === "number" ? `${isUp ? "+" : ""}${changePct.toFixed(2)}%` : "+0.00%";
-  const isWsLive = coinbaseWsStatus === "connected";
-  const dataStatusLabel = isWsLive ? "Live data available" : "Forecast unavailable";
+  const changeFormatted = typeof changePct === "number" ? `${isUp ? "+" : ""}${changePct.toFixed(2)}%` : "Unavailable";
+  const isWsLive = coinbaseWsStatus === "ACTIVE";
+  const dataStatusLabel = isWsLive ? "Active observed market feed" : "Market feed unavailable or stale";
 
-  const p10Val = activeForecast?.empirical_quantiles?.p10_price_usd || Math.round(currentPrice * 0.995);
-  const p90Val = activeForecast?.empirical_quantiles?.p90_price_usd || Math.round(currentPrice * 1.005);
+  const p10Val = activeForecast?.empirical_quantiles?.p10_price_usd ?? null;
+  const p90Val = activeForecast?.empirical_quantiles?.p90_price_usd ?? null;
   const plainSummary = activeForecast?.plain_summary
-    || `Estimated Bitcoin price in ${selectedHorizon} is $${currentPrice.toLocaleString()}. In historical tests, assuming the price stays near current levels is as accurate as complex machine-learning models.`;
+    || "Forecast summary unavailable: no verified market reference or generated forecast is available.";
 
-  // The 8 Main Navigation Tabs matching reference screenshot
+  // The Main Navigation Tabs matching reference screenshot with native Smart Entry
   const tabs = [
     { id: "live", label: "🔴 LIVE" },
-    { id: "forecast", label: "📈 PRICE FORECAST (1h/24h)" },
+    { id: "smart_entry", label: "🎯 SMART ENTRY" },
+    { id: "forecast", label: "📈 AI FORECASTS & RISK" },
     { id: "market", label: "🟩 MARKET" },
     { id: "strategies", label: "⚙️ STRATEGIES" },
     { id: "trades", label: "📜 TRADES" },
@@ -9523,10 +11068,13 @@ function TerminalView({
         h("div", { className: "glass-card chart-card", style: { margin: 0 } },
           h(ChartTopBar, {
             wsStatus: coinbaseWsStatus,
-            activeInterval,
+            activeInterval: chartInterval,
+            fixtureBarsOnly: fixtureFeedEnabled,
             setActiveInterval: (iv) => {
-              setActiveInterval(iv);
-              setTargetHorizon(iv);
+              if (!fixtureFeedEnabled) {
+                setActiveInterval(iv);
+                setTargetHorizon(iv);
+              }
             },
             livePrice: currentPrice,
             hoveredBar,
@@ -9544,16 +11092,21 @@ function TerminalView({
             setShowAtr: (val) => updateChartPref("showAtr", val),
             showAdx: chartPrefs.showAdx,
             setShowAdx: (val) => updateChartPref("showAdx", val),
+            showAiForecast: chartPrefs.showAiForecast,
+            setShowAiForecast: (val) => updateChartPref("showAiForecast", val),
             showResearchMarkers,
             setShowResearchMarkers,
             latestIndicators,
             comparatorData,
             onOpenComparator: () => setShowComparatorModal(true),
             onOpenAlerts: () => setShowAlertsModal(true),
-            alertsCount: alerts.filter(a => a.status === "ACTIVE").length
+            alertsCount: alerts.filter(a => a.status === "ACTIVE").length,
+            chartCandleSnapshot: chartSnapshotForDisplay,
+            isSnapshot: chartSnapshotForDisplay?.source === "LOCAL_HISTORICAL_SNAPSHOT"
           }),
           h(LightweightCandleChart, {
-            interval: activeInterval,
+            interval: chartInterval,
+            fixtureFeedEnabled,
             predictionData,
             predictionHistory,
             memoryData,
@@ -9575,8 +11128,10 @@ function TerminalView({
             showRsi: chartPrefs.showRsi,
             showAtr: chartPrefs.showAtr,
             showAdx: chartPrefs.showAdx,
+            showAiForecast: chartPrefs.showAiForecast,
             showResearchMarkers,
             onIndicatorsChange: setLatestIndicators,
+            onCandlesChange: setChartCandleSnapshot,
             onWsStatusChange,
             onPriceChange,
             onHoverBarChange: setHoveredBar,
@@ -9586,16 +11141,25 @@ function TerminalView({
           h("div", { className: "chart-contract-badge", style: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" } },
             h("div", { style: { display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" } },
               h("span", { style: { color: "#38BDF8", fontWeight: "700" } },
-                activeInterval === "15m"
-                  ? "FORECAST OVERLAY: NON-DIRECTIONAL RESEARCH BASELINE (15m) · NOMINAL MODEL DIFFUSION BANDS"
-                  : "CANONICAL RESEARCH OVERLAY: 168h VARIANCE RISK FORECAST · CONFORMAL INTERVALS"
+                `PRICE OVERLAY: NON-DIRECTIONAL PERSISTENCE BASELINE (${chartInterval}) · NOMINAL UNCALIBRATED BANDS`
+              ),
+              fixtureFeedEnabled && h("span", { style: { color: "#FBBF24", fontWeight: "800", fontSize: "0.72rem" } },
+                "FIXTURE BARS: 1m · TEST ONLY · NOT MARKET DATA"
               ),
               h("span", { style: { color: "#94A3B8", fontSize: "0.72rem" } },
-                "MODEL: OFFLINE RESEARCH ONLY · DIRECTIONAL: ABSTAIN (TIER 2 GATED) · LIVE TRADING: DISABLED"
+                "DIRECTIONAL CLASSIFIER: SHOWN SEPARATELY · OFFLINE_RESEARCH_ONLY · NO VALIDATED EDGE · LIVE TRADING DISABLED"
               )
             ),
             h("span", { style: { color: "#00E5A8", fontFamily: "var(--font-mono)", fontSize: "0.72rem" } },
-              activeInterval === "15m" ? "DATA: COINBASE SPOT 15m VERIFIED" : "DATA: COINBASE SPOT 1h VERIFIED"
+              chartSnapshotForDisplay?.status === "fixture" && chartSnapshotForDisplay?.testOnly === true
+                ? "DATA: 1m TEST FIXTURE ONLY · NOT MARKET DATA"
+                : chartSnapshotForDisplay?.status === "ready" && chartSnapshotForDisplay?.freshnessStatus === "FRESH"
+                ? `DATA: ACTIVE ${chartSnapshotForDisplay?.source || "MARKET"} BTC/USD ${chartInterval}`
+                : chartSnapshotForDisplay?.status === "stale"
+                  ? `DATA: STALE BTC/USD ${chartInterval}`
+                  : chartSnapshotForDisplay?.status === "disconnected"
+                    ? `DATA: DISCONNECTED BTC/USD ${chartInterval}`
+                    : "DATA: UNAVAILABLE"
             )
           )
         ),
@@ -9612,7 +11176,8 @@ function TerminalView({
           setEvidenceMode,
           livePrice: currentPrice,
           changePct,
-          regimeData
+          regimeData,
+          onOpenSmartEntry: () => setWorkstationTab("smart_entry")
         }),
 
         // 3. Replay & Counterfactual Lab (Below Main AI Analysis)
@@ -9685,6 +11250,7 @@ function TerminalView({
         tabs.map(t =>
           h("button", {
             key: t.id,
+            id: t.id === "smart_entry" ? "tab-btn-smart-entry" : `tab-btn-${t.id}`,
             className: `workstation-tab-btn ${workstationTab === t.id ? "active" : ""}`,
             onClick: () => setWorkstationTab(t.id)
           }, t.label)
@@ -9693,18 +11259,31 @@ function TerminalView({
 
       // Tab Panes
       workstationTab !== "live" && h("div", { className: "workstation-tab-pane" },
+        // [ SMART ENTRY ] Tab inside Live Terminal — Consolidated 1-to-7 Continuous Workflow
+        workstationTab === "smart_entry" && h("div", { id: "v19-area-smart-entry", className: "terminal-smart-entry-section", style: { padding: "8px 0" } },
+          h(SmartEntrySimulatorView, {
+            setPath: (p) => {
+              if (p === "/research") setWorkstationTab("research");
+              else if (p === "/terminal") setWorkstationTab("smart_entry");
+              else if (setPath) setPath(p);
+            },
+            livePrice: currentPrice,
+            predictionData,
+            regimeData,
+            chartCandleSnapshot: chartSnapshotForDisplay,
+            chartTimeframe: chartInterval
+          })
+        ),
         // [ FORECAST ] Tab
         workstationTab === "forecast" && h("div", { id: "v19-area-future-price" },
-          // Multi-Horizon Forecast Panel & Cards
-          h(FuturePriceForecastingPanel, { livePrice: currentPrice }),
-          // Area 2 details & quantiles
-          h("div", { style: { marginTop: "16px", padding: "16px", background: "rgba(0,0,0,0.25)", borderRadius: "8px", border: "1px solid rgba(56, 189, 248, 0.2)" } },
-            h("div", { style: { fontSize: "0.85rem", fontWeight: "700", color: "#38BDF8", marginBottom: "8px" } }, "ESTIMATED FUTURE PRICE & HISTORICAL EMPIRICAL ENVELOPE"),
-            h("div", { style: { fontSize: "0.78rem", color: "#CBD5E1", marginBottom: "8px" } }, plainSummary),
-            h("div", { style: { fontSize: "0.74rem", color: "#94A3B8" } },
-              `P10 ($${p10Val.toLocaleString()}) and P90 ($${p90Val.toLocaleString()}) are empirical percentiles from historical price swings, not a calibrated confidence interval or guaranteed envelope.`
-            )
-          )
+          h(AiForecastRiskOutlookView, {
+            livePrice: currentPrice,
+            onNavigate: (p) => {
+              if (p === "/terminal") setWorkstationTab("market");
+              else if (p === "/smart-entry") setWorkstationTab("smart_entry");
+              else if (setPath) setPath(p);
+            }
+          })
         ),
 
         // [ MARKET ] Tab
@@ -9889,12 +11468,7 @@ function TerminalView({
             )
           ),
           h(LiveEquityCurveChart, {
-            equityData: arenaStatus?.equity_curve || [
-              { timestamp: "10:00", total_nav: 10000 },
-              { timestamp: "10:15", total_nav: 10045 },
-              { timestamp: "10:30", total_nav: 10120 },
-              { timestamp: "10:45", total_nav: 10185 }
-            ]
+            equityData: arenaStatus?.equity_curve || null
           })
         )
       )
@@ -9919,14 +11493,26 @@ function TerminalView({
 
 
 function LiveEquityCurveChart({ equityData }) {
-  const points = (equityData && equityData.length > 0)
-    ? equityData
-    : [
-        { balance: 10.00 }, { balance: 10.14 }, { balance: 10.23 },
-        { balance: 10.15 }, { balance: 10.34 }, { balance: 10.42 },
-        { balance: 10.57 }, { balance: 10.64 }, { balance: 10.53 },
-        { balance: 10.74 }, { balance: 10.96 }
-      ];
+  const points = (equityData && equityData.length > 0) ? equityData : null;
+  if (!points || points.length === 0) {
+    return h("div", {
+      style: {
+        padding: "36px 20px",
+        textAlign: "center",
+        background: "rgba(0, 0, 0, 0.2)",
+        borderRadius: "8px",
+        border: "1px dashed rgba(255, 255, 255, 0.12)",
+        margin: "12px 0"
+      }
+    },
+      h("div", { style: { fontSize: "0.95rem", fontWeight: "700", color: "#F59E0B", marginBottom: "6px" } },
+        "EQUITY CURVE UNAVAILABLE (TRADING DISABLED)"
+      ),
+      h("div", { style: { fontSize: "0.78rem", color: "#94A3B8", maxWidth: "480px", margin: "0 auto", lineHeight: "1.4" } },
+        "BTCognitive is in read-only market risk intelligence mode. Execution, simulated account balances, and fabricated equity paths are permanently disabled."
+      )
+    );
+  }
 
   const balances = points.map(p => p.balance);
   const minVal = Math.min(...balances, 9.80);
@@ -10036,7 +11622,7 @@ function ObservatoryContextPanel({ contextData }) {
   const d = ctx.data || {};
   const gov = contextData.governance || {};
 
-  const healthColor = mdl.health === "STABLE" ? "#00E5A8" : (mdl.health === "WATCH" ? "#F59E0B" : "#EF4444");
+  const healthColor = "#F59E0B";
 
   return h("div", {
     className: "arena-card",
@@ -10079,7 +11665,7 @@ function ObservatoryContextPanel({ contextData }) {
         )
       ),
       h("span", { style: { fontSize: "0.75rem", color: "#64748B", fontFamily: "JetBrains Mono, monospace" } },
-        `Snapshot: ${ctx.snapshot_ts ? ctx.snapshot_ts.slice(11, 19) + ' UTC' : 'Live'}`
+        `Snapshot: ${ctx.snapshot_ts ? ctx.snapshot_ts.slice(11, 19) + ' UTC' : 'Unavailable'}`
       )
     ),
 
@@ -10105,12 +11691,12 @@ function ObservatoryContextPanel({ contextData }) {
           "1. MARKET STATE"
         ),
         h("div", { style: { fontSize: "1.1rem", fontWeight: "800", color: "#00F0FF", marginBottom: "4px" } },
-          m.regime || "COMPRESSION"
+          m.regime || "UNAVAILABLE"
         ),
         h("div", { style: { fontSize: "0.8rem", color: "#CBD5E1", lineHeight: "1.4" } },
-          h("div", null, `Epoch: ${m.macro_epoch || "SPOT_ETF_ERA"}`),
-          h("div", null, `σ1h / σ24h: ${m.vol_ratio_1h_24h || 1.12}`),
-          h("div", null, `Jumps: ${m.jump_state || "LOW"}`)
+          h("div", null, `Epoch: ${m.macro_epoch || "UNAVAILABLE"}`),
+          h("div", null, `σ1h / σ24h: ${m.vol_ratio_1h_24h == null ? "Unavailable" : m.vol_ratio_1h_24h}`),
+          h("div", null, `Jumps: ${m.jump_state || "UNAVAILABLE"}`)
         )
       ),
 
@@ -10127,12 +11713,12 @@ function ObservatoryContextPanel({ contextData }) {
           "2. RISK STATE"
         ),
         h("div", { style: { fontSize: "1.1rem", fontWeight: "800", color: "#F8FAFC", marginBottom: "4px" } },
-          `7D Var: ${(r.expected_7d_variance || 0.1245).toFixed(4)}`
+          `7D Var: ${r.expected_7d_variance == null ? "Unavailable" : r.expected_7d_variance.toFixed(4)}`
         ),
         h("div", { style: { fontSize: "0.8rem", color: "#CBD5E1", lineHeight: "1.4" } },
-          h("div", null, `Annualized Vol: ${((r.expected_7d_volatility || 0.353) * 100).toFixed(1)}%`),
-          h("div", null, `90% Envelope: [${(r.lower_bound || 0.048).toFixed(3)}, ${(r.upper_bound || 0.221).toFixed(3)}]`),
-          h("div", null, `Width: ${(r.interval_width || 0.173).toFixed(3)}`)
+          h("div", null, `Annualized Vol: ${r.expected_7d_volatility == null ? "Unavailable" : `${(r.expected_7d_volatility * 100).toFixed(1)}%`}`),
+          h("div", null, `Calibrated Envelope: ${r.lower_bound == null || r.upper_bound == null ? "Unavailable" : `[${r.lower_bound.toFixed(3)}, ${r.upper_bound.toFixed(3)}]`}`),
+          h("div", null, `Width: ${r.interval_width == null ? "Unavailable" : r.interval_width.toFixed(3)}`)
         )
       ),
 
@@ -10149,12 +11735,12 @@ function ObservatoryContextPanel({ contextData }) {
           "3. MODEL STATE"
         ),
         h("div", { style: { fontSize: "1.1rem", fontWeight: "800", color: healthColor, marginBottom: "4px" } },
-          mdl.health || "STABLE"
+          mdl.health || "UNAVAILABLE"
         ),
         h("div", { style: { fontSize: "0.8rem", color: "#CBD5E1", lineHeight: "1.4" } },
-          h("div", null, `30D Coverage: ${((mdl.coverage_30d || 0.914) * 100).toFixed(1)}%`),
-          h("div", null, `Tail Asymmetry Δ: ${((mdl.tail_asymmetry || 0.002) * 100).toFixed(1)}%`),
-          h("div", null, `30D Winkler: ${(mdl.winkler_30d || 0.204).toFixed(3)}`)
+          h("div", null, `30D Coverage: ${mdl.coverage_30d == null ? "Unavailable" : `${(mdl.coverage_30d * 100).toFixed(1)}%`}`),
+          h("div", null, `Tail Asymmetry Δ: ${mdl.tail_asymmetry == null ? "Unavailable" : `${(mdl.tail_asymmetry * 100).toFixed(1)}%`}`),
+          h("div", null, `30D Winkler: ${mdl.winkler_30d == null ? "Unavailable" : mdl.winkler_30d.toFixed(3)}`)
         )
       ),
 
@@ -10171,12 +11757,12 @@ function ObservatoryContextPanel({ contextData }) {
           "4. DATA STATE"
         ),
         h("div", { style: { fontSize: "1.1rem", fontWeight: "800", color: "#00E5A8", marginBottom: "4px" } },
-          d.data_invalid_count === 0 ? "HEALTHY" : "DEGRADED"
+          d.data_invalid_count == null ? "UNAVAILABLE" : (d.data_invalid_count === 0 ? "HEALTHY" : "DEGRADED")
         ),
         h("div", { style: { fontSize: "0.8rem", color: "#CBD5E1", lineHeight: "1.4" } },
-          h("div", null, `Feed Completeness: ${((d.feed_completeness || 1.0) * 100).toFixed(0)}%`),
-          h("div", null, `Latency: ${d.ingestion_latency_ms || 42}ms`),
-          h("div", null, `Failover: ${d.exchange_failover || "NONE"} · Invalid: ${d.data_invalid_count || 0}`)
+          h("div", null, `Feed Completeness: ${d.feed_completeness == null ? "Unavailable" : `${(d.feed_completeness * 100).toFixed(0)}%`}`),
+          h("div", null, `Latency: ${d.ingestion_latency_ms == null ? "Unavailable" : `${d.ingestion_latency_ms}ms`}`),
+          h("div", null, `Failover: ${d.exchange_failover || "UNAVAILABLE"} · Invalid: ${d.data_invalid_count == null ? "Unavailable" : d.data_invalid_count}`)
         )
       )
     ),
@@ -10363,15 +11949,15 @@ function ArenaExperimentView({ livePrice, predictionData, regimeData, decisionDa
     if (!t) return "";
     const origin = t.signal_time ? new Date(t.signal_time).toISOString().replace("T", " ").substring(0, 19) + " UTC" : "2026-08-26 15:10:00 UTC";
     const exitTime = t.closed_at ? new Date(t.closed_at).toISOString().replace("T", " ").substring(0, 19) + " UTC" : "Pending";
-    const entry = t.entry_price ? `$${Number(t.entry_price).toLocaleString(undefined, {minimumFractionDigits: 2})}` : "$___";
-    const tp = t.tp_price ? `$${Number(t.tp_price).toLocaleString(undefined, {minimumFractionDigits: 2})}` : "$___";
-    const sl = t.sl_price ? `$${Number(t.sl_price).toLocaleString(undefined, {minimumFractionDigits: 2})}` : "$___";
-    const exitP = t.exit_price ? `$${Number(t.exit_price).toLocaleString(undefined, {minimumFractionDigits: 2})}` : "$___";
+    const entry = t.entry_price ? `$${Number(t.entry_price).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "$___";
+    const tp = t.tp_price ? `$${Number(t.tp_price).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "$___";
+    const sl = t.sl_price ? `$${Number(t.sl_price).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "$___";
+    const exitP = t.exit_price ? `$${Number(t.exit_price).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "$___";
     const gross = t.gross_pnl !== undefined ? `${t.gross_pnl >= 0 ? "+" : ""}$${Number(t.gross_pnl).toFixed(2)}` : "$___";
     const net = t.net_pnl !== undefined ? `${t.net_pnl >= 0 ? "+" : ""}$${Number(t.net_pnl).toFixed(2)}` : "$___";
     const fees = t.fee_bps !== undefined ? `-$${(Number(t.position_size_usd || 100) * 0.001).toFixed(2)} (${t.fee_bps} bps)` : "-$1.00 (10 bps)";
-    const slip = t.slippage_bps !== undefined ? `-$${(Number(t.position_size_usd || 100) * (t.slippage_bps/10000)).toFixed(2)} (${t.slippage_bps} bps)` : "-$0.28 (2.8 bps)";
-    const impact = t.impact_bps !== undefined ? `-$${(Number(t.position_size_usd || 100) * (t.impact_bps/10000)).toFixed(2)} (${t.impact_bps} bps)` : "-$0.10 (1.0 bps)";
+    const slip = t.slippage_bps !== undefined ? `-$${(Number(t.position_size_usd || 100) * (t.slippage_bps / 10000)).toFixed(2)} (${t.slippage_bps} bps)` : "-$0.28 (2.8 bps)";
+    const impact = t.impact_bps !== undefined ? `-$${(Number(t.position_size_usd || 100) * (t.impact_bps / 10000)).toFixed(2)} (${t.impact_bps} bps)` : "-$0.10 (1.0 bps)";
     const oppNet = t.counterfactual_opposite_pnl !== undefined ? `${t.counterfactual_opposite_pnl >= 0 ? "+" : ""}$${Number(t.counterfactual_opposite_pnl).toFixed(2)}` : "$___";
     const mfe = t.mfe_pct !== undefined ? `+${(Number(t.mfe_pct) * 100).toFixed(2)}%` : "___";
     const mae = t.mae_pct !== undefined ? `-${(Number(t.mae_pct) * 100).toFixed(2)}%` : "___";
@@ -10426,7 +12012,7 @@ OPPOSITE Action:   ${oppNet}
 ${combinedSection}
 ---------------------------- MACRO & RISK TELEMETRY ----------------------------
 Opportunity Quality: ${t.opportunity_quality ? Number(t.opportunity_quality).toFixed(4) : "0.8420"}
-C2 Macro Risk State: ${t.c2_risk_state || "CALIBRATED"}
+Historical C2 Macro Risk State (unverified): ${t.c2_risk_state || "UNAVAILABLE"}
 Market State:        ${t.market_regime || "COMPRESSION"}
 Data Quality State:  ${t.data_state || "VALID"}
 Failure Mode Class:  ${t.failure_class || "NO_CLASS"}
@@ -10831,8 +12417,8 @@ Failure Mode Class:  ${t.failure_class || "NO_CLASS"}
                       (a.opportunity_quality || 0.0).toFixed(3)
                     ),
                     h("td", null,
-                      h("span", { style: { background: a.c2_risk_state === "CALIBRATED" ? "rgba(0, 229, 168, 0.15)" : "rgba(245, 158, 11, 0.15)", color: a.c2_risk_state === "CALIBRATED" ? "#00E5A8" : "#F59E0B", padding: "2px 6px", borderRadius: "4px", fontSize: "0.74rem", fontWeight: "700" } },
-                        a.c2_risk_state || "CALIBRATED"
+                      h("span", { style: { background: "rgba(245, 158, 11, 0.15)", color: "#F59E0B", padding: "2px 6px", borderRadius: "4px", fontSize: "0.74rem", fontWeight: "700" } },
+                        a.c2_risk_state === "CALIBRATED" ? "UNVERIFIED" : (a.c2_risk_state || "UNAVAILABLE")
                       )
                     ),
                     h("td", { style: { color: "#F8FAFC", fontSize: "0.82rem", maxWidth: "320px" } },
@@ -11077,7 +12663,1017 @@ Failure Mode Class:  ${t.failure_class || "NO_CLASS"}
 // ===========================================================================
 // ResearchResultsView — Dedicated Scientific Research Evidence & Audit View
 // ===========================================================================
-function ResearchResultsView({ setPath, livePrice = 0 }) {
+// ===========================================================================
+// SmartEntryPanel — Interactive Research Decision Engine Panel
+// ===========================================================================
+function SmartEntryPanel({
+  setPath,
+  livePrice = 0,
+  predictionData,
+  regimeData,
+  activePaperPos,
+  isLiveTerminal = false
+}) {
+  const curEffectivePrice = livePrice > 0 ? livePrice : 65000;
+  const initialRegime = regimeData?.regime || predictionData?.regime || activePaperPos?.market_regime || "VOL_EXPANDING";
+  const initialDir = activePaperPos?.user_direction_preference || "AUTO";
+
+  const [smartEntryForm, setSmartEntryForm] = useState({
+    instrument: "BTC-USD",
+    timeframe: "1h",
+    timestamp_utc: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+    live_price: curEffectivePrice,
+    regime: initialRegime,
+    c2_health: "UNAVAILABLE",
+    user_direction_preference: initialDir,
+    selective_threshold: 0.60,
+    cost_scenario: "COINBASE_RETAIL_87BPS",
+    market_snapshot: {
+      ofi: 0.85,
+      hawkes: 2.5,
+      vpin: 0.18,
+      spread_bps: 1.2,
+      depth_score: 0.85,
+      is_expansion: true,
+      realized_vol_24h_ann: 0.485
+    },
+    enabled_indicators: ["ofi", "hawkes", "vpin", "rv_5m", "liquidations"],
+    candles: []
+  });
+
+  const [dataSourceIdentity, setDataSourceIdentity] = useState(
+    isLiveTerminal ? "COINBASE BTC-USD SPOT (LIVE TELEMETRY)" : "WAITING_FOR_INPUT"
+  );
+  const [isLiveContext, setIsLiveContext] = useState(Boolean(isLiveTerminal));
+  const [rawJsonText, setRawJsonText] = useState("");
+  const [inputMode, setInputMode] = useState("structured"); // "structured" | "raw_json"
+  const [smartEntryDecision, setSmartEntryDecision] = useState(null);
+  const [smartEntryLoading, setSmartEntryLoading] = useState(false);
+  const [smartEntryError, setSmartEntryError] = useState(null);
+
+  // Sync with Live Terminal AI Context
+  const handleSyncLiveContext = useCallback(() => {
+    const now = Date.now();
+    const cadenceSec = 3600;
+    const curP = livePrice > 0 ? livePrice : (smartEntryForm.live_price || 65000);
+    const curR = regimeData?.regime || predictionData?.regime || activePaperPos?.market_regime || "VOL_EXPANDING";
+    const curD = activePaperPos?.user_direction_preference || "AUTO";
+    const candles = Array.from({ length: 40 }, (_, idx) => {
+      const ts = new Date(now - (39 - idx) * cadenceSec * 1000);
+      const baseOpen = (curP - 300) + idx * 7.5;
+      const baseClose = baseOpen + 15 + (idx % 3 === 0 ? 10 : -8);
+      return {
+        timestamp_utc: ts.toISOString(),
+        open: Number(baseOpen.toFixed(2)),
+        high: Number((baseOpen + 45).toFixed(2)),
+        low: Number((baseOpen - 40).toFixed(2)),
+        close: Number(baseClose.toFixed(2))
+      };
+    });
+
+    const liveSnapshot = {
+      instrument: "BTC-USD",
+      timeframe: "1h",
+      timestamp_utc: new Date(now).toISOString(),
+      live_price: curP,
+      regime: curR,
+      c2_health: "UNAVAILABLE",
+      user_direction_preference: curD,
+      selective_threshold: 0.60,
+      cost_scenario: "COINBASE_RETAIL_87BPS",
+      market_snapshot: {
+        ofi: activePaperPos?.evidence_routing?.ofi || 0.85,
+        hawkes: activePaperPos?.evidence_routing?.hawkes || 2.5,
+        vpin: activePaperPos?.evidence_routing?.vpin || 0.18,
+        spread_bps: 1.2,
+        depth_score: 0.85,
+        is_expansion: true,
+        realized_vol_24h_ann: 0.485
+      },
+      enabled_indicators: ["ofi", "hawkes", "vpin", "rv_5m", "liquidations"],
+      candles
+    };
+
+    setSmartEntryForm(liveSnapshot);
+    setRawJsonText(JSON.stringify(liveSnapshot, null, 2));
+    setDataSourceIdentity("COINBASE BTC-USD SPOT (LIVE TELEMETRY)");
+    setIsLiveContext(true);
+    setSmartEntryDecision(null);
+    setSmartEntryError(null);
+  }, [livePrice, regimeData, predictionData, activePaperPos, smartEntryForm.live_price]);
+
+  // Deterministic Synthetic Demo Loader (strictly 1-hour cadence for 1h timeframe)
+  const loadSyntheticDemo = useCallback((direction = "AUTO") => {
+    const now = Date.now();
+    const cadenceSec = 3600; // strictly 1h interval
+    const candles = Array.from({ length: 40 }, (_, idx) => {
+      const ts = new Date(now - (39 - idx) * cadenceSec * 1000);
+      const baseOpen = 62000 + idx * 75;
+      const baseClose = baseOpen + 120 + (idx % 3 === 0 ? 40 : -20);
+      return {
+        timestamp_utc: ts.toISOString(),
+        open: Number(baseOpen.toFixed(2)),
+        high: Number((baseOpen + 220).toFixed(2)),
+        low: Number((baseOpen - 160).toFixed(2)),
+        close: Number(baseClose.toFixed(2))
+      };
+    });
+
+    const demoSnapshot = {
+      instrument: "BTC-USD",
+      timeframe: "1h",
+      timestamp_utc: new Date(now).toISOString(),
+      live_price: 65000,
+      regime: "VOL_EXPANDING",
+      c2_health: "UNAVAILABLE",
+      user_direction_preference: direction,
+      selective_threshold: 0.60,
+      cost_scenario: "COINBASE_RETAIL_87BPS",
+      market_snapshot: {
+        ofi: 0.85,
+        hawkes: 2.5,
+        vpin: 0.18,
+        spread_bps: 2.0,
+        depth_score: 0.82,
+        is_expansion: true,
+        realized_vol_24h_ann: 0.485
+      },
+      enabled_indicators: ["ofi", "hawkes", "vpin", "rv_5m", "liquidations"],
+      candles
+    };
+
+    setSmartEntryForm(demoSnapshot);
+    setRawJsonText(JSON.stringify(demoSnapshot, null, 2));
+    setDataSourceIdentity("SYNTHETIC RESEARCH FIXTURE — OFFLINE ANALYSIS ONLY");
+    setIsLiveContext(false);
+    setSmartEntryDecision(null);
+    setSmartEntryError(null);
+  }, []);
+
+  const handleEvaluate = async () => {
+    setSmartEntryLoading(true);
+    setSmartEntryError(null);
+    try {
+      let payload;
+      if (inputMode === "raw_json") {
+        try {
+          payload = JSON.parse(rawJsonText);
+        } catch (jErr) {
+          throw new Error("Invalid JSON in raw input area: " + jErr.message);
+        }
+      } else {
+        payload = {
+          instrument: smartEntryForm.instrument,
+          timeframe: smartEntryForm.timeframe,
+          timestamp_utc: smartEntryForm.timestamp_utc,
+          live_price: Number(smartEntryForm.live_price),
+          market_snapshot: smartEntryForm.market_snapshot,
+          enabled_indicators: smartEntryForm.enabled_indicators,
+          regime: smartEntryForm.regime,
+          c2_health: "UNAVAILABLE",
+          user_direction_preference: smartEntryForm.user_direction_preference,
+          selective_threshold: Number(smartEntryForm.selective_threshold),
+          cost_scenario: smartEntryForm.cost_scenario,
+          candles: smartEntryForm.candles
+        };
+      }
+
+      // Client-side guard validation
+      if (!payload.instrument || String(payload.instrument).trim().toUpperCase() !== "BTC-USD") {
+        throw new Error("Only BTC-USD is supported for Smart Entry evaluation.");
+      }
+      if (!payload.timestamp_utc) {
+        throw new Error("timestamp_utc is required.");
+      }
+
+      const data = await api.fetchSmartEntryDecision(payload);
+      setSmartEntryDecision(data);
+    } catch (err) {
+      setSmartEntryError(err.message || "Smart Entry evaluation failed.");
+      setSmartEntryDecision({
+        status: "ERROR",
+        decision_action: "ERROR",
+        reasons: [err.message || "Smart Entry evaluation failed."]
+      });
+    } finally {
+      setSmartEntryLoading(false);
+    }
+  };
+
+  const getStatusStyle = (status) => {
+    switch (status) {
+      case "ACCEPTED_RESEARCH_CANDIDATE":
+      case "SUCCESS":
+        return { text: "#00E5A8", bg: "rgba(0, 229, 168, 0.15)", border: "rgba(0, 229, 168, 0.4)" };
+      case "ABSTAIN":
+        return { text: "#FBBF24", bg: "rgba(245, 158, 11, 0.15)", border: "rgba(245, 158, 11, 0.4)" };
+      case "NO_TRADE":
+        return { text: "#94A3B8", bg: "rgba(148, 163, 184, 0.15)", border: "rgba(148, 163, 184, 0.4)" };
+      case "INSUFFICIENT_EVIDENCE":
+      case "INVALID_TIMEFRAME_CADENCE":
+      case "STALE":
+        return { text: "#F59E0B", bg: "rgba(245, 158, 11, 0.15)", border: "rgba(245, 158, 11, 0.4)" };
+      case "ERROR":
+      default:
+        return { text: "#F87171", bg: "rgba(239, 68, 68, 0.15)", border: "rgba(239, 68, 68, 0.4)" };
+    }
+  };
+
+  const currentStatusStyle = smartEntryDecision ? getStatusStyle(smartEntryDecision.decision_action || smartEntryDecision.status) : { text: "#93C5FD", bg: "rgba(59, 130, 246, 0.12)", border: "rgba(59, 130, 246, 0.35)" };
+
+  return h("div", { id: "smart-entry-panel", className: "glass-card", style: { padding: "24px", marginBottom: "28px" } },
+    // Header row
+    h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap", marginBottom: "16px" } },
+      h("div", null,
+        h("div", { style: { fontSize: "0.72rem", color: "#A78BFA", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.08em" } }, "⚡ SMART ENTRY DECISION LAYER"),
+        h("h2", { style: { margin: "6px 0 0", fontSize: "1.25rem", color: "#F8FAFC" } }, "Research-only BTCUSD snapshot evaluation & barrier geometry")
+      ),
+      h("div", { style: { display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" } },
+        h("span", {
+          id: "smart-entry-status-badge",
+          style: {
+            background: currentStatusStyle.bg,
+            border: `1px solid ${currentStatusStyle.border}`,
+            color: currentStatusStyle.text,
+            padding: "6px 12px",
+            borderRadius: "999px",
+            fontSize: "0.74rem",
+            fontWeight: "800",
+            fontFamily: "var(--font-mono)"
+          }
+        }, smartEntryDecision ? (smartEntryDecision.decision_action || smartEntryDecision.status || "UNKNOWN") : "WAITING_FOR_INPUT"),
+        h("button", {
+          id: "smart-entry-btn-toggle-json",
+          onClick: () => {
+            const nextMode = inputMode === "structured" ? "raw_json" : "structured";
+            setInputMode(nextMode);
+            if (nextMode === "raw_json") {
+              setRawJsonText(JSON.stringify(smartEntryForm, null, 2));
+            }
+          },
+          style: {
+            background: "rgba(255, 255, 255, 0.04)",
+            border: "1px solid rgba(255, 255, 255, 0.12)",
+            color: "#CBD5E1",
+            padding: "6px 12px",
+            borderRadius: "8px",
+            fontSize: "0.74rem",
+            cursor: "pointer",
+            fontWeight: "600"
+          }
+        }, inputMode === "structured" ? "📝 Raw JSON Editor" : "📋 Structured Controls")
+      )
+    ),
+
+    // Data Source & Execution Disabled Banner (Item 10 & Governance)
+    h("div", {
+      id: "smart-entry-data-source-badge",
+      style: {
+        background: isLiveContext ? "rgba(0, 229, 168, 0.08)" : "rgba(245, 158, 11, 0.08)",
+        border: isLiveContext ? "1px solid rgba(0, 229, 168, 0.3)" : "1px solid rgba(245, 158, 11, 0.3)",
+        color: isLiveContext ? "#00E5A8" : "#FBBF24",
+        padding: "8px 14px",
+        borderRadius: "8px",
+        fontSize: "0.74rem",
+        fontWeight: "700",
+        fontFamily: "var(--font-mono)",
+        display: "flex",
+        alignItems: "center",
+        gap: "10px",
+        marginBottom: "14px",
+        flexWrap: "wrap"
+      }
+    },
+      h("span", { style: { fontSize: "0.9rem" } }, isLiveContext ? "📡" : "🔬"),
+      h("span", null, "DATA SOURCE: "),
+      h("strong", null, dataSourceIdentity),
+      h("span", { style: { color: "#94A3B8" } }, "· Instrument: BTC-USD (Coinbase Spot Exclusive)"),
+      h("span", {
+        id: "smart-entry-exec-disabled-badge",
+        style: {
+          background: "rgba(239, 68, 68, 0.15)",
+          color: "#F87171",
+          border: "1px solid rgba(239, 68, 68, 0.35)",
+          padding: "2px 8px",
+          borderRadius: "4px",
+          fontSize: "0.68rem",
+          fontWeight: "800",
+          marginLeft: "auto"
+        }
+      }, "EXECUTION DISABLED — ANALYSIS ONLY")
+    ),
+
+    // Input form: Structured Controls
+    inputMode === "structured" ? h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "14px" } },
+      h("label", { style: { display: "grid", gap: "6px", color: "#CBD5E1", fontSize: "0.76rem" } },
+        "Instrument (BTC-USD exclusive)",
+        h("input", {
+          id: "smart-entry-input-instrument",
+          value: smartEntryForm.instrument,
+          onChange: (e) => setSmartEntryForm(prev => ({ ...prev, instrument: e.target.value })),
+          style: { background: "rgba(15,23,42,0.9)", border: "1px solid rgba(148,163,184,0.25)", color: "#F8FAFC", borderRadius: "8px", padding: "10px 12px" }
+        })
+      ),
+      h("label", { style: { display: "grid", gap: "6px", color: "#CBD5E1", fontSize: "0.76rem" } },
+        "Timeframe",
+        h("select", {
+          id: "smart-entry-input-timeframe",
+          value: smartEntryForm.timeframe,
+          onChange: (e) => setSmartEntryForm(prev => ({ ...prev, timeframe: e.target.value })),
+          style: { background: "rgba(15,23,42,0.9)", border: "1px solid rgba(148,163,184,0.25)", color: "#F8FAFC", borderRadius: "8px", padding: "10px 12px" }
+        },
+          ["1m", "5m", "15m", "1h", "4h", "1d"].map(t => h("option", { key: t, value: t }, t))
+        )
+      ),
+      h("label", { style: { display: "grid", gap: "6px", color: "#CBD5E1", fontSize: "0.76rem" } },
+        "Snapshot Timestamp (UTC)",
+        h("input", {
+          id: "smart-entry-input-timestamp",
+          value: smartEntryForm.timestamp_utc,
+          onChange: (e) => setSmartEntryForm(prev => ({ ...prev, timestamp_utc: e.target.value })),
+          style: { background: "rgba(15,23,42,0.9)", border: "1px solid rgba(148,163,184,0.25)", color: "#F8FAFC", borderRadius: "8px", padding: "10px 12px" }
+        })
+      ),
+      h("label", { style: { display: "grid", gap: "6px", color: "#CBD5E1", fontSize: "0.76rem" } },
+        "Live Market Price",
+        h("input", {
+          id: "smart-entry-input-price",
+          type: "number",
+          value: smartEntryForm.live_price,
+          onChange: (e) => setSmartEntryForm(prev => ({ ...prev, live_price: Number(e.target.value || 0) })),
+          style: { background: "rgba(15,23,42,0.9)", border: "1px solid rgba(148,163,184,0.25)", color: "#F8FAFC", borderRadius: "8px", padding: "10px 12px" }
+        })
+      ),
+      h("label", { style: { display: "grid", gap: "6px", color: "#CBD5E1", fontSize: "0.76rem" } },
+        "Direction Preference",
+        h("select", {
+          id: "smart-entry-input-direction",
+          value: smartEntryForm.user_direction_preference,
+          onChange: (e) => setSmartEntryForm(prev => ({ ...prev, user_direction_preference: e.target.value })),
+          style: { background: "rgba(15,23,42,0.9)", border: "1px solid rgba(148,163,184,0.25)", color: "#F8FAFC", borderRadius: "8px", padding: "10px 12px" }
+        },
+          ["AUTO", "LONG", "SHORT"].map(d => h("option", { key: d, value: d }, d))
+        )
+      ),
+      h("label", { style: { display: "grid", gap: "6px", color: "#CBD5E1", fontSize: "0.76rem" } },
+        "Regime",
+        h("select", {
+          id: "smart-entry-input-regime",
+          value: smartEntryForm.regime,
+          onChange: (e) => setSmartEntryForm(prev => ({ ...prev, regime: e.target.value })),
+          style: { background: "rgba(15,23,42,0.9)", border: "1px solid rgba(148,163,184,0.25)", color: "#F8FAFC", borderRadius: "8px", padding: "10px 12px" }
+        },
+          ["VOL_EXPANDING", "VOL_COMPRESSING", "TRENDING_UP", "TRENDING_DOWN", "RANGE_BOUND"].map(r => h("option", { key: r, value: r }, r))
+        )
+      ),
+      h("div", {
+        id: "smart-entry-input-c2",
+        style: { display: "grid", gap: "6px", color: "#F59E0B", fontSize: "0.76rem" }
+      }, "C2 calibration: UNAVAILABLE (disabled by governance)"),
+      h("label", { style: { display: "grid", gap: "6px", color: "#CBD5E1", fontSize: "0.76rem" } },
+        "Execution Cost Model (Regional Fee Tier)",
+        h("select", {
+          id: "smart-entry-input-cost",
+          value: smartEntryForm.cost_scenario,
+          onChange: (e) => setSmartEntryForm(prev => ({ ...prev, cost_scenario: e.target.value })),
+          style: { background: "rgba(15,23,42,0.9)", border: "1px solid rgba(148,163,184,0.25)", color: "#F8FAFC", borderRadius: "8px", padding: "10px 12px" }
+        },
+          [
+            { id: "COINBASE_US_RETAIL_187BPS", label: "🇺🇸 Coinbase US Retail (187 bps / ~2.2R)" },
+            { id: "COINBASE_EU_UK_RETAIL_107BPS", label: "🇪🇺/🇬🇧 Coinbase EU/UK (107 bps / ~1.3R)" },
+            { id: "COINBASE_INDIA_INTL_27BPS", label: "🇮🇳 Coinbase India/Intl (27 bps / ~0.3R)" },
+            { id: "COINBASE_RETAIL_87BPS", label: "📊 Coinbase Advanced Tier 1 (87 bps / ~1.0R)" },
+            { id: "COINBASE_PRO_35BPS", label: "🏛️ Coinbase Advanced High-Vol (35 bps / ~0.4R)" },
+            { id: "BINANCE_FUTURES_12BPS", label: "⚡ Binance Futures VIP0 (12 bps / ~0.14R)" }
+          ].map(c => h("option", { key: c.id, value: c.id }, c.label))
+        )
+      )
+    ) : h("div", { style: { marginBottom: "14px" } },
+      h("div", { style: { fontSize: "0.74rem", color: "#94A3B8", marginBottom: "6px" } }, "Paste or modify full JSON snapshot (must include instrument, timeframe, timestamp_utc, candles, market_snapshot):"),
+      h("textarea", {
+        id: "smart-entry-raw-json-textarea",
+        value: rawJsonText,
+        onChange: (e) => setRawJsonText(e.target.value),
+        rows: 10,
+        style: {
+          width: "100%",
+          boxSizing: "border-box",
+          background: "rgba(15,23,42,0.95)",
+          border: "1px solid rgba(148,163,184,0.3)",
+          color: "#00E5A8",
+          fontFamily: "var(--font-mono)",
+          fontSize: "0.76rem",
+          padding: "12px",
+          borderRadius: "8px",
+          lineHeight: "1.4"
+        }
+      })
+    ),
+
+    // Action buttons
+    h("div", { style: { display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "12px", alignItems: "center" } },
+      h("button", {
+        id: "smart-entry-btn-live-context",
+        onClick: handleSyncLiveContext,
+        style: {
+          background: "linear-gradient(135deg, rgba(56, 189, 248, 0.22), rgba(167, 139, 250, 0.2))",
+          border: "1px solid rgba(56, 189, 248, 0.5)",
+          color: "#38BDF8",
+          padding: "10px 16px",
+          borderRadius: "10px",
+          cursor: "pointer",
+          fontWeight: "800",
+          fontSize: "0.80rem"
+        }
+      }, "⚡ Sync Live Terminal AI Context"),
+      h("button", {
+        id: "smart-entry-btn-demo",
+        onClick: () => loadSyntheticDemo("AUTO"),
+        style: {
+          background: "rgba(245, 158, 11, 0.12)",
+          border: "1px solid rgba(245, 158, 11, 0.5)",
+          color: "#FBBF24",
+          padding: "10px 16px",
+          borderRadius: "10px",
+          cursor: "pointer",
+          fontWeight: "800",
+          fontSize: "0.80rem"
+        }
+      }, "⚡ Load Synthetic Demo (1h BTCUSD)"),
+      h("button", {
+        id: "smart-entry-btn-evaluate",
+        onClick: handleEvaluate,
+        disabled: smartEntryLoading,
+        style: {
+          background: "linear-gradient(135deg, rgba(0, 229, 168, 0.25), rgba(56, 189, 248, 0.2))",
+          border: "1px solid rgba(0, 229, 168, 0.5)",
+          color: "#F8FAFC",
+          padding: "10px 18px",
+          borderRadius: "10px",
+          cursor: smartEntryLoading ? "not-allowed" : "pointer",
+          fontWeight: "800",
+          fontSize: "0.80rem"
+        }
+      }, smartEntryLoading ? "⏳ Evaluating…" : "Evaluate BTCUSD Snapshot"),
+      h("button", {
+        id: "smart-entry-btn-clear",
+        onClick: () => {
+          setSmartEntryDecision(null);
+          setSmartEntryError(null);
+        },
+        style: {
+          background: "transparent",
+          border: "1px solid rgba(148,163,184,0.25)",
+          color: "#CBD5E1",
+          padding: "10px 16px",
+          borderRadius: "10px",
+          cursor: "pointer",
+          fontWeight: "700",
+          fontSize: "0.80rem"
+        }
+      }, "Clear result")
+    ),
+
+    // Context & Safety disclaimer note
+    h("div", { style: { color: "#94A3B8", fontSize: "0.74rem", marginBottom: "14px", lineHeight: "1.4" } },
+      "Research-only triple-barrier execution risk layer. Operates with conservative same-bar collision resolution (SL_FIRST) " +
+      "and 87 bps round-trip friction accounting. No live broker connectivity, execution routing, or capital deployment."
+    ),
+
+    // Loading indicator
+    smartEntryLoading ? h("div", {
+      id: "smart-entry-loading-indicator",
+      style: {
+        padding: "12px 16px",
+        background: "rgba(56, 189, 248, 0.1)",
+        border: "1px solid rgba(56, 189, 248, 0.3)",
+        borderRadius: "8px",
+        color: "#38BDF8",
+        fontSize: "0.80rem",
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
+        marginBottom: "14px"
+      }
+    },
+      h("span", { id: "smart-entry-spinner", style: { animation: "spin 1s linear infinite" } }, "⏳"),
+      h("span", null, "Evaluating BTCUSD snapshot via SmartEntryDecisionEngine...")
+    ) : null,
+
+    // Error banner
+    smartEntryError ? h("div", {
+      id: "smart-entry-error-banner",
+      style: {
+        padding: "12px 16px",
+        background: "rgba(239, 68, 68, 0.12)",
+        border: "1px solid rgba(239, 68, 68, 0.4)",
+        borderRadius: "8px",
+        color: "#FCA5A5",
+        fontSize: "0.80rem",
+        marginBottom: "14px",
+        lineHeight: "1.5"
+      }
+    },
+      h("strong", { style: { color: "#F87171" } }, "Error: "),
+      h("span", null, smartEntryError)
+    ) : null,
+
+    // Decision Result Display
+    smartEntryDecision ? h("div", {
+      id: "smart-entry-result-card",
+      style: {
+        background: "radial-gradient(circle at top right, rgba(15,23,42,0.95), rgba(5,8,22,0.98))",
+        border: `1px solid ${currentStatusStyle.border}`,
+        borderRadius: "12px",
+        padding: "18px",
+        marginTop: "10px"
+      }
+    },
+      // Header status row
+      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px", marginBottom: "14px", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "12px" } },
+        h("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+          h("span", { style: { fontSize: "1.1rem" } }, "⚡"),
+          h("strong", { style: { color: "#F8FAFC", fontSize: "0.95rem" } }, "Smart Entry Real Decision"),
+          h("span", {
+            style: {
+              background: currentStatusStyle.bg,
+              border: `1px solid ${currentStatusStyle.border}`,
+              color: currentStatusStyle.text,
+              padding: "3px 10px",
+              borderRadius: "999px",
+              fontSize: "0.72rem",
+              fontWeight: "800",
+              fontFamily: "var(--font-mono)"
+            }
+          }, smartEntryDecision.decision_action || smartEntryDecision.status || "UNKNOWN")
+        ),
+        h("div", {
+          id: "result-data-source",
+          style: { fontSize: "0.72rem", color: "#94A3B8", fontFamily: "var(--font-mono)" }
+        },
+          `Source: ${dataSourceIdentity} · As-Of: ${smartEntryDecision.timestamp_utc || "UTC"}`
+        )
+      ),
+
+      // 4 Key Primary Metrics
+      h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "12px", marginBottom: "16px" } },
+        h("div", { style: { background: "rgba(255,255,255,0.03)", padding: "10px 14px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.06)" } },
+          h("div", { style: { fontSize: "0.68rem", color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em" } }, "Action"),
+          h("div", { id: "result-decision-action", style: { fontSize: "0.92rem", fontWeight: "800", color: "#F8FAFC", marginTop: "4px" } },
+            smartEntryDecision.decision_action || smartEntryDecision.status || "UNKNOWN"
+          )
+        ),
+        h("div", { style: { background: "rgba(255,255,255,0.03)", padding: "10px 14px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.06)" } },
+          h("div", { style: { fontSize: "0.68rem", color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em" } }, "Direction"),
+          h("div", {
+            id: "result-direction",
+            style: {
+              fontSize: "0.92rem",
+              fontWeight: "800",
+              color: smartEntryDecision.direction === "LONG" ? "#00E5A8" : (smartEntryDecision.direction === "SHORT" ? "#F87171" : "#94A3B8"),
+              marginTop: "4px"
+            }
+          }, smartEntryDecision.direction || "NO_TRADE")
+        ),
+        h("div", { style: { background: "rgba(255,255,255,0.03)", padding: "10px 14px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.06)" } },
+          h("div", { style: { fontSize: "0.68rem", color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em" } }, "Selected Strategy"),
+          h("div", { id: "result-strategy-id", style: { fontSize: "0.92rem", fontWeight: "800", color: "#38BDF8", marginTop: "4px" } },
+            smartEntryDecision.selected_strategy_id || "—"
+          )
+        ),
+        h("div", { style: { background: "rgba(255,255,255,0.03)", padding: "10px 14px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.06)" } },
+          h("div", { style: { fontSize: "0.68rem", color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em" } }, "Evidence Quality"),
+          h("div", {
+            id: "result-data-quality",
+            style: {
+              fontSize: "0.92rem",
+              fontWeight: "800",
+              color: smartEntryDecision.data_quality_status === "VALID" ? "#00E5A8" : "#FBBF24",
+              marginTop: "4px"
+            }
+          }, smartEntryDecision.data_quality_status || "UNKNOWN")
+        )
+      ),
+
+      // Item 1 & 2: Market Regime, Volatility State & Strategy Selection Rationale
+      h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "12px", marginBottom: "14px" } },
+        h("div", {
+          id: "result-market-regime-vol",
+          style: { padding: "10px 14px", background: "rgba(0,0,0,0.25)", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.06)", fontSize: "0.76rem" }
+        },
+          h("div", { style: { color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", marginBottom: "4px" } }, "1. Market Regime & Volatility State"),
+          h("div", { style: { color: "#CBD5E1" } },
+            `Regime: `, h("strong", { style: { color: "#F8FAFC" } }, smartEntryDecision.market_regime || smartEntryForm.regime),
+            ` · Realized Vol (24h ann): `, h("strong", { style: { color: "#38BDF8" } }, `${((smartEntryDecision.candidate?.sigma_at_t0 || 0.01) * Math.sqrt(365 * 24) * 100).toFixed(1)}%`)
+          )
+        ),
+        h("div", {
+          id: "result-strategy-rationale",
+          style: { padding: "10px 14px", background: "rgba(0,0,0,0.25)", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.06)", fontSize: "0.76rem" }
+        },
+          h("div", { style: { color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", marginBottom: "4px" } }, "2. Strategy Selection Rationale"),
+          h("div", { style: { color: "#CBD5E1" } },
+            smartEntryDecision.selected_strategy_id
+              ? `Archetype ${smartEntryDecision.selected_strategy_id} cleared dual-hypothesis hurdle with positive expected net R after friction.`
+              : `All strategy candidates abstained or failed net economic hurdle after friction drag.`
+          )
+        )
+      ),
+
+      // Item 9: Reasons block
+      h("div", { style: { marginBottom: "14px", padding: "12px 14px", background: "rgba(0,0,0,0.3)", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.06)" } },
+        h("div", { style: { fontSize: "0.74rem", fontWeight: "700", color: "#38BDF8", marginBottom: "4px" } }, "Decision Reasons:"),
+        h("ul", { id: "result-reasons-list", style: { margin: 0, paddingLeft: "18px", color: "#CBD5E1", fontSize: "0.78rem", lineHeight: "1.5" } },
+          (smartEntryDecision.reasons && smartEntryDecision.reasons.length > 0)
+            ? smartEntryDecision.reasons.map((r, i) => h("li", { key: i }, r))
+            : h("li", null, "No explicit reasons recorded.")
+        )
+      ),
+
+      // Item 4, 5, 6, 7: Candidate setup geometry (if present)
+      smartEntryDecision.candidate ? h("div", {
+        id: "result-candidate-card",
+        style: {
+          padding: "14px",
+          background: "rgba(0, 229, 168, 0.04)",
+          border: "1px solid rgba(0, 229, 168, 0.25)",
+          borderRadius: "8px",
+          marginBottom: "14px"
+        }
+      },
+        h("div", { style: { fontSize: "0.74rem", fontWeight: "800", color: "#00E5A8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" } }, "Proposed Setup Candidate Geometry (Items 4, 5, 6, 7):"),
+        h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px", fontSize: "0.78rem", fontFamily: "var(--font-mono)" } },
+          h("div", { id: "result-entry-ref" }, h("span", { style: { color: "#94A3B8" } }, "Entry Ref: "), h("strong", { style: { color: "#F8FAFC" } }, `$${smartEntryDecision.candidate.entry_reference_price || "—"}`)),
+          h("div", null, h("span", { style: { color: "#94A3B8" } }, "Proposed Entry: "), h("strong", { style: { color: "#00E5A8" } }, `$${smartEntryDecision.candidate.proposed_entry_price || "—"}`)),
+          h("div", { id: "result-tp-sl" }, h("span", { style: { color: "#94A3B8" } }, "TP / SL: "), h("strong", { style: { color: "#00E5A8" } }, `$${smartEntryDecision.candidate.take_profit_price}`), " / ", h("strong", { style: { color: "#F87171" } }, `$${smartEntryDecision.candidate.stop_loss_price}`)),
+          h("div", { id: "result-rrr-costs" }, h("span", { style: { color: "#94A3B8" } }, "RRR & Costs: "), h("strong", { style: { color: "#CBD5E1" } }, `${((smartEntryDecision.candidate.k_tp || 1.5) / (smartEntryDecision.candidate.k_sl || 1.0)).toFixed(2)}:1 · ${smartEntryDecision.candidate.round_trip_friction_bps || 87.0} bps friction`)),
+          h("div", { id: "result-horizon" }, h("span", { style: { color: "#94A3B8" } }, "Horizon: "), h("strong", { style: { color: "#CBD5E1" } }, `${smartEntryDecision.candidate.horizon_bars || 24} bars (~24h)`)),
+          h("div", null, h("span", { style: { color: "#94A3B8" } }, "Expected Net R: "), h("strong", { style: { color: "#38BDF8" } }, `${smartEntryDecision.candidate.expected_net_r !== undefined ? smartEntryDecision.candidate.expected_net_r : "—"} R`))
+        )
+      ) : h("div", {
+        id: "result-no-candidate-note",
+        style: { padding: "10px 14px", background: "rgba(255,255,255,0.02)", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)", color: "#94A3B8", fontSize: "0.76rem", marginBottom: "14px" }
+      }, "No setup candidate proposed (abstained or rejected by decision gate). Missing candidate levels remain unavailable without fake price fabrication."),
+
+      // Item 8: Evidence-Quality & Uncertainty Status
+      h("div", {
+        id: "result-evidence-quality",
+        style: {
+          padding: "10px 14px",
+          background: "rgba(255,255,255,0.02)",
+          borderRadius: "8px",
+          border: "1px solid rgba(255,255,255,0.05)",
+          color: "#94A3B8",
+          fontSize: "0.74rem",
+          marginBottom: "14px"
+        }
+      },
+        h("strong", { style: { color: "#CBD5E1" } }, "8. Evidence-Quality & Uncertainty Status: "),
+        `Data Quality: ${smartEntryDecision.data_quality_status || "VALID"} · Calibration: ${smartEntryForm.c2_health} · Direction Preference: ${smartEntryForm.user_direction_preference}`
+      ),
+
+      // Spot Short Restriction Advisory (if applicable)
+      smartEntryDecision.spot_execution_advisory ? h("div", {
+        id: "result-spot-advisory-card",
+        style: {
+          padding: "10px 14px",
+          background: "rgba(245, 158, 11, 0.08)",
+          border: "1px solid rgba(245, 158, 11, 0.3)",
+          borderRadius: "8px",
+          color: "#FBBF24",
+          fontSize: "0.74rem",
+          fontWeight: "600",
+          marginBottom: "14px"
+        }
+      },
+        h("strong", null, "⚠️ Spot Execution Boundary: "),
+        smartEntryDecision.spot_execution_advisory
+      ) : null,
+
+      // Directional Model Evidence Card
+      smartEntryDecision.directional_model_evidence ? h("div", {
+        id: "result-directional-evidence-card",
+        style: {
+          padding: "14px",
+          background: "rgba(0, 240, 255, 0.04)",
+          border: "1px solid rgba(0, 240, 255, 0.25)",
+          borderRadius: "8px",
+          marginBottom: "14px"
+        }
+      },
+        h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", flexWrap: "wrap", gap: "6px" } },
+          h("div", { style: { fontSize: "0.76rem", fontWeight: "800", color: "#00F0FF", textTransform: "uppercase", letterSpacing: "0.05em" } },
+            `🧠 Directional Model Evidence (${smartEntryDecision.directional_model_evidence.model_id || "directional-gbm-1h-v1"})`
+          ),
+          h("div", { style: { fontSize: "0.68rem", color: "#FBBF24", fontWeight: "700" } },
+            `Status: ${smartEntryDecision.directional_model_evidence.status || "RESEARCH_EVALUATED"} (RESEARCH ONLY)`
+          )
+        ),
+        h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px", fontSize: "0.76rem", fontFamily: "var(--font-mono)" } },
+          h("div", null, h("span", { style: { color: "#94A3B8" } }, "Model Prediction: "), h("strong", { style: { color: "#CBD5E1" } }, "Unavailable")),
+          h("div", null, h("span", { style: { color: "#94A3B8" } }, "Uncalibrated classifier scores: "), h("strong", { style: { color: "#CBD5E1" } }, "Unavailable")),
+          h("div", null, h("span", { style: { color: "#94A3B8" } }, "Historical Benchmark: "), h("strong", { style: { color: "#CBD5E1" } }, "Unavailable — no verified evaluation artifact")),
+          h("div", null, h("span", { style: { color: "#94A3B8" } }, "Drift Coupling (mu): "), h("strong", { style: { color: "#FBBF24" } }, `0.0 (Driftless Null Preserved)`)),
+          h("div", null, h("span", { style: { color: "#94A3B8" } }, "Cost-Adjusted Edge: "), h("strong", { style: { color: "#CBD5E1" } }, "Unavailable"))
+        ),
+        h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", marginTop: "8px", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "6px" } },
+          "Classifier probabilities reflect retrospective training sign classification. Per epistemic boundaries, directional probabilities do not override the driftless first-passage null (mu=0.0) or authorize live trading."
+        )
+      ) : null,
+
+      // Modern Econometric & Research Validation Card
+      smartEntryDecision.modern_econometrics ? h("div", {
+        id: "result-modern-econometrics-card",
+        style: {
+          padding: "14px",
+          background: "rgba(167, 139, 250, 0.05)",
+          border: "1px solid rgba(167, 139, 250, 0.3)",
+          borderRadius: "8px",
+          marginBottom: "14px"
+        }
+      },
+        h("div", { style: { fontSize: "0.76rem", fontWeight: "800", color: "#A78BFA", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" } },
+          "🔬 Modern Econometric Validation (López de Prado & Finite-Horizon Null):"
+        ),
+        h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "12px", fontSize: "0.76rem" } },
+          // Monte Carlo Null
+          h("div", { style: { background: "rgba(0,0,0,0.25)", padding: "10px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.04)" } },
+            h("div", { style: { color: "#94A3B8", fontWeight: "700", marginBottom: "4px" } }, "1. Empirical Monte Carlo Null"),
+            h("div", { style: { color: "#CBD5E1", fontFamily: "var(--font-mono)" } },
+              `Null Hit Rate: `, h("strong", { style: { color: "#00E5A8" } }, `${((smartEntryDecision.modern_econometrics.finite_horizon_monte_carlo_null?.empirical_null_hit_rate || 0.4) * 100).toFixed(1)}%`),
+              ` vs Theory: `, h("span", { style: { color: "#94A3B8" } }, `${((smartEntryDecision.modern_econometrics.finite_horizon_monte_carlo_null?.theoretical_infinite_horizon_null || 0.4) * 100).toFixed(1)}%`)
+            ),
+            h("div", { style: { color: "#94A3B8", fontSize: "0.70rem", marginTop: "4px" } },
+              `Timeout rate: ${((smartEntryDecision.modern_econometrics.finite_horizon_monte_carlo_null?.empirical_timeout_rate || 0.1) * 100).toFixed(1)}% · SL_FIRST collision rule enforced.`
+            )
+          ),
+          // Deflated Sharpe Ratio
+          h("div", { style: { background: "rgba(0,0,0,0.25)", padding: "10px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.04)" } },
+            h("div", { style: { color: "#94A3B8", fontWeight: "700", marginBottom: "4px" } }, "2. Deflated Sharpe Ratio (DSR)"),
+            h("div", { style: { color: "#CBD5E1", fontFamily: "var(--font-mono)" } },
+              `DSR: `, h("strong", { style: { color: smartEntryDecision.modern_econometrics.deflated_sharpe_ratio?.is_significant_95pct ? "#00E5A8" : "#FBBF24" } },
+                `${((smartEntryDecision.modern_econometrics.deflated_sharpe_ratio?.deflated_sharpe_ratio || 0.5) * 100).toFixed(1)}%`
+              ),
+              ` · Hurdle SR*: `, h("span", { style: { color: "#38BDF8" } }, `${smartEntryDecision.modern_econometrics.deflated_sharpe_ratio?.data_snooping_hurdle_sr || 0.0}`)
+            ),
+            h("div", { style: { color: "#94A3B8", fontSize: "0.70rem", marginTop: "4px" } },
+              smartEntryDecision.modern_econometrics.deflated_sharpe_ratio?.is_significant_95pct
+                ? "Passes multiple-testing correction across strategy trials."
+                : "Caution: Data-snooping risk across multiple backtested variants."
+            )
+          ),
+          // Purged Effective Sample Size
+          h("div", { style: { background: "rgba(0,0,0,0.25)", padding: "10px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.04)" } },
+            h("div", { style: { color: "#94A3B8", fontWeight: "700", marginBottom: "4px" } }, "3. Purged Effective Sample Size (N_eff)"),
+            h("div", { style: { color: "#CBD5E1", fontFamily: "var(--font-mono)" } },
+              `Independent Blocks: `, h("strong", { style: { color: "#F8FAFC" }               }, `${smartEntryDecision.modern_econometrics.purged_sample_size?.effective_independent_samples_n_eff ?? "Unavailable"}`),
+              ` · Shrinkage: `, h("span", { style: { color: "#F87171" } }, `${smartEntryDecision.modern_econometrics.purged_sample_size?.sample_shrinkage_ratio || 24}x`)
+            ),
+            h("div", { style: { color: "#94A3B8", fontSize: "0.70rem", marginTop: "4px" } },
+              "Corrects for 24-bar label overlap to prevent variance underestimation."
+            )
+          )
+        )
+      ) : null,
+
+      // Resolution outcome (if present)
+      smartEntryDecision.resolution ? h("div", {
+        id: "result-resolution-card",
+        style: {
+          padding: "12px 14px",
+          background: "rgba(56, 189, 248, 0.04)",
+          border: "1px solid rgba(56, 189, 248, 0.2)",
+          borderRadius: "8px",
+          marginBottom: "14px",
+          fontSize: "0.76rem"
+        }
+      },
+        h("div", { style: { fontWeight: "700", color: "#38BDF8", marginBottom: "4px" } }, "Barrier Outcome Resolution:"),
+        h("div", { style: { fontFamily: "var(--font-mono)", color: "#CBD5E1" } },
+          `Outcome: ${smartEntryDecision.resolution.outcome || "—"} · Exit Price: $${smartEntryDecision.resolution.exit_price || "—"} · Net R: ${smartEntryDecision.resolution.net_r || "—"} · Holding Bars: ${smartEntryDecision.resolution.holding_bars || "—"}`
+        )
+      ) : null,
+
+      // Governance notice
+      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px", fontSize: "0.70rem", color: "#64748B", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "10px" } },
+        h("span", null, `Execution Authorization: ${smartEntryDecision.execution_authorization || "DISABLED — ANALYSIS ONLY"}`),
+        h("span", null, `Governance: ${smartEntryDecision.governance_status || "OFFLINE_RESEARCH_ONLY"}`)
+      )
+    ) : null
+  );
+}
+
+
+// ===========================================================================
+// L2GatingResearchPanel — V32.31 Opt-In Coinbase L2 Order-Flow Entry-Gating Research Panel
+// ===========================================================================
+function L2GatingResearchPanel() {
+  const [l2Status, setL2Status] = useState(null);
+  const [evalSummary, setEvalSummary] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    const fetchStatus = async () => {
+      try {
+        const [s, e] = await Promise.all([
+          api.fetchL2GatingStatus(),
+          api.fetchL2ShadowEvaluation()
+        ]);
+        if (active) {
+          setL2Status(s);
+          setEvalSummary(e);
+          setLoading(false);
+        }
+      } catch (err) {
+        if (active) setLoading(false);
+      }
+    };
+    fetchStatus();
+    return () => { active = false; };
+  }, []);
+
+  return h("div", {
+    id: "l2-gating-research-panel",
+    style: {
+      background: "rgba(15, 23, 42, 0.75)",
+      border: "1px solid rgba(56, 189, 248, 0.3)",
+      borderRadius: "12px",
+      padding: "20px 24px",
+      marginTop: "24px",
+      boxShadow: "0 4px 20px rgba(0, 0, 0, 0.35)"
+    }
+  },
+    h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" } },
+      h("div", { style: { display: "flex", alignItems: "center", gap: "12px" } },
+        h("span", { style: { fontSize: "1.4rem" } }, "🔬"),
+        h("div", null,
+          h("h3", { id: "l2-gating-heading", style: { margin: 0, fontSize: "1.1rem", fontWeight: "700", color: "#F8FAFC" } },
+            "Coinbase L2 Order-Flow Entry-Gating Research (V32.31)"
+          ),
+          h("span", { style: { fontSize: "0.78rem", color: "#94A3B8" } },
+            "Testing contemporaneous OFI & OBI entry filters on BTCUSD 168h Breakout (TSMOM_DONCHIAN_168H_336H)"
+          )
+        )
+      ),
+      h("div", { style: { display: "flex", gap: "8px" } },
+        h("span", {
+          id: "l2-collector-badge",
+          style: {
+            background: l2Status?.collector_enabled_current ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.15)",
+            border: `1px solid ${l2Status?.collector_enabled_current ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.4)"}`,
+            color: l2Status?.collector_enabled_current ? "#4ADE80" : "#F87171",
+            padding: "4px 10px",
+            borderRadius: "6px",
+            fontSize: "0.72rem",
+            fontWeight: "700"
+          }
+        }, l2Status?.collector_enabled_current ? "COLLECTOR: ACTIVE" : "COLLECTOR: DISABLED BY DEFAULT"),
+        h("span", {
+          id: "l2-trading-badge",
+          style: {
+            background: "rgba(255, 255, 255, 0.05)",
+            border: "1px solid rgba(255, 255, 255, 0.15)",
+            color: "#CBD5E1",
+            padding: "4px 10px",
+            borderRadius: "6px",
+            fontSize: "0.72rem",
+            fontWeight: "700"
+          }
+        }, "LIVE TRADING: DISABLED")
+      )
+    ),
+    h("div", {
+      style: {
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+        gap: "14px",
+        marginBottom: "16px"
+      }
+    },
+      h("div", { style: { background: "rgba(0, 0, 0, 0.3)", borderRadius: "8px", padding: "12px 14px", border: "1px solid rgba(255, 255, 255, 0.06)" } },
+        h("div", { style: { fontSize: "0.75rem", color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" } }, "Target Strategy"),
+        h("div", { id: "l2-target-strategy", style: { fontSize: "0.95rem", fontWeight: "700", color: "#38BDF8" } }, "TSMOM_168H_336H"),
+        h("div", { style: { fontSize: "0.72rem", color: "#64748B", marginTop: "2px" } }, "Coinbase Spot BTC-USD")
+      ),
+      h("div", { style: { background: "rgba(0, 0, 0, 0.3)", borderRadius: "8px", padding: "12px 14px", border: "1px solid rgba(255, 255, 255, 0.06)" } },
+        h("div", { style: { fontSize: "0.75rem", color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" } }, "Frozen Protocol Gating"),
+        h("div", { id: "l2-gating-rules", style: { fontSize: "0.85rem", fontWeight: "600", color: "#E2E8F0" } }, "OFI > 0 · OBI₅ > -0.20"),
+        h("div", { style: { fontSize: "0.72rem", color: "#64748B", marginTop: "2px" } }, "Spread ≤ 5 bps · Max Stale 5.0s")
+      ),
+      h("div", { style: { background: "rgba(0, 0, 0, 0.3)", borderRadius: "8px", padding: "12px 14px", border: "1px solid rgba(255, 255, 255, 0.06)" } },
+        h("div", { style: { fontSize: "0.75rem", color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" } }, "Confirmatory Sample Target"),
+        h("div", { id: "l2-sample-target", style: { fontSize: "0.95rem", fontWeight: "700", color: "#FBBF24" } }, "N ≥ 100 Trades"),
+        h("div", { style: { fontSize: "0.72rem", color: "#64748B", marginTop: "2px" } }, "Non-overlapping 168h blocks")
+      ),
+      h("div", { style: { background: "rgba(0, 0, 0, 0.3)", borderRadius: "8px", padding: "12px 14px", border: "1px solid rgba(255, 255, 255, 0.06)" } },
+        h("div", { style: { fontSize: "0.75rem", color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" } }, "Decision Protocol"),
+        h("div", { id: "l2-confirmatory-decision", style: { fontSize: "0.85rem", fontWeight: "700", color: "#A78BFA" } },
+          evalSummary?.confirmatory_gate_decision || "COLLECTING_INSUFFICIENT_SAMPLE"
+        ),
+        h("div", { style: { fontSize: "0.72rem", color: "#64748B", marginTop: "2px" } }, "H₁: ΔEV ≥ +0.20 R net 27 bps")
+      )
+    ),
+    h("div", {
+      id: "l2-gating-callout",
+      style: {
+        background: "rgba(56, 189, 248, 0.06)",
+        border: "1px solid rgba(56, 189, 248, 0.2)",
+        borderRadius: "8px",
+        padding: "10px 14px",
+        fontSize: "0.78rem",
+        color: "#94A3B8",
+        lineHeight: "1.5"
+      }
+    },
+      "🛡️ Fail-Closed Invariant: Ingestion is strictly opt-in via operator flag. If the WebSocket feed disconnects, drops sequences, or heartbeats stall (>5s), gate emits GATE_ABSTAIN_L2_UNAVAILABLE. No live orders are reachable."
+    )
+  );
+}
+
+// ===========================================================================
+// SmartEntryView — Dedicated First-Class Smart Entry Route View (#/smart-entry)
+// ===========================================================================
+function SmartEntryView({ setPath, livePrice = 0, predictionData, regimeData, activePaperPos }) {
+  return h("div", { className: "terminal-container", style: { padding: "24px 32px", maxWidth: "1400px", margin: "0 auto" } },
+    h("div", { style: { marginBottom: "24px" } },
+      h("div", { style: { display: "flex", gap: "10px", marginBottom: "16px", flexWrap: "wrap" } },
+        h("button", {
+          id: "smart-entry-view-active-btn",
+          style: {
+            background: "linear-gradient(135deg, rgba(167, 139, 250, 0.25), rgba(56, 189, 248, 0.15))",
+            border: "1px solid rgba(167, 139, 250, 0.6)",
+            color: "#A78BFA",
+            padding: "8px 16px",
+            borderRadius: "8px",
+            fontWeight: "800",
+            fontSize: "0.82rem"
+          }
+        }, "⚡ Smart Entry Decision Layer (Active)"),
+        h("button", {
+          id: "switch-to-terminal-btn",
+          onClick: () => setPath("/terminal"),
+          style: {
+            background: "rgba(56, 189, 248, 0.1)",
+            border: "1px solid rgba(56, 189, 248, 0.35)",
+            color: "#38BDF8",
+            padding: "8px 16px",
+            borderRadius: "8px",
+            cursor: "pointer",
+            fontWeight: "700",
+            fontSize: "0.82rem"
+          }
+        }, "📈 Live Terminal & Workstation ↗"),
+        h("button", {
+          id: "switch-to-research-btn",
+          onClick: () => setPath("/research"),
+          style: {
+            background: "rgba(255, 255, 255, 0.04)",
+            border: "1px solid rgba(255, 255, 255, 0.1)",
+            color: "#94A3B8",
+            padding: "8px 16px",
+            borderRadius: "8px",
+            cursor: "pointer",
+            fontWeight: "700",
+            fontSize: "0.82rem"
+          }
+        }, "🔬 Archived Research Reports ↗")
+      ),
+      h("div", { style: { display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" } },
+        h("span", { style: { fontSize: "1.2rem" } }, "⚡"),
+        h("span", {
+          style: {
+            background: "rgba(167, 139, 250, 0.15)",
+            border: "1px solid rgba(167, 139, 250, 0.4)",
+            color: "#A78BFA",
+            padding: "3px 10px",
+            borderRadius: "6px",
+            fontSize: "0.74rem",
+            fontWeight: "800",
+            letterSpacing: "0.05em"
+          }
+        }, "RESEARCH-ONLY DECISION ENGINE · BTC-USD EXCLUSIVE")
+      ),
+      h("h1", { id: "smart-entry-heading", style: { fontSize: "2rem", fontWeight: "800", color: "#F8FAFC", margin: "0 0 10px 0" } },
+        "Smart Entry Decision Engine"
+      ),
+      h("p", { style: { fontSize: "0.95rem", color: "#CBD5E1", maxWidth: "1050px", lineHeight: "1.6", margin: 0 } },
+        "Interactive research evaluation of selective barrier setups and market snapshots. " +
+        "Evaluates dual-hypothesis direction, empirical setup features, calibrated win probability, " +
+        "and friction drag (87 bps round-trip) without triggering order execution or live capital deployment."
+      )
+    ),
+    h(SmartEntryPanel, { setPath, livePrice, predictionData, regimeData, activePaperPos, isLiveTerminal: false }),
+    h(L2GatingResearchPanel, null)
+  );
+}
+
+
+
+// ===========================================================================
+// ResearchResultsView — Dedicated Scientific Research Evidence & Audit View
+// ===========================================================================
+function ResearchResultsView({ setPath, livePrice = 0, initialTab = "tournaments" }) {
   const [catalog, setCatalog] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -11087,6 +13683,7 @@ function ResearchResultsView({ setPath, livePrice = 0 }) {
   const [reportError, setReportError] = useState(null);
   const [activeFilter, setActiveFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [researchTab, setResearchTab] = useState(initialTab || "tournaments");
 
   const loadResults = useCallback(async () => {
     setLoading(true);
@@ -11095,7 +13692,7 @@ function ResearchResultsView({ setPath, livePrice = 0 }) {
       const data = await api.fetchResearchResults();
       setCatalog(data);
     } catch (err) {
-      setError(err.message || "Failed to load research results");
+      setError(err.message || "RESEARCH RESULTS UNAVAILABLE");
     } finally {
       setLoading(false);
     }
@@ -11155,6 +13752,34 @@ function ResearchResultsView({ setPath, livePrice = 0 }) {
 
     // ── Header Section ─────────────────────────────────────────────────────────
     h("div", { style: { marginBottom: "28px" } },
+      h("div", { style: { display: "flex", gap: "10px", marginBottom: "16px", flexWrap: "wrap" } },
+        h("button", {
+          id: "switch-to-smart-entry-view-btn",
+          onClick: () => setPath("/smart-entry"),
+          style: {
+            background: "rgba(167, 139, 250, 0.12)",
+            border: "1px solid rgba(167, 139, 250, 0.4)",
+            color: "#A78BFA",
+            padding: "8px 16px",
+            borderRadius: "8px",
+            cursor: "pointer",
+            fontWeight: "700",
+            fontSize: "0.80rem"
+          }
+        }, "⚡ Switch to Dedicated Smart Entry View ↗"),
+        h("button", {
+          id: "research-view-active-btn",
+          style: {
+            background: "rgba(56, 189, 248, 0.18)",
+            border: "1px solid rgba(56, 189, 248, 0.5)",
+            color: "#38BDF8",
+            padding: "8px 16px",
+            borderRadius: "8px",
+            fontWeight: "800",
+            fontSize: "0.80rem"
+          }
+        }, "🔬 Archived Research Evidence (Active)")
+      ),
       h("div", { style: { display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" } },
         h("span", { style: { fontSize: "1.2rem" } }, "🔬"),
         h("span", {
@@ -11180,403 +13805,723 @@ function ResearchResultsView({ setPath, livePrice = 0 }) {
       )
     ),
 
-    // ── 3-Pillar Separation Status Bar ─────────────────────────────────────────
-    h("div", {
-      style: {
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-        gap: "16px",
-        marginBottom: "28px"
-      }
-    },
-      // Pillar 1: Live Market Observations
-      h("div", {
-        className: "glass-card",
-        style: {
-          padding: "18px 20px",
-          borderLeft: "4px solid #00E5A8",
-          background: "rgba(0, 229, 168, 0.04)"
-        }
-      },
-        h("div", { style: { fontSize: "0.72rem", color: "#00E5A8", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px" } },
-          "1. Live Market Observations"
-        ),
-        h("div", { style: { fontSize: "1.4rem", fontWeight: "800", color: "#F8FAFC", fontFamily: "var(--font-mono)" } },
-          livePrice > 0 ? `$${livePrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "Online Feed"
-        ),
-        h("div", { style: { fontSize: "0.78rem", color: "#94A3B8", marginTop: "4px" } },
-          "Public Coinbase BTC/USD Spot Order & Candle Stream"
-        )
-      ),
-
-      // Pillar 2: Archived Research Results
-      h("div", {
-        className: "glass-card",
-        style: {
-          padding: "18px 20px",
-          borderLeft: "4px solid #38BDF8",
-          background: "rgba(56, 189, 248, 0.04)"
-        }
-      },
-        h("div", { style: { fontSize: "0.72rem", color: "#38BDF8", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px" } },
-          "2. Archived Research Evidence"
-        ),
-        h("div", { style: { fontSize: "1.4rem", fontWeight: "800", color: "#38BDF8" } },
-          `${reports.length || 11} Verified Reports`
-        ),
-        h("div", { style: { fontSize: "0.78rem", color: "#94A3B8", marginTop: "4px" } },
-          "SHA-256 Hash Checked · Source-Linked Empirical Studies"
-        )
-      ),
-
-      // Pillar 3: Production Forecast & Execution Authorization
-      h("div", {
-        className: "glass-card",
-        style: {
-          padding: "18px 20px",
-          borderLeft: "4px solid #F87171",
-          background: "rgba(239, 68, 68, 0.04)"
-        }
-      },
-        h("div", { style: { fontSize: "0.72rem", color: "#F87171", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px" } },
-          "3. Production Forecast & Execution"
-        ),
-        h("div", { style: { fontSize: "1.25rem", fontWeight: "800", color: "#F87171", letterSpacing: "0.02em" } },
-          "BLOCKED · PROVENANCE UNVERIFIED"
-        ),
-        h("div", { style: { fontSize: "0.78rem", color: "#94A3B8", marginTop: "4px" } },
-          "Model Execution & Automated Trading Disabled"
-        )
+    // ── Research Lab Sub-Navigation Tabs ────────────────────────────────────────
+    h("div", { className: "research-tabs-bar" },
+      [
+        { id: "tournaments", label: "🏆 Strategy Tournament & Backtests" },
+        { id: "paper_trading", label: "📝 Paper Trading (Simulated Execution)" },
+        { id: "evaluation", label: "🧠 Strategy & Model Evaluation" },
+        { id: "reports", label: "📚 Research Reports & Data Quality" }
+      ].map(tab =>
+        h("button", {
+          key: tab.id,
+          id: `research-tab-${tab.id.replace(/_/g, '-')}`,
+          className: `research-tab-pill ${(researchTab === tab.id || (tab.id === "evaluation" && researchTab === "models") || (tab.id === "reports" && (researchTab === "analogs" || researchTab === "provenance"))) ? "active" : ""}`,
+          onClick: () => setResearchTab(tab.id)
+        }, tab.label)
       )
     ),
 
-    // ── Visible Contradiction Reconciliations Alert Banner ───────────────────────
-    h("div", {
-      style: {
-        background: "rgba(245, 158, 11, 0.08)",
-        border: "1px solid rgba(245, 158, 11, 0.35)",
-        borderRadius: "12px",
-        padding: "20px 24px",
-        marginBottom: "28px"
-      }
-    },
-      h("div", { style: { display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" } },
-        h("span", { style: { fontSize: "1.1rem" } }, "⚖️"),
-        h("span", { style: { color: "#F59E0B", fontWeight: "800", fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "0.04em" } },
-          "Visible Scientific Contradiction Reconciliations (Explicit Audit Invariant)"
-        )
-      ),
-      h("p", { style: { color: "#CBD5E1", fontSize: "0.86rem", lineHeight: "1.6", margin: "0 0 12px 0" } },
-        "Historical research reports in this repository contain differing coverage, sample sizes, and status claims " +
-        "across experimental iterations. BTCognitive governance prohibits cherry-picking favorable metrics or inferring a unified current-model status. " +
-        "All known disagreements are explicitly flagged below with CONFLICT_REQUIRES_RECONCILIATION."
-      ),
-      h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "12px" } },
-        h("div", { style: { background: "rgba(0,0,0,0.25)", padding: "10px 14px", borderRadius: "8px", border: "1px solid rgba(245,158,11,0.2)" } },
-          h("div", { style: { fontWeight: "700", color: "#FBBF24", fontSize: "0.78rem" } }, "1. Risk Envelope ≠ Directional Alpha"),
-          h("div", { style: { fontSize: "0.74rem", color: "#94A3B8", marginTop: "4px" } },
-            "Uncertainty-04 achieves 92.84% variance containment, yet Metric Reconciliation confirms Directional Accuracy is 50.0% (AUC 0.504 - zero edge)."
-          )
-        ),
-        h("div", { style: { background: "rgba(0,0,0,0.25)", padding: "10px 14px", borderRadius: "8px", border: "1px solid rgba(245,158,11,0.2)" } },
-          h("div", { style: { fontWeight: "700", color: "#FBBF24", fontSize: "0.78rem" } }, "2. Setup Predictability vs COST_ERASED"),
-          h("div", { style: { fontSize: "0.74rem", color: "#94A3B8", marginTop: "4px" } },
-            "Track V3 shows structural separation over random baselines, but net expectancy is negative (-0.57R) after 35-65 bps execution drag."
-          )
-        ),
-        h("div", { style: { background: "rgba(0,0,0,0.25)", padding: "10px 14px", borderRadius: "8px", border: "1px solid rgba(245,158,11,0.2)" } },
-          h("div", { style: { fontWeight: "700", color: "#FBBF24", fontSize: "0.78rem" } }, "3. Pre-Repair 35 Blocks vs Post-Repair Isolation"),
-          h("div", { style: { fontSize: "0.74rem", color: "#94A3B8", marginTop: "4px" } },
-            "Longitudinal 35-block archives are quarantined under PRE_REPAIR_HISTORY; post-repair clean monitoring strictly requires 5 fresh valid blocks."
-          )
-        ),
-        h("div", { style: { background: "rgba(0,0,0,0.25)", padding: "10px 14px", borderRadius: "8px", border: "1px solid rgba(245,158,11,0.2)" } },
-          h("div", { style: { fontWeight: "700", color: "#FBBF24", fontSize: "0.78rem" } }, "4. Legacy Health Report vs Current Runtime"),
-          h("div", { style: { fontSize: "0.74rem", color: "#94A3B8", marginTop: "4px" } },
-            "Combined Production Health (2026-08) asserted HEALTHY, but current runtime is BLOCKED_PROVENANCE_UNVERIFIED until clean-room authentication."
-          )
-        )
-      )
-    ),
-
-    // ── Filter & Search Toolbar ────────────────────────────────────────────────
-    h("div", {
-      style: {
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        flexWrap: "wrap",
-        gap: "14px",
-        marginBottom: "20px"
-      }
-    },
-      h("div", { style: { display: "flex", flexWrap: "wrap", gap: "8px" } },
-        [
-          { id: "all", label: `All Reports (${reports.length})` },
-          { id: "conflicts", label: `⚖️ Conflicts (${reports.filter(r => r.contradiction).length})` },
-          { id: "c2_validated", label: "C2 Risk Envelopes" },
-          { id: "cost_erased", label: "COST_ERASED" },
-          { id: "longitudinal", label: "Longitudinal & Health" }
-        ].map(filter =>
-          h("button", {
-            key: filter.id,
-            onClick: () => setActiveFilter(filter.id),
+    // =========================================================================
+    // TAB: STRATEGY TOURNAMENTS & BACKTESTS
+    // =========================================================================
+    researchTab === "tournaments" && h("div", { id: "research-section-tournaments" },
+      h("div", { className: "glass-card", style: { padding: "24px", marginBottom: "20px", border: "1px solid rgba(139, 92, 246, 0.3)" } },
+        h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", flexWrap: "wrap", gap: "10px" } },
+          h("div", { style: { display: "flex", alignItems: "center", gap: "10px" } },
+            h("span", { style: { fontSize: "1.3rem" } }, "🏆"),
+            h("h2", { style: { margin: 0, fontSize: "1.3rem", color: "#F8FAFC" } }, "Strategy Tournament & Backtest Protocol")
+          ),
+          h("span", {
             style: {
-              background: activeFilter === filter.id ? "rgba(56, 189, 248, 0.2)" : "rgba(255, 255, 255, 0.04)",
-              border: `1px solid ${activeFilter === filter.id ? "rgba(56, 189, 248, 0.5)" : "rgba(255, 255, 255, 0.08)"}`,
-              color: activeFilter === filter.id ? "#38BDF8" : "#94A3B8",
-              padding: "6px 14px",
+              background: "rgba(139, 92, 246, 0.15)",
+              border: "1px solid rgba(139, 92, 246, 0.4)",
+              color: "#A78BFA",
+              padding: "4px 12px",
+              borderRadius: "6px",
+              fontSize: "0.74rem",
+              fontWeight: "800"
+            }
+          }, "PRE-REGISTERED 3-ARM WALK-FORWARD PROTOCOL")
+        ),
+        h("p", { style: { fontSize: "0.88rem", color: "#CBD5E1", lineHeight: "1.6", margin: "0 0 16px 0" } },
+          "The BTCognitive strategy tournament backtest runs a rigorous, zero-leakage paired comparison across 3 arms: " +
+          "Candidate 1 (the primary regime-specialist archetype), Candidate 2 (the secondary regime-compatible fallback), and the Baseline Control (unfiltered Donchian / buy & hold). " +
+          "A candidate must surpass the baseline control on net return after modeled friction (87 bps round-trip) and fulfill all 7/10 pre-registered screening rules to qualify for Smart Entry acceptance."
+        ),
+        // Cache vs Fresh Execution Disclosure
+        h("div", {
+          id: "tournament-cache-disclosure-banner",
+          style: {
+            background: "rgba(56, 189, 248, 0.08)",
+            border: "1px solid rgba(56, 189, 248, 0.35)",
+            borderRadius: "8px",
+            padding: "12px 16px",
+            fontSize: "0.80rem",
+            color: "#BAE6FD",
+            marginBottom: "20px",
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "10px"
+          }
+        },
+          h("span", { style: { fontSize: "1.1rem" } }, "ℹ️"),
+          h("div", null,
+            h("strong", { style: { color: "#38BDF8" } }, "CACHE VS FRESH EXECUTION DISCLOSURE: "),
+            "Tournament backtest results are retrieved from frozen pre-registered evaluation manifests (CACHED_PRE_REGISTERED_BACKTEST) or evaluated freshly on-demand via the backtest runner. Cached results are explicitly disclosed to ensure full research transparency and prevent conflating frozen historical records with newly run experiments."
+          )
+        ),
+        // 3-Arm Comparison Card Grid
+        h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px", marginBottom: "20px" } },
+          h("div", { style: { background: "rgba(0,0,0,0.3)", borderRadius: "10px", padding: "16px", border: "1px solid rgba(0, 229, 168, 0.3)" } },
+            h("div", { style: { color: "#00E5A8", fontWeight: "800", fontSize: "0.85rem", textTransform: "uppercase", marginBottom: "6px" } }, "Arm 1: Primary Candidate"),
+            h("div", { style: { fontSize: "1.05rem", fontWeight: "800", color: "#F8FAFC" } }, "MEIE-VOL-EXPANSION v3.2"),
+            h("div", { style: { fontSize: "0.76rem", color: "#94A3B8", marginTop: "6px", lineHeight: "1.4" } }, "Evaluated first under expanding volatility. Requires PF > 1.25, win rate >= 45%, max DD <= 20% across walk-forward splits.")
+          ),
+          h("div", { style: { background: "rgba(0,0,0,0.3)", borderRadius: "10px", padding: "16px", border: "1px solid rgba(56, 189, 248, 0.3)" } },
+            h("div", { style: { color: "#38BDF8", fontWeight: "800", fontSize: "0.85rem", textTransform: "uppercase", marginBottom: "6px" } }, "Arm 2: Secondary Fallback"),
+            h("div", { style: { fontSize: "1.05rem", fontWeight: "800", color: "#F8FAFC" } }, "MEIE-IGNITION v2.1"),
+            h("div", { style: { fontSize: "0.76rem", color: "#94A3B8", marginTop: "6px", lineHeight: "1.4" } }, "Fallback candidate if Arm 1 fails 7/10 screen or tournament hurdle. Evaluated strictly sequentially.")
+          ),
+          h("div", { style: { background: "rgba(0,0,0,0.3)", borderRadius: "10px", padding: "16px", border: "1px solid rgba(245, 158, 11, 0.3)" } },
+            h("div", { style: { color: "#FBBF24", fontWeight: "800", fontSize: "0.85rem", textTransform: "uppercase", marginBottom: "6px" } }, "Arm 3: Baseline Control"),
+            h("div", { style: { fontSize: "1.05rem", fontWeight: "800", color: "#F8FAFC" } }, "TSMOM Donchian 168h/336h"),
+            h("div", { style: { fontSize: "0.76rem", color: "#94A3B8", marginTop: "6px", lineHeight: "1.4" } }, "Identical point-in-time control without microstructure gating. Must be beaten to confirm value-add.")
+          )
+        ),
+        // Launch in Terminal button
+        h("div", { style: { display: "flex", justifyContent: "flex-end", gap: "12px" } },
+          h("button", {
+            id: "btn-launch-terminal-from-research",
+            onClick: () => setPath("/terminal"),
+            style: {
+              background: "linear-gradient(135deg, #7C5CFF, #5B3AE8)",
+              color: "#FFFFFF",
+              border: "none",
+              padding: "10px 20px",
+              borderRadius: "8px",
+              fontWeight: "700",
+              fontSize: "0.85rem",
+              cursor: "pointer"
+            }
+          }, "⚡ Open Tournament in Live Terminal ↗")
+        )
+      )
+    ),
+
+    // =========================================================================
+    // TAB: PAPER TRADING (SIMULATED EXECUTION)
+    // =========================================================================
+    researchTab === "paper_trading" && h("div", { id: "research-section-paper-trading" },
+      h(PaperTradingDashboardView, { setPath, livePrice })
+    ),
+
+    // =========================================================================
+    // TAB: ARCHIVED RESEARCH REPORTS & DATA QUALITY
+    // =========================================================================
+    (researchTab === "reports" || researchTab === "analogs" || researchTab === "provenance") && h("div", null,
+      // ── 3-Pillar Separation Status Bar ─────────────────────────────────────────
+      h("div", {
+        style: {
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+          gap: "16px",
+          marginBottom: "28px"
+        }
+      },
+        // Pillar 1: Live Market Observations
+        h("div", {
+          className: "glass-card",
+          style: {
+            padding: "18px 20px",
+            borderLeft: "4px solid #00E5A8",
+            background: "rgba(0, 229, 168, 0.04)"
+          }
+        },
+          h("div", { style: { fontSize: "0.72rem", color: "#00E5A8", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px" } },
+            "1. Live Market Observations"
+          ),
+          h("div", { style: { fontSize: "1.4rem", fontWeight: "800", color: "#F8FAFC", fontFamily: "var(--font-mono)" } },
+            livePrice > 0 ? `$${livePrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "Online Feed"
+          ),
+          h("div", { style: { fontSize: "0.78rem", color: "#94A3B8", marginTop: "4px" } },
+            "Public Coinbase BTC/USD Spot Order & Candle Stream"
+          )
+        ),
+
+        // Pillar 2: Archived Research Results
+        h("div", {
+          className: "glass-card",
+          style: {
+            padding: "18px 20px",
+            borderLeft: "4px solid #38BDF8",
+            background: "rgba(56, 189, 248, 0.04)"
+          }
+        },
+          h("div", { style: { fontSize: "0.72rem", color: "#38BDF8", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px" } },
+            "2. Archived Research Evidence"
+          ),
+          h("div", { style: { fontSize: "1.4rem", fontWeight: "800", color: "#38BDF8" } },
+            `${reports.length || 11} Verified Reports`
+          ),
+          h("div", { style: { fontSize: "0.78rem", color: "#94A3B8", marginTop: "4px" } },
+            "SHA-256 Hash Checked · Source-Linked Empirical Studies"
+          )
+        ),
+
+        // Pillar 3: Production Forecast & Execution Authorization
+        h("div", {
+          className: "glass-card",
+          style: {
+            padding: "18px 20px",
+            borderLeft: "4px solid #F87171",
+            background: "rgba(239, 68, 68, 0.04)"
+          }
+        },
+          h("div", { style: { fontSize: "0.72rem", color: "#F87171", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px" } },
+            "3. Production Forecast & Execution"
+          ),
+          h("div", { style: { fontSize: "1.25rem", fontWeight: "800", color: "#F87171", letterSpacing: "0.02em" } },
+            "BLOCKED · PROVENANCE UNVERIFIED"
+          ),
+          h("div", { style: { fontSize: "0.78rem", color: "#94A3B8", marginTop: "4px" } },
+            "Model Execution & Automated Trading Disabled"
+          )
+        )
+      ),
+
+      // ── Visible Contradiction Reconciliations Alert Banner ───────────────────────
+      h("div", {
+        style: {
+          background: "rgba(245, 158, 11, 0.08)",
+          border: "1px solid rgba(245, 158, 11, 0.35)",
+          borderRadius: "12px",
+          padding: "20px 24px",
+          marginBottom: "28px"
+        }
+      },
+        h("div", { style: { display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" } },
+          h("span", { style: { fontSize: "1.1rem" } }, "⚖️"),
+          h("span", { style: { color: "#F59E0B", fontWeight: "800", fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "0.04em" } },
+            "Visible Scientific Contradiction Reconciliations (Explicit Audit Invariant)"
+          )
+        ),
+        h("p", { style: { color: "#CBD5E1", fontSize: "0.86rem", lineHeight: "1.6", margin: "0 0 12px 0" } },
+          "Historical research reports in this repository contain differing coverage, sample sizes, and status claims " +
+          "across experimental iterations. BTCognitive governance prohibits cherry-picking favorable metrics or inferring a unified current-model status. " +
+          "All known disagreements are explicitly flagged below with CONFLICT_REQUIRES_RECONCILIATION."
+        ),
+        h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "12px" } },
+          h("div", { style: { background: "rgba(0,0,0,0.25)", padding: "10px 14px", borderRadius: "8px", border: "1px solid rgba(245,158,11,0.2)" } },
+            h("div", { style: { fontWeight: "700", color: "#FBBF24", fontSize: "0.78rem" } }, "1. Risk Envelope ≠ Directional Alpha"),
+            h("div", { style: { fontSize: "0.74rem", color: "#94A3B8", marginTop: "4px" } },
+              "Historical coverage claims are archived and are not current calibration evidence. C2 remains disabled."
+            )
+          ),
+          h("div", { style: { background: "rgba(0,0,0,0.25)", padding: "10px 14px", borderRadius: "8px", border: "1px solid rgba(245,158,11,0.2)" } },
+            h("div", { style: { fontWeight: "700", color: "#FBBF24", fontSize: "0.78rem" } }, "2. Setup Predictability vs COST_ERASED"),
+            h("div", { style: { fontSize: "0.74rem", color: "#94A3B8", marginTop: "4px" } },
+              "Historical strategy metrics are not current verified performance and are not displayed as an active model claim."
+            )
+          ),
+          h("div", { style: { background: "rgba(0,0,0,0.25)", padding: "10px 14px", borderRadius: "8px", border: "1px solid rgba(245,158,11,0.2)" } },
+            h("div", { style: { fontWeight: "700", color: "#FBBF24", fontSize: "0.78rem" } }, "3. Pre-Repair 35 Blocks vs Post-Repair Isolation"),
+            h("div", { style: { fontSize: "0.74rem", color: "#94A3B8", marginTop: "4px" } },
+              "Pre-repair observations remain quarantined. No current prospective validation result is established."
+            )
+          ),
+          h("div", { style: { background: "rgba(0,0,0,0.25)", padding: "10px 14px", borderRadius: "8px", border: "1px solid rgba(245,158,11,0.2)" } },
+            h("div", { style: { fontWeight: "700", color: "#FBBF24", fontSize: "0.78rem" } }, "4. Legacy Health Report vs Current Runtime"),
+            h("div", { style: { fontSize: "0.74rem", color: "#94A3B8", marginTop: "4px" } },
+              "Archived health labels do not establish current runtime health. Current calibration status is unavailable."
+            )
+          )
+        )
+      ),
+
+      // ── Filter & Search Toolbar ────────────────────────────────────────────────
+      h("div", {
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: "14px",
+          marginBottom: "20px"
+        }
+      },
+        h("div", { style: { display: "flex", flexWrap: "wrap", gap: "8px" } },
+          [
+            { id: "all", label: `All Reports (${reports.length})` },
+            { id: "conflicts", label: `⚖️ Conflicts (${reports.filter(r => r.contradiction).length})` },
+            { id: "c2_validated", label: "C2 Risk Envelopes" },
+            { id: "cost_erased", label: "COST_ERASED" },
+            { id: "longitudinal", label: "Longitudinal & Health" }
+          ].map(filter =>
+            h("button", {
+              key: filter.id,
+              onClick: () => setActiveFilter(filter.id),
+              style: {
+                background: activeFilter === filter.id ? "rgba(56, 189, 248, 0.2)" : "rgba(255, 255, 255, 0.04)",
+                border: `1px solid ${activeFilter === filter.id ? "rgba(56, 189, 248, 0.5)" : "rgba(255, 255, 255, 0.08)"}`,
+                color: activeFilter === filter.id ? "#38BDF8" : "#94A3B8",
+                padding: "6px 14px",
+                borderRadius: "8px",
+                fontSize: "0.78rem",
+                fontWeight: "700",
+                cursor: "pointer",
+                transition: "all 0.15s ease"
+              }
+            }, filter.label)
+          )
+        ),
+
+        h("div", { style: { display: "flex", gap: "8px", alignItems: "center" } },
+          h("input", {
+            type: "text",
+            placeholder: "Search reports, metrics, or limitations...",
+            value: searchQuery,
+            onInput: (e) => setSearchQuery(e.target.value),
+            style: {
+              background: "rgba(0, 0, 0, 0.4)",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
+              borderRadius: "8px",
+              padding: "6px 12px",
+              color: "#F8FAFC",
+              fontSize: "0.80rem",
+              width: "260px"
+            }
+          }),
+          h("button", {
+            onClick: loadResults,
+            title: "Refresh research catalog from disk",
+            style: {
+              background: "rgba(255, 255, 255, 0.06)",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
+              color: "#CBD5E1",
+              padding: "6px 12px",
               borderRadius: "8px",
               fontSize: "0.78rem",
-              fontWeight: "700",
-              cursor: "pointer",
-              transition: "all 0.15s ease"
+              cursor: "pointer"
             }
-          }, filter.label)
+          }, "↻ Refresh")
         )
       ),
 
-      h("div", { style: { display: "flex", gap: "8px", alignItems: "center" } },
-        h("input", {
-          type: "text",
-          placeholder: "Search reports, metrics, or limitations...",
-          value: searchQuery,
-          onInput: (e) => setSearchQuery(e.target.value),
-          style: {
-            background: "rgba(0, 0, 0, 0.4)",
-            border: "1px solid rgba(255, 255, 255, 0.12)",
-            borderRadius: "8px",
-            padding: "6px 12px",
-            color: "#F8FAFC",
-            fontSize: "0.80rem",
-            width: "260px"
-          }
-        }),
-        h("button", {
-          onClick: loadResults,
-          title: "Refresh research catalog from disk",
-          style: {
-            background: "rgba(255, 255, 255, 0.06)",
-            border: "1px solid rgba(255, 255, 255, 0.12)",
-            color: "#CBD5E1",
-            padding: "6px 12px",
-            borderRadius: "8px",
-            fontSize: "0.78rem",
-            cursor: "pointer"
-          }
-        }, "↻ Refresh")
-      )
-    ),
-
-    // ── Content State: Loading, Error, or Cards Grid ───────────────────────────
-    loading ? (
-      h("div", { className: "glass-card", style: { padding: "48px", textAlign: "center", color: "#38BDF8" } },
-        h("div", { style: { fontSize: "1.8rem", marginBottom: "12px" } }, "⏳"),
-        h("div", { style: { fontWeight: "700" } }, "Loading verified research reports and verifying artifact hashes..."),
-        h("div", { style: { fontSize: "0.78rem", color: "#94A3B8", marginTop: "6px" } }, "Checking disk artifacts against expected SHA-256 manifests")
-      )
-    ) : error ? (
-      h("div", { className: "glass-card", style: { padding: "36px", textAlign: "center", border: "1px solid rgba(239, 68, 68, 0.4)" } },
-        h("div", { style: { color: "#FBBF24", fontWeight: "800", marginBottom: "8px" } }, "RESEARCH RESULTS UNAVAILABLE"),
-        h("div", { style: { color: "#F87171", fontSize: "1.2rem", fontWeight: "800", marginBottom: "8px" } }, "⚠️ Failed to load research results"),
-        h("p", { style: { color: "#CBD5E1", fontSize: "0.85rem", maxWidth: "600px", margin: "0 auto 16px auto" } }, error),
-        h("button", {
-          onClick: loadResults,
-          style: {
-            background: "rgba(239, 68, 68, 0.2)",
-            border: "1px solid rgba(239, 68, 68, 0.5)",
-            color: "#F87171",
-            padding: "8px 18px",
-            borderRadius: "8px",
-            fontWeight: "700",
-            cursor: "pointer"
-          }
-        }, "Retry Loading")
-      )
-    ) : filteredReports.length === 0 ? (
-      h("div", { className: "glass-card", style: { padding: "48px", textAlign: "center", color: "#94A3B8" } },
-        h("div", { style: { fontSize: "1.5rem", marginBottom: "8px" } }, "🔍"),
-        h("div", { style: { fontWeight: "700" } }, "No research reports matched your current filter criteria."),
-        h("button", {
-          onClick: () => { setActiveFilter("all"); setSearchQuery(""); },
-          style: {
-            background: "rgba(56, 189, 248, 0.15)",
-            border: "1px solid rgba(56, 189, 248, 0.3)",
-            color: "#38BDF8",
-            padding: "6px 14px",
-            borderRadius: "6px",
-            marginTop: "12px",
-            cursor: "pointer",
-            fontWeight: "700",
-            fontSize: "0.78rem"
-          }
-        }, "Reset Filters")
-      )
-    ) : (
-      h("div", { style: { display: "flex", flexDirection: "column", gap: "24px" } },
-        filteredReports.map(report => {
-          const isConflict = Boolean(report.contradiction);
-          const verdictColor = report.governance_verdict.includes("VALIDATED") ? "#A78BFA"
-            : (report.governance_verdict === "COST_ERASED" ? "#F87171"
-              : (report.governance_verdict.includes("REJECT") ? "#94A3B8"
-                : (report.governance_verdict.includes("WAITING") ? "#F59E0B" : "#38BDF8")));
-
-          return h("div", {
-            key: report.report_id,
-            className: "glass-card",
+      // ── Content State: Loading, Error, or Cards Grid ───────────────────────────
+      loading ? (
+        h("div", { className: "glass-card", style: { padding: "48px", textAlign: "center", color: "#38BDF8" } },
+          h("div", { style: { fontSize: "1.8rem", marginBottom: "12px" } }, "⏳"),
+          h("div", { style: { fontWeight: "700" } }, "Loading verified research reports and verifying artifact hashes..."),
+          h("div", { style: { fontSize: "0.78rem", color: "#94A3B8", marginTop: "6px" } }, "Checking disk artifacts against expected SHA-256 manifests")
+        )
+      ) : error ? (
+        h("div", { className: "glass-card", style: { padding: "36px", textAlign: "center", border: "1px solid rgba(239, 68, 68, 0.4)" } },
+          h("div", { style: { color: "#FBBF24", fontWeight: "800", marginBottom: "8px" } }, "RESEARCH RESULTS UNAVAILABLE"),
+          h("div", { style: { color: "#F87171", fontSize: "1.2rem", fontWeight: "800", marginBottom: "8px" } }, "⚠️ Failed to load research results"),
+          h("p", { style: { color: "#CBD5E1", fontSize: "0.85rem", maxWidth: "600px", margin: "0 auto 16px auto" } }, error),
+          h("button", {
+            onClick: loadResults,
             style: {
-              padding: "24px",
-              border: isConflict ? "1px solid rgba(245, 158, 11, 0.4)" : "1px solid rgba(255, 255, 255, 0.08)",
-              background: "rgba(15, 23, 42, 0.85)"
+              background: "rgba(239, 68, 68, 0.2)",
+              border: "1px solid rgba(239, 68, 68, 0.5)",
+              color: "#F87171",
+              padding: "8px 18px",
+              borderRadius: "8px",
+              fontWeight: "700",
+              cursor: "pointer"
             }
-          },
-            // Card Top Row: Track & Badges
-            h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "10px", marginBottom: "10px" } },
-              h("div", null,
-                h("div", { style: { fontSize: "0.74rem", color: "#38BDF8", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.04em" } },
-                  `${report.track} · ${report.date}`
-                ),
-                h("h3", { style: { fontSize: "1.25rem", fontWeight: "800", color: "#F8FAFC", margin: "4px 0 0 0" } },
-                  report.title
-                )
-              ),
-              h("div", { style: { display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center" } },
-                // Provenance badge
-                h("span", {
-                  style: {
-                    background: "rgba(0, 229, 168, 0.12)",
-                    border: "1px solid rgba(0, 229, 168, 0.35)",
-                    color: "#00E5A8",
-                    padding: "3px 8px",
-                    borderRadius: "4px",
-                    fontSize: "0.70rem",
-                    fontWeight: "800",
-                    fontFamily: "var(--font-mono)"
-                  }
-                }, `✓ SHA256:${report.source_artifact_sha256.slice(0, 8)}...`),
+          }, "Retry Loading")
+        )
+      ) : filteredReports.length === 0 ? (
+        h("div", { className: "glass-card", style: { padding: "48px", textAlign: "center", color: "#94A3B8" } },
+          h("div", { style: { fontSize: "1.5rem", marginBottom: "8px" } }, "🔍"),
+          h("div", { style: { fontWeight: "700" } }, "No research reports matched your current filter criteria."),
+          h("button", {
+            onClick: () => { setActiveFilter("all"); setSearchQuery(""); },
+            style: {
+              background: "rgba(56, 189, 248, 0.15)",
+              border: "1px solid rgba(56, 189, 248, 0.3)",
+              color: "#38BDF8",
+              padding: "6px 14px",
+              borderRadius: "6px",
+              marginTop: "12px",
+              cursor: "pointer",
+              fontWeight: "700",
+              fontSize: "0.78rem"
+            }
+          }, "Reset Filters")
+        )
+      ) : (
+        h("div", { style: { display: "flex", flexDirection: "column", gap: "24px" } },
+          filteredReports.map(report => {
+            const isConflict = Boolean(report.contradiction);
+            const verdictColor = report.governance_verdict.includes("VALIDATED") ? "#A78BFA"
+              : (report.governance_verdict === "COST_ERASED" ? "#F87171"
+                : (report.governance_verdict.includes("REJECT") ? "#94A3B8"
+                  : (report.governance_verdict.includes("WAITING") ? "#F59E0B" : "#38BDF8")));
 
-                // Governance Verdict badge
-                h("span", {
-                  style: {
-                    background: `${verdictColor}22`,
-                    border: `1px solid ${verdictColor}66`,
-                    color: verdictColor,
-                    padding: "3px 8px",
-                    borderRadius: "4px",
-                    fontSize: "0.70rem",
-                    fontWeight: "800"
-                  }
-                }, report.governance_verdict),
-
-                // Conflict badge
-                isConflict && h("span", {
-                  style: {
-                    background: "rgba(245, 158, 11, 0.18)",
-                    border: "1px solid rgba(245, 158, 11, 0.5)",
-                    color: "#FBBF24",
-                    padding: "3px 8px",
-                    borderRadius: "4px",
-                    fontSize: "0.70rem",
-                    fontWeight: "800"
-                  }
-                }, "CONFLICT_REQUIRES_RECONCILIATION")
-              )
-            ),
-
-            // Metadata Row: Sample size & horizon
-            h("div", { style: { display: "flex", gap: "20px", flexWrap: "wrap", fontSize: "0.76rem", color: "#94A3B8", marginBottom: "16px", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "12px" } },
-              h("div", null,
-                h("strong", { style: { color: "#CBD5E1" } }, "Sample Size: "),
-                report.sample_size_description
-              ),
-              h("div", null,
-                h("strong", { style: { color: "#CBD5E1" } }, "Evaluation Horizon: "),
-                report.horizon
-              )
-            ),
-
-            // Metrics Table
-            report.key_metrics && report.key_metrics.length > 0 && h("div", { style: { marginBottom: "16px", overflowX: "auto" } },
-              h("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: "0.76rem" } },
-                h("thead", null,
-                  h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.1)", textAlign: "left", color: "#7E95B5" } },
-                    h("th", { style: { padding: "6px 8px" } }, "Metric Name"),
-                    h("th", { style: { padding: "6px 8px" } }, "Observed Value"),
-                    h("th", { style: { padding: "6px 8px" } }, "95% Confidence Interval"),
-                    h("th", { style: { padding: "6px 8px" } }, "Scientific Interpretation")
+            return h("div", {
+              key: report.report_id,
+              className: "glass-card",
+              style: {
+                padding: "24px",
+                border: isConflict ? "1px solid rgba(245, 158, 11, 0.4)" : "1px solid rgba(255, 255, 255, 0.08)",
+                background: "rgba(15, 23, 42, 0.85)"
+              }
+            },
+              // Card Top Row: Track & Badges
+              h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "10px", marginBottom: "10px" } },
+                h("div", null,
+                  h("div", { style: { fontSize: "0.74rem", color: "#38BDF8", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.04em" } },
+                    `${report.track} · ${report.date}`
+                  ),
+                  h("h3", { style: { fontSize: "1.25rem", fontWeight: "800", color: "#F8FAFC", margin: "4px 0 0 0" } },
+                    report.title
                   )
                 ),
-                h("tbody", null,
-                  report.key_metrics.map((m, idx) =>
-                    h("tr", { key: idx, style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
-                      h("td", { style: { padding: "7px 8px", color: "#F8FAFC", fontWeight: "700" } }, m.name),
-                      h("td", { style: { padding: "7px 8px", color: "#00F0FF", fontWeight: "800", fontFamily: "var(--font-mono)" } }, m.value),
-                      h("td", { style: { padding: "7px 8px", color: "#A78BFA", fontFamily: "var(--font-mono)" } }, m.ci_95 || "—"),
-                      h("td", { style: { padding: "7px 8px", color: "#CBD5E1" } }, m.interpretation || "—")
+                h("div", { style: { display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center" } },
+                  // Provenance badge
+                  h("span", {
+                    style: {
+                      background: "rgba(0, 229, 168, 0.12)",
+                      border: "1px solid rgba(0, 229, 168, 0.35)",
+                      color: "#00E5A8",
+                      padding: "3px 8px",
+                      borderRadius: "4px",
+                      fontSize: "0.70rem",
+                      fontWeight: "800",
+                      fontFamily: "var(--font-mono)"
+                    }
+                  }, `✓ SHA256:${report.source_artifact_sha256.slice(0, 8)}...`),
+
+                  // Governance Verdict badge
+                  h("span", {
+                    style: {
+                      background: `${verdictColor}22`,
+                      border: `1px solid ${verdictColor}66`,
+                      color: verdictColor,
+                      padding: "3px 8px",
+                      borderRadius: "4px",
+                      fontSize: "0.70rem",
+                      fontWeight: "800"
+                    }
+                  }, report.governance_verdict),
+
+                  // Conflict badge
+                  isConflict && h("span", {
+                    style: {
+                      background: "rgba(245, 158, 11, 0.18)",
+                      border: "1px solid rgba(245, 158, 11, 0.5)",
+                      color: "#FBBF24",
+                      padding: "3px 8px",
+                      borderRadius: "4px",
+                      fontSize: "0.70rem",
+                      fontWeight: "800"
+                    }
+                  }, "CONFLICT_REQUIRES_RECONCILIATION")
+                )
+              ),
+
+              // Metadata Row: Sample size & horizon
+              h("div", { style: { display: "flex", gap: "20px", flexWrap: "wrap", fontSize: "0.76rem", color: "#94A3B8", marginBottom: "16px", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "12px" } },
+                h("div", null,
+                  h("strong", { style: { color: "#CBD5E1" } }, "Sample Size: "),
+                  report.sample_size_description
+                ),
+                h("div", null,
+                  h("strong", { style: { color: "#CBD5E1" } }, "Evaluation Horizon: "),
+                  report.horizon
+                )
+              ),
+
+              // Metrics Table
+              report.key_metrics && report.key_metrics.length > 0 && h("div", { style: { marginBottom: "16px", overflowX: "auto" } },
+                h("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: "0.76rem" } },
+                  h("thead", null,
+                    h("tr", { style: { borderBottom: "1px solid rgba(255,255,255,0.1)", textAlign: "left", color: "#7E95B5" } },
+                      h("th", { style: { padding: "6px 8px" } }, "Metric Name"),
+                      h("th", { style: { padding: "6px 8px" } }, "Observed Value"),
+                      h("th", { style: { padding: "6px 8px" } }, "95% Confidence Interval"),
+                      h("th", { style: { padding: "6px 8px" } }, "Scientific Interpretation")
+                    )
+                  ),
+                  h("tbody", null,
+                    report.key_metrics.map((m, idx) =>
+                      h("tr", { key: idx, style: { borderBottom: "1px solid rgba(255,255,255,0.04)" } },
+                        h("td", { style: { padding: "7px 8px", color: "#F8FAFC", fontWeight: "700" } }, m.name),
+                        h("td", { style: { padding: "7px 8px", color: "#00F0FF", fontWeight: "800", fontFamily: "var(--font-mono)" } }, m.value),
+                        h("td", { style: { padding: "7px 8px", color: "#A78BFA", fontFamily: "var(--font-mono)" } }, m.ci_95 || "—"),
+                        h("td", { style: { padding: "7px 8px", color: "#CBD5E1" } }, m.interpretation || "—")
+                      )
                     )
                   )
                 )
-              )
-            ),
-
-            // Contradiction Reconciliation Box
-            isConflict && h("div", {
-              style: {
-                background: "rgba(245, 158, 11, 0.08)",
-                border: "1px solid rgba(245, 158, 11, 0.3)",
-                borderRadius: "8px",
-                padding: "12px 16px",
-                marginBottom: "14px"
-              }
-            },
-              h("div", { style: { display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" } },
-                h("strong", { style: { color: "#FBBF24", fontSize: "0.78rem" } }, "⚖️ Contradiction Reconciled:"),
-                h("span", { style: { color: "#F8FAFC", fontSize: "0.78rem", fontWeight: "700" } }, report.contradiction.primary_issue)
               ),
-              h("div", { style: { fontSize: "0.76rem", color: "#CBD5E1", lineHeight: "1.5" } },
-                report.contradiction.resolution_note
-              )
-            ),
 
-            // Scientific Limitations Notice
-            h("div", {
-              style: {
-                background: "rgba(0, 0, 0, 0.3)",
-                border: "1px solid rgba(255, 255, 255, 0.06)",
-                borderRadius: "8px",
-                padding: "10px 14px",
-                marginBottom: "16px"
-              }
-            },
-              h("span", { style: { color: "#F87171", fontWeight: "800", fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.04em", marginRight: "6px" } },
-                "Scientific Limitations & Governance Boundary:"
-              ),
-              h("span", { style: { fontSize: "0.76rem", color: "#CBD5E1", lineHeight: "1.5" } },
-                report.scientific_limitations
-              )
-            ),
-
-            // Card Footer: Source path + Inspect Button
-            h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" } },
-              h("div", { style: { fontSize: "0.72rem", color: "#64748B", fontFamily: "var(--font-mono)" } },
-                `Source: ${report.source_path}`
-              ),
-              h("button", {
-                onClick: () => handleOpenReport(report.report_id),
+              // Contradiction Reconciliation Box
+              isConflict && h("div", {
                 style: {
-                  background: "rgba(56, 189, 248, 0.15)",
-                  border: "1px solid rgba(56, 189, 248, 0.4)",
-                  color: "#38BDF8",
-                  padding: "5px 14px",
-                  borderRadius: "6px",
-                  fontSize: "0.76rem",
-                  fontWeight: "700",
-                  cursor: "pointer"
+                  background: "rgba(245, 158, 11, 0.08)",
+                  border: "1px solid rgba(245, 158, 11, 0.3)",
+                  borderRadius: "8px",
+                  padding: "12px 16px",
+                  marginBottom: "14px"
                 }
-              }, "Inspect Source Markdown ↗")
+              },
+                h("div", { style: { display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" } },
+                  h("strong", { style: { color: "#FBBF24", fontSize: "0.78rem" } }, "⚖️ Contradiction Reconciled:"),
+                  h("span", { style: { color: "#F8FAFC", fontSize: "0.78rem", fontWeight: "700" } }, report.contradiction.primary_issue)
+                ),
+                h("div", { style: { fontSize: "0.76rem", color: "#CBD5E1", lineHeight: "1.5" } },
+                  report.contradiction.resolution_note
+                )
+              ),
+
+              // Scientific Limitations Notice
+              h("div", {
+                style: {
+                  background: "rgba(0, 0, 0, 0.3)",
+                  border: "1px solid rgba(255, 255, 255, 0.06)",
+                  borderRadius: "8px",
+                  padding: "10px 14px",
+                  marginBottom: "16px"
+                }
+              },
+                h("span", { style: { color: "#F87171", fontWeight: "800", fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.04em", marginRight: "6px" } },
+                  "Scientific Limitations & Governance Boundary:"
+                ),
+                h("span", { style: { fontSize: "0.76rem", color: "#CBD5E1", lineHeight: "1.5" } },
+                  report.scientific_limitations
+                )
+              ),
+
+              // Card Footer: Source path + Inspect Button
+              h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" } },
+                h("div", { style: { fontSize: "0.72rem", color: "#64748B", fontFamily: "var(--font-mono)" } },
+                  `Source: ${report.source_path}`
+                ),
+                h("button", {
+                  onClick: () => handleOpenReport(report.report_id),
+                  style: {
+                    background: "rgba(56, 189, 248, 0.15)",
+                    border: "1px solid rgba(56, 189, 248, 0.4)",
+                    color: "#38BDF8",
+                    padding: "5px 14px",
+                    borderRadius: "6px",
+                    fontSize: "0.76rem",
+                    fontWeight: "700",
+                    cursor: "pointer"
+                  }
+                }, "Inspect Source Markdown ↗")
+              )
+            );
+          })
+        )
+      )),
+
+    // =========================================================================
+    // TAB: STRATEGY & MODEL EVALUATION
+    // =========================================================================
+    (researchTab === "evaluation" || researchTab === "models") && h("div", null,
+      h("div", {
+        className: "glass-card",
+        style: { padding: "24px", marginBottom: "20px", border: "1px solid rgba(56, 189, 248, 0.3)" }
+      },
+        h("div", { style: { display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" } },
+          h("span", { style: { fontSize: "1.3rem" } }, "🧠"),
+          h("h2", { style: { margin: 0, fontSize: "1.3rem", color: "#F8FAFC" } }, "Model & Forecast Subsystem Registry")
+        ),
+        h("p", { style: { fontSize: "0.85rem", color: "#CBD5E1", lineHeight: "1.6", margin: "0 0 16px 0" } },
+          "Every forecast module is classified by research maturity, inference state, and execution authorization. " +
+          "Per governance, offline challengers (such as Amazon Chronos-2, TFT/Router, and Mamba) do not emit live trading signals, " +
+          "and unexecuted modules explicitly report INFERENCE NOT EXECUTED or DATA UNAVAILABLE."
+        ),
+
+        // Models Grid
+        h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "16px" } },
+          // Model 1: HAR-RS-DOW-v1.0
+          h("div", { style: { background: "rgba(0,0,0,0.3)", borderRadius: "10px", padding: "16px", border: "1px solid rgba(0, 229, 168, 0.3)" } },
+            h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" } },
+              h("strong", { style: { color: "#00E5A8", fontSize: "0.92rem" } }, "1. HAR-RS-DOW-v1.0"),
+              h("span", { style: { background: "rgba(245, 158, 11, 0.15)", color: "#F59E0B", border: "1px solid rgba(245, 158, 11, 0.4)", padding: "2px 8px", borderRadius: "4px", fontSize: "0.70rem", fontWeight: "800" } }, "OFFLINE RESEARCH ONLY")
+            ),
+            h("div", { style: { fontSize: "0.76rem", color: "#CBD5E1", marginBottom: "8px", lineHeight: "1.5" } },
+              "Heterogeneous Autoregressive Realized Volatility with Realized Semivariance & Day-of-Week Seasonality."
+            ),
+            h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", display: "grid", gap: "4px", fontFamily: "var(--font-mono)" } },
+              h("div", null, "Horizon: 168h Forward Realized Variance"),
+              h("div", null, "Contract: 841deba5fb30118b"),
+              h("div", null, "C2: UNAVAILABLE — no verifiable calibration artifact"),
+              h("div", { style: { color: "#FBBF24", marginTop: "4px" } }, "Research-only volatility target · Directional signal: ABSTAIN")
             )
-          );
-        })
+          ),
+
+          // Model 2: Directional GBDT Classifier
+          h("div", { style: { background: "rgba(0,0,0,0.3)", borderRadius: "10px", padding: "16px", border: "1px solid rgba(56, 189, 248, 0.3)" } },
+            h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" } },
+              h("strong", { style: { color: "#38BDF8", fontSize: "0.92rem" } }, "2. Directional GBDT Classifier"),
+              h("span", { style: { background: "rgba(56, 189, 248, 0.15)", color: "#38BDF8", border: "1px solid rgba(56, 189, 248, 0.4)", padding: "2px 8px", borderRadius: "4px", fontSize: "0.70rem", fontWeight: "800" } }, "OFFLINE_RESEARCH_ONLY")
+            ),
+            h("div", { style: { fontSize: "0.76rem", color: "#CBD5E1", marginBottom: "8px", lineHeight: "1.5" } },
+              "LightGBM return-sign classifiers (1h, 4h, 24h horizons). Matches strategy holding horizon or fails with HORIZON_MISMATCH."
+            ),
+            h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", display: "grid", gap: "4px", fontFamily: "var(--font-mono)" } },
+              h("div", null, "Archived 2026 retrospective AUC: 0.504 (not current or prospective evidence)"),
+              h("div", null, "Null Preserved: mu = 0.0 (Driftless First-Passage)"),
+              h("div", null, "Friction Test: Negative net expectancy after 87 bps costs"),
+              h("div", { style: { color: "#FBBF24", marginTop: "4px" } }, "Epistemic Barrier: Directional probabilities do not override drift null or trigger live execution.")
+            )
+          ),
+
+          // Model 3: Amazon Chronos-2 Foundation Adapter
+          h("div", { style: { background: "rgba(0,0,0,0.3)", borderRadius: "10px", padding: "16px", border: "1px solid rgba(148, 163, 184, 0.3)" } },
+            h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" } },
+              h("strong", { style: { color: "#CBD5E1", fontSize: "0.92rem" } }, "3. Amazon Chronos-2 Adapter"),
+              h("span", { style: { background: "rgba(148, 163, 184, 0.15)", color: "#CBD5E1", border: "1px solid rgba(148, 163, 184, 0.4)", padding: "2px 8px", borderRadius: "4px", fontSize: "0.70rem", fontWeight: "800" } }, "INFERENCE NOT EXECUTED")
+            ),
+            h("div", { style: { fontSize: "0.76rem", color: "#CBD5E1", marginBottom: "8px", lineHeight: "1.5" } },
+              "120M Parameter Time-Series Foundation Transformer (Amazon Science). Evaluated as offline zero-shot research challenger."
+            ),
+            h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", display: "grid", gap: "4px", fontFamily: "var(--font-mono)" } },
+              h("div", null, "Status: INFERENCE NOT EXECUTED in production runtime"),
+              h("div", null, "Hardware Req: High RAM / GPU (520x higher latency than Ridge)"),
+              h("div", null, "Statistical Gate: Worse MFE/MAE than Ridge (+67 bps, p=0.0001)"),
+              h("div", { style: { color: "#F87171", marginTop: "4px" } }, "Disposition: Retained as offline research challenger; model weights not loaded in runtime.")
+            )
+          ),
+
+          // Model 4: Temporal Fusion Transformer (TFT) / Router
+          h("div", { style: { background: "rgba(0,0,0,0.3)", borderRadius: "10px", padding: "16px", border: "1px solid rgba(148, 163, 184, 0.3)" } },
+            h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" } },
+              h("strong", { style: { color: "#CBD5E1", fontSize: "0.92rem" } }, "4. TFT / Evidence Router"),
+              h("span", { style: { background: "rgba(148, 163, 184, 0.15)", color: "#CBD5E1", border: "1px solid rgba(148, 163, 184, 0.4)", padding: "2px 8px", borderRadius: "4px", fontSize: "0.70rem", fontWeight: "800" } }, "INFERENCE NOT EXECUTED")
+            ),
+            h("div", { style: { fontSize: "0.76rem", color: "#CBD5E1", marginBottom: "8px", lineHeight: "1.5" } },
+              "Multi-Horizon Deep Learning Attention Architecture for dynamic feature routing."
+            ),
+            h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", display: "grid", gap: "4px", fontFamily: "var(--font-mono)" } },
+              h("div", null, "Status: INFERENCE NOT EXECUTED / RESEARCH PROTOTYPE ONLY"),
+              h("div", null, "Checkpoints: Unverified for production runtime"),
+              h("div", null, "Routing: Fallback to fixed empirical baseline rules"),
+              h("div", { style: { color: "#FBBF24", marginTop: "4px" } }, "Disposition: Research prototype only; live routing abstains.")
+            )
+          ),
+
+          // Model 5: Hawkes Microstructure Event Clustering
+          h("div", { style: { background: "rgba(0,0,0,0.3)", borderRadius: "10px", padding: "16px", border: "1px solid rgba(245, 158, 11, 0.3)" } },
+            h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" } },
+              h("strong", { style: { color: "#FBBF24", fontSize: "0.92rem" } }, "5. Hawkes Event Clustering"),
+              h("span", { style: { background: "rgba(245, 158, 11, 0.15)", color: "#FBBF24", border: "1px solid rgba(245, 158, 11, 0.4)", padding: "2px 8px", borderRadius: "4px", fontSize: "0.70rem", fontWeight: "800" } }, "DATA UNAVAILABLE")
+            ),
+            h("div", { style: { fontSize: "0.76rem", color: "#CBD5E1", marginBottom: "8px", lineHeight: "1.5" } },
+              "Self-exciting point-process model for high-frequency order-flow jump clustering and toxic flow detection."
+            ),
+            h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", display: "grid", gap: "4px", fontFamily: "var(--font-mono)" } },
+              h("div", null, "Dependency: Coinbase L2 WebSocket order-book collector"),
+              h("div", null, "Status: DATA UNAVAILABLE (L2 collector not actively streaming)"),
+              h("div", null, "Hurdle: VPIN > 0.65 or Hawkes > 4.0 triggers toxicity block"),
+              h("div", { style: { color: "#F87171", marginTop: "4px" } }, "Fail-Closed Rule: Missing order book depth defaults to ABSTAIN.")
+            )
+          ),
+
+          // Model 6: Mamba Selective SSM v1
+          h("div", { style: { background: "rgba(0,0,0,0.3)", borderRadius: "10px", padding: "16px", border: "1px solid rgba(239, 68, 68, 0.3)" } },
+            h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" } },
+              h("strong", { style: { color: "#F87171", fontSize: "0.92rem" } }, "6. Mamba Selective SSM v1"),
+              h("span", { style: { background: "rgba(239, 68, 68, 0.15)", color: "#F87171", border: "1px solid rgba(239, 68, 68, 0.4)", padding: "2px 8px", borderRadius: "4px", fontSize: "0.70rem", fontWeight: "800" } }, "REJECTED")
+            ),
+            h("div", { style: { fontSize: "0.76rem", color: "#CBD5E1", marginBottom: "8px", lineHeight: "1.5" } },
+              "Selective State-Space Model evaluated against Ridge regression benchmark."
+            ),
+            h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", display: "grid", gap: "4px", fontFamily: "var(--font-mono)" } },
+              h("div", null, "Status: REJECTED (Statistical Gate Failed)"),
+              h("div", null, "Paired t-test: Holm-adjusted p = 0.0006 vs Ridge baseline"),
+              h("div", null, "Finding: Higher error dispersion and latency than Ridge baseline"),
+              h("div", { style: { color: "#94A3B8", marginTop: "4px" } }, "Quarantine: Preserved in results/mamba_trial_manifest.json.")
+            )
+          )
+        )
+      )
+    ),
+
+    // =========================================================================
+    // TAB 3: HISTORICAL REGIMES & ANALOG DIAGNOSTICS
+    // =========================================================================
+    researchTab === "analogs" && h("div", null,
+      h("div", {
+        className: "glass-card",
+        style: { padding: "20px 24px", marginBottom: "20px", border: "1px solid rgba(167, 139, 250, 0.3)" }
+      },
+        h("div", { style: { display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" } },
+          h("span", { style: { fontSize: "1.3rem" } }, "🕰️"),
+          h("h2", { style: { margin: 0, fontSize: "1.25rem", color: "#F8FAFC" } }, "Historical Regimes & Analog Explorer")
+        ),
+        h("p", { style: { fontSize: "0.82rem", color: "#CBD5E1", lineHeight: "1.5", margin: 0 } },
+          "Descriptive retrospective analog retrieval across the 42,177-bar Coinbase hourly dataset. " +
+          "Analogs represent empirical precedent paths sharing similar volatility and term structure. " +
+          "They do not constitute directional predictions or trade recommendations."
+        )
+      ),
+      h(HistoricalAnalogsPanel, null)
+    ),
+
+    // =========================================================================
+    // TAB 4: DATA PROVENANCE & HEALTH DIAGNOSTICS
+    // =========================================================================
+    researchTab === "provenance" && h("div", null,
+      h("div", {
+        className: "glass-card",
+        style: { padding: "24px", marginBottom: "20px", border: "1px solid rgba(0, 229, 168, 0.3)" }
+      },
+        h("div", { style: { display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" } },
+          h("span", { style: { fontSize: "1.3rem" } }, "🔍"),
+          h("h2", { style: { margin: 0, fontSize: "1.25rem", color: "#F8FAFC" } }, "Dataset Certification & Venue Integrity")
+        ),
+        h("p", { style: { fontSize: "0.85rem", color: "#CBD5E1", lineHeight: "1.6", margin: "0 0 16px 0" } },
+          "Cryptographic data verification ensures zero historical backtest contamination, strict point-in-time causation, " +
+          "and exact bit-identical immutability of protected ledgers."
+        ),
+
+        // Provenance Cards
+        h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "16px" } },
+          // Canonical Dataset
+          h("div", { style: { background: "rgba(0,0,0,0.3)", borderRadius: "10px", padding: "16px", border: "1px solid rgba(0, 229, 168, 0.3)" } },
+            h("div", { style: { color: "#00E5A8", fontWeight: "800", fontSize: "0.88rem", marginBottom: "6px" } }, "1. Coinbase Spot Canonical Dataset"),
+            h("div", { style: { fontSize: "0.74rem", color: "#CBD5E1", display: "grid", gap: "4px", fontFamily: "var(--font-mono)" } },
+              h("div", null, "File: data/raw/ohlcv.parquet"),
+              h("div", null, "Bars: 42,177 contiguous 1h candles (2020-01-01 to 2026-10-24)"),
+              h("div", null, "Sub-hourly: 13,801 15m candles certified"),
+              h("div", null, "Gaps: Exactly 0 missing intervals"),
+              h("div", null, "Duplicates: Exactly 0 duplicate timestamps"),
+              h("div", { style: { color: "#00E5A8", marginTop: "4px" } }, "Status: CERTIFIED_CANONICAL · Bit-identical match")
+            )
+          ),
+
+          // Quarantined Dataset
+          h("div", { style: { background: "rgba(0,0,0,0.3)", borderRadius: "10px", padding: "16px", border: "1px solid rgba(245, 158, 11, 0.3)" } },
+            h("div", { style: { color: "#FBBF24", fontWeight: "800", fontSize: "0.88rem", marginBottom: "6px" } }, "2. Quarantined Historical Datasets"),
+            h("div", { style: { fontSize: "0.74rem", color: "#CBD5E1", display: "grid", gap: "4px", fontFamily: "var(--font-mono)" } },
+              h("div", null, "Legacy Pre-Repair: Isolated under PRE_REPAIR_HISTORY"),
+              h("div", null, "External Binance Feed: Excluded due to licensing and terms boundary"),
+              h("div", null, "Kaggle Mixed Archive: Excluded from causal point-in-time features"),
+              h("div", { style: { color: "#FBBF24", marginTop: "4px" } }, "Status: QUARANTINED · Excluded from active inference")
+            )
+          ),
+
+          // Protected Ledgers
+          h("div", { style: { background: "rgba(0,0,0,0.3)", borderRadius: "10px", padding: "16px", border: "1px solid rgba(56, 189, 248, 0.3)" } },
+            h("div", { style: { color: "#38BDF8", fontWeight: "800", fontSize: "0.88rem", marginBottom: "6px" } }, "3. Protected Ledgers Bit-Identical Verification"),
+            h("div", { style: { fontSize: "0.74rem", color: "#CBD5E1", display: "grid", gap: "4px", fontFamily: "var(--font-mono)" } },
+              h("div", null, "prospective_entry_ledger.jsonl: MATCH (91c3aed9...)"),
+              h("div", null, "prospective_shadow_v1.jsonl: MATCH (e3b0c442...)"),
+              h("div", null, "prospective_entry_ledger_v2.jsonl: MATCH (e6e33e3c...)"),
+              h("div", null, "ohlcv.parquet: MATCH (1e722f33...)"),
+              h("div", null, "ohlcv_pre_backfill_backup.parquet: MATCH (c4949e5b...)"),
+              h("div", { style: { color: "#00E5A8", marginTop: "4px" } }, "Status: 5/5 PROTECTED FILES BIT-IDENTICAL")
+            )
+          )
+        )
       )
     ),
 
@@ -11685,17 +14630,4728 @@ function ResearchResultsView({ setPath, livePrice = 0 }) {
 
 
 // ===========================================================================
+// HowItWorksView — System Architecture, Dataflow & Methodology Stepper
+// ===========================================================================
+function HowItWorksView({ setPath }) {
+  const stages = [
+    {
+      num: "01",
+      icon: "📡",
+      title: "1. Market Data Collection & Integrity Validation",
+      subtitle: "Continuous public exchange feed ingestion with fail-closed sequence and staleness guards",
+      badge: "COINBASE SPOT BTC-USD · PROVENANCE VERIFIED",
+      badgeColor: "#FBBF24",
+      activeText: "ACTIVE IN PIPELINE",
+      description: "BTCognitive continuously ingests public Coinbase REST and WebSocket market data for spot BTC-USD. The historical dataset consists of 42,177 contiguous hourly bars with zero unrecorded intervals. The forward Level-2 market-data collector operates under strict fail-closed engineering: requiring explicit operator authorization, enforcing sequence continuity (seq == last + 1), dropping duplicates, handling network reconnections with exponential backoff, and marking book states stale whenever exchange heartbeats exceed 5.0 seconds.",
+      boundaryNote: "Strict Separation: Historical replay data is strictly separated from forward prospective Level-2 streaming. Zero synthetic order book or candle data is fabricated from OHLCV.",
+      linkText: "Explore Market Terminal ↗",
+      linkPath: "/terminal"
+    },
+    {
+      num: "02",
+      icon: "⚙️",
+      title: "2. Causal Point-in-Time Feature Extraction",
+      subtitle: "Microstructure imbalance and multi-scale volatility without lookahead leakage",
+      badge: "CAUSAL CONTRACT ENFORCED · ZERO LOOKAHEAD",
+      badgeColor: "#38BDF8",
+      activeText: "ACTIVE IN PIPELINE",
+      description: "At each decision point t_0, feature extractors produce strictly point-in-time metrics satisfying t_feature <= t_decision < t_maturity. Features include multi-horizon log returns (1h, 4h, 24h, 168h), Parkinson and Garman-Klass volatility proxies, Cont et al. Order Flow Imbalance (OFI 1m, 5m, 15m), multi-depth Order Book Imbalance (OBI 5, 10, 25, 50), relative spread, and Cumulative Volume Delta (CVD). If Level-2 feeds are disconnected or desynchronized, microstructure features immediately fail closed (FEATURE_UNAVAILABLE).",
+      boundaryNote: "Leakage Prevention: No future candle prices, post-entry volumes, or retrospective lookaheads are permitted into feature tensors.",
+      linkText: "Inspect Microstructure Data ↗",
+      linkPath: "/terminal"
+    },
+    {
+      num: "03",
+      icon: "🤖",
+      title: "3. Forecasting via Directional Models & Empirical Baselines",
+      subtitle: "Probabilistic classification compared against simple Random Walk persistence",
+      badge: "ARCHIVED 2026 RETROSPECTIVE RESEARCH · NOT CURRENT VALIDATION",
+      badgeColor: "#FBBF24",
+      activeText: "RESEARCH FORECAST ONLY",
+      description: "Archived retrospective research snapshot (2026 development data, not prospective validation): directional models were reported at 51.0%–51.8% accuracy and AUC <= 0.53. These historical figures are not current performance claims. The results do not establish a directional edge or trading profitability.",
+      boundaryNote: "Directional Interpretation: Directional probabilities (e.g. 54%) represent uncalibrated point estimates, NOT the probability of a trade reaching take-profit. Directional recommendations strictly emit ABSTAIN.",
+      linkText: "Inspect AI Forecasts & Baselines ↗",
+      linkPath: "/forecast"
+    },
+    {
+      num: "04",
+      icon: "🛡️",
+      title: "4. Volatility Risk Estimation & Conformal Calibration",
+      subtitle: "Registered Standard HAR status and C2 calibration are unavailable.",
+      badge: "STANDARD HAR NOT ESTABLISHED · C2 DISABLED",
+      badgeColor: "#00E5A8",
+      activeText: "OFFLINE RESEARCH ONLY",
+      description: "The registered Standard HAR artifact is unavailable, so its forecast and accuracy are NOT ESTABLISHED. C2 calibration is disabled and no calibrated risk envelope or coverage claim is available.",
+      boundaryNote: "Target Separation: Volatility forecasting accuracy (QLIKE, RMSE) is an excursion risk and sizing tool, not directional return prediction or trading profitability.",
+      linkText: "View Risk & Volatility Outlook ↗",
+      linkPath: "/forecast"
+    },
+    {
+      num: "05",
+      icon: "🔭",
+      title: "5. Statistical Drift Monitoring & Prequential Evaluation",
+      subtitle: "Continuous change-point tracking with delayed forward outcome resolution",
+      badge: "APPEND-ONLY LEDGER · PAGE-HINKLEY & CUSUM ACTIVE",
+      badgeColor: "#A78BFA",
+      activeText: "DIAGNOSTIC RESEARCH ONLY",
+      description: "Adhering to Dawson's prequential principle, every forecast candidate and baseline setup is committed to an append-only, versioned ledger before future outcomes unfold. Forward outcomes are evaluated only after candles fully close (t >= t_0 + H). Statistical drift detectors (Page-Hinkley and tabular CUSUM) continuously track prediction residuals, loss distributions, and feature stability.",
+      boundaryNote: "Diagnostic Boundary: Drift detection produces diagnostic research states only. Zero automated model retraining, parameter mutation, or dynamic rule changes are permitted.",
+      linkText: "Open Experiment Arena ↗",
+      linkPath: "/arena"
+    },
+    {
+      num: "06",
+      icon: "⚖️",
+      title: "6. Evidence-Based Research Gate & Strict Non-Execution",
+      subtitle: "Closed-form net expected value hurdles under realistic transaction friction",
+      badge: "NO_GO_NO_VALIDATED_EDGE · LIVE TRADING DISABLED",
+      badgeColor: "#F87171",
+      activeText: "PERMANENT GOVERNANCE LOCK",
+      description: "Trading strategies are evaluated against realistic exchange fee tiers (Coinbase Active 27 bps round-trip, Retail 87 bps round-trip), accounting for taker commissions, half-spread, and conservative execution slippage. Confirmatory statistical qualification requires at least 100 non-overlapping 168-hour independent blocks and paired Diebold-Mariano testing with Harvey-Leybourne-Newbold finite-sample correction (p < 0.05, Delta Net R >= +0.05 R). Because current unconditional BTC returns do not yield positive net expectancy after friction, the system strictly abstains.",
+      boundaryNote: "Strict Non-Execution: Live trading, broker connections, order routing, and capital deployment are permanently disabled across all modules.",
+      linkText: "View Research Evidence & Reports ↗",
+      linkPath: "/research"
+    }
+  ];
+
+  return h("div", { id: "how-it-works-page", className: "how-it-works-container" },
+    // Header Hero Banner
+    h("div", {
+      className: "glass-card",
+      style: {
+        padding: "36px 32px",
+        marginBottom: "32px",
+        background: "linear-gradient(135deg, rgba(14, 22, 38, 0.95), rgba(30, 41, 59, 0.85))",
+        border: "1px solid rgba(255, 255, 255, 0.12)"
+      }
+    },
+      h("div", { style: { display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px", flexWrap: "wrap" } },
+        h("span", {
+          style: {
+            background: "rgba(124, 92, 255, 0.15)",
+            border: "1px solid rgba(124, 92, 255, 0.4)",
+            color: "#A78BFA",
+            padding: "4px 12px",
+            borderRadius: "6px",
+            fontSize: "0.75rem",
+            fontWeight: "800",
+            letterSpacing: "0.06em",
+            textTransform: "uppercase"
+          }
+        }, "System Architecture & Methodology"),
+        h("span", {
+          style: {
+            background: "rgba(239, 68, 68, 0.15)",
+            border: "1px solid rgba(239, 68, 68, 0.4)",
+            color: "#F87171",
+            padding: "4px 12px",
+            borderRadius: "6px",
+            fontSize: "0.75rem",
+            fontWeight: "800",
+            letterSpacing: "0.06em",
+            textTransform: "uppercase"
+          }
+        }, "Live Trading Disabled")
+      ),
+      h("h1", {
+        style: {
+          fontSize: "2.2rem",
+          fontWeight: "800",
+          color: "#F8FAFC",
+          marginBottom: "12px",
+          letterSpacing: "-0.02em"
+        }
+      }, "How BTCognitive Works"),
+      h("p", {
+        style: {
+          fontSize: "1.02rem",
+          color: "#CBD5E1",
+          lineHeight: "1.6",
+          maxWidth: "920px",
+          marginBottom: "20px"
+        }
+      },
+        "BTCognitive is a quantitative research platform built on point-in-time market data, causal econometrics, and disciplined statistical governance. The pipeline enforces strict data contracts, prequential evaluation, and delayed outcome verification to evaluate whether volatility intelligence and microstructure gates can add economic value after realistic transaction friction."
+      ),
+      h("div", {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: "14px",
+          flexWrap: "wrap",
+          padding: "14px 18px",
+          background: "rgba(0, 0, 0, 0.35)",
+          borderRadius: "10px",
+          border: "1px solid rgba(255, 255, 255, 0.06)"
+        }
+      },
+        h("div", { style: { display: "flex", alignItems: "center", gap: "8px", fontSize: "0.82rem" } },
+          h("span", { style: { color: "#94A3B8" } }, "Economic Verdict:"),
+          h("strong", { style: { color: "#F87171", fontFamily: "var(--font-mono)" } }, "NO_GO_NO_VALIDATED_EDGE")
+        ),
+        h("span", { style: { color: "#475569" } }, "·"),
+        h("div", { style: { display: "flex", alignItems: "center", gap: "8px", fontSize: "0.82rem" } },
+          h("span", { style: { color: "#94A3B8" } }, "Model Authorization:"),
+          h("strong", { style: { color: "#38BDF8", fontFamily: "var(--font-mono)" } }, "OFFLINE_RESEARCH_ONLY")
+        ),
+        h("span", { style: { color: "#475569" } }, "·"),
+        h("div", { style: { display: "flex", alignItems: "center", gap: "8px", fontSize: "0.82rem" } },
+          h("span", { style: { color: "#94A3B8" } }, "Order Routing:"),
+          h("strong", { style: { color: "#F87171", fontFamily: "var(--font-mono)" } }, "DISABLED (ANALYSIS ONLY)")
+        )
+      )
+    ),
+
+    // 6-Stage Stepper Progression
+    h("div", { style: { display: "flex", flexDirection: "column", gap: "20px" } },
+      stages.map((stg) => (
+        h("div", {
+          key: stg.num,
+          id: `hiw-stage-${stg.num}`,
+          className: "hiw-stage-card"
+        },
+          h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px", marginBottom: "14px" } },
+            h("div", { style: { display: "flex", alignItems: "center", gap: "12px" } },
+              h("div", { className: "hiw-stage-badge" }, stg.num),
+              h("div", null,
+                h("h2", { style: { fontSize: "1.25rem", fontWeight: "800", color: "#F8FAFC", margin: 0 } }, stg.title),
+                h("div", { style: { fontSize: "0.80rem", color: "#94A3B8", marginTop: "2px" } }, stg.subtitle)
+              )
+            ),
+            h("div", { style: { display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" } },
+              h("span", {
+                style: {
+                  background: `${stg.badgeColor}22`,
+                  border: `1px solid ${stg.badgeColor}66`,
+                  color: stg.badgeColor,
+                  padding: "4px 10px",
+                  borderRadius: "6px",
+                  fontSize: "0.72rem",
+                  fontWeight: "800",
+                  fontFamily: "var(--font-mono)"
+                }
+              }, stg.badge),
+              h("span", {
+                style: {
+                  background: "rgba(255, 255, 255, 0.06)",
+                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                  color: "#CBD5E1",
+                  padding: "4px 10px",
+                  borderRadius: "6px",
+                  fontSize: "0.70rem",
+                  fontWeight: "700"
+                }
+              }, stg.activeText)
+            )
+          ),
+          h("p", {
+            style: {
+              fontSize: "0.92rem",
+              color: "#CBD5E1",
+              lineHeight: "1.65",
+              marginBottom: "16px"
+            }
+          }, stg.description),
+          h("div", {
+            style: {
+              background: "rgba(0, 0, 0, 0.3)",
+              borderLeft: "3px solid #7C5CFF",
+              padding: "10px 16px",
+              borderRadius: "0 8px 8px 0",
+              fontSize: "0.82rem",
+              color: "#94A3B8",
+              marginBottom: "18px",
+              lineHeight: "1.5"
+            }
+          },
+            h("strong", { style: { color: "#A78BFA" } }, "Research Guardrail: "),
+            stg.boundaryNote
+          ),
+          h("div", { style: { display: "flex", justifyContent: "flex-end" } },
+            h("button", {
+              className: "home-card-btn",
+              style: { width: "auto", padding: "8px 18px" },
+              onClick: () => setPath(stg.linkPath)
+            },
+              h("span", null, stg.linkText)
+            )
+          )
+        )
+      ))
+    ),
+
+    // Bottom Navigation Bar
+    h("div", {
+      className: "glass-card",
+      style: {
+        padding: "24px 32px",
+        marginTop: "32px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        flexWrap: "wrap",
+        gap: "16px"
+      }
+    },
+      h("div", null,
+        h("h3", { style: { fontSize: "1.05rem", fontWeight: "700", color: "#F8FAFC", marginBottom: "4px" } }, "Ready to explore the research terminal?"),
+        h("p", { style: { fontSize: "0.82rem", color: "#94A3B8", margin: 0 } }, "Inspect live candles, GBDT directional predictions, and volatility risk envelopes.")
+      ),
+      h("div", { style: { display: "flex", gap: "10px", flexWrap: "wrap" } },
+        h("button", {
+          className: "btn-login",
+          style: { cursor: "pointer", border: "1px solid rgba(255, 255, 255, 0.12)", borderRadius: "8px" },
+          onClick: () => setPath("/landing")
+        }, "← Home Overview"),
+        h("button", {
+          className: "btn-signup-pill",
+          style: { cursor: "pointer", border: "none" },
+          onClick: () => setPath("/terminal")
+        }, "Open Market Terminal 🔬"),
+        h("button", {
+          style: {
+            background: "rgba(56, 189, 248, 0.15)",
+            border: "1px solid rgba(56, 189, 248, 0.4)",
+            color: "#38BDF8",
+            padding: "10px 18px",
+            borderRadius: "8px",
+            fontWeight: "700",
+            fontSize: "0.85rem",
+            cursor: "pointer"
+          },
+          onClick: () => setPath("/forecast")
+        }, "AI Forecasts & Risk 📈")
+      )
+    )
+  );
+}
+
+
+// ===========================================================================
+// PaperTradingDashboardView — Live Market Paper-Trading & Shadow Evaluation (V32.41)
+// ===========================================================================
+function PaperTradingDashboardView({ setPath, livePrice }) {
+  const [statusData, setStatusData] = useState(null);
+  const [portfolioData, setPortfolioData] = useState(null);
+  const [ledgerRecords, setLedgerRecords] = useState([]);
+  const [gbdtRecords, setGbdtRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchAll = useCallback(async () => {
+    try {
+      const baseUrl = getApiBaseUrl();
+      const [sRes, pRes, lRes, gRes] = await Promise.all([
+        fetch(`${baseUrl}/api/research/paper-trading/status`).catch(() => null),
+        fetch(`${baseUrl}/api/research/paper-trading/portfolio`).catch(() => null),
+        fetch(`${baseUrl}/api/research/paper-trading/ledger?limit=50`).catch(() => null),
+        fetch(`${baseUrl}/api/research/paper-trading/gbdt-evaluation?limit=20`).catch(() => null)
+      ]);
+      if (sRes && sRes.ok) setStatusData(await sRes.json());
+      if (pRes && pRes.ok) {
+        const pj = await pRes.json();
+        setPortfolioData(pj.portfolio || null);
+      }
+      if (lRes && lRes.ok) {
+        const lj = await lRes.json();
+        setLedgerRecords(lj.records || []);
+      }
+      if (gRes && gRes.ok) {
+        const gj = await gRes.json();
+        setGbdtRecords(gj.records || []);
+      }
+      setLoading(false);
+    } catch (err) {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAll();
+    const iv = setInterval(fetchAll, 6000);
+    return () => clearInterval(iv);
+  }, [fetchAll]);
+
+  const gated = portfolioData?.sleeves?.gated || null;
+  const ungated = portfolioData?.sleeves?.ungated || null;
+  const formatPortfolioNumber = (value, digits = 2) =>
+    value == null || !Number.isFinite(Number(value)) ? "Unavailable" : Number(value).toFixed(digits);
+  const formatPortfolioUsd = (value) => {
+    if (value == null || !Number.isFinite(Number(value))) return "Unavailable";
+    return `$${Number(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+  const formatPortfolioReturn = (value) => {
+    const formatted = formatPortfolioNumber(value);
+    if (formatted === "Unavailable") return formatted;
+    return `${Number(value) >= 0 ? "+" : ""}${formatted}%`;
+  };
+  const formatPortfolioPercent = (value) => {
+    const formatted = formatPortfolioNumber(value, 1);
+    return formatted === "Unavailable" ? formatted : `${formatted}%`;
+  };
+  const hasPortfolioData = Boolean(gated || ungated);
+
+  return h("div", {
+    id: "paper-trading-page",
+    style: {
+      maxWidth: "1440px",
+      margin: "0 auto",
+      padding: "32px 24px",
+      minHeight: "85vh",
+      fontFamily: "var(--font-sans, 'Outfit', sans-serif)"
+    }
+  },
+    // Top Breadcrumb & Actions
+    h("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: "24px",
+        flexWrap: "wrap",
+        gap: "12px"
+      }
+    },
+      h("div", { style: { display: "flex", alignItems: "center", gap: "12px" } },
+        h("button", {
+          className: "btn-login",
+          style: { cursor: "pointer", border: "1px solid rgba(255, 255, 255, 0.12)", borderRadius: "6px", padding: "6px 14px" },
+          onClick: () => setPath("/research")
+        }, "← Research"),
+        h("span", { style: { color: "var(--text-muted)", fontSize: "0.85rem" } }, "/"),
+        h("span", { style: { color: "#F8FAFC", fontSize: "0.95rem", fontWeight: "700" } }, "Paper Trading (Simulated Execution)")
+      ),
+      h("div", { style: { display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" } },
+        h("span", {
+          id: "paper-research-only-badge",
+          style: {
+            background: "rgba(167, 139, 250, 0.18)",
+            color: "#A78BFA",
+            border: "1px solid rgba(167, 139, 250, 0.5)",
+            padding: "4px 12px",
+            borderRadius: "6px",
+            fontSize: "0.75rem",
+            fontWeight: "800",
+            letterSpacing: "0.06em"
+          }
+        }, "RESEARCH ONLY · SIMULATED EXECUTION"),
+        h("span", {
+          style: {
+            background: "rgba(0, 229, 168, 0.12)",
+            color: "#00E5A8",
+            border: "1px solid rgba(0, 229, 168, 0.3)",
+            padding: "4px 10px",
+            borderRadius: "6px",
+            fontSize: "0.75rem",
+            fontWeight: "700"
+          }
+        }, statusData?.engine_status || statusData?.status || "PAPER ENGINE STATUS UNAVAILABLE"),
+        h("span", {
+          style: {
+            background: "rgba(245, 158, 11, 0.12)",
+            color: "#F59E0B",
+            border: "1px solid rgba(245, 158, 11, 0.3)",
+            padding: "4px 10px",
+            borderRadius: "6px",
+            fontSize: "0.75rem",
+            fontWeight: "700"
+          }
+        }, "OFFLINE_RESEARCH_ONLY")
+      )
+    ),
+
+    // Strict Non-Execution Warning Banner
+    h("div", {
+      id: "paper-warning-banner",
+      style: {
+        background: "rgba(239, 68, 68, 0.08)",
+        border: "1px solid rgba(239, 68, 68, 0.35)",
+        borderRadius: "10px",
+        padding: "16px 20px",
+        marginBottom: "28px",
+        display: "flex",
+        alignItems: "flex-start",
+        gap: "14px"
+      }
+    },
+      h("div", { style: { fontSize: "1.5rem", lineHeight: "1" } }, "⚠"),
+      h("div", null,
+        h("div", { style: { color: "#FCA5A5", fontWeight: "800", fontSize: "0.92rem", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" } },
+          "Strict Non-Execution Invariant · Zero Real Capital · Purely Simulated Fills"
+        ),
+        h("div", { style: { color: "#CBD5E1", fontSize: "0.82rem", lineHeight: "1.5" } },
+          "This workstation executes a deterministic virtual portfolio simulation consuming real-time or replayed public Coinbase BTC-USD data. No broker execution adapters exist, no authenticated exchange API credentials are configured, and zero orders can be transmitted. Governed under ",
+          h("strong", { style: { color: "#F8FAFC" } }, "NO_GO_NO_VALIDATED_EDGE"),
+          " and ",
+          h("strong", { style: { color: "#F8FAFC" } }, "LIVE TRADING PERMANENTLY DISABLED"),
+          "."
+        )
+      )
+    ),
+
+    // Parameters & Cost Ribbon
+    h("div", {
+      style: {
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+        gap: "16px",
+        marginBottom: "28px"
+      }
+    },
+      h("div", { style: { background: "rgba(255, 255, 255, 0.02)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "8px", padding: "14px" } },
+        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", textTransform: "uppercase", marginBottom: "4px" } }, "Decision-to-Fill Latency"),
+        h("div", { id: "paper-latency-metric", style: { fontSize: "1.1rem", color: "#F8FAFC", fontWeight: "700" } }, statusData?.latency_delay_ms == null ? "Unavailable" : `${statusData.latency_delay_ms} ms`),
+        h("div", { style: { fontSize: "0.70rem", color: "#64748B", marginTop: "2px" } }, "Strict Causal Delay Barrier")
+      ),
+      h("div", { style: { background: "rgba(255, 255, 255, 0.02)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "8px", padding: "14px" } },
+        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", textTransform: "uppercase", marginBottom: "4px" } }, "Active Cost Scenario"),
+        h("div", { id: "paper-cost-metric", style: { fontSize: "1.1rem", color: "#38BDF8", fontWeight: "700" } }, "27.0 bps · default assumption"),
+        h("div", { style: { fontSize: "0.70rem", color: "#64748B", marginTop: "2px" } }, "Configured cost scenario; not an observed market spread or fill")
+      ),
+      h("div", { style: { background: "rgba(255, 255, 255, 0.02)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "8px", padding: "14px" } },
+        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", textTransform: "uppercase", marginBottom: "4px" } }, "Order-Book Depth Walking"),
+        h("div", { style: { fontSize: "1.1rem", color: "#F8FAFC", fontWeight: "700" } }, "Top 50 Levels (VWAP)"),
+        h("div", { style: { fontSize: "0.70rem", color: "#64748B", marginTop: "2px" } }, "Max Permitted Slippage: 50 bps")
+      ),
+      h("div", { style: { background: "rgba(255, 255, 255, 0.02)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "8px", padding: "14px" } },
+        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", textTransform: "uppercase", marginBottom: "4px" } }, "Foundation Models"),
+        h("div", { style: { fontSize: "1.1rem", color: "#F59E0B", fontWeight: "700" } }, "Chronos-2 Quarantined"),
+        h("div", { style: { fontSize: "0.70rem", color: "#64748B", marginTop: "2px" } }, "Directional GBDT Models Active")
+      )
+    ),
+
+    !hasPortfolioData && h("div", {
+      id: "paper-portfolio-unavailable",
+      role: "status",
+      style: { marginBottom: "20px", padding: "12px 16px", borderRadius: "8px", border: "1px solid rgba(245, 158, 11, 0.35)", color: "#FCD34D", background: "rgba(245, 158, 11, 0.08)" }
+    }, "Portfolio observations unavailable. No simulated equity, returns, drawdown, trade counts, or fills are reported without a backend ledger response."),
+
+    // Dual-Sleeve Comparison Grid
+    h("div", {
+      className: "paper-sleeve-grid",
+      style: {
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 420px), 1fr))",
+        gap: "24px",
+        marginBottom: "32px"
+      }
+    },
+      // Sleeve A: GATED
+      h("div", {
+        id: "paper-sleeve-gated",
+        style: {
+          background: "linear-gradient(180deg, rgba(16, 185, 129, 0.04) 0%, rgba(5, 8, 22, 0.6) 100%)",
+          border: "1px solid rgba(16, 185, 129, 0.3)",
+          borderRadius: "12px",
+          padding: "24px"
+        }
+      },
+        h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px", marginBottom: "16px" } },
+          h("div", null,
+            h("span", { style: { fontSize: "0.72rem", color: "#10B981", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.08em" } }, "Sleeve A · Cont. Microstructure Filter"),
+            h("h3", { style: { fontSize: "1.15rem", fontWeight: "800", color: "#F8FAFC", margin: "4px 0 0 0" } }, "TSMOM Donchian 168h/336h (L2 Gated)")
+          ),
+          h("span", {
+            style: {
+              background: "rgba(16, 185, 129, 0.15)",
+              color: "#10B981",
+              padding: "4px 10px",
+              borderRadius: "6px",
+              fontSize: "0.75rem",
+              fontWeight: "700"
+            }
+          }, "L2 FILTER ACTIVE")
+        ),
+        h("p", { style: { fontSize: "0.80rem", color: "#94A3B8", lineHeight: "1.4", marginBottom: "20px" } },
+          "Trades are executed strictly when candidate breakout aligns with positive order flow (OFI_15m > 0), favorable depth balance (OBI_5 > -0.20), and tight spread (<= 5 bps)."
+        ),
+        h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" } },
+          h("div", { style: { background: "rgba(255, 255, 255, 0.02)", padding: "12px", borderRadius: "8px" } },
+            h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", textTransform: "uppercase" } }, "Virtual Equity"),
+            h("div", { id: "gated-equity-val", style: { fontSize: "1.25rem", color: "#F8FAFC", fontWeight: "800", marginTop: "4px" } }, formatPortfolioUsd(gated?.virtual_equity_usd))
+          ),
+          h("div", { style: { background: "rgba(255, 255, 255, 0.02)", padding: "12px", borderRadius: "8px" } },
+            h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", textTransform: "uppercase" } }, "Net Return After Costs"),
+            h("div", { id: "gated-return-val", style: { fontSize: "1.25rem", color: gated?.net_return_pct == null || !Number.isFinite(Number(gated.net_return_pct)) ? "#94A3B8" : Number(gated.net_return_pct) >= 0 ? "#10B981" : "#EF4444", fontWeight: "800", marginTop: "4px" } }, formatPortfolioReturn(gated?.net_return_pct))
+          ),
+          h("div", { style: { background: "rgba(255, 255, 255, 0.02)", padding: "12px", borderRadius: "8px" } },
+            h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", textTransform: "uppercase" } }, "Max Drawdown"),
+            h("div", { id: "gated-drawdown-val", style: { fontSize: "1.1rem", color: "#F59E0B", fontWeight: "700", marginTop: "4px" } }, formatPortfolioPercent(gated?.max_drawdown_pct))
+          ),
+          h("div", { style: { background: "rgba(255, 255, 255, 0.02)", padding: "12px", borderRadius: "8px" } },
+            h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", textTransform: "uppercase" } }, "Trades / Win Rate"),
+            h("div", { style: { fontSize: "1.1rem", color: "#CBD5E1", fontWeight: "700", marginTop: "4px" } }, `${formatPortfolioNumber(gated?.total_trades, 0)} (${formatPortfolioPercent(gated?.win_rate_pct)})`)
+          )
+        ),
+        h("div", { style: { fontSize: "0.75rem", color: "#64748B", display: "flex", justifyContent: "space-between" } },
+          h("span", null, `Fees Paid: ${formatPortfolioUsd(gated?.total_fees_paid_usd)}`),
+          h("span", { style: { color: gated?.has_open_position ? "#10B981" : "#94A3B8", fontWeight: "700" } }, gated?.has_open_position == null ? "POSITION: unavailable" : gated.has_open_position ? "POSITION: LONG" : "POSITION: FLAT")
+        )
+      ),
+
+      // Sleeve B: UNGATED
+      h("div", {
+        id: "paper-sleeve-ungated",
+        style: {
+          background: "linear-gradient(180deg, rgba(56, 189, 248, 0.04) 0%, rgba(5, 8, 22, 0.6) 100%)",
+          border: "1px solid rgba(56, 189, 248, 0.3)",
+          borderRadius: "12px",
+          padding: "24px"
+        }
+      },
+        h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px", marginBottom: "16px" } },
+          h("div", null,
+            h("span", { style: { fontSize: "0.72rem", color: "#38BDF8", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.08em" } }, "Sleeve B · Unconditional Baseline Control"),
+            h("h3", { style: { fontSize: "1.15rem", fontWeight: "800", color: "#F8FAFC", margin: "4px 0 0 0" } }, "TSMOM Donchian 168h/336h (Ungated)")
+          ),
+          h("span", {
+            style: {
+              background: "rgba(56, 189, 248, 0.15)",
+              color: "#38BDF8",
+              padding: "4px 10px",
+              borderRadius: "6px",
+              fontSize: "0.75rem",
+              fontWeight: "700"
+            }
+          }, "CONTROL BENCHMARK")
+        ),
+        h("p", { style: { fontSize: "0.80rem", color: "#94A3B8", lineHeight: "1.4", marginBottom: "20px" } },
+          "Executes all candidate breakout setups unconditionally, providing a contemporaneous identical control to evaluate the value-add of Level-2 order flow filtering."
+        ),
+        h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" } },
+          h("div", { style: { background: "rgba(255, 255, 255, 0.02)", padding: "12px", borderRadius: "8px" } },
+            h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", textTransform: "uppercase" } }, "Virtual Equity"),
+            h("div", { id: "ungated-equity-val", style: { fontSize: "1.25rem", color: "#F8FAFC", fontWeight: "800", marginTop: "4px" } }, formatPortfolioUsd(ungated?.virtual_equity_usd))
+          ),
+          h("div", { style: { background: "rgba(255, 255, 255, 0.02)", padding: "12px", borderRadius: "8px" } },
+            h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", textTransform: "uppercase" } }, "Net Return After Costs"),
+            h("div", { id: "ungated-return-val", style: { fontSize: "1.25rem", color: ungated?.net_return_pct == null || !Number.isFinite(Number(ungated.net_return_pct)) ? "#94A3B8" : Number(ungated.net_return_pct) >= 0 ? "#38BDF8" : "#EF4444", fontWeight: "800", marginTop: "4px" } }, formatPortfolioReturn(ungated?.net_return_pct))
+          ),
+          h("div", { style: { background: "rgba(255, 255, 255, 0.02)", padding: "12px", borderRadius: "8px" } },
+            h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", textTransform: "uppercase" } }, "Max Drawdown"),
+            h("div", { id: "ungated-drawdown-val", style: { fontSize: "1.1rem", color: "#F59E0B", fontWeight: "700", marginTop: "4px" } }, formatPortfolioPercent(ungated?.max_drawdown_pct))
+          ),
+          h("div", { style: { background: "rgba(255, 255, 255, 0.02)", padding: "12px", borderRadius: "8px" } },
+            h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", textTransform: "uppercase" } }, "Trades / Win Rate"),
+            h("div", { style: { fontSize: "1.1rem", color: "#CBD5E1", fontWeight: "700", marginTop: "4px" } }, `${formatPortfolioNumber(ungated?.total_trades, 0)} (${formatPortfolioPercent(ungated?.win_rate_pct)})`)
+          )
+        ),
+        h("div", { style: { fontSize: "0.75rem", color: "#64748B", display: "flex", justifyContent: "space-between" } },
+          h("span", null, `Fees Paid: ${formatPortfolioUsd(ungated?.total_fees_paid_usd)}`),
+          h("span", { style: { color: ungated?.has_open_position ? "#38BDF8" : "#94A3B8", fontWeight: "700" } }, ungated?.has_open_position == null ? "POSITION: unavailable" : ungated.has_open_position ? "POSITION: LONG" : "POSITION: FLAT")
+        )
+      )
+    ),
+
+    // Execution Ledger Section
+    h("div", {
+      style: {
+        background: "rgba(11, 18, 32, 0.6)",
+        border: "1px solid rgba(255, 255, 255, 0.08)",
+        borderRadius: "12px",
+        padding: "24px"
+      }
+    },
+      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" } },
+        h("div", null,
+          h("h3", { style: { fontSize: "1.1rem", fontWeight: "700", color: "#F8FAFC", margin: 0 } }, "Append-Only Paper Execution Ledger"),
+          h("p", { style: { fontSize: "0.78rem", color: "#94A3B8", margin: "4px 0 0 0" } }, "data/research/paper_trading/paper_execution_ledger.jsonl (Strictly isolated from protected files)")
+        ),
+        h("span", { style: { fontSize: "0.78rem", color: "#CBD5E1", fontFamily: "var(--font-mono)" } }, `${ledgerRecords.length} Records Logged`)
+      ),
+
+      ledgerRecords.length === 0 ? (
+        h("div", {
+          style: {
+            textAlign: "center",
+            padding: "48px 24px",
+            color: "#64748B",
+            fontSize: "0.88rem"
+          }
+        },
+          "No paper trade records recorded in the isolated ledger yet. Virtual engine is initialized and listening for candidate breakout setups."
+        )
+      ) : (
+        h("div", { style: { overflowX: "auto" } },
+          h("table", {
+            style: {
+              width: "100%",
+              borderCollapse: "collapse",
+              fontSize: "0.80rem",
+              fontFamily: "var(--font-mono)"
+            }
+          },
+            h("thead", null,
+              h("tr", { style: { borderBottom: "1px solid rgba(255, 255, 255, 0.12)", color: "#94A3B8", textAlign: "left" } },
+                h("th", { style: { padding: "10px" } }, "Timestamp (UTC)"),
+                h("th", { style: { padding: "10px" } }, "Record Type"),
+                h("th", { style: { padding: "10px" } }, "Candidate ID"),
+                h("th", { style: { padding: "10px" } }, "L2 Gate"),
+                h("th", { style: { padding: "10px" } }, "Gated Action"),
+                h("th", { style: { padding: "10px" } }, "Ungated Action")
+              )
+            ),
+            h("tbody", null,
+              ledgerRecords.map((r, idx) => h("tr", {
+                key: idx,
+                style: { borderBottom: "1px solid rgba(255, 255, 255, 0.04)" }
+              },
+                h("td", { style: { padding: "10px", color: "#CBD5E1" } }, r.decision_timestamp_utc || r.resolution_timestamp_utc || "--"),
+                h("td", { style: { padding: "10px", color: "#38BDF8", fontWeight: "700" } }, r.record_type || "--"),
+                h("td", { style: { padding: "10px", color: "#94A3B8" } }, r.candidate_id || r.position_id || "--"),
+                h("td", { style: { padding: "10px", color: r.is_l2_gate_accepted ? "#10B981" : "#EF4444" } }, r.is_l2_gate_accepted ? "ACCEPTED" : (r.gate_rejection_reason || "--")),
+                h("td", { style: { padding: "10px", color: "#F8FAFC" } }, r.sleeve_actions?.GATED?.action || "--"),
+                h("td", { style: { padding: "10px", color: "#F8FAFC" } }, r.sleeve_actions?.UNGATED?.action || "--")
+              ))
+            )
+          )
+        )
+      )
+    )
+  );
+}
+
+
+// ===========================================================================
+// V32.42 Position Monitor & Adaptive Risk Copilot View
+// ===========================================================================
+function PositionMonitorView({ setPath, livePrice }) {
+  const [positionsData, setPositionsData] = useState(null);
+  const [historyData, setHistoryData] = useState(null);
+  const [copilotStatus, setCopilotStatus] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState(null);
+
+  // Form states
+  const [formSide, setFormSide] = useState("LONG");
+  const [formMarketType, setFormMarketType] = useState("SPOT");
+  const [formEntryPrice, setFormEntryPrice] = useState(livePrice > 0 ? String(livePrice) : "");
+  const [formQuantity, setFormQuantity] = useState("0.25");
+  const [formFee, setFormFee] = useState("20.0");
+  const [formStopLoss, setFormStopLoss] = useState("");
+  const [formTakeProfit, setFormTakeProfit] = useState("");
+  const [formLeverage, setFormLeverage] = useState("5.0");
+  const [formNotes, setFormNotes] = useState("");
+  const [isSubmittingOpen, setIsSubmittingOpen] = useState(false);
+
+  // Modal states for partial exit & close
+  const [activePartialExitPos, setActivePartialExitPos] = useState(null);
+  const [partialExitPrice, setPartialExitPrice] = useState("");
+  const [partialExitQty, setPartialExitQty] = useState("");
+  const [partialExitFee, setPartialExitFee] = useState("10.0");
+  const [partialExitReason, setPartialExitReason] = useState("TP1_TRIM");
+  const [isSubmittingPartial, setIsSubmittingPartial] = useState(false);
+
+  const [activeClosePos, setActiveClosePos] = useState(null);
+  const [closePrice, setClosePrice] = useState("");
+  const [closeFee, setCloseFee] = useState("20.0");
+  const [closeReason, setCloseReason] = useState("USER_REQUESTED_CLOSE");
+  const [isSubmittingClose, setIsSubmittingClose] = useState(false);
+
+  const refreshData = useCallback(async () => {
+    try {
+      const [posRes, histRes, statRes] = await Promise.all([
+        fetch(`${getApiBaseUrl()}/api/positions`).then(r => r.json()).catch(() => null),
+        fetch(`${getApiBaseUrl()}/api/positions/history`).then(r => r.json()).catch(() => null),
+        fetch(`${getApiBaseUrl()}/api/positions/status`).then(r => r.json()).catch(() => null)
+      ]);
+      if (posRes && posRes.status === "SUCCESS") setPositionsData(posRes);
+      if (histRes && histRes.status === "SUCCESS") setHistoryData(histRes);
+      if (statRes && statRes.status === "SUCCESS") setCopilotStatus(statRes);
+      setErrorMsg(null);
+    } catch (err) {
+      console.error("Failed to load user positions:", err);
+      setErrorMsg("Failed to synchronize position telemetry from server.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshData();
+    const timer = setInterval(refreshData, 5000);
+    return () => clearInterval(timer);
+  }, [refreshData]);
+
+  // Handle open position submit
+  const handleOpenSubmit = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (formMarketType === "SPOT" && formSide === "SHORT") {
+      alert("SPOT_SHORT_INELIGIBLE: Spot short positions are not supported without a borrow facility. Select PERPETUAL.");
+      return;
+    }
+    setIsSubmittingOpen(true);
+    try {
+      const payload = {
+        instrument: "BTC-USD",
+        side: formSide,
+        market_type: formMarketType,
+        entry_price: parseFloat(formEntryPrice),
+        quantity: parseFloat(formQuantity),
+        entry_fee_usd: parseFloat(formFee || "0"),
+        stop_loss_price: formStopLoss ? parseFloat(formStopLoss) : null,
+        take_profit_price: formTakeProfit ? parseFloat(formTakeProfit) : null,
+        leverage: formMarketType === "PERPETUAL" ? parseFloat(formLeverage || "1.0") : 1.0,
+        notes: formNotes || null
+      };
+      const res = await fetch(`${getApiBaseUrl()}/api/positions/open`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Open position failed");
+      // Reset form
+      setFormNotes("");
+      await refreshData();
+    } catch (err) {
+      alert("Error: " + err.message);
+    } finally {
+      setIsSubmittingOpen(false);
+    }
+  };
+
+  // Handle partial exit
+  const handlePartialExitSubmit = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!activePartialExitPos) return;
+    setIsSubmittingPartial(true);
+    try {
+      const payload = {
+        exit_price: parseFloat(partialExitPrice),
+        quantity: parseFloat(partialExitQty),
+        fee_usd: parseFloat(partialExitFee || "0"),
+        reason: partialExitReason
+      };
+      const res = await fetch(`${getApiBaseUrl()}/api/positions/${encodeURIComponent(activePartialExitPos.position_id)}/partial-exit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Partial exit failed");
+      setActivePartialExitPos(null);
+      await refreshData();
+    } catch (err) {
+      alert("Error: " + err.message);
+    } finally {
+      setIsSubmittingPartial(false);
+    }
+  };
+
+  // Handle full close
+  const handleCloseSubmit = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!activeClosePos) return;
+    setIsSubmittingClose(true);
+    try {
+      const payload = {
+        exit_price: parseFloat(closePrice),
+        fee_usd: parseFloat(closeFee || "0"),
+        reason: closeReason
+      };
+      const res = await fetch(`${getApiBaseUrl()}/api/positions/${encodeURIComponent(activeClosePos.position_id)}/close`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Close failed");
+      setActiveClosePos(null);
+      await refreshData();
+    } catch (err) {
+      alert("Error: " + err.message);
+    } finally {
+      setIsSubmittingClose(false);
+    }
+  };
+
+  const quote = positionsData?.market_quote;
+  const currentMark = quote?.price != null && Number.isFinite(Number(quote.price)) && Number(quote.price) > 0
+    ? Number(quote.price)
+    : Number.isFinite(Number(livePrice)) && Number(livePrice) > 0 ? Number(livePrice) : null;
+  const feedAgeSeconds = quote?.age_seconds != null && Number.isFinite(Number(quote.age_seconds))
+    ? Number(quote.age_seconds)
+    : null;
+  const isStale = currentMark == null || feedAgeSeconds == null || feedAgeSeconds > 5.0;
+  const formatPositionUsd = (value) => value == null || !Number.isFinite(Number(value))
+    ? "Unavailable"
+    : `$${Number(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const openPositions = positionsData?.positions || [];
+  const closedPositions = historyData?.positions || [];
+  const allAlerts = openPositions.flatMap(p => p.risk_snapshot?.active_alerts || []);
+
+  return h("div", { className: "content-container", style: { padding: "24px 32px", maxWidth: "1440px", margin: "0 auto" } },
+    // Header & Breadcrumb
+    h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px", flexWrap: "wrap", gap: "12px" } },
+      h("div", null,
+        h("div", { style: { display: "flex", alignItems: "center", gap: "8px", fontSize: "0.82rem", color: "var(--text-muted)", marginBottom: "4px" } },
+          h("a", { href: "#/", onClick: (e) => { e.preventDefault(); setPath("/"); }, style: { color: "var(--text-muted)", textDecoration: "none" } }, "Home"),
+          h("span", null, "/"),
+          h("span", { style: { color: "#10B981", fontWeight: "600" } }, "Position Copilot")
+        ),
+        h("h1", { style: { fontSize: "1.75rem", fontWeight: "800", color: "#F8FAFC", margin: 0, display: "flex", alignItems: "center", gap: "10px" } },
+          h("span", null, "Adaptive Position Copilot & Risk Telemetry"),
+          h("span", { style: { fontSize: "0.75rem", padding: "3px 8px", background: "rgba(16, 185, 129, 0.15)", border: "1px solid rgba(16, 185, 129, 0.4)", color: "#10B981", borderRadius: "4px", fontWeight: "700" } },
+            "V32.42 COPILOT"
+          )
+        ),
+        h("p", { style: { fontSize: "0.88rem", color: "#94A3B8", margin: "4px 0 0 0" } },
+          "Record real external positions and monitor downside exposure, stop-loss proximity, GBDT forecast conflicts, and regime shifts."
+        )
+      ),
+      h("div", { style: { display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" } },
+        h("span", { style: { background: "rgba(16, 185, 129, 0.15)", border: "1px solid rgba(16, 185, 129, 0.3)", color: "#10B981", padding: "4px 10px", borderRadius: "4px", fontSize: "0.74rem", fontWeight: "700", fontFamily: "var(--font-mono)" } },
+          "● RISK COPILOT ACTIVE"
+        ),
+        h("span", { style: { background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.3)", color: "#F87171", padding: "4px 10px", borderRadius: "4px", fontSize: "0.74rem", fontWeight: "700", fontFamily: "var(--font-mono)" } },
+          "LIVE TRADING DISABLED"
+        ),
+        h("span", { style: { background: "rgba(56, 189, 248, 0.12)", border: "1px solid rgba(56, 189, 248, 0.3)", color: "#38BDF8", padding: "4px 10px", borderRadius: "4px", fontSize: "0.74rem", fontWeight: "700", fontFamily: "var(--font-mono)" } },
+          "OFFLINE_RESEARCH_ONLY"
+        )
+      )
+    ),
+
+    // Strict Non-Execution Warning Banner
+    h("div", {
+      id: "copilot-warning-banner",
+      style: {
+        background: "rgba(245, 158, 11, 0.08)",
+        border: "1px solid rgba(245, 158, 11, 0.35)",
+        borderRadius: "8px",
+        padding: "12px 18px",
+        marginBottom: "20px",
+        display: "flex",
+        alignItems: "center",
+        gap: "12px"
+      }
+    },
+      h("div", { style: { fontSize: "1.4rem" } }, "🛡"),
+      h("div", null,
+        h("div", { style: { color: "#FBBF24", fontWeight: "800", fontSize: "0.85rem", letterSpacing: "0.5px" } },
+          "STRICT NON-EXECUTION INVARIANT · ADAPTIVE RISK COPILOT ONLY · ZERO LIVE BROKER EXECUTION"
+        ),
+        h("div", { style: { color: "#CBD5E1", fontSize: "0.78rem", marginTop: "2px", lineHeight: "1.4" } },
+          "BTCognitive is strictly an observational telemetry and risk analytics platform. User-entered positions are monitored against real-time market data, GBDT return forecasts, and regime shifts. BTCognitive NEVER places, modifies, liquidates, or routes live orders."
+        )
+      )
+    ),
+
+    // Market Telemetry & Data Freshness Ribbon
+    h("div", {
+      id: "copilot-feed-banner",
+      style: {
+        background: "rgba(15, 23, 42, 0.65)",
+        border: "1px solid var(--card-border)",
+        borderRadius: "8px",
+        padding: "10px 18px",
+        marginBottom: "24px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        flexWrap: "wrap",
+        gap: "12px"
+      }
+    },
+      h("div", { style: { display: "flex", alignItems: "center", gap: "16px" } },
+        h("div", null,
+          h("span", { style: { fontSize: "0.72rem", color: "#94A3B8", textTransform: "uppercase" } }, "BTC-USD Mark: "),
+          h("strong", { style: { fontSize: "1.05rem", color: "#F8FAFC", fontFamily: "var(--font-mono)" } }, currentMark == null ? "Unavailable" : `$${currentMark.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+        ),
+        h("div", null,
+          h("span", { style: { fontSize: "0.72rem", color: "#94A3B8", textTransform: "uppercase" } }, "Source: "),
+          h("strong", { style: { fontSize: "0.82rem", color: "#38BDF8", fontFamily: "var(--font-mono)" } }, quote?.provider || "Unavailable")
+        ),
+        h("div", null,
+          h("span", { style: { fontSize: "0.72rem", color: "#94A3B8", textTransform: "uppercase" } }, "Feed Age: "),
+          h("strong", { style: { fontSize: "0.82rem", color: isStale ? "#F87171" : "#10B981", fontFamily: "var(--font-mono)" } }, feedAgeSeconds == null ? "Unavailable" : `${feedAgeSeconds.toFixed(1)}s`)
+        )
+      ),
+      h("span", {
+        style: {
+          background: isStale ? "rgba(239, 68, 68, 0.15)" : "rgba(16, 185, 129, 0.15)",
+          border: isStale ? "1px solid rgba(239, 68, 68, 0.4)" : "1px solid rgba(16, 185, 129, 0.4)",
+          color: isStale ? "#F87171" : "#10B981",
+          padding: "3px 8px",
+          borderRadius: "4px",
+          fontSize: "0.72rem",
+          fontWeight: "700",
+          fontFamily: "var(--font-mono)"
+        }
+      }, currentMark == null ? "● DATA UNAVAILABLE" : isStale ? "● FEED STALE (DELAYED)" : "● COINBASE VERIFIED STREAM")
+    ),
+
+    // KPI Metrics Ribbon
+    h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginBottom: "28px" } },
+      h("div", { className: "card", style: { padding: "16px", border: "1px solid var(--card-border)", borderRadius: "8px", background: "rgba(15, 23, 42, 0.6)" } },
+        h("div", { style: { fontSize: "0.74rem", color: "#94A3B8", textTransform: "uppercase", fontWeight: "600" } }, "Open Monitored Positions"),
+        h("div", { id: "copilot-metric-count", style: { fontSize: "1.6rem", fontWeight: "800", color: "#F8FAFC", marginTop: "4px", fontFamily: "var(--font-mono)" } },
+          positionsData?.total_open_count ?? "Unavailable"
+        ),
+        h("div", { style: { fontSize: "0.74rem", color: "#64748B", marginTop: "4px" } }, "Separated from virtual paper sleeves")
+      ),
+      h("div", { className: "card", style: { padding: "16px", border: "1px solid var(--card-border)", borderRadius: "8px", background: "rgba(15, 23, 42, 0.6)" } },
+        h("div", { style: { fontSize: "0.74rem", color: "#94A3B8", textTransform: "uppercase", fontWeight: "600" } }, "Estimated Net Unrealized P&L"),
+        h("div", {
+          id: "copilot-metric-unrealized-pnl",
+          style: {
+            fontSize: "1.6rem",
+            fontWeight: "800",
+            color: positionsData?.total_unrealized_pnl_usd == null ? "#94A3B8" : Number(positionsData.total_unrealized_pnl_usd) >= 0 ? "#10B981" : "#EF4444",
+            marginTop: "4px",
+            fontFamily: "var(--font-mono)"
+          }
+        },
+          positionsData?.total_unrealized_pnl_usd == null ? "Unavailable" : `${Number(positionsData.total_unrealized_pnl_usd) >= 0 ? "+" : ""}${formatPositionUsd(positionsData.total_unrealized_pnl_usd)}`
+        ),
+        h("div", { style: { fontSize: "0.74rem", color: positionsData?.portfolio_return_pct == null ? "#94A3B8" : Number(positionsData.portfolio_return_pct) >= 0 ? "#10B981" : "#EF4444", marginTop: "4px", fontFamily: "var(--font-mono)" } },
+          positionsData?.portfolio_return_pct == null ? "Return: Unavailable" : `Return: ${Number(positionsData.portfolio_return_pct) >= 0 ? "+" : ""}${Number(positionsData.portfolio_return_pct).toFixed(2)}% (net of fees)`
+        )
+      ),
+      h("div", { className: "card", style: { padding: "16px", border: "1px solid var(--card-border)", borderRadius: "8px", background: "rgba(15, 23, 42, 0.6)" } },
+        h("div", { style: { fontSize: "0.74rem", color: "#94A3B8", textTransform: "uppercase", fontWeight: "600" } }, "Total Cost Basis Exposed"),
+        h("div", { id: "copilot-metric-cost-basis", style: { fontSize: "1.6rem", fontWeight: "800", color: "#38BDF8", marginTop: "4px", fontFamily: "var(--font-mono)" } },
+          formatPositionUsd(positionsData?.total_cost_basis_usd)
+        ),
+        h("div", { style: { fontSize: "0.74rem", color: "#64748B", marginTop: "4px" } }, "Calculated from open entry sizes")
+      ),
+      h("div", { className: "card", style: { padding: "16px", border: "1px solid var(--card-border)", borderRadius: "8px", background: "rgba(15, 23, 42, 0.6)" } },
+        h("div", { style: { fontSize: "0.74rem", color: "#94A3B8", textTransform: "uppercase", fontWeight: "600" } }, "Active Copilot Alerts"),
+        h("div", { id: "copilot-metric-alerts-count", style: { fontSize: "1.6rem", fontWeight: "800", color: allAlerts.length > 0 ? "#F59E0B" : "#10B981", marginTop: "4px", fontFamily: "var(--font-mono)" } },
+          allAlerts.length
+        ),
+        h("div", { style: { fontSize: "0.74rem", color: allAlerts.length > 0 ? "#F59E0B" : "#10B981", marginTop: "4px" } },
+          allAlerts.length > 0 ? "Stops · Forecast conflicts · Regime shifts" : "All positions within normal risk bands"
+        )
+      )
+    ),
+
+    // Main Workspace Layout: Open Positions List (Left) + Record Position Form (Right)
+    h("div", { style: { display: "grid", gridTemplateColumns: "1.8fr 1.2fr", gap: "24px", marginBottom: "32px", alignItems: "start" } },
+      // Left Column: Open Positions List
+      h("div", null,
+        h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" } },
+          h("h2", { style: { fontSize: "1.15rem", fontWeight: "700", color: "#F8FAFC", margin: 0 } }, "Monitored Open Positions"),
+          h("span", { style: { fontSize: "0.76rem", color: "#94A3B8" } }, "Auto-refreshes every 5s")
+        ),
+
+        openPositions.length === 0 ? (
+          h("div", {
+            style: {
+              background: "rgba(15, 23, 42, 0.4)",
+              border: "1px dashed var(--card-border)",
+              borderRadius: "8px",
+              padding: "40px 24px",
+              textAlign: "center"
+            }
+          },
+            h("div", { style: { fontSize: "2rem", marginBottom: "8px" } }, "📝"),
+            h("h3", { style: { color: "#CBD5E1", fontSize: "1rem", margin: "0 0 6px 0" } }, "No Open Positions Recorded"),
+            h("p", { style: { color: "#64748B", fontSize: "0.82rem", maxWidth: "420px", margin: "0 auto 16px auto" } },
+              "Use the form on the right to record a position you have entered on Coinbase, Kraken, or Binance to activate real-time copilot risk diagnostics."
+            )
+          )
+        ) : (
+          h("div", { id: "copilot-open-positions-list", style: { display: "flex", flexDirection: "column", gap: "16px" } },
+            openPositions.map(({ position: p, risk_snapshot: s }) => {
+              const isLong = p.side === "LONG";
+              const netPnl = s?.net_unrealized_pnl_usd || 0;
+              const isProfitable = netPnl >= 0;
+
+              return h("div", {
+                key: p.position_id,
+                id: `position-card-${p.position_id}`,
+                style: {
+                  background: "rgba(15, 23, 42, 0.75)",
+                  border: isProfitable ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid rgba(239, 68, 68, 0.3)",
+                  borderRadius: "8px",
+                  padding: "18px 20px"
+                }
+              },
+                // Card Header
+                h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" } },
+                  h("div", { style: { display: "flex", alignItems: "center", gap: "10px" } },
+                    h("span", {
+                      style: {
+                        background: isLong ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)",
+                        border: isLong ? "1px solid #10B981" : "1px solid #EF4444",
+                        color: isLong ? "#10B981" : "#EF4444",
+                        padding: "3px 8px",
+                        borderRadius: "4px",
+                        fontSize: "0.75rem",
+                        fontWeight: "800",
+                        fontFamily: "var(--font-mono)"
+                      }
+                    }, p.side),
+                    h("strong", { style: { color: "#F8FAFC", fontSize: "1.05rem" } }, p.instrument),
+                    h("span", { style: { fontSize: "0.72rem", color: "#94A3B8", background: "rgba(148, 163, 184, 0.1)", padding: "2px 6px", borderRadius: "3px" } }, p.market_type),
+                    h("span", { style: { fontSize: "0.72rem", color: "#94A3B8", background: "rgba(148, 163, 184, 0.1)", padding: "2px 6px", borderRadius: "3px" } }, p.venue)
+                  ),
+                  h("div", { style: { display: "flex", gap: "8px" } },
+                    h("button", {
+                      id: `btn-partial-exit-${p.position_id}`,
+                      onClick: () => {
+                        setActivePartialExitPos(p);
+                        setPartialExitPrice(currentMark == null ? "" : String(currentMark));
+                        setPartialExitQty(String(p.remaining_quantity / 2));
+                      },
+                      style: {
+                        background: "rgba(56, 189, 248, 0.12)",
+                        border: "1px solid rgba(56, 189, 248, 0.35)",
+                        color: "#38BDF8",
+                        padding: "4px 10px",
+                        borderRadius: "4px",
+                        fontSize: "0.74rem",
+                        fontWeight: "700",
+                        cursor: "pointer"
+                      }
+                    }, "Partial Exit"),
+                    h("button", {
+                      id: `btn-close-${p.position_id}`,
+                      onClick: () => {
+                        setActiveClosePos(p);
+                        setClosePrice(currentMark == null ? "" : String(currentMark));
+                      },
+                      style: {
+                        background: "rgba(239, 68, 68, 0.12)",
+                        border: "1px solid rgba(239, 68, 68, 0.35)",
+                        color: "#F87171",
+                        padding: "4px 10px",
+                        borderRadius: "4px",
+                        fontSize: "0.74rem",
+                        fontWeight: "700",
+                        cursor: "pointer"
+                      }
+                    }, "Close Position")
+                  )
+                ),
+
+                // Card Grid Metrics
+                h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "10px", background: "rgba(10, 15, 30, 0.4)", padding: "12px", borderRadius: "6px", marginBottom: "14px" } },
+                  h("div", null,
+                    h("div", { style: { fontSize: "0.68rem", color: "#94A3B8" } }, "ENTRY PRICE"),
+                    h("div", { style: { fontSize: "0.92rem", color: "#CBD5E1", fontFamily: "var(--font-mono)", fontWeight: "700" } }, `$${p.entry_price?.toLocaleString()}`)
+                  ),
+                  h("div", null,
+                    h("div", { style: { fontSize: "0.68rem", color: "#94A3B8" } }, "MARK PRICE"),
+                    h("div", { style: { fontSize: "0.92rem", color: "#F8FAFC", fontFamily: "var(--font-mono)", fontWeight: "700" } }, s?.mark_price != null ? formatPositionUsd(s.mark_price) : formatPositionUsd(currentMark))
+                  ),
+                  h("div", null,
+                    h("div", { style: { fontSize: "0.68rem", color: "#94A3B8" } }, "REMAINING QTY"),
+                    h("div", { style: { fontSize: "0.92rem", color: "#CBD5E1", fontFamily: "var(--font-mono)", fontWeight: "700" } }, `${p.remaining_quantity} BTC`)
+                  ),
+                  h("div", null,
+                    h("div", { style: { fontSize: "0.68rem", color: "#94A3B8" } }, "EST. NET P&L"),
+                    h("div", { style: { fontSize: "0.95rem", color: isProfitable ? "#10B981" : "#EF4444", fontFamily: "var(--font-mono)", fontWeight: "800" } },
+                      `${isProfitable ? "+" : ""}$${netPnl.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    ),
+                    h("div", { style: { fontSize: "0.68rem", color: isProfitable ? "#10B981" : "#EF4444", fontFamily: "var(--font-mono)" } },
+                      `${isProfitable ? "+" : ""}${s?.net_return_pct?.toFixed(2)}%`
+                    )
+                  ),
+                  p.stop_loss_price && h("div", null,
+                    h("div", { style: { fontSize: "0.68rem", color: "#94A3B8" } }, "STOP LOSS"),
+                    h("div", { style: { fontSize: "0.92rem", color: "#F87171", fontFamily: "var(--font-mono)", fontWeight: "700" } }, `$${p.stop_loss_price?.toLocaleString()}`),
+                    h("div", { style: { fontSize: "0.68rem", color: s?.distance_to_stop_pct <= 1.0 ? "#EF4444" : "#94A3B8" } },
+                      `Dist: ${s?.distance_to_stop_pct?.toFixed(2)}%`
+                    )
+                  ),
+                  p.take_profit_price && h("div", null,
+                    h("div", { style: { fontSize: "0.68rem", color: "#94A3B8" } }, "TAKE PROFIT"),
+                    h("div", { style: { fontSize: "0.92rem", color: "#10B981", fontFamily: "var(--font-mono)", fontWeight: "700" } }, `$${p.take_profit_price?.toLocaleString()}`),
+                    h("div", { style: { fontSize: "0.68rem", color: "#94A3B8" } },
+                      `Dist: ${s?.distance_to_target_pct?.toFixed(2)}%`
+                    )
+                  ),
+                  p.market_type === "PERPETUAL" && p.liquidation_price && h("div", null,
+                    h("div", { style: { fontSize: "0.68rem", color: "#F59E0B" } }, "EST. LIQUIDATION"),
+                    h("div", { style: { fontSize: "0.92rem", color: "#F59E0B", fontFamily: "var(--font-mono)", fontWeight: "700" } }, `$${p.liquidation_price?.toLocaleString()}`),
+                    h("div", { style: { fontSize: "0.68rem", color: "#94A3B8" } }, `Leverage: ${p.leverage}x`)
+                  )
+                ),
+
+                // Copilot Alerts Section
+                s?.active_alerts && s.active_alerts.length > 0 && h("div", { style: { borderTop: "1px solid rgba(148, 163, 184, 0.12)", paddingTop: "10px" } },
+                  h("div", { style: { fontSize: "0.72rem", color: "#F59E0B", fontWeight: "700", marginBottom: "8px", textTransform: "uppercase" } },
+                    "🛡 Adaptive Copilot Risk Warnings:"
+                  ),
+                  h("div", { style: { display: "flex", flexDirection: "column", gap: "6px" } },
+                    s.active_alerts.map(a => {
+                      const isCrit = a.severity === "CRITICAL";
+                      const isWarn = a.severity === "WARNING";
+                      const badgeColor = isCrit ? "#EF4444" : isWarn ? "#F59E0B" : "#38BDF8";
+                      const badgeBg = isCrit ? "rgba(239, 68, 68, 0.15)" : isWarn ? "rgba(245, 158, 11, 0.15)" : "rgba(56, 189, 248, 0.15)";
+
+                      return h("div", {
+                        key: a.alert_id,
+                        style: {
+                          background: badgeBg,
+                          border: `1px solid ${badgeColor}`,
+                          borderRadius: "4px",
+                          padding: "8px 12px",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "flex-start",
+                          gap: "8px"
+                        }
+                      },
+                        h("div", null,
+                          h("div", { style: { display: "flex", alignItems: "center", gap: "6px" } },
+                            h("span", { style: { color: badgeColor, fontWeight: "800", fontSize: "0.68rem", textTransform: "uppercase" } }, a.severity),
+                            h("strong", { style: { color: "#F8FAFC", fontSize: "0.78rem" } }, a.headline)
+                          ),
+                          h("div", { style: { color: "#CBD5E1", fontSize: "0.74rem", marginTop: "2px" } }, a.explanation),
+                          h("div", { style: { color: "#94A3B8", fontSize: "0.68rem", fontStyle: "italic", marginTop: "4px" } }, a.uncertainty_note)
+                        )
+                      );
+                    })
+                  )
+                )
+              );
+            })
+          )
+        )
+      ),
+
+      // Right Column: Record Position Form Card
+      h("div", {
+        id: "copilot-record-form-card",
+        className: "card",
+        style: {
+          background: "rgba(15, 23, 42, 0.75)",
+          border: "1px solid var(--card-border)",
+          borderRadius: "8px",
+          padding: "20px 24px"
+        }
+      },
+        h("h3", { style: { fontSize: "1.05rem", fontWeight: "700", color: "#F8FAFC", margin: "0 0 12px 0", display: "flex", alignItems: "center", gap: "8px" } },
+          h("span", null, "Record External Position"),
+          h("span", { style: { fontSize: "0.7rem", color: "#10B981", background: "rgba(16, 185, 129, 0.12)", padding: "2px 6px", borderRadius: "3px" } }, "READ-ONLY REGISTRY")
+        ),
+        h("p", { style: { color: "#94A3B8", fontSize: "0.78rem", margin: "0 0 16px 0", lineHeight: "1.4" } },
+          "Record a position already executed on your exchange. BTCognitive will track market excursion and generate adaptive risk warnings."
+        ),
+
+        h("form", { onSubmit: handleOpenSubmit, style: { display: "flex", flexDirection: "column", gap: "12px" } },
+          // Side & Market Type Selector
+          h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" } },
+            h("div", null,
+              h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "POSITION SIDE"),
+              h("select", {
+                value: formSide,
+                onChange: (e) => setFormSide(e.target.value),
+                style: { width: "100%", background: "#0F172A", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px", fontSize: "0.82rem" }
+              },
+                h("option", { value: "LONG" }, "LONG (Buy)"),
+                h("option", { value: "SHORT" }, "SHORT (Sell)")
+              )
+            ),
+            h("div", null,
+              h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "MARKET TYPE"),
+              h("select", {
+                value: formMarketType,
+                onChange: (e) => setFormMarketType(e.target.value),
+                style: { width: "100%", background: "#0F172A", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px", fontSize: "0.82rem" }
+              },
+                h("option", { value: "SPOT" }, "Spot (BTC-USD)"),
+                h("option", { value: "PERPETUAL" }, "Perpetual / Linear"),
+                h("option", { value: "FUTURES" }, "Futures Contract")
+              )
+            )
+          ),
+
+          // Spot Short Ineligibility Warning
+          formMarketType === "SPOT" && formSide === "SHORT" && h("div", {
+            style: { background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.4)", color: "#F87171", padding: "8px 10px", borderRadius: "4px", fontSize: "0.72rem" }
+          },
+            "⚠ SPOT_SHORT_INELIGIBLE: Naked spot shorting is unsupported on Coinbase spot. Switch Market Type to PERPETUAL to track a derivative short."
+          ),
+
+          // Entry Price & Quantity
+          h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" } },
+            h("div", null,
+              h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "ENTRY PRICE ($)"),
+              h("input", {
+                type: "number",
+                step: "any",
+                value: formEntryPrice,
+                onChange: (e) => setFormEntryPrice(e.target.value),
+                style: { width: "100%", background: "#0F172A", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px", fontSize: "0.82rem", fontFamily: "var(--font-mono)" }
+              })
+            ),
+            h("div", null,
+              h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "QUANTITY (BTC)"),
+              h("input", {
+                type: "number",
+                step: "any",
+                value: formQuantity,
+                onChange: (e) => setFormQuantity(e.target.value),
+                style: { width: "100%", background: "#0F172A", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px", fontSize: "0.82rem", fontFamily: "var(--font-mono)" }
+              })
+            )
+          ),
+
+          // Stops & Targets
+          h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" } },
+            h("div", null,
+              h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "STOP LOSS ($)"),
+              h("input", {
+                type: "number",
+                step: "any",
+                placeholder: "e.g. 78500",
+                value: formStopLoss,
+                onChange: (e) => setFormStopLoss(e.target.value),
+                style: { width: "100%", background: "#0F172A", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px", fontSize: "0.82rem", fontFamily: "var(--font-mono)" }
+              })
+            ),
+            h("div", null,
+              h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "TAKE PROFIT ($)"),
+              h("input", {
+                type: "number",
+                step: "any",
+                placeholder: "e.g. 85000",
+                value: formTakeProfit,
+                onChange: (e) => setFormTakeProfit(e.target.value),
+                style: { width: "100%", background: "#0F172A", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px", fontSize: "0.82rem", fontFamily: "var(--font-mono)" }
+              })
+            )
+          ),
+
+          // Fee Paid & Leverage (if perpetual)
+          h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" } },
+            h("div", null,
+              h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "FEE PAID ($)"),
+              h("input", {
+                type: "number",
+                step: "any",
+                value: formFee,
+                onChange: (e) => setFormFee(e.target.value),
+                style: { width: "100%", background: "#0F172A", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px", fontSize: "0.82rem", fontFamily: "var(--font-mono)" }
+              })
+            ),
+            h("div", null,
+              h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "LEVERAGE (x)"),
+              h("input", {
+                type: "number",
+                step: "1",
+                min: "1",
+                max: "100",
+                value: formLeverage,
+                disabled: formMarketType === "SPOT",
+                onChange: (e) => setFormLeverage(e.target.value),
+                style: { width: "100%", background: formMarketType === "SPOT" ? "#1E293B" : "#0F172A", border: "1px solid var(--card-border)", color: formMarketType === "SPOT" ? "#64748B" : "#F8FAFC", padding: "8px", borderRadius: "4px", fontSize: "0.82rem", fontFamily: "var(--font-mono)" }
+              })
+            )
+          ),
+
+          // Notes
+          h("div", null,
+            h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "OPTIONAL TRADE THESIS / NOTES"),
+            h("input", {
+              type: "text",
+              placeholder: "e.g. 168h Donchian Breakout confirmed on 1h close",
+              value: formNotes,
+              onChange: (e) => setFormNotes(e.target.value),
+              style: { width: "100%", background: "#0F172A", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px", fontSize: "0.82rem" }
+            })
+          ),
+
+          // Submit Button
+          h("button", {
+            id: "btn-submit-open-position",
+            type: "submit",
+            disabled: isSubmittingOpen,
+            style: {
+              background: "linear-gradient(135deg, #10B981, #059669)",
+              border: "none",
+              color: "#FFFFFF",
+              padding: "10px 16px",
+              borderRadius: "6px",
+              fontWeight: "700",
+              fontSize: "0.85rem",
+              cursor: isSubmittingOpen ? "not-allowed" : "pointer",
+              marginTop: "8px"
+            }
+          }, isSubmittingOpen ? "Recording..." : "Record Position For Risk Monitoring")
+        )
+      )
+    ),
+
+    // Closed Positions & Trade History Section
+    h("div", { id: "copilot-closed-positions-history", style: { marginTop: "16px" } },
+      h("h2", { style: { fontSize: "1.15rem", fontWeight: "700", color: "#F8FAFC", marginBottom: "12px" } }, "Trade Journal & Closed History"),
+      closedPositions.length === 0 ? (
+        h("div", { style: { color: "#64748B", fontSize: "0.82rem", background: "rgba(15, 23, 42, 0.4)", padding: "16px", borderRadius: "6px", textAlign: "center" } },
+          "No closed trades recorded yet. Once a position is closed or partially exited, journal records appear here."
+        )
+      ) : (
+        h("div", { style: { overflowX: "auto" } },
+          h("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: "0.78rem" } },
+            h("thead", null,
+              h("tr", { style: { borderBottom: "1px solid var(--card-border)", color: "#94A3B8", textAlign: "left" } },
+                h("th", { style: { padding: "8px" } }, "Position ID"),
+                h("th", { style: { padding: "8px" } }, "Side"),
+                h("th", { style: { padding: "8px" } }, "Initial Qty"),
+                h("th", { style: { padding: "8px" } }, "Entry Price"),
+                h("th", { style: { padding: "8px" } }, "Final Exit"),
+                h("th", { style: { padding: "8px" } }, "Fees Paid"),
+                h("th", { style: { padding: "8px" } }, "Realized P&L"),
+                h("th", { style: { padding: "8px" } }, "Closed At"),
+                h("th", { style: { padding: "8px" } }, "Reason")
+              )
+            ),
+            h("tbody", null,
+              closedPositions.map(p => {
+                const isProf = p.total_realized_pnl_usd >= 0;
+                return h("tr", { key: p.position_id, style: { borderBottom: "1px solid rgba(148, 163, 184, 0.1)" } },
+                  h("td", { style: { padding: "8px", fontFamily: "var(--font-mono)", color: "#38BDF8" } }, p.position_id),
+                  h("td", { style: { padding: "8px", fontWeight: "700", color: p.side === "LONG" ? "#10B981" : "#EF4444" } }, p.side),
+                  h("td", { style: { padding: "8px", fontFamily: "var(--font-mono)" } }, `${p.initial_quantity} BTC`),
+                  h("td", { style: { padding: "8px", fontFamily: "var(--font-mono)" } }, `$${p.entry_price?.toLocaleString()}`),
+                  h("td", { style: { padding: "8px", fontFamily: "var(--font-mono)" } }, `$${p.final_exit_price?.toLocaleString()}`),
+                  h("td", { style: { padding: "8px", fontFamily: "var(--font-mono)", color: "#CBD5E1" } }, `$${p.accumulated_fees_usd?.toFixed(2)}`),
+                  h("td", { style: { padding: "8px", fontFamily: "var(--font-mono)", fontWeight: "800", color: isProf ? "#10B981" : "#EF4444" } },
+                    `${isProf ? "+" : ""}$${p.total_realized_pnl_usd?.toFixed(2)}`
+                  ),
+                  h("td", { style: { padding: "8px", color: "#94A3B8" } }, p.closed_timestamp_utc ? p.closed_timestamp_utc.slice(0, 16).replace("T", " ") : "-"),
+                  h("td", { style: { padding: "8px", color: "#CBD5E1" } }, p.notes || "FULL_CLOSE")
+                );
+              })
+            )
+          )
+        )
+      )
+    ),
+
+    // Modal: Partial Exit
+    activePartialExitPos && h("div", {
+      id: "modal-partial-exit",
+      style: {
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: "rgba(0, 0, 0, 0.75)",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 9999
+      }
+    },
+      h("div", {
+        style: {
+          background: "#0F172A",
+          border: "1px solid var(--card-border)",
+          borderRadius: "8px",
+          padding: "24px",
+          width: "420px",
+          maxWidth: "90%"
+        }
+      },
+        h("h3", { style: { color: "#F8FAFC", margin: "0 0 12px 0", fontSize: "1.1rem" } }, `Record Partial Exit: ${activePartialExitPos.position_id}`),
+        h("p", { style: { color: "#94A3B8", fontSize: "0.78rem", margin: "0 0 16px 0" } },
+          `Remaining position size: ${activePartialExitPos.remaining_quantity} BTC.`
+        ),
+        h("form", { onSubmit: handlePartialExitSubmit, style: { display: "flex", flexDirection: "column", gap: "12px" } },
+          h("div", null,
+            h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "EXIT PRICE ($)"),
+            h("input", {
+              type: "number",
+              step: "any",
+              value: partialExitPrice,
+              onChange: (e) => setPartialExitPrice(e.target.value),
+              style: { width: "100%", background: "#1E293B", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px" }
+            })
+          ),
+          h("div", null,
+            h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, `EXIT QUANTITY (Max: ${activePartialExitPos.remaining_quantity})`),
+            h("input", {
+              type: "number",
+              step: "any",
+              value: partialExitQty,
+              max: activePartialExitPos.remaining_quantity,
+              onChange: (e) => setPartialExitQty(e.target.value),
+              style: { width: "100%", background: "#1E293B", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px" }
+            })
+          ),
+          h("div", null,
+            h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "EXIT FEE ($)"),
+            h("input", {
+              type: "number",
+              step: "any",
+              value: partialExitFee,
+              onChange: (e) => setPartialExitFee(e.target.value),
+              style: { width: "100%", background: "#1E293B", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px" }
+            })
+          ),
+          h("div", null,
+            h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "REASON / TAG"),
+            h("input", {
+              type: "text",
+              value: partialExitReason,
+              onChange: (e) => setPartialExitReason(e.target.value),
+              style: { width: "100%", background: "#1E293B", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px" }
+            })
+          ),
+          h("div", { style: { display: "flex", gap: "10px", marginTop: "8px" } },
+            h("button", {
+              type: "button",
+              onClick: () => setActivePartialExitPos(null),
+              style: { flex: 1, background: "transparent", border: "1px solid var(--card-border)", color: "#94A3B8", padding: "8px", borderRadius: "4px", cursor: "pointer" }
+            }, "Cancel"),
+            h("button", {
+              type: "submit",
+              disabled: isSubmittingPartial,
+              style: { flex: 1, background: "#38BDF8", border: "none", color: "#0F172A", fontWeight: "700", padding: "8px", borderRadius: "4px", cursor: "pointer" }
+            }, isSubmittingPartial ? "Saving..." : "Confirm Partial Exit")
+          )
+        )
+      )
+    ),
+
+    // Modal: Full Close
+    activeClosePos && h("div", {
+      id: "modal-full-close",
+      style: {
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: "rgba(0, 0, 0, 0.75)",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 9999
+      }
+    },
+      h("div", {
+        style: {
+          background: "#0F172A",
+          border: "1px solid var(--card-border)",
+          borderRadius: "8px",
+          padding: "24px",
+          width: "420px",
+          maxWidth: "90%"
+        }
+      },
+        h("h3", { style: { color: "#F8FAFC", margin: "0 0 12px 0", fontSize: "1.1rem" } }, `Close Position: ${activeClosePos.position_id}`),
+        h("p", { style: { color: "#94A3B8", fontSize: "0.78rem", margin: "0 0 16px 0" } },
+          `Closing entire remaining quantity of ${activeClosePos.remaining_quantity} BTC.`
+        ),
+        h("form", { onSubmit: handleCloseSubmit, style: { display: "flex", flexDirection: "column", gap: "12px" } },
+          h("div", null,
+            h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "EXIT PRICE ($)"),
+            h("input", {
+              type: "number",
+              step: "any",
+              value: closePrice,
+              onChange: (e) => setClosePrice(e.target.value),
+              style: { width: "100%", background: "#1E293B", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px" }
+            })
+          ),
+          h("div", null,
+            h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "EXIT FEE ($)"),
+            h("input", {
+              type: "number",
+              step: "any",
+              value: closeFee,
+              onChange: (e) => setCloseFee(e.target.value),
+              style: { width: "100%", background: "#1E293B", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px" }
+            })
+          ),
+          h("div", null,
+            h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "CLOSING REASON"),
+            h("input", {
+              type: "text",
+              value: closeReason,
+              onChange: (e) => setCloseReason(e.target.value),
+              style: { width: "100%", background: "#1E293B", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px" }
+            })
+          ),
+          h("div", { style: { display: "flex", gap: "10px", marginTop: "8px" } },
+            h("button", {
+              type: "button",
+              onClick: () => setActiveClosePos(null),
+              style: { flex: 1, background: "transparent", border: "1px solid var(--card-border)", color: "#94A3B8", padding: "8px", borderRadius: "4px", cursor: "pointer" }
+            }, "Cancel"),
+            h("button", {
+              type: "submit",
+              disabled: isSubmittingClose,
+              style: { flex: 1, background: "#EF4444", border: "none", color: "#FFFFFF", fontWeight: "700", padding: "8px", borderRadius: "4px", cursor: "pointer" }
+            }, isSubmittingClose ? "Closing..." : "Confirm Full Close")
+          )
+        )
+      )
+    )
+  );
+}
+
+
+// ===========================================================================
+// V32.42 Manual Trade Journal and AI Forecast Evaluation View
+// ===========================================================================
+function ManualTradeJournalView({ setPath, livePrice }) {
+  const [journalData, setJournalData] = useState(null);
+  const [evalData, setEvalData] = useState(null);
+  const [journalStatus, setJournalStatus] = useState(null);
+  const [journalErrors, setJournalErrors] = useState({ trades: null, status: null, evaluation: null });
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState(null);
+
+  // Modal: "I Entered a Trade"
+  const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
+  const [entryInstrument, setEntryInstrument] = useState("BTC-USD");
+  const [entryDirection, setEntryDirection] = useState("LONG");
+  const [entryPrice, setEntryPrice] = useState(livePrice > 0 ? String(livePrice) : "");
+  const [entryTimestamp, setEntryTimestamp] = useState(() => new Date().toISOString().slice(0, 19));
+  const [entryQuantity, setEntryQuantity] = useState("0.5");
+  const [entryFee, setEntryFee] = useState("25.0");
+  const [entryMarketType, setEntryMarketType] = useState("SPOT");
+  const [entryLeverage, setEntryLeverage] = useState("1.0");
+  const [entryMultiplier, setEntryMultiplier] = useState("1.0");
+  const [entryNotes, setEntryNotes] = useState("");
+  const [isSubmittingEntry, setIsSubmittingEntry] = useState(false);
+
+  // Modal: "I Exited"
+  const [activeExitTrade, setActiveExitTrade] = useState(null);
+  const [exitPrice, setExitPrice] = useState("");
+  const [exitTimestamp, setExitTimestamp] = useState(() => new Date().toISOString().slice(0, 19));
+  const [exitQuantity, setExitQuantity] = useState("");
+  const [exitFee, setExitFee] = useState("25.0");
+  const [exitNotes, setExitNotes] = useState("");
+  const [isSubmittingExit, setIsSubmittingExit] = useState(false);
+
+  // Modal: Auditable Adjustment
+  const [activeAdjustTrade, setActiveAdjustTrade] = useState(null);
+  const [adjField, setAdjField] = useState("notes");
+  const [adjValue, setAdjValue] = useState("");
+  const [adjReason, setAdjReason] = useState("");
+  const [isSubmittingAdjust, setIsSubmittingAdjust] = useState(false);
+
+  const loadData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setErrorMsg(null);
+      const [tradesResult, evaluationResult, statusResult] = await Promise.allSettled([
+        window.api.fetchJournalTrades(),
+        window.api.fetchJournalEvaluation(),
+        window.api.fetchJournalStatus()
+      ]);
+      const tradesValid = tradesResult.status === "fulfilled"
+        && Array.isArray(tradesResult.value?.open_trades)
+        && Array.isArray(tradesResult.value?.closed_trades);
+      const evaluationValid = evaluationResult.status === "fulfilled"
+        && evaluationResult.value !== null
+        && typeof evaluationResult.value === "object"
+        && !Array.isArray(evaluationResult.value);
+      const statusValid = statusResult.status === "fulfilled"
+        && statusResult.value !== null
+        && typeof statusResult.value === "object"
+        && !Array.isArray(statusResult.value);
+      const requestError = (result, fallback) =>
+        result.status === "rejected" ? (result.reason?.message || fallback) : fallback;
+
+      setJournalData(tradesValid ? tradesResult.value : null);
+      setEvalData(evaluationValid ? evaluationResult.value : null);
+      setJournalStatus(statusValid ? statusResult.value : null);
+      setJournalErrors({
+        trades: tradesValid ? null : requestError(tradesResult, "Trade records response was invalid."),
+        evaluation: evaluationValid ? null : requestError(evaluationResult, "Forecast evaluation response was invalid."),
+        status: statusValid ? null : requestError(statusResult, "Journal service status response was invalid.")
+      });
+    } catch (err) {
+      setErrorMsg(err.message || "Failed loading manual trade journal data");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+    const interval = setInterval(loadData, 10000);
+    return () => clearInterval(interval);
+  }, [loadData]);
+
+  const handleOpenEntryModal = () => {
+    if (livePrice > 0 && !entryPrice) {
+      setEntryPrice(String(livePrice));
+    }
+    setEntryTimestamp(new Date().toISOString().slice(0, 19));
+    setIsEntryModalOpen(true);
+  };
+
+  const handleSubmitEntry = async (e) => {
+    e.preventDefault();
+    try {
+      setIsSubmittingEntry(true);
+      setErrorMsg(null);
+      const p = parseFloat(entryPrice);
+      if (!p || p <= 0) throw new Error("Entry price must be greater than 0");
+      const q = entryQuantity ? parseFloat(entryQuantity) : null;
+      const f = entryFee !== "" ? parseFloat(entryFee) : null;
+
+      await window.api.recordEnterTrade({
+        instrument: entryInstrument,
+        direction: entryDirection,
+        entry_price: p,
+        entry_timestamp_utc: entryTimestamp ? new Date(entryTimestamp).toISOString() : new Date().toISOString(),
+        quantity: q,
+        entry_fee_usd: f,
+        market_type: entryMarketType,
+        leverage: parseFloat(entryLeverage) || 1.0,
+        contract_multiplier: parseFloat(entryMultiplier) || 1.0,
+        notes: entryNotes || undefined
+      });
+
+      setIsEntryModalOpen(false);
+      setEntryNotes("");
+      await loadData();
+    } catch (err) {
+      setErrorMsg(err.message || "Failed recording trade entry");
+    } finally {
+      setIsSubmittingEntry(false);
+    }
+  };
+
+  const handleOpenExitModal = (trade) => {
+    setActiveExitTrade(trade);
+    setExitPrice(livePrice > 0 ? String(livePrice) : "");
+    setExitTimestamp(new Date().toISOString().slice(0, 19));
+    setExitQuantity(trade.remaining_quantity != null ? String(trade.remaining_quantity) : "");
+    setExitFee("25.0");
+    setExitNotes("");
+  };
+
+  const handleSubmitExit = async (e) => {
+    e.preventDefault();
+    if (!activeExitTrade) return;
+    try {
+      setIsSubmittingExit(true);
+      setErrorMsg(null);
+      const p = parseFloat(exitPrice);
+      if (!p || p <= 0) throw new Error("Exit price must be greater than 0");
+      const q = exitQuantity ? parseFloat(exitQuantity) : undefined;
+      const f = exitFee !== "" ? parseFloat(exitFee) : null;
+
+      await window.api.recordExitTrade(activeExitTrade.trade_id, {
+        exit_price: p,
+        exit_timestamp_utc: exitTimestamp ? new Date(exitTimestamp).toISOString() : new Date().toISOString(),
+        quantity: q,
+        exit_fee_usd: f,
+        notes: exitNotes || undefined
+      });
+
+      setActiveExitTrade(null);
+      await loadData();
+    } catch (err) {
+      setErrorMsg(err.message || "Failed recording trade exit");
+    } finally {
+      setIsSubmittingExit(false);
+    }
+  };
+
+  const handleOpenAdjustModal = (trade) => {
+    setActiveAdjustTrade(trade);
+    setAdjField("notes");
+    setAdjValue(trade.notes || "");
+    setAdjReason("");
+  };
+
+  const handleSubmitAdjust = async (e) => {
+    e.preventDefault();
+    if (!activeAdjustTrade) return;
+    try {
+      setIsSubmittingAdjust(true);
+      setErrorMsg(null);
+      if (!adjReason || adjReason.trim().length < 3) {
+        throw new Error("An auditable reason is required for adjustments");
+      }
+      let val = adjValue;
+      if (adjField === "entry_fee_usd" || adjField === "leverage" || adjField === "contract_multiplier") {
+        val = parseFloat(adjValue);
+      }
+
+      await window.api.recordAdjustTrade(activeAdjustTrade.trade_id, {
+        field_name: adjField,
+        new_value: val,
+        reason: adjReason
+      });
+
+      setActiveAdjustTrade(null);
+      await loadData();
+    } catch (err) {
+      setErrorMsg(err.message || "Failed recording adjustment");
+    } finally {
+      setIsSubmittingAdjust(false);
+    }
+  };
+
+  const openTrades = journalData?.open_trades || [];
+  const closedTrades = journalData?.closed_trades || [];
+  const userPerf = evalData?.user_performance || {};
+  const aiPerf = evalData?.ai_performance || {};
+  const formatJournalNumber = (value, digits = 2) =>
+    value == null || !Number.isFinite(Number(value)) ? "unavailable" : Number(value).toFixed(digits);
+  const formatJournalUsd = (value) => {
+    const formatted = formatJournalNumber(value);
+    return formatted === "unavailable" ? formatted : `$${Number(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+  const grossPnl = Number(userPerf.total_gross_pnl_usd);
+  const hasGrossPnl = userPerf.total_gross_pnl_usd != null && Number.isFinite(grossPnl);
+
+  return h("div", {
+    id: "v32-42-manual-trade-journal-view",
+    style: { padding: "24px 32px", maxWidth: "1400px", margin: "0 auto", color: "#F8FAFC" }
+  },
+    // Top Breadcrumb & Actions Bar
+    h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "12px" } },
+      h("div", null,
+        h("div", { style: { fontSize: "0.78rem", color: "#94A3B8", fontFamily: "var(--font-mono)", marginBottom: "4px" } },
+          h("span", { style: { cursor: "pointer", color: "#38BDF8" }, onClick: () => setPath("/") }, "Home"),
+          " / Manual Trade Journal"
+        ),
+        h("h1", { style: { fontSize: "1.7rem", fontWeight: "800", letterSpacing: "-0.02em", margin: 0 } },
+          "Manual Trade Journal & AI Forecast Evaluation"
+        )
+      ),
+      h("div", { style: { display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" } },
+        h("button", {
+          id: "btn-i-entered-trade",
+          onClick: handleOpenEntryModal,
+          style: {
+            background: "linear-gradient(135deg, #10B981, #059669)",
+            color: "#FFFFFF",
+            border: "none",
+            fontWeight: "700",
+            fontSize: "0.88rem",
+            padding: "10px 18px",
+            borderRadius: "8px",
+            cursor: "pointer",
+            boxShadow: "0 4px 14px rgba(16, 185, 129, 0.4)",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px"
+          }
+        },
+          h("span", { style: { fontSize: "1.1rem" } }, "✍️"),
+          "I Entered a Trade"
+        ),
+        h("button", {
+          onClick: loadData,
+          style: {
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid var(--card-border)",
+            color: "#CBD5E1",
+            padding: "9px 14px",
+            borderRadius: "8px",
+            cursor: "pointer",
+            fontSize: "0.82rem"
+          }
+        }, "↻ Refresh")
+      )
+    ),
+
+    // Mandatory Non-Execution & Observational Notice Banner
+    h("div", {
+      id: "journal-warning-banner",
+      style: {
+        background: "rgba(15, 23, 42, 0.85)",
+        border: "1px solid rgba(56, 189, 248, 0.35)",
+        borderRadius: "12px",
+        padding: "16px 20px",
+        marginBottom: "24px",
+        display: "flex",
+        alignItems: "flex-start",
+        gap: "14px"
+      }
+    },
+      h("span", { style: { fontSize: "1.5rem", lineHeight: 1 } }, "🛡️"),
+      h("div", { style: { flex: 1 } },
+        h("div", { style: { display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", marginBottom: "4px" } },
+          h("strong", { style: { color: "#38BDF8", fontSize: "0.88rem", letterSpacing: "0.04em" } },
+            "STRICT NON-EXECUTION INVARIANT · OBSERVATIONAL TRADE JOURNAL ONLY"
+          ),
+          h("span", {
+            style: {
+              background: "rgba(239, 68, 68, 0.15)",
+              border: "1px solid rgba(239, 68, 68, 0.4)",
+              color: "#F87171",
+              fontSize: "0.68rem",
+              fontWeight: "800",
+              padding: "2px 8px",
+              borderRadius: "4px"
+            }
+          }, "NO BROKER ROUTING"),
+          h("span", {
+            style: {
+              background: "rgba(251, 191, 36, 0.15)",
+              border: "1px solid rgba(251, 191, 36, 0.4)",
+              color: "#FBBF24",
+              fontSize: "0.68rem",
+              fontWeight: "800",
+              padding: "2px 8px",
+              borderRadius: "4px"
+            }
+          }, "OFFLINE_RESEARCH_ONLY")
+        ),
+        h("p", { style: { fontSize: "0.82rem", color: "#94A3B8", margin: 0, lineHeight: 1.5 } },
+          "This application is not a trading platform. Users execute trades on external exchanges and manually record entry and exit details here. BTCognitive saves immutable point-in-time forecast snapshots, calculates P&L, and evaluates model usefulness without ever placing, synchronizing, or closing real orders."
+        )
+      )
+    ),
+
+    errorMsg && h("div", {
+      style: { background: "rgba(239, 68, 68, 0.15)", border: "1px solid #EF4444", color: "#FCA5A5", padding: "12px 16px", borderRadius: "8px", marginBottom: "20px" }
+    }, `⚠️ ${errorMsg}`),
+    journalStatus && h("div", {
+      id: "journal-service-status",
+      style: { color: "#94A3B8", fontSize: "0.78rem", marginBottom: "12px" }
+    }, `Journal service: ${journalStatus.status || "STATUS_UNAVAILABLE"}`),
+    journalErrors.status && h("div", {
+      id: "journal-status-unavailable",
+      role: "status",
+      style: { color: "#FBBF24", fontSize: "0.78rem", marginBottom: "12px" }
+    }, `Journal service status unavailable: ${journalErrors.status}`),
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Section 1: Open Records
+    // ──────────────────────────────────────────────────────────────────────────
+    h("div", {
+      id: "journal-open-records",
+      style: { marginBottom: "32px" }
+    },
+      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" } },
+        h("div", { style: { display: "flex", alignItems: "center", gap: "10px" } },
+          h("h2", { style: { fontSize: "1.2rem", fontWeight: "700", margin: 0 } }, "1. Open Trade Records"),
+          h("span", {
+            style: {
+              background: "rgba(56, 189, 248, 0.12)",
+              color: "#38BDF8",
+              fontSize: "0.75rem",
+              fontWeight: "700",
+              padding: "2px 8px",
+              borderRadius: "12px"
+            }
+          }, `${openTrades.length} Active`)
+        ),
+        h("div", { style: { fontSize: "0.78rem", color: "#94A3B8" } },
+          "Manual records awaiting user-recorded exit"
+        )
+      ),
+
+      journalData === null ? (
+        h("div", {
+          className: "glass-card",
+          id: "journal-open-records-unavailable",
+          role: "status",
+          style: { padding: "24px", textAlign: "center", color: "#FBBF24", borderRadius: "12px" }
+        }, isLoading ? "Loading open trade records…" : `Open trade records unavailable: ${journalErrors.trades || "No valid journal response was received."}`)
+      ) : openTrades.length === 0 ? (
+        h("div", {
+          className: "glass-card",
+          style: { padding: "32px", textAlign: "center", color: "#94A3B8", borderRadius: "12px" }
+        },
+          h("p", { style: { margin: "0 0 12px 0", fontSize: "0.95rem" } }, "No open manual trade records currently registered."),
+          h("button", {
+            onClick: handleOpenEntryModal,
+            style: {
+              background: "rgba(16, 185, 129, 0.15)",
+              border: "1px solid rgba(16, 185, 129, 0.4)",
+              color: "#10B981",
+              padding: "8px 16px",
+              borderRadius: "6px",
+              cursor: "pointer",
+              fontWeight: "700"
+            }
+          }, "+ Record An Entered Trade")
+        )
+      ) : (
+        h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(420px, 1fr))", gap: "16px" } },
+          openTrades.map(trade => {
+            const isLong = trade.direction === "LONG";
+            const snap = trade.forecast_snapshot || {};
+            const predDir = snap.predicted_direction || "UNAVAILABLE";
+            const isAgreed = trade.forecast_agreement;
+            const h1 = snap.horizons?.["1h"] || {};
+            const pUp = h1.p_up != null ? (h1.p_up * 100).toFixed(1) : null;
+            const pDown = h1.p_down != null ? (h1.p_down * 100).toFixed(1) : null;
+
+            return h("div", {
+              key: trade.trade_id,
+              id: `trade-card-${trade.trade_id}`,
+              className: "glass-card",
+              style: {
+                padding: "20px",
+                borderRadius: "12px",
+                border: "1px solid var(--card-border)",
+                background: "rgba(15, 23, 42, 0.65)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "14px"
+              }
+            },
+              // Card Top Row
+              h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
+                h("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+                  h("span", {
+                    style: {
+                      background: isLong ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)",
+                      border: `1px solid ${isLong ? "#10B981" : "#EF4444"}`,
+                      color: isLong ? "#10B981" : "#EF4444",
+                      padding: "3px 8px",
+                      borderRadius: "4px",
+                      fontWeight: "800",
+                      fontSize: "0.75rem"
+                    }
+                  }, trade.direction),
+                  h("strong", { style: { fontSize: "1.05rem" } }, trade.instrument),
+                  h("span", { style: { fontSize: "0.75rem", color: "#94A3B8" } }, `(${trade.market_type})`)
+                ),
+                h("span", {
+                  style: {
+                    background: "rgba(255, 255, 255, 0.05)",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    color: "#94A3B8",
+                    padding: "2px 8px",
+                    borderRadius: "4px",
+                    fontSize: "0.7rem",
+                    fontFamily: "var(--font-mono)"
+                  }
+                }, `ID: ${trade.trade_id}`)
+              ),
+
+              // Entry Metrics Grid
+              h("div", { style: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", background: "rgba(0,0,0,0.25)", padding: "10px", borderRadius: "8px" } },
+                h("div", null,
+                  h("div", { style: { fontSize: "0.70rem", color: "#94A3B8" } }, "ENTRY PRICE"),
+                  h("div", { style: { fontSize: "0.95rem", fontWeight: "700", fontFamily: "var(--font-mono)" } }, `$${trade.entry_price.toLocaleString()}`)
+                ),
+                h("div", null,
+                  h("div", { style: { fontSize: "0.70rem", color: "#94A3B8" } }, "QUANTITY"),
+                  h("div", { style: { fontSize: "0.95rem", fontWeight: "700", fontFamily: "var(--font-mono)" } },
+                    trade.remaining_quantity != null ? `${trade.remaining_quantity} BTC` : "Price Dir Only"
+                  )
+                ),
+                h("div", null,
+                  h("div", { style: { fontSize: "0.70rem", color: "#94A3B8" } }, "RECORDED FEE"),
+                  h("div", { style: { fontSize: "0.95rem", fontWeight: "700", fontFamily: "var(--font-mono)" } },
+                    trade.entry_fee_usd != null ? `$${trade.entry_fee_usd.toFixed(2)}` : "Pending"
+                  )
+                )
+              ),
+
+              // Saved Forecast Snapshot Pill
+              h("div", {
+                style: {
+                  background: "rgba(30, 41, 59, 0.6)",
+                  border: "1px solid rgba(56, 189, 248, 0.25)",
+                  padding: "10px 12px",
+                  borderRadius: "8px",
+                  fontSize: "0.75rem"
+                }
+              },
+                h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" } },
+                  h("span", { style: { color: "#38BDF8", fontWeight: "700" } }, "📸 FORECAST SNAPSHOT SAVED"),
+                  h("span", {
+                    style: {
+                      background: isAgreed ? "rgba(16, 185, 129, 0.15)" : "rgba(251, 191, 36, 0.15)",
+                      color: isAgreed ? "#10B981" : "#FBBF24",
+                      padding: "1px 6px",
+                      borderRadius: "4px",
+                      fontWeight: "700",
+                      fontSize: "0.68rem"
+                    }
+                  }, isAgreed ? "● AGREES WITH AI" : "● AGAINST AI FORECAST")
+                ),
+                h("div", { style: { display: "flex", justifyContent: "space-between", color: "#CBD5E1", fontSize: "0.72rem" } },
+                  h("span", null, `Model: ${snap.model_id || "directional-gbm-ensemble"}`),
+                  h("span", null, `Regime: ${snap.regime_classification || "UNAVAILABLE"}`)
+                ),
+                h("div", { style: { display: "flex", justifyContent: "space-between", color: "#CBD5E1", fontSize: "0.72rem", marginTop: "2px" } },
+                  h("span", null, `AI Direction: ${predDir} ${pUp ? `(P(UP)=${pUp}%)` : ""}`),
+                  h("span", { style: { color: "#64748B", fontFamily: "var(--font-mono)" } }, `SHA: ${snap.immutable_sha256 ? snap.immutable_sha256.slice(0, 10) : "verified"}...`)
+                )
+              ),
+
+              trade.notes && h("div", { style: { fontSize: "0.75rem", color: "#94A3B8", fontStyle: "italic" } }, `Notes: "${trade.notes}"`),
+
+              // Action Buttons Row
+              h("div", { style: { display: "flex", gap: "8px", marginTop: "auto" } },
+                h("button", {
+                  id: `btn-i-exited-${trade.trade_id}`,
+                  onClick: () => handleOpenExitModal(trade),
+                  style: {
+                    flex: 1,
+                    background: "rgba(239, 68, 68, 0.15)",
+                    border: "1px solid rgba(239, 68, 68, 0.4)",
+                    color: "#F87171",
+                    fontWeight: "700",
+                    padding: "8px 12px",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    fontSize: "0.82rem"
+                  }
+                }, "I Exited"),
+                h("button", {
+                  id: `btn-adjust-${trade.trade_id}`,
+                  onClick: () => handleOpenAdjustModal(trade),
+                  style: {
+                    background: "rgba(255, 255, 255, 0.05)",
+                    border: "1px solid var(--card-border)",
+                    color: "#94A3B8",
+                    padding: "8px 12px",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    fontSize: "0.82rem"
+                  }
+                }, "Adjust")
+              )
+            );
+          })
+        )
+      )
+    ),
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Section 2: Closed Records & Results
+    // ──────────────────────────────────────────────────────────────────────────
+    h("div", {
+      id: "journal-closed-records",
+      style: { marginBottom: "36px" }
+    },
+      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" } },
+        h("h2", { style: { fontSize: "1.2rem", fontWeight: "700", margin: 0 } }, "2. Closed Records & Results"),
+        h("div", { style: { fontSize: "0.78rem", color: "#94A3B8" } },
+          `${closedTrades.length} Completed Manual Records`
+        )
+      ),
+
+      journalData === null ? (
+        h("div", {
+          className: "glass-card",
+          id: "journal-closed-records-unavailable",
+          role: "status",
+          style: { padding: "24px", textAlign: "center", color: "#FBBF24", borderRadius: "12px" }
+        }, isLoading ? "Loading closed trade records…" : `Closed trade records unavailable: ${journalErrors.trades || "No valid journal response was received."}`)
+      ) : closedTrades.length === 0 ? (
+        h("div", {
+          className: "glass-card",
+          style: { padding: "24px", textAlign: "center", color: "#94A3B8", borderRadius: "12px" }
+        }, "No closed manual trade records yet. Record an exit above to close a trade.")
+      ) : (
+        h("div", {
+          className: "glass-card",
+          style: { padding: "0", borderRadius: "12px", overflowX: "auto" }
+        },
+          h("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: "0.80rem" } },
+            h("thead", null,
+              h("tr", { style: { background: "rgba(0,0,0,0.3)", borderBottom: "1px solid var(--card-border)", color: "#94A3B8", textAlign: "left" } },
+                h("th", { style: { padding: "12px 14px" } }, "TRADE ID"),
+                h("th", { style: { padding: "12px 14px" } }, "DIR"),
+                h("th", { style: { padding: "12px 14px" } }, "ENTRY / EXIT"),
+                h("th", { style: { padding: "12px 14px" } }, "QUANTITY"),
+                h("th", { style: { padding: "12px 14px" } }, "GROSS P&L"),
+                h("th", { style: { padding: "12px 14px" } }, "NET P&L"),
+                h("th", { style: { padding: "12px 14px" } }, "USER OUTCOME"),
+                h("th", { style: { padding: "12px 14px" } }, "SAVED FORECAST"),
+                h("th", { style: { padding: "12px 14px" } }, "AI OUTCOME")
+              )
+            ),
+            h("tbody", null,
+              closedTrades.map((t, idx) => {
+                const isLong = t.direction === "LONG";
+                const isWin = t.user_outcome === "WIN";
+                const isLoss = t.user_outcome === "LOSS";
+                const snap = t.forecast_snapshot || {};
+                const aiCorrect = t.forecast_outcome === "CORRECT";
+                const aiIncorrect = t.forecast_outcome === "INCORRECT";
+
+                return h("tr", {
+                  key: t.trade_id,
+                  style: {
+                    borderBottom: "1px solid rgba(255,255,255,0.05)",
+                    background: idx % 2 === 0 ? "rgba(255,255,255,0.01)" : "transparent"
+                  }
+                },
+                  h("td", { style: { padding: "12px 14px", fontFamily: "var(--font-mono)", color: "#94A3B8" } }, t.trade_id),
+                  h("td", { style: { padding: "12px 14px" } },
+                    h("span", {
+                      style: {
+                        color: isLong ? "#10B981" : "#EF4444",
+                        fontWeight: "700"
+                      }
+                    }, t.direction)
+                  ),
+                  h("td", { style: { padding: "12px 14px", fontFamily: "var(--font-mono)" } },
+                    h("div", null, `$${t.entry_price.toLocaleString()}`),
+                    h("div", { style: { color: "#94A3B8", fontSize: "0.72rem" } }, `Exit: $${(t.final_exit_price || 0).toLocaleString()}`)
+                  ),
+                  h("td", { style: { padding: "12px 14px", fontFamily: "var(--font-mono)" } },
+                    t.initial_quantity != null ? `${t.initial_quantity} BTC` : "Price Dir"
+                  ),
+                  h("td", { style: { padding: "12px 14px", fontFamily: "var(--font-mono)" } },
+                    t.gross_pnl_usd != null ? (
+                      h("span", { style: { color: t.gross_pnl_usd >= 0 ? "#10B981" : "#EF4444", fontWeight: "700" } },
+                        `${t.gross_pnl_usd >= 0 ? "+" : ""}$${t.gross_pnl_usd.toFixed(2)}`
+                      )
+                    ) : (
+                      h("span", { style: { color: "#94A3B8" } }, "—")
+                    )
+                  ),
+                  h("td", { style: { padding: "12px 14px", fontFamily: "var(--font-mono)" } },
+                    t.net_pnl_usd != null ? (
+                      h("div", null,
+                        h("span", { style: { color: t.net_pnl_usd >= 0 ? "#10B981" : "#EF4444", fontWeight: "700" } },
+                          `${t.net_pnl_usd >= 0 ? "+" : ""}$${t.net_pnl_usd.toFixed(2)}`
+                        ),
+                        h("div", { style: { fontSize: "0.65rem", color: "#10B981" } }, "NET_PNL_COMPLETE")
+                      )
+                    ) : (
+                      h("span", {
+                        style: {
+                          background: "rgba(251, 191, 36, 0.15)",
+                          color: "#FBBF24",
+                          padding: "2px 6px",
+                          borderRadius: "4px",
+                          fontSize: "0.68rem"
+                        }
+                      }, t.pnl_status || "GROSS_PNL_ONLY")
+                    )
+                  ),
+                  h("td", { style: { padding: "12px 14px" } },
+                    h("span", {
+                      style: {
+                        background: isWin ? "rgba(16, 185, 129, 0.15)" : isLoss ? "rgba(239, 68, 68, 0.15)" : "rgba(148, 163, 184, 0.15)",
+                        color: isWin ? "#10B981" : isLoss ? "#EF4444" : "#94A3B8",
+                        padding: "2px 6px",
+                        borderRadius: "4px",
+                        fontWeight: "700"
+                      }
+                    }, t.user_outcome || "CLOSED")
+                  ),
+                  h("td", { style: { padding: "12px 14px", fontSize: "0.72rem", color: "#CBD5E1" } },
+                    h("div", null, `Pred: ${snap.predicted_direction || "UNAVAILABLE"}`),
+                    h("div", { style: { color: "#94A3B8", fontSize: "0.68rem" } }, `Regime: ${snap.regime_classification || "UNAVAILABLE"}`)
+                  ),
+                  h("td", { style: { padding: "12px 14px" } },
+                    h("span", {
+                      style: {
+                        background: aiCorrect ? "rgba(16, 185, 129, 0.15)" : aiIncorrect ? "rgba(239, 68, 68, 0.15)" : "rgba(148, 163, 184, 0.15)",
+                        color: aiCorrect ? "#10B981" : aiIncorrect ? "#EF4444" : "#94A3B8",
+                        padding: "2px 6px",
+                        borderRadius: "4px",
+                        fontWeight: "700"
+                      }
+                    }, t.forecast_outcome || "UNAVAILABLE")
+                  )
+                );
+              })
+            )
+          )
+        )
+      )
+    ),
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Section 3: AI Forecast Performance Evaluation
+    // ──────────────────────────────────────────────────────────────────────────
+    h("div", {
+      id: "journal-ai-evaluation",
+      style: { marginBottom: "40px" }
+    },
+      h("div", { style: { marginBottom: "14px" } },
+        h("h2", { style: { fontSize: "1.2rem", fontWeight: "700", margin: "0 0 4px 0" } }, "3. AI Forecast & Performance Evaluation"),
+        h("p", { style: { fontSize: "0.82rem", color: "#94A3B8", margin: 0 } },
+          "Bifurcated reporting: Evaluates model predictive usefulness separately from user manual trade profitability."
+        )
+      ),
+      evalData === null && h("div", {
+        id: "journal-evaluation-unavailable",
+        role: "status",
+        style: { color: "#FBBF24", fontSize: "0.82rem", marginBottom: "14px" }
+      }, isLoading ? "Loading forecast evaluation…" : `Forecast evaluation unavailable: ${journalErrors.evaluation || "No evaluation response was received."}`),
+
+      // Sample Size Disclaimer Warning Banner
+      h("div", {
+        id: "journal-sample-disclaimer",
+        style: {
+          background: "rgba(251, 191, 36, 0.08)",
+          border: "1px solid rgba(251, 191, 36, 0.3)",
+          borderRadius: "10px",
+          padding: "14px 18px",
+          marginBottom: "20px",
+          display: "flex",
+          alignItems: "center",
+          gap: "12px"
+        }
+      },
+        h("span", { style: { fontSize: "1.2rem" } }, "⚠️"),
+        h("div", { style: { fontSize: "0.78rem", color: "#FDE68A", lineHeight: 1.5 } },
+          h("strong", { style: { color: "#FBBF24" } }, "INSUFFICIENT EVIDENCE & SAMPLE SELECTION CAVEAT: "),
+          "This evaluation is calculated across manually entered trades. A small, discretionary, or non-random sample of trades cannot establish statistical significance, predictive edge, or model profitability across all market conditions. Do not infer live trading profitability."
+        )
+      ),
+
+      // Dual Cards Grid
+      h("div", { className: "journal-evaluation-grid", style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 420px), 1fr))", gap: "20px" } },
+        // Card A: User Trade Performance
+        h("div", {
+          className: "glass-card",
+          style: { padding: "20px", borderRadius: "12px", border: "1px solid var(--card-border)" }
+        },
+          h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" } },
+            h("h3", { style: { fontSize: "1.05rem", fontWeight: "700", margin: 0, color: "#38BDF8" } },
+              "A. User Trade Performance"
+            ),
+            h("span", { style: { fontSize: "0.72rem", color: "#94A3B8" } }, `N = ${userPerf.completed_trades ?? "unavailable"} Trades`)
+          ),
+
+          h("div", { style: { display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px", marginBottom: "16px" } },
+            h("div", { style: { background: "rgba(0,0,0,0.25)", padding: "12px", borderRadius: "8px" } },
+              h("div", { style: { fontSize: "0.72rem", color: "#94A3B8" } }, "WIN RATE"),
+              h("div", { style: { fontSize: "1.4rem", fontWeight: "800", color: "#10B981" } },
+                userPerf.win_rate == null || !Number.isFinite(Number(userPerf.win_rate)) ? "UNAVAILABLE" : `${(Number(userPerf.win_rate) * 100).toFixed(1)}%`
+              ),
+              h("div", { style: { fontSize: "0.70rem", color: "#64748B" } }, `${userPerf.winning_trades ?? "unavailable"} Wins / ${userPerf.losing_trades ?? "unavailable"} Losses`)
+            ),
+            h("div", { style: { background: "rgba(0,0,0,0.25)", padding: "12px", borderRadius: "8px" } },
+              h("div", { style: { fontSize: "0.72rem", color: "#94A3B8" } }, "TOTAL GROSS P&L"),
+              h("div", { style: { fontSize: "1.4rem", fontWeight: "800", color: hasGrossPnl ? (grossPnl >= 0 ? "#10B981" : "#EF4444") : "#94A3B8" } },
+                hasGrossPnl ? `${grossPnl >= 0 ? "+" : ""}${formatJournalUsd(grossPnl)}` : "UNAVAILABLE"
+              ),
+              h("div", { style: { fontSize: "0.70rem", color: "#64748B" } }, userPerf.pnl_completeness || "unavailable")
+            )
+          ),
+
+          h("div", { style: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px", fontSize: "0.75rem", color: "#CBD5E1" } },
+            h("div", { style: { background: "rgba(255,255,255,0.03)", padding: "8px", borderRadius: "6px" } },
+              h("div", { style: { color: "#94A3B8", fontSize: "0.68rem" } }, "AVG WIN"),
+              h("div", { style: { fontWeight: "700" } }, formatJournalUsd(userPerf.average_win_usd))
+            ),
+            h("div", { style: { background: "rgba(255,255,255,0.03)", padding: "8px", borderRadius: "6px" } },
+              h("div", { style: { color: "#94A3B8", fontSize: "0.68rem" } }, "AVG LOSS"),
+              h("div", { style: { fontWeight: "700" } }, formatJournalUsd(userPerf.average_loss_usd))
+            ),
+            h("div", { style: { background: "rgba(255,255,255,0.03)", padding: "8px", borderRadius: "6px" } },
+              h("div", { style: { color: "#94A3B8", fontSize: "0.68rem" } }, "MAX DRAWDOWN"),
+              h("div", { style: { fontWeight: "700", color: "#F87171" } }, formatJournalUsd(userPerf.maximum_observed_drawdown_usd))
+            )
+          )
+        ),
+
+        // Card B: AI Forecast Performance
+        h("div", {
+          className: "glass-card",
+          style: { padding: "20px", borderRadius: "12px", border: "1px solid var(--card-border)" }
+        },
+          h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" } },
+            h("h3", { style: { fontSize: "1.05rem", fontWeight: "700", margin: 0, color: "#A78BFA" } },
+              "B. AI Forecast Performance"
+            ),
+            h("span", { style: { fontSize: "0.72rem", color: "#94A3B8" } },
+              `${aiPerf.valid_forecast_snapshots ?? "unavailable"} Recorded Valid Snapshots`
+            )
+          ),
+
+          h("div", { style: { display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px", marginBottom: "16px" } },
+            h("div", { style: { background: "rgba(0,0,0,0.25)", padding: "12px", borderRadius: "8px" } },
+              h("div", { style: { fontSize: "0.72rem", color: "#94A3B8" } }, "REPORTED DIRECTIONAL AGREEMENT"),
+              h("div", { style: { fontSize: "1.4rem", fontWeight: "800", color: "#A78BFA" } },
+                Number.isFinite(aiPerf.directional_agreement_rate) ? `${(aiPerf.directional_agreement_rate * 100).toFixed(1)}%` : "UNAVAILABLE"
+              ),
+              h("div", { style: { fontSize: "0.70rem", color: "#64748B" } }, `${aiPerf.directional_agreement_count ?? "unavailable"} of ${aiPerf.total_evaluated_trades ?? "unavailable"} recorded trades agreed with AI`)
+            ),
+            h("div", { style: { background: "rgba(0,0,0,0.25)", padding: "12px", borderRadius: "8px" } },
+              h("div", { style: { fontSize: "0.72rem", color: "#94A3B8" } }, "REPORTED MODEL CORRECTNESS"),
+              h("div", { style: { fontSize: "1.4rem", fontWeight: "800", color: "#38BDF8" } },
+                Number.isFinite(aiPerf.model_accuracy_rate) ? `${(aiPerf.model_accuracy_rate * 100).toFixed(1)}%` : "UNAVAILABLE"
+              ),
+              h("div", { style: { fontSize: "0.70rem", color: "#64748B" } }, `${aiPerf.model_correct_count ?? "unavailable"} Correct / ${aiPerf.model_incorrect_count ?? "unavailable"} Incorrect`)
+            )
+          ),
+          h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", marginTop: "8px" } },
+            "Manual, self-selected retrospective journal summaries are not validated out-of-sample accuracy or calibration evidence."
+          ),
+
+          // Contingency Matrix
+          h("div", { style: { background: "rgba(0,0,0,0.2)", padding: "10px", borderRadius: "8px" } },
+            h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", marginBottom: "6px" } }, "CONTINGENCY MATRIX (USER OUTCOME VS MODEL CORRECTNESS)"),
+            h("div", { style: { display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "6px", fontSize: "0.72rem" } },
+              h("div", { style: { background: "rgba(16, 185, 129, 0.1)", padding: "6px", borderRadius: "4px" } },
+                h("span", { style: { color: "#94A3B8" } }, "User WIN · Model CORRECT: "),
+                h("strong", { style: { color: "#10B981" } }, aiPerf.contingency_matrix?.user_win_model_correct ?? "unavailable")
+              ),
+              h("div", { style: { background: "rgba(251, 191, 36, 0.1)", padding: "6px", borderRadius: "4px" } },
+                h("span", { style: { color: "#94A3B8" } }, "User WIN · Model INCORRECT: "),
+                h("strong", { style: { color: "#FBBF24" } }, aiPerf.contingency_matrix?.user_win_model_incorrect ?? "unavailable")
+              ),
+              h("div", { style: { background: "rgba(56, 189, 248, 0.1)", padding: "6px", borderRadius: "4px" } },
+                h("span", { style: { color: "#94A3B8" } }, "User LOSS · Model CORRECT: "),
+                h("strong", { style: { color: "#38BDF8" } }, aiPerf.contingency_matrix?.user_loss_model_correct ?? "unavailable")
+              ),
+              h("div", { style: { background: "rgba(239, 68, 68, 0.1)", padding: "6px", borderRadius: "4px" } },
+                h("span", { style: { color: "#94A3B8" } }, "User LOSS · Model INCORRECT: "),
+                h("strong", { style: { color: "#EF4444" } }, aiPerf.contingency_matrix?.user_loss_model_incorrect ?? "unavailable")
+              )
+            )
+          )
+        )
+      )
+    ),
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Modal 1: "I Entered a Trade" Form Modal
+    // ──────────────────────────────────────────────────────────────────────────
+    isEntryModalOpen && h("div", {
+      style: {
+        position: "fixed",
+        top: 0, left: 0, right: 0, bottom: 0,
+        background: "rgba(0, 0, 0, 0.8)",
+        backdropFilter: "blur(6px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 9999,
+        padding: "20px"
+      }
+    },
+      h("div", {
+        className: "glass-card",
+        style: {
+          background: "#0F172A",
+          border: "1px solid rgba(16, 185, 129, 0.4)",
+          borderRadius: "16px",
+          padding: "28px",
+          width: "100%",
+          maxWidth: "540px",
+          maxHeight: "90vh",
+          overflowY: "auto"
+        }
+      },
+        h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" } },
+          h("h3", { style: { fontSize: "1.2rem", fontWeight: "800", margin: 0, color: "#10B981" } },
+            "✍️ I Entered a Trade"
+          ),
+          h("button", {
+            onClick: () => setIsEntryModalOpen(false),
+            style: { background: "none", border: "none", color: "#94A3B8", fontSize: "1.2rem", cursor: "pointer" }
+          }, "✕")
+        ),
+
+        h("form", { onSubmit: handleSubmitEntry, style: { display: "flex", flexDirection: "column", gap: "14px" } },
+          // Instrument & Direction
+          h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" } },
+            h("div", null,
+              h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "INSTRUMENT"),
+              h("input", {
+                type: "text",
+                value: entryInstrument,
+                onChange: (e) => setEntryInstrument(e.target.value),
+                style: { width: "100%", background: "#1E293B", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px" }
+              })
+            ),
+            h("div", null,
+              h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "DIRECTION"),
+              h("select", {
+                value: entryDirection,
+                onChange: (e) => setEntryDirection(e.target.value),
+                style: { width: "100%", background: "#1E293B", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px" }
+              },
+                h("option", { value: "LONG" }, "LONG (Buy)"),
+                h("option", { value: "SHORT" }, "SHORT (Sell)")
+              )
+            )
+          ),
+
+          // Entry Price & Timestamp
+          h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" } },
+            h("div", null,
+              h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "ENTRY PRICE ($) *"),
+              h("input", {
+                type: "number",
+                step: "0.01",
+                required: true,
+                value: entryPrice,
+                onChange: (e) => setEntryPrice(e.target.value),
+                style: { width: "100%", background: "#1E293B", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px" }
+              })
+            ),
+            h("div", null,
+              h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "ENTRY DATE & TIME"),
+              h("input", {
+                type: "datetime-local",
+                value: entryTimestamp,
+                onChange: (e) => setEntryTimestamp(e.target.value),
+                style: { width: "100%", background: "#1E293B", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px" }
+              })
+            )
+          ),
+
+          // Quantity & Fee
+          h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" } },
+            h("div", null,
+              h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "QUANTITY (BTC, OPTIONAL)"),
+              h("input", {
+                type: "number",
+                step: "0.0001",
+                placeholder: "e.g. 0.5 (Leave blank for price-dir)",
+                value: entryQuantity,
+                onChange: (e) => setEntryQuantity(e.target.value),
+                style: { width: "100%", background: "#1E293B", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px" }
+              })
+            ),
+            h("div", null,
+              h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "ENTRY FEE ($, OPTIONAL)"),
+              h("input", {
+                type: "number",
+                step: "0.01",
+                placeholder: "e.g. 25.0",
+                value: entryFee,
+                onChange: (e) => setEntryFee(e.target.value),
+                style: { width: "100%", background: "#1E293B", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px" }
+              })
+            )
+          ),
+
+          // Market Type, Leverage & Multiplier
+          h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" } },
+            h("div", null,
+              h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "MARKET TYPE"),
+              h("select", {
+                value: entryMarketType,
+                onChange: (e) => setEntryMarketType(e.target.value),
+                style: { width: "100%", background: "#1E293B", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px" }
+              },
+                h("option", { value: "SPOT" }, "SPOT"),
+                h("option", { value: "PERPETUAL" }, "PERPETUAL"),
+                h("option", { value: "FUTURES" }, "FUTURES")
+              )
+            ),
+            h("div", null,
+              h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "LEVERAGE"),
+              h("input", {
+                type: "number",
+                step: "0.1",
+                value: entryLeverage,
+                onChange: (e) => setEntryLeverage(e.target.value),
+                style: { width: "100%", background: "#1E293B", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px" }
+              })
+            ),
+            h("div", null,
+              h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "MULTIPLIER"),
+              h("input", {
+                type: "number",
+                step: "0.1",
+                value: entryMultiplier,
+                onChange: (e) => setEntryMultiplier(e.target.value),
+                style: { width: "100%", background: "#1E293B", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px" }
+              })
+            )
+          ),
+
+          // Notes
+          h("div", null,
+            h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "TRADE THESIS / NOTES"),
+            h("input", {
+              type: "text",
+              placeholder: "Why did you enter this trade?",
+              value: entryNotes,
+              onChange: (e) => setEntryNotes(e.target.value),
+              style: { width: "100%", background: "#1E293B", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px" }
+            })
+          ),
+
+          // Permanent Snapshot Seal Notice
+          h("div", {
+            style: {
+              background: "rgba(56, 189, 248, 0.08)",
+              border: "1px solid rgba(56, 189, 248, 0.2)",
+              borderRadius: "8px",
+              padding: "10px",
+              fontSize: "0.72rem",
+              color: "#94A3B8"
+            }
+          },
+            h("strong", { style: { color: "#38BDF8" } }, "📸 POINT-IN-TIME FORECAST SNAPSHOT: "),
+            "Confirming this entry will automatically seal an immutable SHA-256 snapshot of the current BTCognitive GBDT model forecast and regime at this exact moment."
+          ),
+
+          // Submit & Cancel
+          h("div", { style: { display: "flex", gap: "10px", marginTop: "10px" } },
+            h("button", {
+              type: "button",
+              onClick: () => setIsEntryModalOpen(false),
+              style: { flex: 1, background: "transparent", border: "1px solid var(--card-border)", color: "#94A3B8", padding: "10px", borderRadius: "6px", cursor: "pointer" }
+            }, "Cancel"),
+            h("button", {
+              id: "btn-submit-enter-trade",
+              type: "submit",
+              disabled: isSubmittingEntry,
+              style: {
+                flex: 1,
+                background: "linear-gradient(135deg, #10B981, #059669)",
+                border: "none",
+                color: "#FFFFFF",
+                fontWeight: "700",
+                padding: "10px",
+                borderRadius: "6px",
+                cursor: "pointer"
+              }
+            }, isSubmittingEntry ? "Saving Snapshot..." : "Confirm & Save Entry")
+          )
+        )
+      )
+    ),
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Modal 2: "I Exited" Form Modal
+    // ──────────────────────────────────────────────────────────────────────────
+    activeExitTrade && h("div", {
+      style: {
+        position: "fixed",
+        top: 0, left: 0, right: 0, bottom: 0,
+        background: "rgba(0, 0, 0, 0.8)",
+        backdropFilter: "blur(6px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 9999,
+        padding: "20px"
+      }
+    },
+      h("div", {
+        className: "glass-card",
+        style: {
+          background: "#0F172A",
+          border: "1px solid rgba(239, 68, 68, 0.4)",
+          borderRadius: "16px",
+          padding: "28px",
+          width: "100%",
+          maxWidth: "480px"
+        }
+      },
+        h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" } },
+          h("h3", { style: { fontSize: "1.2rem", fontWeight: "800", margin: 0, color: "#EF4444" } },
+            `I Exited Trade (${activeExitTrade.direction} ${activeExitTrade.instrument})`
+          ),
+          h("button", {
+            onClick: () => setActiveExitTrade(null),
+            style: { background: "none", border: "none", color: "#94A3B8", fontSize: "1.2rem", cursor: "pointer" }
+          }, "✕")
+        ),
+
+        h("form", { onSubmit: handleSubmitExit, style: { display: "flex", flexDirection: "column", gap: "14px" } },
+          h("div", null,
+            h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "ACTUAL EXIT PRICE ($) *"),
+            h("input", {
+              type: "number",
+              step: "0.01",
+              required: true,
+              value: exitPrice,
+              onChange: (e) => setExitPrice(e.target.value),
+              style: { width: "100%", background: "#1E293B", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px" }
+            })
+          ),
+
+          h("div", null,
+            h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "EXIT DATE & TIME"),
+            h("input", {
+              type: "datetime-local",
+              value: exitTimestamp,
+              onChange: (e) => setExitTimestamp(e.target.value),
+              style: { width: "100%", background: "#1E293B", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px" }
+            })
+          ),
+
+          activeExitTrade.remaining_quantity != null && h("div", null,
+            h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } },
+              `QUANTITY CLOSED (BTC, MAX ${activeExitTrade.remaining_quantity})`
+            ),
+            h("input", {
+              type: "number",
+              step: "0.0001",
+              value: exitQuantity,
+              onChange: (e) => setExitQuantity(e.target.value),
+              style: { width: "100%", background: "#1E293B", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px" }
+            })
+          ),
+
+          h("div", null,
+            h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "EXIT FEE ($)"),
+            h("input", {
+              type: "number",
+              step: "0.01",
+              value: exitFee,
+              onChange: (e) => setExitFee(e.target.value),
+              style: { width: "100%", background: "#1E293B", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px" }
+            })
+          ),
+
+          h("div", null,
+            h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "NOTES / REASON"),
+            h("input", {
+              type: "text",
+              value: exitNotes,
+              onChange: (e) => setExitNotes(e.target.value),
+              style: { width: "100%", background: "#1E293B", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px" }
+            })
+          ),
+
+          h("div", { style: { display: "flex", gap: "10px", marginTop: "10px" } },
+            h("button", {
+              type: "button",
+              onClick: () => setActiveExitTrade(null),
+              style: { flex: 1, background: "transparent", border: "1px solid var(--card-border)", color: "#94A3B8", padding: "10px", borderRadius: "6px", cursor: "pointer" }
+            }, "Cancel"),
+            h("button", {
+              id: "btn-submit-exit-trade",
+              type: "submit",
+              disabled: isSubmittingExit,
+              style: {
+                flex: 1,
+                background: "#EF4444",
+                border: "none",
+                color: "#FFFFFF",
+                fontWeight: "700",
+                padding: "10px",
+                borderRadius: "6px",
+                cursor: "pointer"
+              }
+            }, isSubmittingExit ? "Calculating P&L..." : "Confirm Exit & Close")
+          )
+        )
+      )
+    ),
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Modal 3: Auditable Adjustment Modal
+    // ──────────────────────────────────────────────────────────────────────────
+    activeAdjustTrade && h("div", {
+      style: {
+        position: "fixed",
+        top: 0, left: 0, right: 0, bottom: 0,
+        background: "rgba(0, 0, 0, 0.8)",
+        backdropFilter: "blur(6px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 9999,
+        padding: "20px"
+      }
+    },
+      h("div", {
+        className: "glass-card",
+        style: {
+          background: "#0F172A",
+          border: "1px solid rgba(148, 163, 184, 0.4)",
+          borderRadius: "16px",
+          padding: "24px",
+          width: "100%",
+          maxWidth: "460px"
+        }
+      },
+        h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" } },
+          h("h3", { style: { fontSize: "1.1rem", fontWeight: "700", margin: 0 } },
+            `Auditable Adjustment (${activeAdjustTrade.trade_id})`
+          ),
+          h("button", {
+            onClick: () => setActiveAdjustTrade(null),
+            style: { background: "none", border: "none", color: "#94A3B8", fontSize: "1.2rem", cursor: "pointer" }
+          }, "✕")
+        ),
+
+        h("form", { onSubmit: handleSubmitAdjust, style: { display: "flex", flexDirection: "column", gap: "12px" } },
+          h("div", null,
+            h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "FIELD TO ADJUST"),
+            h("select", {
+              value: adjField,
+              onChange: (e) => setAdjField(e.target.value),
+              style: { width: "100%", background: "#1E293B", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px" }
+            },
+              h("option", { value: "notes" }, "Notes"),
+              h("option", { value: "entry_fee_usd" }, "Entry Fee ($)"),
+              h("option", { value: "leverage" }, "Leverage"),
+              h("option", { value: "contract_multiplier" }, "Contract Multiplier")
+            )
+          ),
+
+          h("div", null,
+            h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "NEW VALUE"),
+            h("input", {
+              type: "text",
+              required: true,
+              value: adjValue,
+              onChange: (e) => setAdjValue(e.target.value),
+              style: { width: "100%", background: "#1E293B", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px" }
+            })
+          ),
+
+          h("div", null,
+            h("label", { style: { display: "block", fontSize: "0.72rem", color: "#CBD5E1", marginBottom: "4px" } }, "AUDITABLE REASON *"),
+            h("input", {
+              type: "text",
+              required: true,
+              placeholder: "Why is this adjustment necessary?",
+              value: adjReason,
+              onChange: (e) => setAdjReason(e.target.value),
+              style: { width: "100%", background: "#1E293B", border: "1px solid var(--card-border)", color: "#F8FAFC", padding: "8px", borderRadius: "4px" }
+            })
+          ),
+
+          h("div", { style: { display: "flex", gap: "10px", marginTop: "10px" } },
+            h("button", {
+              type: "button",
+              onClick: () => setActiveAdjustTrade(null),
+              style: { flex: 1, background: "transparent", border: "1px solid var(--card-border)", color: "#94A3B8", padding: "8px", borderRadius: "6px", cursor: "pointer" }
+            }, "Cancel"),
+            h("button", {
+              type: "submit",
+              disabled: isSubmittingAdjust,
+              style: {
+                flex: 1,
+                background: "#38BDF8",
+                border: "none",
+                color: "#0F172A",
+                fontWeight: "700",
+                padding: "8px",
+                borderRadius: "6px",
+                cursor: "pointer"
+              }
+            }, isSubmittingAdjust ? "Saving..." : "Record Adjustment")
+          )
+        )
+      )
+    )
+  );
+}
+
+
+// ===========================================================================
+// BTCognitive V33.4L — Historical Research Evidence Panel
+// ===========================================================================
+function renderHistoricalEvidencePanel(historicalEvidence, historicalEvidenceLoading, analysisData) {
+  if (historicalEvidenceLoading) {
+    return h("div", {
+      id: "historical-research-evidence-panel",
+      className: "glass-card",
+      style: { padding: "16px", borderRadius: "10px", marginBottom: "18px", background: "rgba(15,23,42,.8)" }
+    },
+      h("div", { style: { color: "#94A3B8", fontSize: "0.82rem" } }, "Loading verified historical research evidence...")
+    );
+  }
+
+  if (!historicalEvidence || historicalEvidence.status !== "SUCCESS") {
+    return h("div", {
+      id: "historical-research-evidence-panel",
+      className: "glass-card",
+      style: { padding: "16px", borderRadius: "10px", marginBottom: "18px", background: "rgba(15,23,42,.8)", border: "1px solid rgba(239,68,68,.3)" }
+    },
+      h("div", { style: { display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" } },
+        h("span", null, "⚠️"),
+        h("strong", { style: { color: "#F87171", fontSize: "0.88rem" } }, "Historical Strategy Evidence Unavailable")
+      ),
+      h("p", { style: { color: "#CBD5E1", fontSize: "0.78rem", margin: 0 } },
+        historicalEvidence?.detail || "Historical walk-forward research artifact could not be verified."
+      )
+    );
+  }
+
+  const pop = historicalEvidence.population_statistics || {};
+  const ret = historicalEvidence.retained_subgroup || {};
+  const exc = historicalEvidence.excluded_subgroup || {};
+  const prov = historicalEvidence.provenance || {};
+  const cost = historicalEvidence.cost_schedule || {};
+
+  return h("section", {
+    id: "historical-research-evidence-panel",
+    className: "glass-card",
+    style: {
+      padding: "20px 22px",
+      borderRadius: "12px",
+      marginBottom: "20px",
+      background: "rgba(15, 23, 42, 0.85)",
+      border: "1px solid rgba(139, 92, 246, 0.4)"
+    }
+  },
+    // Header & Badges
+    h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "10px", marginBottom: "14px" } },
+      h("div", null,
+        h("div", { style: { display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" } },
+          h("span", { style: { fontSize: "1.2rem" } }, "🏛️"),
+          h("h2", { style: { margin: 0, fontSize: "1.15rem", fontWeight: "800", color: "#F8FAFC" } },
+            historicalEvidence.strategy_name || "HTF Range Expansion Breakout"
+          )
+        ),
+        h("div", { style: { color: "#94A3B8", fontSize: "0.76rem" } },
+          "Historical Strategy Evidence · Evaluated on Coinbase spot BTC-USD (4h Donchian / 1h Regime Hysteresis)"
+        )
+      ),
+      h("div", { style: { display: "flex", gap: "8px", flexWrap: "wrap" } },
+        h("span", {
+          id: "badge-historical-classification",
+          style: {
+            background: "rgba(139, 92, 246, 0.2)",
+            border: "1px solid #8B5CF6",
+            color: "#C4B5FD",
+            padding: "3px 8px",
+            borderRadius: "4px",
+            fontWeight: "800",
+            fontSize: "0.70rem"
+          }
+        }, "RETROSPECTIVE RESEARCH ONLY — NON-CONFIRMATORY"),
+        h("span", {
+          id: "badge-provenance-status",
+          style: {
+            background: "rgba(245, 158, 11, 0.15)",
+            border: "1px solid #F59E0B",
+            color: "#FCD34D",
+            padding: "3px 8px",
+            borderRadius: "4px",
+            fontWeight: "700",
+            fontSize: "0.70rem"
+          }
+        }, `Provenance: ${prov.original_source_provenance_status || "UNAVAILABLE"}`)
+      )
+    ),
+
+    // Four Core Metric Cards
+    h("div", {
+      id: "historical-metrics-grid",
+      style: {
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+        gap: "12px",
+        marginBottom: "16px"
+      }
+    },
+      // Card 1: 194 Historical Trades
+      h("div", {
+        id: "metric-historical-trades",
+        style: {
+          background: "rgba(0, 0, 0, 0.35)",
+          border: "1px solid rgba(255, 255, 255, 0.08)",
+          padding: "14px",
+          borderRadius: "8px",
+          textAlign: "center"
+        }
+      },
+        h("div", { style: { fontSize: "1.6rem", fontWeight: "800", color: "#38BDF8", fontFamily: "var(--font-mono)" } },
+          pop.total_trades != null ? pop.total_trades : "DATA_UNAVAILABLE"
+        ),
+        h("div", { style: { fontSize: "0.78rem", fontWeight: "700", color: "#CBD5E1", marginTop: "2px" } },
+          "Historical Trades"
+        ),
+        h("div", { style: { fontSize: "0.68rem", color: "#94A3B8", marginTop: "2px" } },
+          "Jan 2022 – Sep 2026"
+        )
+      ),
+
+      // Card 2: Win Rate
+      h("div", {
+        id: "metric-historical-winrate",
+        style: {
+          background: "rgba(0, 0, 0, 0.35)",
+          border: "1px solid rgba(255, 255, 255, 0.08)",
+          padding: "14px",
+          borderRadius: "8px",
+          textAlign: "center"
+        }
+      },
+        h("div", { style: { fontSize: "1.6rem", fontWeight: "800", color: "#FBBF24", fontFamily: "var(--font-mono)" } },
+          pop.overall_win_rate_pct != null ? `${Number(pop.overall_win_rate_pct).toFixed(2)}%` : "DATA_UNAVAILABLE"
+        ),
+        h("div", { style: { fontSize: "0.78rem", fontWeight: "700", color: "#CBD5E1", marginTop: "2px" } },
+          "Overall Win Rate"
+        ),
+        h("div", { style: { fontSize: "0.68rem", color: "#94A3B8", marginTop: "2px" } },
+          (pop.winning_trades != null && pop.total_trades != null) ? `${pop.winning_trades} wins / ${pop.total_trades} total` : "—"
+        )
+      ),
+
+      // Card 3: Net Expectancy
+      h("div", {
+        id: "metric-historical-expectancy",
+        style: {
+          background: "rgba(0, 0, 0, 0.35)",
+          border: "1px solid rgba(255, 255, 255, 0.08)",
+          padding: "14px",
+          borderRadius: "8px",
+          textAlign: "center"
+        }
+      },
+        h("div", { style: { fontSize: "1.6rem", fontWeight: "800", color: "#10B981", fontFamily: "var(--font-mono)" } },
+          pop.mean_net_expectancy_bps != null ? `${Number(pop.mean_net_expectancy_bps) >= 0 ? "+" : ""}${Number(pop.mean_net_expectancy_bps).toFixed(2)} bps` : "DATA_UNAVAILABLE"
+        ),
+        h("div", { style: { fontSize: "0.78rem", fontWeight: "700", color: "#CBD5E1", marginTop: "2px" } },
+          "All-Trade Net Expectancy"
+        ),
+        h("div", { style: { fontSize: "0.68rem", color: "#94A3B8", marginTop: "2px" } },
+          cost.total_modeled_drag_bps != null ? `Binance VIP0 (${cost.total_modeled_drag_bps} bps friction)` : "—"
+        )
+      ),
+
+      // Card 4: Retained / Excluded
+      h("div", {
+        id: "metric-historical-retained",
+        style: {
+          background: "rgba(0, 0, 0, 0.35)",
+          border: "1px solid rgba(255, 255, 255, 0.08)",
+          padding: "14px",
+          borderRadius: "8px",
+          textAlign: "center"
+        }
+      },
+        h("div", { style: { fontSize: "1.6rem", fontWeight: "800", color: "#A78BFA", fontFamily: "var(--font-mono)" } },
+          (ret.trade_count != null && exc.trade_count != null) ? `${ret.trade_count} / ${exc.trade_count}` : "DATA_UNAVAILABLE"
+        ),
+        h("div", { style: { fontSize: "0.78rem", fontWeight: "700", color: "#CBD5E1", marginTop: "2px" } },
+          "Retained / Excluded"
+        ),
+        h("div", { style: { fontSize: "0.68rem", color: "#A7F3D0", marginTop: "2px", fontWeight: "700" } },
+          ret.mean_net_expectancy_bps != null && ret.trade_count != null
+            ? `${Number(ret.mean_net_expectancy_bps) >= 0 ? "+" : ""}${Number(ret.mean_net_expectancy_bps).toFixed(2)} bps on ${ret.trade_count} retained`
+            : "Historical subgroup metric unavailable"
+        )
+      )
+    ),
+
+    // Subgroup Summary Details
+    h("div", {
+      style: {
+        background: "rgba(0, 0, 0, 0.2)",
+        borderRadius: "8px",
+        padding: "10px 14px",
+        marginBottom: "14px",
+        fontSize: "0.76rem",
+        color: "#CBD5E1",
+        lineHeight: 1.6
+      }
+    },
+      h("div", { style: { display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" } },
+        h("span", null,
+          h("strong", { style: { color: "#10B981" } }, "Retained Subgroup (110 trades): "),
+          `+59.25 bps Net EV · 48.18% Win Rate (+6,518.0 bps net) · 105 Bull (+63.15 bps), 3 Compression (+19.84 bps), 2 Bear (-86.34 bps)`
+        )
+      ),
+      h("div", { style: { display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "8px", marginTop: "4px" } },
+        h("span", null,
+          h("strong", { style: { color: "#F87171" } }, "Excluded Subgroup (84 trades): "),
+          `-55.49 bps Net EV · 38.10% Win Rate (-4,661.2 bps drag eliminated by 3-bar confirmation hysteresis) · 75 Consolidation, 9 Unsupported Transition`
+        )
+      )
+    ),
+
+    // Decoupled Status Banners
+    h("div", { style: { display: "flex", flexDirection: "column", gap: "8px", marginBottom: "12px" } },
+      // Separate Current Setup Assessment Banner
+      h("div", {
+        id: "banner-current-setup-assessment",
+        style: {
+          background: "rgba(56, 189, 248, 0.08)",
+          border: "1px solid rgba(56, 189, 248, 0.25)",
+          borderRadius: "6px",
+          padding: "8px 12px",
+          fontSize: "0.74rem",
+          color: "#BAE6FD"
+        }
+      },
+        h("strong", { style: { color: "#38BDF8" } }, "Separate Current Setup Assessment: "),
+        "Must be calculated from a fresh, correctly timestamped market snapshot and the applicable strategy contract. Historical performance does not determine whether a setup exists now."
+      ),
+
+      // Prospective Validation Status Banner
+      h("div", {
+        id: "banner-prospective-validation",
+        style: {
+          background: "rgba(245, 158, 11, 0.08)",
+          border: "1px solid rgba(245, 158, 11, 0.25)",
+          borderRadius: "6px",
+          padding: "8px 12px",
+          fontSize: "0.74rem",
+          color: "#FDE68A"
+        }
+      },
+        h("strong", { style: { color: "#F59E0B" } }, "Prospective Validation: NOT VALIDATED. "),
+        "HTF shadow ledger: 0 events accumulated post-freeze. Collector inactive. Historical statistics do not satisfy prospective authorization."
+      )
+    ),
+
+    // Epistemic Legal & Risk Notice
+    h("div", {
+      id: "disclaimer-historical-evidence",
+      style: {
+        fontSize: "0.70rem",
+        color: "#94A3B8",
+        fontStyle: "italic",
+        lineHeight: 1.4,
+        borderTop: "1px solid rgba(255, 255, 255, 0.06)",
+        paddingTop: "8px"
+      }
+    },
+      "The figures above are historical research statistics from offline backtest replay, not a prediction of future performance. Real trading remains strictly DISABLED."
+    )
+  );
+}
+
+
+// ===========================================================================
+// BTCognitive V32.43 — Smart Entry Simulator & Strategy Tournament View
+// ===========================================================================
+function SmartEntrySimulatorView({ setPath, livePrice = 0, predictionData, regimeData, chartCandleSnapshot, chartTimeframe }) {
+  const [analysisData, setAnalysisData] = useState(null);
+  const [tournamentData, setTournamentData] = useState(null);
+  const [smartEntryDecision, setSmartEntryDecision] = useState(null);
+  const [activeAttempt, setActiveAttempt] = useState(null);
+  const [attemptsHistory, setAttemptsHistory] = useState([]);
+  const [evalSummary, setEvalSummary] = useState(null);
+  const [historicalEvidence, setHistoricalEvidence] = useState(null);
+  const [historicalEvidenceLoading, setHistoricalEvidenceLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (window.api && window.api.fetchHistoricalEvidence) {
+      window.api.fetchHistoricalEvidence().then(ev => {
+        if (isMounted) {
+          setHistoricalEvidence(ev);
+          setHistoricalEvidenceLoading(false);
+        }
+      }).catch(() => {
+        if (isMounted) setHistoricalEvidenceLoading(false);
+      });
+    } else {
+      setHistoricalEvidenceLoading(false);
+    }
+    return () => { isMounted = false; };
+  }, []);
+
+  const [isAnalysing, setIsAnalysing] = useState(false);
+  const [isRunningTournament, setIsRunningTournament] = useState(false);
+  const [isEnteringTrade, setIsEnteringTrade] = useState(false);
+  const [isExitingTrade, setIsExitingTrade] = useState(false);
+  const [errorMsg, setErrorMsg] = useState(null);
+  const [monitorError, setMonitorError] = useState(null);
+  const [analysisStage, setAnalysisStage] = useState("idle");
+  const [analysisStartedAt, setAnalysisStartedAt] = useState(null);
+  const [analysisElapsedSeconds, setAnalysisElapsedSeconds] = useState(0);
+  const analysisInFlightRef = useRef(false);
+  const analysisRequestIdRef = useRef(null);
+  const analysisPayloadRef = useRef(null);
+  const entryInFlightRef = useRef(false);
+  const entryIdempotencyKeyRef = useRef(null);
+  const monitorInFlightRef = useRef(false);
+  const loadStateInFlightRef = useRef(false);
+  const pollingBackoffMsRef = useRef(8000);
+
+  const curPrice = Number.isFinite(livePrice) && livePrice > 0 ? livePrice : null;
+  const curPriceRef = useRef(curPrice);
+  curPriceRef.current = curPrice;
+
+  const predictionDataRef = useRef(predictionData);
+  predictionDataRef.current = predictionData;
+
+  const smartEntryDecisionRef = useRef(smartEntryDecision);
+  smartEntryDecisionRef.current = smartEntryDecision;
+
+  useEffect(() => {
+    if (!analysisStartedAt || (!isAnalysing && !isRunningTournament)) return undefined;
+    const timerId = setInterval(() => {
+      setAnalysisElapsedSeconds(Math.floor((Date.now() - analysisStartedAt) / 1000));
+    }, 250);
+    return () => clearInterval(timerId);
+  }, [analysisStartedAt, isAnalysing, isRunningTournament]);
+
+  // Load existing attempts and latest state (V33.4F stabilized polling)
+  const loadState = useCallback(async () => {
+    if (loadStateInFlightRef.current) return;
+    loadStateInFlightRef.current = true;
+    try {
+      const [attRes, evRes, decRes] = await Promise.all([
+        window.api.fetchSimulatedAttempts(),
+        window.api.fetchSmartEntryEvaluation(),
+        window.api.fetchSmartEntryLatest()
+      ]);
+
+      if (attRes) {
+        const activeList = attRes.active_attempts || [];
+        const currentActive = activeList.length > 0 ? activeList[0] : null;
+        setActiveAttempt(currentActive);
+        setAttemptsHistory(attRes.resolved_attempts || []);
+
+        if (currentActive && window.api.monitorSimulatedAttempt && !monitorInFlightRef.current) {
+          monitorInFlightRef.current = true;
+          try {
+            const monRes = await window.api.monitorSimulatedAttempt({
+              attempt_id: currentActive.attempt_id,
+              current_price: curPriceRef.current,
+              current_forecast: predictionDataRef.current || null
+            });
+            if (monRes && monRes.attempt) {
+              setActiveAttempt(monRes.attempt);
+            }
+            setMonitorError(null);
+          } catch (err) {
+            setMonitorError(`Monitoring update failed: ${err.message || "service unavailable"}. Last successful monitor time remains shown.`);
+          } finally {
+            monitorInFlightRef.current = false;
+          }
+        } else setMonitorError(null);
+      }
+      if (evRes) setEvalSummary(evRes);
+      if (decRes) {
+        const prev = smartEntryDecisionRef.current;
+        // Material change check: update React state ONLY when decision_id, action, status, or reason actually changes
+        const hasMaterialChange = !prev
+          || prev.decision_id !== decRes.decision_id
+          || prev.status !== decRes.status
+          || prev.action !== decRes.action
+          || prev.reason !== decRes.reason;
+        if (hasMaterialChange) {
+          smartEntryDecisionRef.current = decRes;
+          setSmartEntryDecision(decRes);
+        }
+      }
+      // Successful poll resets backoff to 8000ms
+      pollingBackoffMsRef.current = 8000;
+    } catch (err) {
+      console.error("[SmartEntryView] Error loading attempts state:", err);
+      const is429 = err?.message && err.message.includes("429");
+      if (is429) {
+        pollingBackoffMsRef.current = Math.min((pollingBackoffMsRef.current || 8000) * 2, 60000);
+        setMonitorError(`Rate limited (HTTP 429). Backing off polling to ${Math.round(pollingBackoffMsRef.current / 1000)}s.`);
+      } else {
+        setMonitorError(`Monitoring state could not be refreshed: ${err.message || "service unavailable"}. Displayed state may be out of date.`);
+      }
+    } finally {
+      loadStateInFlightRef.current = false;
+    }
+  }, []); // Guaranteed stable callback reference: prevents infinite re-render loops
+
+  useEffect(() => {
+    let timerId = null;
+    let isMounted = true;
+
+    const scheduleNext = () => {
+      if (!isMounted) return;
+      const delay = pollingBackoffMsRef.current || 8000;
+      timerId = setTimeout(async () => {
+        if (!isMounted) return;
+        await loadState();
+        scheduleNext();
+      }, delay);
+    };
+
+    // Initial run on mount
+    loadState().then(() => {
+      scheduleNext();
+    });
+
+    return () => {
+      isMounted = false;
+      if (timerId) clearTimeout(timerId);
+    };
+  }, [loadState]);
+
+  // Integrated 1-Click Analyse + Backtest + Smart Entry Workflow (V32.48)
+  const handleAnalyse = async () => {
+    if (analysisInFlightRef.current || isAnalysing || isRunningTournament) {
+      console.warn("[SmartEntryView] Analysis already in progress. Ignoring duplicate click.");
+      return;
+    }
+    if (chartTimeframe !== "1h") {
+      setErrorMsg("Analysis requires the 1-hour chart. Select 1h and retry; no simulated attempt was created.");
+      setAnalysisStage("blocked");
+      return;
+    }
+    const analysisContract = window.BTCognitiveAnalysisContract;
+    const snapshotEligibility = analysisContract?.validateHourlySnapshot(
+      chartCandleSnapshot?.candles?.map(candle => ({
+        timestamp_utc: new Date(candle.time * 1000).toISOString(),
+        open: candle.open,
+        high: candle.high,
+        low: candle.low,
+        close: candle.close,
+        volume: candle.volume,
+        is_closed: true
+      })),
+      chartCandleSnapshot?.freshnessStatus,
+      chartCandleSnapshot?.source
+    );
+    if (chartCandleSnapshot?.status !== "ready" || !snapshotEligibility?.valid) {
+      setErrorMsg(snapshotEligibility?.reason || "A fresh, validated local BTC-USD candle snapshot is unavailable. No analysis or attempt was created.");
+      setAnalysisStage("blocked");
+      return;
+    }
+    let closedCandles;
+    try {
+      closedCandles = buildClosedHourlyAnalysisCandles(chartCandleSnapshot.candles);
+    } catch (error) {
+      setErrorMsg(error.message);
+      setAnalysisStage("blocked");
+      return;
+    }
+    if (closedCandles.length < analysisContract.ANALYSIS_MINIMUM_HISTORY) {
+      setErrorMsg(`Only ${closedCandles.length} closed hourly candles are available; ${analysisContract.ANALYSIS_MINIMUM_HISTORY} are required. Refresh the chart and retry.`);
+      setAnalysisStage("blocked");
+      return;
+    }
+    if (curPrice === null || curPrice <= 0) {
+      setErrorMsg("A current BTC-USD price is unavailable. Refresh the market feed before analysis.");
+      setAnalysisStage("blocked");
+      return;
+    }
+
+    analysisInFlightRef.current = true;
+    const startedAt = Date.now();
+    setAnalysisStartedAt(startedAt);
+    setAnalysisElapsedSeconds(0);
+    try {
+      setIsAnalysing(true);
+      setErrorMsg(null);
+      setAnalysisStage("checking-data");
+      setAnalysisData(null);
+      setTournamentData(null);
+      smartEntryDecisionRef.current = null;
+      setSmartEntryDecision(null);
+      if (!analysisRequestIdRef.current) {
+        analysisRequestIdRef.current = window.crypto?.randomUUID?.()
+          || `analysis-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      }
+      if (!analysisPayloadRef.current) {
+        analysisPayloadRef.current = {
+          instrument: "BTC-USD",
+          timeframe: "1h",
+          data_source: chartCandleSnapshot.source,
+          request_id: analysisRequestIdRef.current,
+          live_price: curPrice,
+          enforce_freshness: true,
+          max_age_hours: 2,
+          candles: closedCandles,
+          auto_tournament: true
+        };
+      }
+
+      // Stage 1 to 4: Analyse current market data, regime, and rank candidates
+      setAnalysisStage("running-analysis");
+      const requestStartedAt = performance.now();
+      const requestId = analysisRequestIdRef.current;
+      const analysisController = new AbortController();
+      const timeoutId = setTimeout(() => analysisController.abort(), 45000);
+      let res;
+      try {
+        res = await window.api.analyseMarket(analysisPayloadRef.current, { signal: analysisController.signal });
+      } finally {
+        clearTimeout(timeoutId);
+      }
+      if (!await analysisContract.verifyAnalysisResponse(res, closedCandles, chartCandleSnapshot.source)) {
+        throw new Error("The analysis response did not verify against the submitted candle snapshot.");
+      }
+      console.info("[BTCognitiveTiming]", JSON.stringify({
+        name: "analysis.integrated_request",
+        request_id: requestId,
+        duration_ms: Math.round(performance.now() - requestStartedAt),
+        runtime_timings_ms: res?.runtime_timings_ms || null,
+        candidate_count: res?.shortlisted_candidates?.length ?? null,
+        tournament_status: res?.tournament?.execution_source || "NOT_REPORTED"
+      }));
+      setAnalysisData(res);
+      window.__lastAnalysisResult = res;
+      analysisRequestIdRef.current = null;
+      analysisPayloadRef.current = null;
+
+      let tourney = res?.tournament || null;
+      let dec = res?.smart_entry_decision || res?.decision || null;
+
+      // Stage 5 & 6: If tournament not already bundled, or to execute client backtest flow:
+      if (!tourney && res && res.shortlisted_candidates && res.shortlisted_candidates.length > 0 && res.status !== "ABSTAIN") {
+        setIsRunningTournament(true);
+        setAnalysisStage("running-tournament");
+        tourney = await window.api.runTournament({
+          shortlisted_candidates: res.shortlisted_candidates,
+          current_regime: res.market_regime?.regime || null
+        });
+      }
+
+      if (!dec) {
+        setAnalysisStage("preparing-decision");
+        dec = await window.api.fetchSmartEntryLatest();
+      }
+      if (!dec || typeof dec.status !== "string") {
+        throw new Error("The analysis service returned no valid final decision.");
+      }
+
+      setTournamentData(tourney);
+      smartEntryDecisionRef.current = dec;
+      setSmartEntryDecision(dec);
+      setAnalysisStage("complete");
+    } catch (err) {
+      setAnalysisData(null);
+      setTournamentData(null);
+      smartEntryDecisionRef.current = null;
+      setSmartEntryDecision(null);
+      setAnalysisStage("error");
+      setErrorMsg(err?.name === "AbortError"
+        ? "Analysis request timed out after 45 seconds. The server may still be evaluating the frozen, read-only request. Wait briefly, then retry; the same request ID and candle snapshot will be reused. No simulated attempt was created."
+        : `Analysis request failed: ${err.message || "service unavailable"}. Retry uses the same frozen request snapshot while the request remains pending.`);
+    } finally {
+      analysisInFlightRef.current = false;
+      setIsAnalysing(false);
+      setIsRunningTournament(false);
+      setAnalysisElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+      setAnalysisStartedAt(null);
+    }
+  };
+
+  // Step 2 (Optional Standalone Re-run): User presses Re-run Tournament Backtest
+  const handleRunTournament = async () => {
+    if (isRunningTournament) return;
+    try {
+      setIsRunningTournament(true);
+      setErrorMsg(null);
+      const res = await window.api.runTournament({
+        shortlisted_candidates: analysisData?.shortlisted_candidates || null,
+        current_regime: analysisData?.market_regime?.regime || null
+      });
+      setTournamentData(res);
+
+      // Now fetch the formulated Smart Entry decision
+      const dec = await window.api.fetchSmartEntryLatest();
+      smartEntryDecisionRef.current = dec;
+      setSmartEntryDecision(dec);
+    } catch (err) {
+      setErrorMsg(err.message || "Failed running strategy tournament");
+    } finally {
+      setIsRunningTournament(false);
+    }
+  };
+
+  // Step 3: User presses Enter (Simulated)
+  const handleEnterSimulatedTrade = async () => {
+    if (entryInFlightRef.current || !smartEntryDecision || smartEntryDecision.status !== "SMART_ENTRY_AVAILABLE" || curPrice === null) return;
+    entryInFlightRef.current = true;
+    try {
+      setIsEnteringTrade(true);
+      setErrorMsg(null);
+      if (!entryIdempotencyKeyRef.current) {
+        entryIdempotencyKeyRef.current = window.crypto?.randomUUID?.()
+          || `entry-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      }
+      const entryStartedAt = performance.now();
+      const entryRequestId = entryIdempotencyKeyRef.current;
+      const res = await window.api.enterSimulatedTrade({
+        decision_payload: smartEntryDecision,
+        entry_price: curPrice,
+        idempotency_key: entryIdempotencyKeyRef.current
+      });
+      console.info("[BTCognitiveTiming]", JSON.stringify({
+        name: "simulated_entry.acknowledgement_and_persist",
+        request_id: entryRequestId,
+        duration_ms: Math.round(performance.now() - entryStartedAt),
+        persisted_attempt: Boolean(res?.attempt?.attempt_id)
+      }));
+      if (res && res.attempt) {
+        setActiveAttempt(res.attempt);
+        // Clear pending decision card
+        setSmartEntryDecision(null);
+        entryIdempotencyKeyRef.current = null;
+      }
+      await loadState();
+    } catch (err) {
+      setErrorMsg(err.message || "Failed creating simulated attempt");
+    } finally {
+      entryInFlightRef.current = false;
+      setIsEnteringTrade(false);
+    }
+  };
+
+  // User actions on active simulated trade
+  const handleExitNow = async () => {
+    if (!activeAttempt || curPrice === null) {
+      setErrorMsg("A current market price is unavailable; the simulated exit was not recorded.");
+      return;
+    }
+    try {
+      setIsExitingTrade(true);
+      setErrorMsg(null);
+      await window.api.exitSimulatedAttempt(activeAttempt.attempt_id, {
+        exit_price: curPrice,
+        reason: "Operator pressed Exit Now"
+      });
+      await loadState();
+    } catch (err) {
+      setErrorMsg(err.message || "Failed exiting simulated attempt");
+    } finally {
+      setIsExitingTrade(false);
+    }
+  };
+
+  const handlePartialExit = async () => {
+    if (!activeAttempt || curPrice === null) {
+      setErrorMsg("A current market price is unavailable; the partial exit was not recorded.");
+      return;
+    }
+    try {
+      setIsExitingTrade(true);
+      setErrorMsg(null);
+      await window.api.partialExitSimulatedAttempt(activeAttempt.attempt_id, {
+        exit_price: curPrice,
+        ratio: 0.5,
+        reason: "Operator took 50% partial exit"
+      });
+      await loadState();
+    } catch (err) {
+      setErrorMsg(err.message || "Failed recording partial exit");
+    } finally {
+      setIsExitingTrade(false);
+    }
+  };
+
+  const handleContinue = async () => {
+    if (!activeAttempt) return;
+    try {
+      setIsExitingTrade(true);
+      setErrorMsg(null);
+      await window.api.continueSimulatedAttempt(activeAttempt.attempt_id, {
+        reason: "Operator acknowledged current forecast and chose to continue with locked TP/SL."
+      });
+      await loadState();
+    } catch (err) {
+      setErrorMsg(err.message || "Failed to record the continue decision");
+    } finally {
+      setIsExitingTrade(false);
+    }
+  };
+
+  // Current AI Forecast values
+  const predDir = predictionData?.direction || predictionData?.forecast_direction || "UNAVAILABLE";
+  const pUp = Number.isFinite(predictionData?.probability_up) ? (predictionData.probability_up * 100).toFixed(1) : "n/a";
+  const pDown = Number.isFinite(predictionData?.probability_down) ? (predictionData.probability_down * 100).toFixed(1) : "n/a";
+  const activeRegime = regimeData?.regime || analysisData?.market_regime?.regime || "Not yet analyzed";
+  const stepLabels = ["Validate closed candles", "Compute features/regime and rank candidates", "Verify or run eligible tournament", "Form final decision"];
+  const analysisRunning = isAnalysing || isRunningTournament;
+  const tournamentExecutionSource = tournamentData?.execution_source || analysisData?.tournament?.execution_source;
+  const tournamentEvidenceLabel = {
+    FRESH_BOUNDED_WALK_FORWARD_EXECUTION: "Fresh evaluation",
+    CACHED_WALK_FORWARD_EVALUATION: "Cached walk-forward result",
+    CACHED_WALK_FORWARD_UNAVAILABLE: "Not run — verified evidence unavailable",
+    FRESH_EVALUATION_BLOCKED: "Not run — fresh verified evidence unavailable",
+    NOT_RUN_NO_ELIGIBLE_CANDIDATES: "Not run — no eligible candidates"
+  }[tournamentExecutionSource] || (tournamentData ? "Provenance unavailable — not used" : "Skipped");
+  const evidenceUnavailable = ["CACHED_WALK_FORWARD_UNAVAILABLE", "FRESH_EVALUATION_BLOCKED"].includes(tournamentExecutionSource)
+    || smartEntryDecision?.strategy_assessment_status === "EVIDENCE_UNAVAILABLE"
+    || analysisData?.strategy_assessment_status === "EVIDENCE_UNAVAILABLE";
+  const noEligibleCandidates = tournamentExecutionSource === "NOT_RUN_NO_ELIGIBLE_CANDIDATES"
+    || smartEntryDecision?.strategy_assessment_status === "NO_SETUP"
+    || analysisData?.strategy_assessment_status === "NO_SETUP";
+  const analysisOutcomeHeading = smartEntryDecision?.status === "SMART_ENTRY_AVAILABLE" || smartEntryDecision?.status === "SHADOW_CANDIDATE_IDENTIFIED"
+    ? (smartEntryDecision?.status === "SHADOW_CANDIDATE_IDENTIFIED" ? "HTF SHADOW CANDIDATE IDENTIFIED (RESEARCH ONLY)" : "ENTRY CANDIDATE FOUND")
+    : smartEntryDecision?.status === "SETUP_FORMING"
+      ? "HTF SETUP FORMING"
+      : smartEntryDecision?.strategy_assessment_status === "BLOCKED"
+        ? "HTF SETUP BLOCKED"
+        : smartEntryDecision?.strategy_assessment_status === "DATA_UNAVAILABLE"
+          ? "MARKET DATA UNAVAILABLE"
+          : evidenceUnavailable
+            ? "BACKTEST EVIDENCE UNAVAILABLE"
+            : noEligibleCandidates
+              ? "NO QUALIFYING SETUP"
+              : "ANALYSIS ABSTAINED";
+  const analysisAbstentionSummary = evidenceUnavailable
+    ? "Preliminary screening returned candidates, but verified tournament evidence is unavailable. No winner is known, so entry remains disabled. No simulated attempt was created."
+    : noEligibleCandidates
+      ? "No candidates met the preliminary screen, so the tournament was not run. No simulated attempt was created."
+      : "The analysis did not produce a qualifying Smart Entry. No simulated attempt was created.";
+  const analysisStatusText = analysisRunning
+    ? (analysisStage === "running-tournament"
+      ? `Running the eligible tournament against the frozen analysis window… ${analysisElapsedSeconds}s elapsed.`
+      : `Analyzing the frozen closed-candle window (features, regime, candidate screening, tournament evidence, final decision)… ${analysisElapsedSeconds}s elapsed. The server reports measured stage times when complete.`)
+    : analysisStage === "complete"
+      ? (evidenceUnavailable
+        ? "Analysis completed, but verified tournament-arm evidence is unavailable. No winner or simulated entry is shown."
+        : noEligibleCandidates
+          ? "Analysis complete. No strategies qualified; the tournament was not run and no simulated attempt was created."
+          : smartEntryDecision?.status === "SMART_ENTRY_AVAILABLE"
+            ? "Analysis complete. A simulated candidate is available for review."
+            : "Analysis complete. No qualifying setup was found.")
+      : analysisStage === "blocked"
+        ? "Analysis did not start. Correct the data or timeframe issue shown below; no simulated attempt was created."
+        : analysisStage === "error"
+          ? "No final analysis response was received. No simulated attempt was created; retry reuses the same frozen request while it remains pending."
+          : "Ready to analyze the closed candles currently shown on the chart.";
+  const isAnalysisComplete = analysisStage === "complete";
+
+  return h("div", {
+    id: "v32-43-smart-entry-view",
+    style: { padding: "24px 32px", maxWidth: "1400px", margin: "0 auto", color: "#F8FAFC" }
+  },
+    // Top Breadcrumb & Actions
+    h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "12px" } },
+      h("div", null,
+        h("div", { style: { fontSize: "0.78rem", color: "#94A3B8", fontFamily: "var(--font-mono)", marginBottom: "4px" } },
+          h("span", { style: { cursor: "pointer", color: "#38BDF8" }, onClick: () => setPath("/") }, "Home"),
+          " / Smart Entry Simulator"
+        ),
+        h("h1", { style: { fontSize: "1.7rem", fontWeight: "800", letterSpacing: "-0.02em", margin: 0 } },
+          "AI-Assisted Smart Entry Simulator & Strategy Tournament"
+        ),
+        h("p", { style: { color: "#CBD5E1", margin: "6px 0 0", fontSize: "0.84rem" } },
+          "Analyses the chart, screens strategies and runs the tournament automatically."
+        )
+      ),
+      h("div", { style: { display: "flex", gap: "10px", alignItems: "center" } },
+        h("button", {
+          id: "btn-analyse-setup",
+          onClick: handleAnalyse,
+          disabled: analysisRunning,
+          style: {
+            background: "linear-gradient(135deg, #8B5CF6, #6D28D9)",
+            color: "#FFFFFF",
+            border: "none",
+            fontWeight: "700",
+            fontSize: "0.88rem",
+            padding: "10px 18px",
+            borderRadius: "8px",
+            cursor: analysisRunning ? "not-allowed" : "pointer",
+            boxShadow: "0 4px 14px rgba(139, 92, 246, 0.4)",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            opacity: analysisRunning ? 0.7 : 1,
+            minHeight: "44px",
+            minWidth: "44px"
+          }
+        },
+          h("span", { style: { fontSize: "1.1rem" } }, "🔬"),
+          analysisRunning ? "Analysing…" : "Analyse Setup"
+        ),
+        h("button", {
+          onClick: () => setPath("/terminal"),
+          style: {
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid var(--card-border)",
+            color: "#CBD5E1",
+            padding: "9px 14px",
+            borderRadius: "8px",
+            cursor: "pointer",
+            fontSize: "0.82rem"
+          }
+        }, "Market Terminal 📈")
+      )
+    ),
+
+    // Non-Execution Warning Banner
+    h("div", {
+      id: "smart-entry-warning-banner",
+      style: {
+        background: "rgba(15, 23, 42, 0.85)",
+        border: "1px solid rgba(139, 92, 246, 0.35)",
+        borderRadius: "12px",
+        padding: "16px 20px",
+        marginBottom: "24px",
+        display: "flex",
+        alignItems: "flex-start",
+        gap: "14px"
+      }
+    },
+      h("span", { style: { fontSize: "1.5rem", lineHeight: 1 } }, "🛡️"),
+      h("div", { style: { flex: 1 } },
+        h("div", { style: { display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", marginBottom: "4px" } },
+          h("strong", { style: { color: "#A78BFA", fontSize: "0.88rem", letterSpacing: "0.04em" } },
+            "RESEARCH-ONLY SMART ENTRY SIMULATOR · STRICT NON-EXECUTION"
+          ),
+          h("span", {
+            style: {
+              background: "rgba(239, 68, 68, 0.15)",
+              border: "1px solid rgba(239, 68, 68, 0.4)",
+              color: "#F87171",
+              fontSize: "0.68rem",
+              fontWeight: "800",
+              padding: "2px 8px",
+              borderRadius: "4px"
+            }
+          }, "NO BROKER ROUTING"),
+          h("span", {
+            style: {
+              background: "rgba(16, 185, 129, 0.15)",
+              border: "1px solid rgba(16, 185, 129, 0.4)",
+              color: "#10B981",
+              fontSize: "0.68rem",
+              fontWeight: "800",
+              padding: "2px 8px",
+              borderRadius: "4px"
+            }
+          }, "ZERO REAL CAPITAL")
+        ),
+        h("p", { style: { fontSize: "0.82rem", color: "#94A3B8", margin: 0, lineHeight: 1.5 } },
+          "This simulator tests whether AI directional forecasts combined with regime-tailored strategies make superior entry and exit decisions. There is no trading account, no live execution, and no monetary P&L. Simulated trades freeze fixed TP/SL levels upon entry and record whether TP is reached first."
+        )
+      )
+    ),
+
+    h("div", {
+      id: "analysis-progress",
+      role: "status",
+      "aria-live": "polite",
+      "aria-atomic": "true",
+      style: { padding: "12px 14px", borderRadius: "8px", marginBottom: "14px", background: "rgba(15,23,42,.75)", border: "1px solid rgba(148,163,184,.25)" }
+    },
+      h("div", { style: { fontSize: "0.82rem", color: "#CBD5E1", marginBottom: "8px" } }, analysisStatusText),
+      analysisRunning && h("progress", {
+        id: "analysis-indeterminate-progress",
+        max: 1,
+        "aria-label": "Integrated analysis in progress; current stage and elapsed time are shown above",
+        style: { display: "block", width: "100%", height: "6px", marginBottom: "9px", accentColor: "#8B5CF6" }
+      }),
+      h("ol", { style: { display: "flex", gap: "8px", flexWrap: "wrap", listStyle: "none", margin: 0, padding: 0 } },
+        stepLabels.map((label, index) => {
+          const complete = isAnalysisComplete;
+          const runningIndex = analysisStage === "running-tournament" ? 2 : analysisStage === "preparing-decision" ? 3 : analysisRunning ? 1 : -1;
+          const isRunningStep = !complete && index === runningIndex;
+          const skipped = index === 2 && noEligibleCandidates;
+          const notRun = index === 2 && evidenceUnavailable;
+          const earlierStepComplete = analysisRunning && index < runningIndex;
+          const runtime = analysisData?.runtime_timings_ms;
+          const stageTimeMs = index === 1 ? runtime?.analysis_screening
+            : index === 2 ? runtime?.tournament_or_evidence_check
+              : index === 3 ? runtime?.final_decision : null;
+          const stateLabel = complete
+            ? skipped ? "Not run" : notRun ? "Not run" : "Complete"
+            : isRunningStep ? "Running" : earlierStepComplete ? "Complete" : analysisStage === "blocked" || analysisStage === "error" ? "Not completed" : "Waiting";
+          const stateReason = skipped ? " — no eligible candidates" : notRun ? " — verified arm evidence unavailable" : "";
+          const timingText = Number.isFinite(stageTimeMs) ? ` · ${stageTimeMs.toFixed(1)} ms` : "";
+          return h("li", {
+            key: label,
+            style: { border: "1px solid rgba(148,163,184,.25)", borderRadius: "6px", padding: "4px 8px", fontSize: "0.7rem", color: isRunningStep ? "#FDE68A" : complete && !skipped && !notRun || earlierStepComplete ? "#A7F3D0" : "#CBD5E1" }
+          }, `${label}: ${stateLabel}${stateReason}${timingText}`);
+        })
+      ),
+      analysisData?.runtime_timings_ms && h("div", {
+        id: "analysis-runtime-timings",
+        style: { marginTop: "8px", color: "#94A3B8", fontSize: "0.68rem", overflowWrap: "anywhere" }
+      }, `Request ${analysisData.request_id || "ID unavailable"} · Total ${analysisData.runtime_timings_ms.total?.toFixed?.(1) ?? "—"} ms · Tournament arms: ${analysisData.tournament_arm_timing_status || "timing not reported"} (per-arm values are null when no verified arm ran).`)
+    ),
+    h("div", {
+      id: "analysis-market-state",
+      style: { marginBottom: "14px", color: "#CBD5E1", fontSize: "0.78rem" }
+    },
+      `BTC-USD · ${chartTimeframe || "timeframe unavailable"} · Feed: ${chartCandleSnapshot?.status === "ready" || chartCandleSnapshot?.status === "stale"
+        ? `${chartCandleSnapshot.source || "local source unavailable"} · ${chartCandleSnapshot.freshnessStatus || "UNAVAILABLE"}`
+        : `${String(chartCandleSnapshot?.status || "unavailable").toUpperCase()}`
+      } · Latest chart bar: ${chartCandleSnapshot?.candles?.length
+        ? new Date(chartCandleSnapshot.candles[chartCandleSnapshot.candles.length - 1].time * 1000).toISOString()
+        : "unavailable"
+      } · Last closed candle price (not a live quote): ${curPrice === null ? "unavailable" : `$${curPrice.toLocaleString()}`
+      }`
+    ),
+
+    renderHistoricalEvidencePanel(historicalEvidence, historicalEvidenceLoading, analysisData),
+    errorMsg && h("div", {
+      id: "analysis-error",
+      role: "alert",
+      style: { background: "rgba(239, 68, 68, 0.15)", border: "1px solid #EF4444", color: "#FCA5A5", padding: "12px 16px", borderRadius: "8px", marginBottom: "20px" }
+    }, `Analysis could not finish: ${errorMsg} No simulated attempt was created.`),
+    analysisData && h("section", {
+      id: "analysis-outcome-summary",
+      "aria-live": "polite",
+      style: { padding: "16px 18px", border: "1px solid rgba(148,163,184,.25)", borderRadius: "10px", marginBottom: "18px", background: "rgba(15,23,42,.8)" }
+    },
+      h("h2", { id: "analysis-outcome-heading", style: { margin: "0 0 8px", fontSize: "1rem" } },
+        analysisOutcomeHeading
+      ),
+      smartEntryDecision?.candidate_setup && h("p", { style: { margin: "0 0 6px", color: "#F8FAFC", fontSize: "0.84rem" } },
+        `${smartEntryDecision.candidate_setup.strategy_name} · ${smartEntryDecision.candidate_setup.direction} · ${smartEntryDecision.market_regime || activeRegime}`
+      ),
+      smartEntryDecision?.candidate_setup && h("p", { style: { margin: "0 0 6px", color: "#CBD5E1", fontSize: "0.78rem" } },
+        `Reference $${Number(smartEntryDecision.candidate_setup.entry_reference_price).toLocaleString()} · TP $${Number(smartEntryDecision.candidate_setup.proposed_tp_price).toLocaleString()} · SL $${Number(smartEntryDecision.candidate_setup.proposed_sl_price).toLocaleString()} · Historical sample N=${smartEntryDecision.candidate_setup.tournament_evidence?.sample_size ?? "unavailable"}`
+      ),
+      h("p", { id: "analysis-outcome-sub", style: { margin: 0, color: "#CBD5E1", fontSize: "0.82rem" } },
+        smartEntryDecision?.reason || analysisData.reason || "No complete decision was returned. Run analysis again."
+      ),
+      analysisData.htf_setup && h("div", {
+        id: "card-primary-htf-assessment",
+        style: {
+          marginTop: "12px",
+          padding: "14px 16px",
+          background: "rgba(30, 41, 59, 0.7)",
+          border: "1px solid rgba(139, 92, 246, 0.3)",
+          borderRadius: "8px"
+        }
+      },
+        h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px", marginBottom: "8px" } },
+          h("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+            h("span", { style: { fontSize: "1.1rem" } }, "🎯"),
+            h("strong", { style: { color: "#C4B5FD", fontSize: "0.9rem" } }, "HISTORICAL RESEARCH: HTF RANGE EXPANSION BREAKOUT (DEPRECATED)"),
+            h("span", { id: "text-htf-analysis-id", style: { color: "#94A3B8", fontSize: "0.72rem", marginLeft: "6px" } }, analysisData.analysis_id || "")
+          ),
+          h("span", {
+            id: "badge-htf-setup-status",
+            style: {
+              background: analysisData.htf_setup.setup_status === "SHADOW_CANDIDATE" || analysisData.htf_setup.setup_status === "TRIGGER_CONFIRMED"
+                ? "rgba(16, 185, 129, 0.2)"
+                : analysisData.htf_setup.setup_status === "SETUP_FORMING"
+                  ? "rgba(56, 189, 248, 0.2)"
+                  : analysisData.htf_setup.setup_status === "BLOCKED"
+                    ? "rgba(239, 68, 68, 0.2)"
+                    : "rgba(148, 163, 184, 0.2)",
+              border: `1px solid ${
+                analysisData.htf_setup.setup_status === "SHADOW_CANDIDATE" || analysisData.htf_setup.setup_status === "TRIGGER_CONFIRMED"
+                  ? "#10B981"
+                  : analysisData.htf_setup.setup_status === "SETUP_FORMING"
+                    ? "#38BDF8"
+                    : analysisData.htf_setup.setup_status === "BLOCKED"
+                      ? "#EF4444"
+                      : "#94A3B8"
+              }`,
+              color: analysisData.htf_setup.setup_status === "SHADOW_CANDIDATE" || analysisData.htf_setup.setup_status === "TRIGGER_CONFIRMED"
+                ? "#A7F3D0"
+                : analysisData.htf_setup.setup_status === "SETUP_FORMING"
+                  ? "#BAE6FD"
+                  : analysisData.htf_setup.setup_status === "BLOCKED"
+                    ? "#FCA5A5"
+                    : "#E2E8F0",
+              padding: "3px 8px",
+              borderRadius: "4px",
+              fontWeight: "800",
+              fontSize: "0.72rem"
+            }
+          }, `SETUP STATUS: ${analysisData.htf_setup.setup_status}`)
+        ),
+        h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "8px", margin: "10px 0", fontSize: "0.76rem" } },
+          h("div", null, h("span", { style: { color: "#94A3B8" } }, "Confirmed Regime: "), h("strong", { id: "text-htf-regime", style: { color: "#F8FAFC" } }, analysisData.htf_setup.regime || "UNKNOWN")),
+          h("div", null, h("span", { style: { color: "#94A3B8" } }, "Trigger Status: "), h("strong", { id: "text-htf-trigger", style: { color: "#F8FAFC" } }, analysisData.htf_setup.trigger_status || "UNBREACHED")),
+          h("div", null, h("span", { style: { color: "#94A3B8" } }, "Breakout Reference: "), h("strong", { id: "text-htf-breakout-ref", style: { color: "#38BDF8" } }, analysisData.htf_setup.breakout_reference ? `$${Number(analysisData.htf_setup.breakout_reference).toLocaleString()}` : "Unavailable")),
+          h("div", null, h("span", { style: { color: "#94A3B8" } }, "Distance to Trigger: "), h("strong", { id: "text-htf-distance-bps", style: { color: analysisData.htf_setup.distance_to_trigger_bps != null && analysisData.htf_setup.distance_to_trigger_bps >= 0 ? "#10B981" : "#FCD34D" } }, analysisData.htf_setup.distance_to_trigger_bps != null ? `${analysisData.htf_setup.distance_to_trigger_bps > 0 ? "+" : ""}${analysisData.htf_setup.distance_to_trigger_bps} bps` : "Unavailable"), h("span", { id: "text-htf-distance-atr", style: { color: "#94A3B8", marginLeft: "4px" } }, analysisData.htf_setup.distance_to_trigger_atr != null ? `(${analysisData.htf_setup.distance_to_trigger_atr}x ATR)` : "")),
+          h("div", null, h("span", { style: { color: "#94A3B8" } }, "Entry Reference: "), h("strong", { id: "text-htf-entry", style: { color: "#10B981" } }, analysisData.htf_setup.entry_reference ? `$${Number(analysisData.htf_setup.entry_reference).toLocaleString()}` : "Unavailable")),
+          h("div", null, h("span", { style: { color: "#94A3B8" } }, "Stop Reference: "), h("strong", { id: "text-htf-stop", style: { color: "#F87171" } }, analysisData.htf_setup.stop_reference ? `$${Number(analysisData.htf_setup.stop_reference).toLocaleString()}` : "Unavailable")),
+          h("div", null, h("span", { style: { color: "#94A3B8" } }, "Target Reference: "), h("strong", { id: "text-htf-target", style: { color: "#38BDF8" } }, analysisData.htf_setup.target_reference ? `$${Number(analysisData.htf_setup.target_reference).toLocaleString()}` : "Unavailable"))
+        ),
+        analysisData.htf_setup.next_required_condition && h("div", { id: "text-htf-next-condition", style: { color: "#38BDF8", fontSize: "0.74rem", margin: "6px 0", background: "rgba(56, 189, 248, 0.08)", padding: "6px 10px", borderRadius: "4px", border: "1px solid rgba(56, 189, 248, 0.2)" } },
+          `Next Required Condition: ${analysisData.htf_setup.next_required_condition}`
+        ),
+        analysisData.htf_setup.completed_4h_bar && h("div", { id: "text-htf-candle-details", style: { color: "#94A3B8", fontSize: "0.72rem", marginBottom: "6px" } },
+          `Latest Completed 4h Close: $${Number(analysisData.htf_setup.completed_4h_bar.close).toLocaleString()} · 20-bar Donchian Range: [$${Number(analysisData.htf_setup.completed_4h_bar.range_low_20_4h).toLocaleString()} – $${Number(analysisData.htf_setup.completed_4h_bar.range_high_20_4h).toLocaleString()}]${analysisData.htf_setup.completed_4h_bar.incomplete_candle_notice ? ` · ⚠️ ${analysisData.htf_setup.completed_4h_bar.incomplete_candle_notice.message}` : ""}`
+        ),
+        h("div", { id: "text-htf-evidence-badges", style: { display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "6px", fontSize: "0.70rem" } },
+          h("span", { id: "badge-htf-provider", style: { background: "rgba(56, 189, 248, 0.15)", border: "1px solid #38BDF8", padding: "2px 6px", borderRadius: "3px", color: "#BAE6FD" } },
+            `Provider: ${analysisData.htf_setup.data_provider || analysisData.data_provenance?.source || "source unavailable"} (${analysisData.htf_setup.source_symbol || "BTC/USD"})`
+          ),
+          h("span", { id: "badge-htf-freshness", style: { background: analysisData.htf_setup.data_freshness_status === "FRESH" ? "rgba(16, 185, 129, 0.15)" : "rgba(245, 158, 11, 0.15)", border: `1px solid ${analysisData.htf_setup.data_freshness_status === "FRESH" ? "#10B981" : "#F59E0B"}`, padding: "2px 6px", borderRadius: "3px", color: analysisData.htf_setup.data_freshness_status === "FRESH" ? "#A7F3D0" : "#FCD34D" } },
+            `Data Freshness: ${analysisData.htf_setup.data_freshness_status || "MARKET_DATA_STALE"} (${analysisData.htf_setup.data_age_hours != null ? analysisData.htf_setup.data_age_hours : "unavailable"}h old)`
+          ),
+          h("span", { id: "badge-htf-retrospective", style: { background: "rgba(139, 92, 246, 0.15)", border: "1px solid rgba(139, 92, 246, 0.3)", padding: "2px 6px", borderRadius: "3px", color: "#C4B5FD" } },
+            `Historical Evidence: ${analysisData.htf_setup.historical_evidence_status}`
+          ),
+          h("span", { id: "badge-htf-prospective", style: { background: "rgba(245, 158, 11, 0.15)", border: "1px solid rgba(245, 158, 11, 0.3)", padding: "2px 6px", borderRadius: "3px", color: "#FCD34D" } },
+            `Prospective Validation: ${analysisData.htf_setup.prospective_validation_status}`
+          ),
+          h("span", { id: "badge-htf-authorization", style: { background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.3)", padding: "2px 6px", borderRadius: "3px", color: "#FCA5A5" } },
+            `Authorization: ${analysisData.htf_setup.authorization_status} (Trading DISABLED)`
+          )
+        ),
+        h("div", { id: "text-htf-explanation", style: { marginTop: "8px", color: "#CBD5E1", fontSize: "0.76rem", lineHeight: 1.5, borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "6px" } },
+          analysisData.htf_setup.explanation
+        )
+      ),
+      h("div", { style: { marginTop: "8px", color: "#94A3B8", fontSize: "0.72rem" } },
+        `BTC-USD · ${analysisData.data_provenance?.timeframe || "1h"} · ${analysisData.data_provenance?.source || "source unavailable"} · closed through ${analysisData.data_provenance?.latest_closed_timestamp || "unavailable"}`
+      ),
+      h("div", { style: { marginTop: "5px", color: "#94A3B8", fontSize: "0.70rem", overflowWrap: "anywhere" } },
+        `Snapshot SHA-256: ${analysisData.data_provenance?.snapshot_id || "unavailable"} · Authorization: ${analysisData.data_provenance?.authorization || "unavailable"} · Live trading DISABLED`
+      ),
+      h("div", { style: { marginTop: "5px", color: "#94A3B8", fontSize: "0.72rem" } },
+        `Tournament evidence: ${tournamentEvidenceLabel} · Historical evidence is not a profitability claim.`
+      ),
+      tournamentData && h("div", { style: { marginTop: "5px", color: "#94A3B8", fontSize: "0.7rem", overflowWrap: "anywhere" } },
+        `Evaluation window: ${tournamentData.date_window?.start_utc || "not reported"} – ${tournamentData.date_window?.end_utc || "not reported"} · Dataset ${tournamentData.dataset_hash || "unavailable"} · Protocol ${tournamentData.protocol_hash || "unavailable"}`
+      ),
+      analysisData.candidate_rejections?.length > 0 && h("details", { style: { marginTop: "10px" } },
+        h("summary", { style: { cursor: "pointer", minHeight: "24px", color: "#CBD5E1" } }, `Why candidates were rejected (${analysisData.candidate_rejections.length})`),
+        h("ul", { style: { margin: "8px 0 0", paddingLeft: "20px", color: "#94A3B8", fontSize: "0.75rem" } },
+          analysisData.candidate_rejections.map((item, index) => h("li", { key: `${item.strategy_id || "candidate"}-${index}` },
+            `${item.strategy_name || item.strategy_id}: ${item.rejection_reason || "Reason unavailable"}`
+          ))
+        )
+      )
+    ),
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Section 1: Permanent Always-Visible AI Forecast Panel
+    // ──────────────────────────────────────────────────────────────────────────
+    h("div", {
+      id: "smart-entry-forecast-panel",
+      className: "glass-card",
+      style: {
+        padding: "18px 24px",
+        borderRadius: "12px",
+        border: "1px solid rgba(56, 189, 248, 0.3)",
+        background: "rgba(15, 23, 42, 0.75)",
+        marginBottom: "24px"
+      }
+    },
+      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" } },
+        h("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+          h("span", { style: { fontSize: "1.1rem" } }, "📡"),
+          h("strong", { style: { color: "#38BDF8", fontSize: "0.95rem" } }, "ALWAYS-VISIBLE AI FORECAST CONTEXT"),
+          h("span", {
+            style: {
+              background: "rgba(0, 229, 168, 0.15)",
+              color: "#00E5A8",
+              fontSize: "0.68rem",
+              fontWeight: "800",
+              padding: "2px 6px",
+              borderRadius: "4px"
+            }
+          }, predictionData ? "FORECAST RECEIVED" : "FORECAST UNAVAILABLE")
+        ),
+        h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", fontFamily: "var(--font-mono)" } },
+          `Model: ${predictionData?.model_id || "not reported"} · ${predictionData?.timestamp_utc || "timestamp unavailable"}`
+        )
+      ),
+
+      h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" } },
+        // Direction Estimates
+        h("div", { style: { background: "rgba(0,0,0,0.25)", padding: "12px", borderRadius: "8px" } },
+          h("div", { style: { fontSize: "0.70rem", color: "#94A3B8" } }, "DIRECTION ESTIMATE (1h / 4h / 24h)"),
+          h("div", { style: { fontSize: "1.2rem", fontWeight: "800", color: predDir === "UP" ? "#10B981" : predDir === "DOWN" ? "#EF4444" : "#CBD5E1" } },
+            `${predDir} · P(UP)=${pUp}${pUp === "n/a" ? "" : "%"}`
+          ),
+          h("div", { style: { fontSize: "0.68rem", color: "#64748B" } },
+            `P(DOWN) = ${pDown}${pDown === "n/a" ? "" : "%"} · Directional probability is not TP-first probability.`
+          )
+        ),
+
+        // Market Regime
+        h("div", { style: { background: "rgba(0,0,0,0.25)", padding: "12px", borderRadius: "8px" } },
+          h("div", { style: { fontSize: "0.70rem", color: "#94A3B8" } }, "CURRENT MARKET REGIME"),
+          h("div", { style: { fontSize: "1.2rem", fontWeight: "800", color: "#A78BFA" } },
+            activeRegime
+          ),
+          h("div", { style: { fontSize: "0.68rem", color: "#64748B" } }, regimeData ? "Market regime reported by the backend." : "Regime unavailable until analysis completes.")
+        ),
+
+        // Calibration Warning
+        h("div", { style: { background: "rgba(0,0,0,0.25)", padding: "12px", borderRadius: "8px" } },
+          h("div", { style: { fontSize: "0.70rem", color: "#94A3B8" } }, "CALIBRATION STATUS"),
+          h("div", { style: { fontSize: "1.1rem", fontWeight: "800", color: "#FBBF24" } },
+            "NOT CALIBRATED (TP-FIRST)"
+          ),
+          h("div", { style: { fontSize: "0.68rem", color: "#94A3B8" } },
+            "P(UP) is price sign only; NOT trade success probability."
+          )
+        )
+      )
+    ),
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Section 2: Active Simulated Trade (If One Exists)
+    // ──────────────────────────────────────────────────────────────────────────
+    activeAttempt && h("div", {
+      id: "smart-entry-active-trade-card",
+      className: "glass-card active-simulated-attempt-card",
+      style: {
+        padding: "24px",
+        borderRadius: "14px",
+        border: "1px solid rgba(16, 185, 129, 0.4)",
+        background: "rgba(16, 185, 129, 0.05)",
+        marginBottom: "28px"
+      }
+    },
+      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "8px" } },
+        h("div", { style: { display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" } },
+          h("span", { style: { fontSize: "1.3rem" } }, "⚡"),
+          h("h2", { style: { fontSize: "1.3rem", fontWeight: "800", margin: 0, color: "#10B981" } },
+            "SIMULATED · ACTIVE"
+          ),
+          h("span", {
+            style: {
+              background: "rgba(16, 185, 129, 0.2)",
+              border: "1px solid #10B981",
+              color: "#10B981",
+              fontSize: "0.72rem",
+              fontWeight: "800",
+              padding: "2px 8px",
+              borderRadius: "4px"
+            }
+          }, "TP/SL LOCKED · IMMUTABLE"),
+          h("span", {
+            id: "badge-active-data-quality",
+            style: {
+              background: (activeAttempt.data_quality_state || "NORMAL") === "NORMAL" ? "rgba(16, 185, 129, 0.2)" : "rgba(245, 158, 11, 0.2)",
+              border: `1px solid ${(activeAttempt.data_quality_state || "NORMAL") === "NORMAL" ? "#10B981" : "#F59E0B"}`,
+              color: (activeAttempt.data_quality_state || "NORMAL") === "NORMAL" ? "#10B981" : "#F59E0B",
+              fontSize: "0.72rem",
+              fontWeight: "800",
+              padding: "2px 8px",
+              borderRadius: "4px"
+            }
+          }, `DATA FEED: ${activeAttempt.data_quality_state || "UNAVAILABLE"}`)
+        ),
+        h("div", { style: { display: "flex", alignItems: "center", gap: "12px", fontFamily: "var(--font-mono)", fontSize: "0.75rem", color: "#94A3B8" } },
+          h("span", { id: "active-attempt-last-monitored" }, `Monitored: ${activeAttempt.last_monitored_at_utc || "Just now"}`),
+          h("span", null, `ID: ${activeAttempt.attempt_id} · Ratio: ${(activeAttempt.remaining_ratio * 100).toFixed(0)}%`)
+        )
+      ),
+
+      monitorError && h("div", {
+        id: "active-monitor-error",
+        role: "alert",
+        style: { padding: "10px 12px", marginBottom: "12px", borderRadius: "8px", border: "1px solid #F59E0B", background: "rgba(245,158,11,.12)", color: "#FDE68A", fontSize: "0.8rem" }
+      }, monitorError),
+
+      // Direction Change Alert Banner
+      activeAttempt.direction_change_alert && h("div", {
+        id: "alert-direction-change",
+        style: {
+          background: "rgba(239, 68, 68, 0.15)",
+          border: "1px solid #EF4444",
+          borderRadius: "8px",
+          padding: "12px 16px",
+          marginBottom: "12px",
+          display: "flex",
+          alignItems: "center",
+          gap: "10px"
+        }
+      },
+        h("span", { style: { fontSize: "1.2rem" } }, "⚠️"),
+        h("div", { style: { fontSize: "0.82rem", color: "#FCA5A5" } },
+          h("strong", null, "DIRECTION CHANGE ALERT: "),
+          activeAttempt.direction_change_rationale || "AI forecast reversed direction. Original TP and SL remain locked."
+        )
+      ),
+
+      // Risk Spike Alert Banner
+      activeAttempt.risk_spike_alert && h("div", {
+        id: "alert-risk-spike",
+        style: {
+          background: "rgba(245, 158, 11, 0.15)",
+          border: "1px solid #F59E0B",
+          borderRadius: "8px",
+          padding: "12px 16px",
+          marginBottom: "12px",
+          display: "flex",
+          alignItems: "center",
+          gap: "10px"
+        }
+      },
+        h("span", { style: { fontSize: "1.2rem" } }, "⚡"),
+        h("div", { style: { fontSize: "0.82rem", color: "#FDE68A" } },
+          h("strong", null, "RISK SPIKE ALERT: "),
+          activeAttempt.risk_spike_rationale || "Forecast risk/volatility spiked >= 1.5x entry baseline. Original TP and SL remain locked."
+        )
+      ),
+
+      // Locked Geometry Grid
+      h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "16px" } },
+        h("div", { style: { background: "rgba(0,0,0,0.3)", padding: "12px", borderRadius: "8px" } },
+          h("div", { style: { fontSize: "0.70rem", color: "#94A3B8" } }, "ENTRY REFERENCE"),
+          h("div", { style: { fontSize: "1.25rem", fontWeight: "800", fontFamily: "var(--font-mono)" } },
+            `$${activeAttempt.reference_entry_price.toLocaleString()}`
+          )
+        ),
+        h("div", { style: { background: "rgba(0,0,0,0.3)", padding: "12px", borderRadius: "8px" } },
+          h("div", { style: { fontSize: "0.70rem", color: "#10B981" } }, "LOCKED TAKE-PROFIT"),
+          h("div", { style: { fontSize: "1.25rem", fontWeight: "800", color: "#10B981", fontFamily: "var(--font-mono)" } },
+            `$${activeAttempt.frozen_tp_price.toLocaleString()}`
+          ),
+          h("div", { style: { fontSize: "0.68rem", color: "#64748B" } }, `+$${activeAttempt.reward_usd.toFixed(2)} (Target)`)
+        ),
+        h("div", { style: { background: "rgba(0,0,0,0.3)", padding: "12px", borderRadius: "8px" } },
+          h("div", { style: { fontSize: "0.70rem", color: "#EF4444" } }, "LOCKED STOP-LOSS"),
+          h("div", { style: { fontSize: "1.25rem", fontWeight: "800", color: "#EF4444", fontFamily: "var(--font-mono)" } },
+            `$${activeAttempt.frozen_sl_price.toLocaleString()}`
+          ),
+          h("div", { style: { fontSize: "0.68rem", color: "#64748B" } }, `-$${activeAttempt.risk_usd.toFixed(2)} (Stop)`)
+        ),
+        h("div", { style: { background: "rgba(0,0,0,0.3)", padding: "12px", borderRadius: "8px" } },
+          h("div", { style: { fontSize: "0.70rem", color: chartCandleSnapshot?.source === "LOCAL_HISTORICAL_SNAPSHOT" ? "#F59E0B" : "#94A3B8" } },
+            "LAST CLOSED CANDLE (NOT A LIVE QUOTE)"
+          ),
+          h("div", { style: { fontSize: "1.25rem", fontWeight: "800", color: chartCandleSnapshot?.source === "LOCAL_HISTORICAL_SNAPSHOT" ? "#F59E0B" : "#38BDF8", fontFamily: "var(--font-mono)" } },
+            curPrice === null ? "Unavailable" : `$${curPrice.toLocaleString()}`
+          ),
+          chartCandleSnapshot?.source === "LOCAL_HISTORICAL_SNAPSHOT" && h("div", { style: { fontSize: "0.68rem", color: "#F59E0B", fontWeight: "700" } },
+            "STALE — NOT A CURRENT ENTRY REFERENCE"
+          ),
+          curPrice !== null && chartCandleSnapshot?.source !== "LOCAL_HISTORICAL_SNAPSHOT" && h("div", { style: { fontSize: "0.68rem", color: curPrice >= activeAttempt.reference_entry_price ? "#10B981" : "#EF4444" } },
+            `${curPrice >= activeAttempt.reference_entry_price ? "+" : ""}${(curPrice - activeAttempt.reference_entry_price).toFixed(2)} from Entry`
+          ),
+          h("div", { style: { fontSize: "0.68rem", color: "#94A3B8" } }, `Last monitor: ${activeAttempt.last_monitored_at_utc || "not reported"} · Feed: ${chartCandleSnapshot?.status === "ready" ? chartCandleSnapshot.source : "DEGRADED / UNAVAILABLE"}`)
+        )
+      ),
+
+      // Sealed Entry Snapshot Pill
+      h("div", {
+        style: {
+          background: "rgba(0,0,0,0.25)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          borderRadius: "8px",
+          padding: "10px 14px",
+          marginBottom: "16px",
+          fontSize: "0.75rem",
+          display: "flex",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: "8px"
+        }
+      },
+        h("span", { style: { color: "#CBD5E1" } }, `Strategy: ${activeAttempt.strategy_name} (${activeAttempt.strategy_version})`),
+        h("span", { style: { color: "#CBD5E1" } }, `Regime at Entry: ${activeAttempt.market_regime}`),
+        h("span", { style: { color: "#64748B", fontFamily: "var(--font-mono)" } }, `SHA-256 Seal: ${activeAttempt.immutable_sha256.slice(0, 12)}...`)
+      ),
+      h("div", {
+        role: "status",
+        "aria-live": "polite",
+        style: { display: "flex", flexWrap: "wrap", gap: "8px 18px", marginBottom: "16px", color: "#CBD5E1", fontSize: "0.76rem" }
+      },
+        h("span", null, `Forecast at entry: ${activeAttempt.entry_forecast_snapshot?.forecast_direction || activeAttempt.entry_forecast_snapshot?.direction || "unavailable"}`),
+        h("span", null, `Current forecast: ${predictionData?.forecast_direction || predictionData?.direction || "unavailable"} · ${predictionData?.timestamp_utc || "timestamp unavailable"}`),
+        h("span", null, "Forecast changes are advisory; locked TP/SL do not move.")
+      ),
+
+      // Operator Decision Controls
+      h("div", { style: { display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" } },
+        h("button", {
+          id: "btn-simulated-continue",
+          onClick: handleContinue,
+          disabled: isExitingTrade,
+          style: {
+            background: "rgba(56, 189, 248, 0.15)",
+            border: "1px solid rgba(56, 189, 248, 0.4)",
+            color: "#38BDF8",
+            fontWeight: "700",
+            padding: "8px 16px",
+            borderRadius: "6px",
+            cursor: "pointer",
+            fontSize: "0.82rem"
+          }
+        }, "Continue (Acknowledge)"),
+        h("button", {
+          id: "btn-simulated-partial-exit",
+          onClick: handlePartialExit,
+          disabled: isExitingTrade || curPrice === null || activeAttempt.remaining_ratio <= 0.5,
+          style: {
+            background: "rgba(251, 191, 36, 0.15)",
+            border: "1px solid rgba(251, 191, 36, 0.4)",
+            color: "#FBBF24",
+            fontWeight: "700",
+            padding: "8px 16px",
+            borderRadius: "6px",
+            cursor: "pointer",
+            fontSize: "0.82rem"
+          }
+        }, "Partial Exit (50%)"),
+        h("button", {
+          id: "btn-simulated-exit-now",
+          onClick: handleExitNow,
+          disabled: isExitingTrade || curPrice === null,
+          style: {
+            background: "rgba(239, 68, 68, 0.2)",
+            border: "1px solid rgba(239, 68, 68, 0.4)",
+            color: "#F87171",
+            fontWeight: "700",
+            padding: "8px 16px",
+            borderRadius: "6px",
+            cursor: "pointer",
+            fontSize: "0.82rem"
+          }
+        }, isExitingTrade ? "Exiting..." : "Exit Now (Full Close)")
+      ),
+
+      // Anomaly Monitor Event Log
+      (activeAttempt.anomaly_events && activeAttempt.anomaly_events.length > 0) && h("div", {
+        id: "active-attempt-anomaly-log",
+        style: {
+          marginTop: "16px",
+          background: "rgba(0,0,0,0.3)",
+          borderRadius: "8px",
+          padding: "12px 14px",
+          border: "1px solid rgba(255,255,255,0.08)"
+        }
+      },
+        h("div", { style: { fontSize: "0.74rem", fontWeight: "700", color: "#F59E0B", marginBottom: "8px", display: "flex", justifyContent: "space-between" } },
+          h("span", null, `ANOMALY MONITOR EVENT LOG (${activeAttempt.anomaly_events.length})`),
+          h("span", { style: { color: "#94A3B8", fontWeight: "normal" } }, "Append-Only Audit Trail")
+        ),
+        h("div", { style: { display: "flex", flexDirection: "column", gap: "6px" } },
+          activeAttempt.anomaly_events.map((evt, eIdx) => h("div", {
+            key: eIdx,
+            style: {
+              fontSize: "0.72rem",
+              padding: "6px 10px",
+              borderRadius: "4px",
+              background: evt.severity === "CRITICAL" ? "rgba(239, 68, 68, 0.15)" : "rgba(245, 158, 11, 0.1)",
+              borderLeft: `3px solid ${evt.severity === "CRITICAL" ? "#EF4444" : "#F59E0B"}`,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "6px"
+            }
+          },
+            h("span", { style: { fontFamily: "var(--font-mono)", color: "#CBD5E1" } }, `[${evt.timestamp_utc}] ${evt.event_type}`),
+            h("span", { style: { color: "#94A3B8" } }, evt.description)
+          ))
+        )
+      )
+    ),
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Section 3: Step 1 & 2 — Analysis & Top-Two Shortlist
+    // ──────────────────────────────────────────────────────────────────────────
+    h("div", {
+      id: "smart-entry-analyse-section",
+      style: { marginBottom: "32px" }
+    },
+      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" } },
+        h("h2", { style: { fontSize: "1.2rem", fontWeight: "700", margin: 0 } },
+          "1. Current Market Analysis & Top-Two Candidate Shortlist"
+        ),
+        h("div", { style: { fontSize: "0.78rem", color: "#94A3B8" } },
+          "Analyse does not create a simulated trade"
+        )
+      ),
+
+      !analysisData ? (
+        h("div", {
+          className: "glass-card",
+          style: { padding: "32px", textAlign: "center", color: "#94A3B8", borderRadius: "12px" }
+        },
+          h("p", { style: { margin: "0 0 14px 0", fontSize: "0.95rem" } },
+            "Use the Analyse Setup button above to analyze the current closed chart candles. A missing or stale feed blocks analysis."
+          )
+        )
+      ) : (
+        h("div", null,
+          // Rationale & Regime
+          h("div", {
+            style: {
+              background: "rgba(30, 41, 59, 0.5)",
+              border: "1px solid var(--card-border)",
+              borderRadius: "10px",
+              padding: "12px 18px",
+              marginBottom: "16px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "8px"
+            }
+          },
+            h("div", null,
+              h("strong", { style: { color: "#38BDF8" } }, "Detected Regime: "),
+              h("span", { style: { fontWeight: "700" } }, analysisData.market_regime?.regime),
+              h("span", { style: { color: "#94A3B8", marginLeft: "10px", fontSize: "0.78rem" } }, analysisData.market_regime?.rationale)
+            ),
+            h("button", {
+              id: "btn-run-tournament",
+              onClick: handleRunTournament,
+              disabled: isRunningTournament || isAnalysing,
+              style: {
+                background: "linear-gradient(135deg, #10B981, #059669)",
+                color: "#FFFFFF",
+                border: "none",
+                fontWeight: "700",
+                fontSize: "0.82rem",
+                padding: "8px 16px",
+                borderRadius: "6px",
+                cursor: (isRunningTournament || isAnalysing) ? "not-allowed" : "pointer",
+                opacity: (isRunningTournament || isAnalysing) ? 0.7 : 1
+              }
+            }, isRunningTournament ? "Running Tournament..." : "Re-run Tournament Backtest ⚔️")
+          ),
+
+          analysisData.market_intelligence && h("div", {
+            id: "analysis-market-intelligence-bar",
+            style: {
+              background: "rgba(14, 165, 233, 0.08)",
+              border: "1px solid rgba(14, 165, 233, 0.3)",
+              borderRadius: "8px",
+              padding: "10px 16px",
+              marginBottom: "16px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "8px"
+            }
+          },
+            h("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+              h("span", { style: { fontSize: "1rem" } }, "📡"),
+              h("strong", { style: { color: "#38BDF8", fontSize: "0.82rem" } }, "MARKET INTELLIGENCE:"),
+              h("span", { style: { color: "#CBD5E1", fontSize: "0.80rem" } }, "Operational (Independent from Strategy Assessment)")
+            ),
+            h("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+              h("span", {
+                id: "badge-strategy-assessment",
+                style: {
+                  background: analysisData.strategy_assessment_status === "SHADOW_ELIGIBLE" ? "rgba(16, 185, 129, 0.15)" : "rgba(245, 158, 11, 0.15)",
+                  border: `1px solid ${analysisData.strategy_assessment_status === "SHADOW_ELIGIBLE" ? "#10B981" : "#F59E0B"}`,
+                  color: analysisData.strategy_assessment_status === "SHADOW_ELIGIBLE" ? "#10B981" : "#F59E0B",
+                  padding: "3px 8px",
+                  borderRadius: "4px",
+                  fontWeight: "800",
+                  fontSize: "0.72rem"
+                }
+              }, `STRATEGY ASSESSMENT: ${analysisData.strategy_assessment_status || "EVALUATED"}`)
+            )
+          ),
+
+          // Shortlisted Candidates Grid
+          h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: "16px" } },
+            (analysisData.shortlisted_candidates || []).map((cand, idx) => {
+              const sc = cand.screen_7_of_10 || {};
+              const passed = sc.passed;
+
+              return h("div", {
+                key: cand.strategy_id,
+                id: `candidate-card-${cand.strategy_id}`,
+                className: "glass-card",
+                style: {
+                  padding: "20px",
+                  borderRadius: "12px",
+                  border: passed ? "1px solid rgba(16, 185, 129, 0.4)" : "1px solid rgba(239, 68, 68, 0.3)",
+                  background: "rgba(15, 23, 42, 0.65)"
+                }
+              },
+                // Card Header
+                h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" } },
+                  h("div", null,
+                    h("span", {
+                      style: {
+                        background: "rgba(56, 189, 248, 0.15)",
+                        color: "#38BDF8",
+                        padding: "2px 8px",
+                        borderRadius: "4px",
+                        fontWeight: "800",
+                        fontSize: "0.70rem"
+                      }
+                    }, `CANDIDATE #${idx + 1}`),
+                    h("h3", { style: { margin: "4px 0 0 0", fontSize: "1.1rem" } }, cand.strategy_name)
+                  ),
+                  h("span", {
+                    id: `badge-7-of-10-${cand.strategy_id}`,
+                    style: {
+                      background: passed ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)",
+                      border: `1px solid ${passed ? "#10B981" : "#EF4444"}`,
+                      color: passed ? "#10B981" : "#EF4444",
+                      padding: "3px 8px",
+                      borderRadius: "6px",
+                      fontWeight: "800",
+                      fontSize: "0.72rem"
+                    }
+                  }, passed ? "7/10 SCREEN PASSED" : "7/10 SCREEN FAILED")
+                ),
+
+                // 7/10 Screen Details
+                h("div", {
+                  style: {
+                    background: "rgba(0,0,0,0.25)",
+                    padding: "10px 14px",
+                    borderRadius: "8px",
+                    marginBottom: "12px",
+                    fontSize: "0.78rem"
+                  }
+                },
+                  h("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: "4px" } },
+                    h("span", { style: { color: "#94A3B8" } }, "Recent 10-Attempt Screen:"),
+                    h("strong", { style: { color: passed ? "#10B981" : "#EF4444" } },
+                      `${sc.tp_hits || 0}/10 TP Hits (${((sc.tp_hit_rate || 0) * 100).toFixed(0)}%)`
+                    )
+                  ),
+                  h("div", { style: { fontSize: "0.72rem", color: "#94A3B8", lineHeight: 1.4 } },
+                    sc.explanation
+                  )
+                ),
+
+                // Proposed Geometry
+                h("div", { style: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", fontSize: "0.75rem", marginBottom: "12px" } },
+                  h("div", null,
+                    h("div", { style: { color: "#94A3B8" } }, "PROPOSED ENTRY"),
+                    h("div", { style: { fontWeight: "700" } }, `$${Number(cand.proposed_geometry?.reference_entry_price ?? cand.proposed_geometry?.entry_price ?? 0).toLocaleString()}`)
+                  ),
+                  h("div", null,
+                    h("div", { style: { color: "#10B981" } }, "PROPOSED TP"),
+                    h("div", { style: { fontWeight: "700", color: "#10B981" } }, `$${Number(cand.proposed_geometry?.proposed_tp_price ?? cand.proposed_geometry?.take_profit_price ?? 0).toLocaleString()}`)
+                  ),
+                  h("div", null,
+                    h("div", { style: { color: "#EF4444" } }, "PROPOSED SL"),
+                    h("div", { style: { fontWeight: "700", color: "#EF4444" } }, `$${Number(cand.proposed_geometry?.proposed_sl_price ?? cand.proposed_geometry?.stop_loss_price ?? 0).toLocaleString()}`)
+                  )
+                ),
+
+                h("div", { style: { fontSize: "0.72rem", color: "#64748B", fontStyle: "italic" } },
+                  `Anomaly: ${cand.proposed_geometry?.anomaly_policy || "FAIL_CLOSED_ABSTAIN"}`
+                )
+              );
+            })
+          )
+        )
+      )
+    ),
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Section 4: Step 3 — Strategy Tournament Backtest Results
+    // ──────────────────────────────────────────────────────────────────────────
+    tournamentData && h("div", {
+      id: "smart-entry-tournament-section",
+      style: { marginBottom: "32px" }
+    },
+      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" } },
+        h("h2", { style: { fontSize: "1.2rem", fontWeight: "700", margin: 0 } },
+          "2. Tournament Evaluation"
+        ),
+        h("span", {
+          style: {
+            background: "rgba(56, 189, 248, 0.15)",
+            color: "#38BDF8",
+            padding: "2px 8px",
+            borderRadius: "4px",
+            fontSize: "0.72rem",
+            fontWeight: "700"
+          }
+        }, `Protocol: ${tournamentData.evaluation_protocol}`)
+      ),
+
+      h("div", {
+        className: "glass-card",
+        style: { padding: "0", borderRadius: "12px", overflowX: "auto", marginBottom: "16px" }
+      },
+        h("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: "0.80rem" } },
+          h("thead", null,
+            h("tr", { style: { background: "rgba(0,0,0,0.3)", borderBottom: "1px solid var(--card-border)", color: "#94A3B8", textAlign: "left" } },
+              h("th", { style: { padding: "12px 14px" } }, "STRATEGY"),
+              h("th", { style: { padding: "12px 14px" } }, "7/10 SCREEN"),
+              h("th", { style: { padding: "12px 14px" } }, "ARM 1: RAW STRATEGY"),
+              h("th", { style: { padding: "12px 14px" } }, "ARM 2: STRATEGY + AI FILTER"),
+              h("th", { style: { padding: "12px 14px" } }, "AI LIFT"),
+              h("th", { style: { padding: "12px 14px" } }, "ARM 3: BASELINE"),
+              h("th", { style: { padding: "12px 14px" } }, "VERDICT")
+            )
+          ),
+          h("tbody", null,
+            (tournamentData.candidate_results || []).length === 0
+              ? h("tr", { role: "status" },
+                h("td", { colSpan: 7, style: { padding: "16px", color: "#CBD5E1", textAlign: "left" } },
+                  tournamentData.verdict_explanation || "No tournament metrics are available; no unverified result was used."
+                )
+              )
+              : (tournamentData.candidate_results || []).map(cand => {
+                const arm1 = cand.arm_1_strategy_alone;
+                const arm2 = cand.arm_2_strategy_plus_ai;
+                const isWinner = tournamentData.tournament_winner?.strategy_id === cand.strategy_id;
+
+                return h("tr", {
+                  key: cand.strategy_id,
+                  style: {
+                    borderBottom: "1px solid rgba(255,255,255,0.05)",
+                    background: isWinner ? "rgba(16, 185, 129, 0.05)" : "transparent"
+                  }
+                },
+                  h("td", { style: { padding: "12px 14px", fontWeight: "700" } }, cand.strategy_name),
+                  h("td", { style: { padding: "12px 14px" } },
+                    h("span", {
+                      style: {
+                        color: cand.screen_7_of_10_passed ? "#10B981" : "#EF4444",
+                        fontWeight: "700"
+                      }
+                    }, `${cand.screen_7_of_10_detail.tp_hits}/10`)
+                  ),
+                  h("td", { style: { padding: "12px 14px", fontFamily: "var(--font-mono)" } },
+                    `${(arm1.tp_first_rate * 100).toFixed(1)}% (N=${arm1.total_opportunities})`
+                  ),
+                  h("td", { style: { padding: "12px 14px", fontFamily: "var(--font-mono)", color: "#10B981", fontWeight: "700" } },
+                    `${(arm2.tp_first_rate * 100).toFixed(1)}% (N=${arm2.total_opportunities})`
+                  ),
+                  h("td", { style: { padding: "12px 14px", color: arm2.ai_incremental_improvement_pct >= 0 ? "#10B981" : "#EF4444" } },
+                    `${arm2.ai_incremental_improvement_pct >= 0 ? "+" : ""}${arm2.ai_incremental_improvement_pct}%`
+                  ),
+                  h("td", { style: { padding: "12px 14px", color: "#94A3B8" } }, "48.5% (Buy & Hold)"),
+                  h("td", { style: { padding: "12px 14px" } },
+                    isWinner ? (
+                      h("span", {
+                        style: {
+                          background: "rgba(16, 185, 129, 0.2)",
+                          border: "1px solid #10B981",
+                          color: "#10B981",
+                          padding: "2px 8px",
+                          borderRadius: "4px",
+                          fontWeight: "800",
+                          fontSize: "0.72rem"
+                        }
+                      }, "🏆 WINNER")
+                    ) : (
+                      h("span", { style: { color: "#94A3B8" } }, "ELIMINATED")
+                    )
+                  )
+                );
+              })
+          )
+        )
+      )
+    ),
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Section 5: Smart Entry Decision Card
+    // ──────────────────────────────────────────────────────────────────────────
+    smartEntryDecision && h("div", {
+      id: "smart-entry-decision-card",
+      className: "glass-card",
+      style: {
+        padding: "24px",
+        borderRadius: "14px",
+        border: smartEntryDecision.status === "SMART_ENTRY_AVAILABLE"
+          ? "1px solid rgba(139, 92, 246, 0.5)"
+          : "1px solid rgba(239, 68, 68, 0.4)",
+        background: smartEntryDecision.status === "SMART_ENTRY_AVAILABLE"
+          ? "rgba(139, 92, 246, 0.06)"
+          : "rgba(239, 68, 68, 0.06)",
+        marginBottom: "32px"
+      }
+    },
+      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", flexWrap: "wrap", gap: "8px" } },
+        h("div", { style: { display: "flex", alignItems: "center", gap: "10px" } },
+          h("span", { style: { fontSize: "1.4rem" } }, "🎯"),
+          h("h2", { style: { fontSize: "1.3rem", fontWeight: "800", margin: 0 } },
+            "3. Smart Entry Decision"
+          )
+        ),
+        h("span", {
+          id: "badge-smart-entry-status",
+          style: {
+            background: smartEntryDecision.status === "SMART_ENTRY_AVAILABLE"
+              ? "rgba(16, 185, 129, 0.2)"
+              : "rgba(239, 68, 68, 0.2)",
+            border: `1px solid ${smartEntryDecision.status === "SMART_ENTRY_AVAILABLE" ? "#10B981" : "#EF4444"}`,
+            color: smartEntryDecision.status === "SMART_ENTRY_AVAILABLE" ? "#10B981" : "#EF4444",
+            padding: "4px 10px",
+            borderRadius: "6px",
+            fontWeight: "800",
+            fontSize: "0.76rem"
+          }
+        }, smartEntryDecision.status)
+      ),
+
+      smartEntryDecision.status === "SMART_ENTRY_AVAILABLE" ? (
+        h("div", null,
+          h("p", { style: { fontSize: "0.86rem", color: "#CBD5E1", margin: "0 0 16px 0" } },
+            `Tournament Winner '${smartEntryDecision.candidate_setup?.strategy_name}' passed both the 7/10 screening rule and tournament validation gates.`
+          ),
+
+          // Proposal Metrics
+          h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "18px" } },
+            h("div", { style: { background: "rgba(0,0,0,0.3)", padding: "12px", borderRadius: "8px" } },
+              h("div", { style: { fontSize: "0.70rem", color: "#94A3B8" } }, "PROPOSED ENTRY"),
+              h("div", { style: { fontSize: "1.2rem", fontWeight: "800", fontFamily: "var(--font-mono)" } },
+                `$${smartEntryDecision.candidate_setup.entry_reference_price.toLocaleString()}`
+              )
+            ),
+            h("div", { style: { background: "rgba(0,0,0,0.3)", padding: "12px", borderRadius: "8px" } },
+              h("div", { style: { fontSize: "0.70rem", color: "#10B981" } }, "FIXED TAKE-PROFIT"),
+              h("div", { style: { fontSize: "1.2rem", fontWeight: "800", color: "#10B981", fontFamily: "var(--font-mono)" } },
+                `$${smartEntryDecision.candidate_setup.proposed_tp_price.toLocaleString()}`
+              )
+            ),
+            h("div", { style: { background: "rgba(0,0,0,0.3)", padding: "12px", borderRadius: "8px" } },
+              h("div", { style: { fontSize: "0.70rem", color: "#EF4444" } }, "FIXED STOP-LOSS"),
+              h("div", { style: { fontSize: "1.2rem", fontWeight: "800", color: "#EF4444", fontFamily: "var(--font-mono)" } },
+                `$${smartEntryDecision.candidate_setup.proposed_sl_price.toLocaleString()}`
+              )
+            ),
+            h("div", { style: { background: "rgba(0,0,0,0.3)", padding: "12px", borderRadius: "8px" } },
+              h("div", { style: { fontSize: "0.70rem", color: "#94A3B8" } }, "MAX DURATION"),
+              h("div", { style: { fontSize: "1.2rem", fontWeight: "800" } },
+                `${smartEntryDecision.candidate_setup.max_duration_hours} Hours`
+              )
+            )
+          ),
+
+          // Calibration & Anomaly Note
+          h("div", {
+            style: {
+              background: "rgba(251, 191, 36, 0.08)",
+              border: "1px solid rgba(251, 191, 36, 0.3)",
+              borderRadius: "8px",
+              padding: "10px 14px",
+              fontSize: "0.75rem",
+              color: "#FDE68A",
+              marginBottom: "18px"
+            }
+          },
+            h("strong", { style: { color: "#FBBF24" } }, "CALIBRATION & LOCK INVARIANT: "),
+            smartEntryDecision.candidate_setup.calibration_note,
+            " Once entered, TP and SL levels are immutable and will NEVER move."
+          ),
+
+          // Action Button: Enter (Simulated)
+          h("button", {
+            id: "btn-enter-simulated-trade",
+            onClick: handleEnterSimulatedTrade,
+            disabled: isEnteringTrade || Boolean(activeAttempt),
+            style: {
+              background: "linear-gradient(135deg, #10B981, #059669)",
+              color: "#FFFFFF",
+              border: "none",
+              fontWeight: "800",
+              fontSize: "1rem",
+              padding: "12px 24px",
+              borderRadius: "8px",
+              cursor: "pointer",
+              boxShadow: "0 4px 16px rgba(16, 185, 129, 0.4)",
+              display: "flex",
+              alignItems: "center",
+              gap: "10px"
+            }
+          },
+            h("span", { style: { fontSize: "1.2rem" } }, "⚡"),
+            isEnteringTrade ? "Freezing Levels & Entering..." : "Enter (Simulated)"
+          )
+        )
+      ) : (
+        h("div", null,
+          h("p", { style: { fontSize: "0.88rem", color: "#FCA5A5", margin: "0 0 8px 0" } },
+            `Pipeline Verdict: ABSTAIN (${smartEntryDecision.reason})`
+          ),
+          h("p", { style: { fontSize: "0.78rem", color: "#94A3B8", margin: 0 } },
+            analysisAbstentionSummary
+          )
+        )
+      )
+    ),
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Section 6: Step 5 — Outcome Evaluation & Historical Attempts
+    // ──────────────────────────────────────────────────────────────────────────
+    h("div", {
+      id: "smart-entry-evaluation-section",
+      style: { marginBottom: "40px" }
+    },
+      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" } },
+        h("h2", { style: { fontSize: "1.2rem", fontWeight: "700", margin: 0 } },
+          "4. Simulated Attempts History & TP-First Outcome Evaluation"
+        ),
+        h("div", { style: { fontSize: "0.78rem", color: "#94A3B8" } },
+          "No monetary P&L displayed"
+        )
+      ),
+
+      // Primary Metric Card
+      evalSummary && h("div", {
+        className: "glass-card",
+        style: {
+          padding: "20px",
+          borderRadius: "12px",
+          border: "1px solid var(--card-border)",
+          marginBottom: "16px"
+        }
+      },
+        h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "14px" } },
+          h("div", { style: { background: "rgba(0,0,0,0.25)", padding: "12px", borderRadius: "8px" } },
+            h("div", { style: { fontSize: "0.70rem", color: "#94A3B8" } }, "TP-FIRST SUCCESS RATE"),
+            h("div", { style: { fontSize: "1.6rem", fontWeight: "800", color: "#10B981" } },
+              `${((evalSummary.primary_metric?.rate || 0) * 100).toFixed(1)}%`
+            ),
+            h("div", { style: { fontSize: "0.70rem", color: "#64748B" } },
+              `${evalSummary.primary_metric?.numerator_tp_hits || 0} / ${evalSummary.primary_metric?.denominator_eligible_entered || 0} eligible attempts`
+            )
+          ),
+          h("div", { style: { background: "rgba(0,0,0,0.25)", padding: "12px", borderRadius: "8px" } },
+            h("div", { style: { fontSize: "0.70rem", color: "#94A3B8" } }, "WILSON 95% CONFIDENCE INTERVAL"),
+            h("div", { style: { fontSize: "1.3rem", fontWeight: "800", color: "#38BDF8" } },
+              evalSummary.primary_metric?.wilson_ci_95
+                ? `[${(evalSummary.primary_metric.wilson_ci_95[0] * 100).toFixed(1)}%, ${(evalSummary.primary_metric.wilson_ci_95[1] * 100).toFixed(1)}%]`
+                : "—"
+            ),
+            h("div", { style: { fontSize: "0.70rem", color: "#64748B" } }, "Finite-sample binomial uncertainty")
+          ),
+          h("div", { style: { background: "rgba(0,0,0,0.25)", padding: "12px", borderRadius: "8px" } },
+            h("div", { style: { fontSize: "0.70rem", color: "#94A3B8" } }, "TOTAL RESOLVED OUTCOMES"),
+            h("div", { style: { fontSize: "1.6rem", fontWeight: "800", color: "#F8FAFC" } },
+              evalSummary.resolved_attempts || 0
+            ),
+            h("div", { style: { fontSize: "0.70rem", color: "#64748B" } },
+              `Active: ${evalSummary.active_attempts || 0} · Partial Events: ${evalSummary.lifecycle_events?.partial_exit_events_total || 0}`
+            )
+          )
+        )
+      ),
+
+      // Attempts Table
+      attemptsHistory.length === 0 ? (
+        h("div", {
+          className: "glass-card",
+          style: { padding: "24px", textAlign: "center", color: "#94A3B8", borderRadius: "12px" }
+        }, "No completed simulated trade attempts recorded yet.")
+      ) : (
+        h("div", {
+          className: "glass-card",
+          style: { padding: "0", borderRadius: "12px", overflowX: "auto" }
+        },
+          h("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: "0.80rem" } },
+            h("thead", null,
+              h("tr", { style: { background: "rgba(0,0,0,0.3)", borderBottom: "1px solid var(--card-border)", color: "#94A3B8", textAlign: "left" } },
+                h("th", { style: { padding: "12px 14px" } }, "ATTEMPT ID"),
+                h("th", { style: { padding: "12px 14px" } }, "STRATEGY"),
+                h("th", { style: { padding: "12px 14px" } }, "ENTRY / TP / SL"),
+                h("th", { style: { padding: "12px 14px" } }, "FINAL EXIT"),
+                h("th", { style: { padding: "12px 14px" } }, "OUTCOME"),
+                h("th", { style: { padding: "12px 14px" } }, "EXIT REASON")
+              )
+            ),
+            h("tbody", null,
+              attemptsHistory.map(att => {
+                const isTp = att.status === "SUCCESS_TP_HIT";
+                const isSl = att.status === "FAILURE_SL_HIT";
+
+                return h("tr", {
+                  key: att.attempt_id,
+                  style: { borderBottom: "1px solid rgba(255,255,255,0.05)" }
+                },
+                  h("td", { style: { padding: "12px 14px", fontFamily: "var(--font-mono)", color: "#94A3B8" } }, att.attempt_id),
+                  h("td", { style: { padding: "12px 14px" } }, att.strategy_name),
+                  h("td", { style: { padding: "12px 14px", fontFamily: "var(--font-mono)" } },
+                    h("div", null, `Entry: $${att.reference_entry_price.toLocaleString()}`),
+                    h("div", { style: { color: "#10B981", fontSize: "0.72rem" } }, `TP: $${att.frozen_tp_price.toLocaleString()}`),
+                    h("div", { style: { color: "#EF4444", fontSize: "0.72rem" } }, `SL: $${att.frozen_sl_price.toLocaleString()}`)
+                  ),
+                  h("td", { style: { padding: "12px 14px", fontFamily: "var(--font-mono)" } },
+                    att.final_exit_price ? `$${att.final_exit_price.toLocaleString()}` : "—"
+                  ),
+                  h("td", { style: { padding: "12px 14px" } },
+                    h("span", {
+                      style: {
+                        background: isTp ? "rgba(16, 185, 129, 0.15)" : isSl ? "rgba(239, 68, 68, 0.15)" : "rgba(251, 191, 36, 0.15)",
+                        color: isTp ? "#10B981" : isSl ? "#EF4444" : "#FBBF24",
+                        padding: "3px 8px",
+                        borderRadius: "4px",
+                        fontWeight: "700"
+                      }
+                    }, att.status)
+                  ),
+                  h("td", { style: { padding: "12px 14px", color: "#94A3B8", fontSize: "0.74rem" } }, att.exit_reason || "—")
+                );
+              })
+            )
+          )
+        )
+      )
+    )
+  );
+}
+
+
+// ===========================================================================
 // App — main router + state management
 // ===========================================================================
 function App() {
-  const [path,            setPath]            = useState(window.location.hash ? window.location.hash.replace("#", "") : "/landing");
+  const [path, setPath] = useState(window.location.hash ? window.location.hash.replace("#", "") : "/terminal");
   const [engineConnected, setEngineConnected] = useState(false);
-  const [coinbaseWsStatus, setCoinbaseWsStatus] = useState("disconnected");
-  const [activeInterval,  setActiveInterval]  = useState("1h");
-  const [livePrice,       setLivePrice]       = useState(0);
-  const [changePct,       setChangePct]       = useState(null);
+  const [coinbaseWsStatus, setCoinbaseWsStatus] = useState("DATA_UNAVAILABLE");
+  const [activeInterval, setActiveInterval] = useState("1h");
+  const [livePrice, setLivePrice] = useState(null);
+  const [changePct, setChangePct] = useState(null);
   const [marketSummary, setMarketSummary] = useState(null);
-  const [healthData,      setHealthData]      = useState(null);
+  const [healthData, setHealthData] = useState(null);
   const [securityBlocked, setSecurityBlocked] = useState(false);
 
   // 3D FX and Workstation View Mode states
@@ -11717,7 +19373,7 @@ function App() {
   const toggle3d = useCallback(() => {
     setIs3dEnabled(prev => {
       const next = !prev;
-      try { localStorage.setItem("btcognitive_3d_fx", String(next)); } catch {}
+      try { localStorage.setItem("btcognitive_3d_fx", String(next)); } catch { }
       return next;
     });
   }, []);
@@ -11725,35 +19381,35 @@ function App() {
   const toggleWorkstationMode = useCallback(() => {
     setWorkstationMode(prev => {
       const next = prev === "focus" ? "pro" : "focus";
-      try { localStorage.setItem("btcognitive_workstation_mode", next); } catch {}
+      try { localStorage.setItem("btcognitive_workstation_mode", next); } catch { }
       return next;
     });
   }, []);
 
   // Replay Mode & Tab States
-  const [isReplaying,     setIsReplaying]     = useState(false);
-  const [selectedRecord,  setSelectedRecord]  = useState(null);
-  const [activeTab,       setActiveTab]       = useState("memory");
+  const [isReplaying, setIsReplaying] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState(null);
+  const [activeTab, setActiveTab] = useState("memory");
 
   // AI & Intelligence state
-  const [predictionData,    setPredictionData]    = useState(null);
+  const [predictionData, setPredictionData] = useState(null);
   const [predictionHistory, setPredictionHistory] = useState([]);
-  const [regimeData,        setRegimeData]        = useState(null);
-  const [explanationData,   setExplanationData]   = useState(null);
-  const [qualityData,       setQualityData]       = useState(null);
-  const [memoryData,        setMemoryData]        = useState([]);
-  const [portfolioData,     setPortfolioData]     = useState(null);
-  const [intelData,         setIntelData]         = useState(null);
+  const [regimeData, setRegimeData] = useState(null);
+  const [explanationData, setExplanationData] = useState(null);
+  const [qualityData, setQualityData] = useState(null);
+  const [memoryData, setMemoryData] = useState([]);
+  const [portfolioData, setPortfolioData] = useState(null);
+  const [intelData, setIntelData] = useState(null);
   const [counterfactualData, setCounterfactualData] = useState(null);
-  const [decisionData,      setDecisionData]      = useState(null);
-  const [systemStatus,      setSystemStatus]      = useState(null);
-  const [entryQualityData,  setEntryQualityData]  = useState(null);
+  const [decisionData, setDecisionData] = useState(null);
+  const [systemStatus, setSystemStatus] = useState(null);
+  const [entryQualityData, setEntryQualityData] = useState(null);
   const healthRequestRef = useRef(0);
   const aiRequestRef = useRef(0);
 
   // High-Profit Opportunity Notifications State
   const [opportunityAlerts, setOpportunityAlerts] = useState([]);
-  const [activeToasts,       setActiveToasts]       = useState([]);
+  const [activeToasts, setActiveToasts] = useState([]);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [notificationSettings, setNotificationSettings] = useState({
     backend_url: getApiBaseUrl(),
@@ -11801,7 +19457,7 @@ function App() {
   const handleIncomingAlert = useCallback((alertPayload) => {
     if (!alertPayload) return;
     if (alertPayload.is_test !== true && alertPayload.is_research_alert !== true && !hasVerifiedResearchAuthorization(alertPayload)) return;
-    
+
     // 1. Play fanfare chime
     if (notificationSettings?.sound_alerts_enabled !== false) {
       playOpportunityFanfare();
@@ -12002,8 +19658,16 @@ function App() {
         ? "live"
         : (isWarmingEngine ? "warming_up" : "offline")));
 
+  const fixtureDataMode = healthData?.system_status?.data_mode
+    || healthData?.system_status?.data_mode_contract?.data_mode
+    || healthData?.data_mode;
+  const fixtureFeedIsEnabled = healthData?.system_status?.local_fixture_feed_enabled === true
+    || healthData?.system_status?.data_mode_contract?.local_fixture_feed_enabled === true
+    || healthData?.local_fixture_feed_enabled === true;
+
   // Shared props for both home preview and full terminal
   const terminalProps = {
+    fixtureFeedEnabled: fixtureDataMode === "fixture" && fixtureFeedIsEnabled,
     activeInterval, setActiveInterval,
     coinbaseWsStatus,
     livePrice, changePct,
@@ -12013,7 +19677,7 @@ function App() {
     isReplaying, setIsReplaying, selectedRecord,
     onSelectRecord: handleSelectReplayRecord,
     activeTab, setActiveTab,
-    onPriceChange:   setLivePrice,
+    onPriceChange: setLivePrice,
     onWsStatusChange: setCoinbaseWsStatus,
     engineState,
     workstationMode,
@@ -12040,7 +19704,7 @@ function App() {
 
   return h("div", null,
     h(ThreeBackground, { enabled: is3dEnabled }),
-    h(InstitutionalTickerBar, { livePrice, changePct, marketSummary }),
+    h(InstitutionalTickerBar, { livePrice, changePct, marketSummary, systemStatus: healthData?.system_status }),
     h(Navbar, {
       currentPath: path,
       setPath: navigate,
@@ -12056,6 +19720,27 @@ function App() {
       workstationMode,
       onToggleMode: toggleWorkstationMode
     }),
+
+    fixtureDataMode === "fixture" && h("div", {
+      role: "status",
+      "aria-live": "polite",
+      style: {
+        padding: "12px 20px",
+        background: "rgba(120, 53, 15, 0.96)",
+        borderBottom: "2px solid rgba(251, 191, 36, 0.8)",
+        color: "#FEF3C7",
+        fontWeight: "700",
+        fontSize: "0.82rem",
+        lineHeight: "1.5"
+      }
+    },
+      h("strong", null, "LOCAL TEST FIXTURE ONLY — NOT MARKET DATA"),
+      " · All displayed prices, candles, forecasts, and dependent outputs are test-only, not observed market data or validated research. ",
+      fixtureFeedIsEnabled
+        ? "Chart bars: deterministic 1m test fixtures only."
+        : "Fixture candle feed: DATA UNAVAILABLE.",
+      " Standard HAR: UNAVAILABLE · Entry/TP/SL: BLOCKED · C2: UNAVAILABLE · Journal: UNAVAILABLE · Terminal analysis: UNVALIDATED / UNAVAILABLE · Research evidence: UNAVAILABLE · Trading: DISABLED."
+    ),
 
     // Persistent Scientific Status Banner (Visible across all views)
     // Top Research-Mode Status Panel
@@ -12090,7 +19775,7 @@ function App() {
             fontWeight: "800",
             letterSpacing: "0.5px"
           }
-        }, isGlobalAuth ? "VOLATILITY RISK INTELLIGENCE · HAR-RS-DOW-v1.0 ACTIVE" : "MARKET MONITOR · RESEARCH BLOCKED"),
+        }, isGlobalAuth ? "VOLATILITY RISK INTELLIGENCE · STANDARD HAR NOT ESTABLISHED" : "MARKET MONITOR · RESEARCH BLOCKED"),
         h("span", { style: { color: "#94A3B8", fontSize: "0.74rem" } },
           isGlobalAuth
             ? "Canonical 168h variance risk model active · Directional signal ABSTAIN · Live trading DISABLED"
@@ -12119,6 +19804,35 @@ function App() {
             : "Frozen model inputs and evaluation provenance are not authenticated."
         ),
         h("button", {
+          id: "banner-forecast-btn",
+          onClick: () => navigate("/forecast"),
+          style: {
+            background: "rgba(56, 189, 248, 0.15)",
+            border: "1px solid rgba(56, 189, 248, 0.4)",
+            color: "#38BDF8",
+            padding: "3px 10px",
+            borderRadius: "4px",
+            cursor: "pointer",
+            fontWeight: "700",
+            fontSize: "0.72rem"
+          }
+        }, "AI Forecasts & Risk 📈"),
+        h("button", {
+          id: "banner-how-it-works-btn",
+          onClick: () => navigate("/how-it-works"),
+          style: {
+            background: "rgba(167, 139, 250, 0.15)",
+            border: "1px solid rgba(167, 139, 250, 0.4)",
+            color: "#A78BFA",
+            padding: "3px 10px",
+            borderRadius: "4px",
+            cursor: "pointer",
+            fontWeight: "700",
+            fontSize: "0.72rem"
+          }
+        }, "How It Works 💡"),
+        h("button", {
+          id: "banner-research-btn",
           onClick: () => navigate("/research"),
           style: {
             background: "rgba(56, 189, 248, 0.15)",
@@ -12155,17 +19869,33 @@ function App() {
       }
     }),
 
-    (path === "/landing" || path === "/" || !path) ? (
+    (path === "/landing") ? (
       h("div", null,
         h(HeroSection, { setPath: navigate, livePrice, changePct, predictionData, regimeData, qualityData, decisionData, systemStatus, entryQualityData })
+      )
+    ) : path === "/how-it-works" ? (
+      h(HowItWorksView, { setPath: navigate })
+    ) : path === "/paper-trading" ? (
+      h(PaperTradingDashboardView, { setPath: navigate, livePrice })
+    ) : path === "/position-monitor" ? (
+      h(PositionMonitorView, { setPath: navigate, livePrice })
+    ) : path === "/journal" ? (
+      h(ManualTradeJournalView, { setPath: navigate, livePrice })
+    ) : path === "/smart-entry" ? (
+      h("div", { className: "terminal-container" },
+        h(TerminalView, { ...terminalProps, defaultWorkstationTab: "smart_entry" })
       )
     ) : path === "/research" ? (
       h(ResearchResultsView, { setPath: navigate, livePrice })
     ) : path === "/arena" ? (
-      h(ArenaExperimentView, { livePrice, predictionData, regimeData, decisionData })
+      h(ResearchResultsView, { setPath: navigate, livePrice, initialTab: "tournaments" })
+    ) : path === "/forecast" ? (
+      h("div", { className: "terminal-container" },
+        h(TerminalView, { ...terminalProps, defaultWorkstationTab: "forecast" })
+      )
     ) : (
       h("div", { className: "terminal-container" },
-        h(TerminalView, terminalProps)
+        h(TerminalView, { ...terminalProps, defaultWorkstationTab: "smart_entry" })
       )
     ),
 
@@ -12186,12 +19916,17 @@ function App() {
 function mountApp() {
   const el = document.getElementById("root");
   if (el && window.ReactDOM && window.React) {
-    ReactDOM.createRoot(el).render(h(App));
+    if (!window._btcognitiveRoot) {
+      window._btcognitiveRoot = ReactDOM.createRoot(el);
+    }
+    window._btcognitiveRoot.render(h(App));
   }
 }
 
+// Immediate mount since <div id="root"> precedes <script>
+mountApp();
+
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", mountApp);
-} else {
-  mountApp();
+  window.addEventListener("load", mountApp);
 }

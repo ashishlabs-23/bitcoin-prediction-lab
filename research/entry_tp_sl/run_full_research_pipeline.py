@@ -32,7 +32,11 @@ from research.entry_tp_sl.barrier_contract import (
 )
 from research.entry_tp_sl.triple_barrier import build_trade_contract, TripleBarrierEngine
 from research.entry_tp_sl.setup_detector import StructuralSetupDetector, SetupEvent
-from research.entry_tp_sl.pit_features import compute_pit_features_table, FEATURE_NAMES
+from research.entry_tp_sl.pit_features import (
+    compute_pit_features_table,
+    FEATURE_NAMES,
+    PITTimingProvenanceError,
+)
 from research.entry_tp_sl.baselines import (
     BaselineB0Random, BaselineB3Structural, BaselineB3bTrendFilter,
     MetaModelB4LiteLogistic, MetaModelB4LightGBM
@@ -43,6 +47,12 @@ from research.entry_tp_sl.walk_forward_engine import (
 
 
 def run():
+    raise PITTimingProvenanceError(
+        "Production research pipeline is blocked: no repository-controlled, "
+        "evidence-backed timing authorization exists. Caller-supplied contracts "
+        "cannot authorize CSV access, resampling, or outcome generation."
+    )
+
     print("=" * 80)
     print("STARTING BTC-ENTRY-TP-SL-V3 RESEARCH EXECUTION PIPELINE (PHASES 6C - 6K)")
     print("=" * 80)
@@ -68,7 +78,7 @@ def run():
 
     # 3. Compute PIT Features
     print("3. Computing Point-in-Time features...")
-    df_features = compute_pit_features_table(df_15m)
+    df_features = compute_pit_features_table(df_15m, timing_contract=timing_contract)
     df_features = df_features[(df_features['vol_atr14_pct'] > 1e-5) & (df_features['vol_atr14_pct'].notna())].copy()
     print(f"   Valid feature decision bars: {len(df_features):,}")
 

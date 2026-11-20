@@ -1,0 +1,103 @@
+{
+  "evaluation_name": "Purged Walk-Forward Drift Model Fitting & Out-of-Sample Validation",
+  "validation_protocol": "Purged Expanding Window (2022->2023, 2022-2023->2024, Test: 2025-2026)",
+  "purge_embargo_hours": 24,
+  "variants_evaluated_count": 5,
+  "variants": {
+    "V1_1h_momentum": {
+      "features": [
+        "f_r1"
+      ],
+      "fitted_coefficients": {
+        "f_r1": 0.048,
+        "intercept": -1.5155
+      },
+      "cv_val_aucs": [
+        0.4791,
+        0.5094
+      ],
+      "cv_val_auc_mean": 0.4943,
+      "out_of_sample_test_auc": 0.4987,
+      "mean_oos_predicted_drift": -0.0012,
+      "test_sample_size": 14901
+    },
+    "V2_4h_momentum": {
+      "features": [
+        "f_r4"
+      ],
+      "fitted_coefficients": {
+        "f_r4": 0.081,
+        "intercept": -1.5176
+      },
+      "cv_val_aucs": [
+        0.4597,
+        0.5127
+      ],
+      "cv_val_auc_mean": 0.4862,
+      "out_of_sample_test_auc": 0.5035,
+      "mean_oos_predicted_drift": -0.0033,
+      "test_sample_size": 14901
+    },
+    "V3_24h_momentum": {
+      "features": [
+        "f_r24"
+      ],
+      "fitted_coefficients": {
+        "f_r24": 0.031,
+        "intercept": -1.5159
+      },
+      "cv_val_aucs": [
+        0.4639,
+        0.4919
+      ],
+      "cv_val_auc_mean": 0.4779,
+      "out_of_sample_test_auc": 0.5205,
+      "mean_oos_predicted_drift": -0.0009,
+      "test_sample_size": 14901
+    },
+    "V4_multi_horizon": {
+      "features": [
+        "f_r1",
+        "f_r4",
+        "f_r24"
+      ],
+      "fitted_coefficients": {
+        "f_r1": 0.0123,
+        "f_r4": 0.0776,
+        "f_r24": -0.0076,
+        "intercept": -1.5174
+      },
+      "cv_val_aucs": [
+        0.4749,
+        0.5126
+      ],
+      "cv_val_auc_mean": 0.4938,
+      "out_of_sample_test_auc": 0.5014,
+      "mean_oos_predicted_drift": -0.0033,
+      "test_sample_size": 14901
+    },
+    "V5_momentum_vol_interaction": {
+      "features": [
+        "f_r1",
+        "f_r4",
+        "f_r24",
+        "f_vol_ratio"
+      ],
+      "fitted_coefficients": {
+        "f_r1": 0.0113,
+        "f_r4": 0.0892,
+        "f_r24": -0.0112,
+        "f_vol_ratio": -1.0468,
+        "intercept": -1.7473
+      },
+      "cv_val_aucs": [
+        0.6011,
+        0.6627
+      ],
+      "cv_val_auc_mean": 0.6319,
+      "out_of_sample_test_auc": 0.6574,
+      "mean_oos_predicted_drift": -0.0889,
+      "test_sample_size": 14901
+    }
+  }
+}

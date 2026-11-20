@@ -20,8 +20,8 @@ Verifies:
 6. Primary experiment (Option A: Target Noise Deadzone):
    - Confirms hypothesis test results: deadzone filtering fails to break 53.4% barrier on significant moves.
    - Proves difference is statistically non-significant (p > 0.05).
-7. Production model immutability:
-   - HAR-RS-DOW-v1.0 is strictly preserved as authorized production model.
+7. Model identity and authorization:
+   - HAR-RS-DOW-v1.0 identity is preserved while authorization remains offline research only.
    - Directional models remain OFFLINE_RESEARCH_ONLY.
 """
 
@@ -144,8 +144,8 @@ def test_deadzone_experiment_results(stage9_results):
     assert paired["statistically_significant"] is False
 
 
-def test_production_model_registry_immutability():
-    """Verify HAR-RS-DOW-v1.0 remains active production model and directional model is OFFLINE_RESEARCH_ONLY."""
+def test_model_registry_identity_and_research_only_authorization():
+    """Verify the canonical volatility model remains unauthorized for production serving."""
     from models.authoritative_model_registry import (
         get_active_production_model,
         get_directional_research_baseline,
@@ -156,8 +156,9 @@ def test_production_model_registry_immutability():
     prod = get_active_production_model()
     assert prod.canonical_id == "HAR-RS-DOW-v1.0"
     assert prod.classification == ModelClassification.PRODUCTION_VOLATILITY
-    assert prod.authorization_status == AuthorizationStatus.AUTHORIZED_FOR_PRODUCTION
-    assert verify_production_model_alignment("/api/terminal/live", "HAR-RS-DOW-v1.0") is True
+    assert prod.authorization_status == AuthorizationStatus.OFFLINE_RESEARCH_ONLY
+    assert verify_production_model_alignment("/api/terminal/live", "HAR-RS-DOW-v1.0") is False
+    assert prod.production_endpoints == []
     assert verify_production_model_alignment("/api/terminal/live", "directional-gbm-4lag-v1") is False
 
     dir_model = get_directional_research_baseline()

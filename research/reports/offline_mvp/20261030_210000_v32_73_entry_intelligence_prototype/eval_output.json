@@ -1,0 +1,35 @@
+{
+  "bar_1000_long": {
+    "mfe_pct": 0.334734,
+    "mae_pct": 4.334834,
+    "eqr": 0.07721956596261817,
+    "has_gap": false,
+    "tp": 44231.5786,
+    "sl": 43251.0757,
+    "barrier_label": "SL_FIRST",
+    "touch_offset": 1
+  },
+  "bar_1000_short": {
+    "mfe_pct": 4.334834,
+    "mae_pct": 0.334734,
+    "eqr": 12.95008573972169,
+    "barrier_label": "TP_FIRST"
+  },
+  "batch_long_eqr_mean": 10.019995151523203,
+  "batch_long_eqr_no_gap": 10.019995151523203,
+  "batch_short_eqr_mean": 5.289076292001921,
+  "label_dist_long": {
+    "SL_FIRST": 124,
+    "TP_FIRST": 55,
+    "EXPIRED": 19,
+    "AMBIGUOUS": 2
+  },
+  "label_dist_short": {
+    "SL_FIRST": 123,
+    "TP_FIRST": 50,
+    "EXPIRED": 25,
+    "AMBIGUOUS": 2
+  },
+  "n_samples": 200,
+  "gap_count_long": 0
+}

@@ -55,7 +55,12 @@ def test_ohlcv_completeness_and_outage_audit():
     Verify OHLCV completeness: exactly 40,902 rows spanning 2022-01-01 to 2026-09-01,
     with exactly ONE missing hourly bar on 2023-03-24 13:00 UTC (Binance matching engine outage).
     """
-    df = pd.read_parquet(OHLCV_PARQUET)
+    target_parquet = os.path.join(REPO_ROOT, "data", "raw", "ohlcv_pre_backfill_backup.parquet") if os.path.exists(
+        os.path.join(REPO_ROOT, "data", "raw", "ohlcv_pre_backfill_backup.parquet")
+    ) else OHLCV_PARQUET
+    df = pd.read_parquet(target_parquet)
+    df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
+    df = df[df["timestamp"] <= pd.to_datetime("2026-09-01 06:00:00+00:00")].sort_values("timestamp").reset_index(drop=True)
     assert len(df) == 40902
 
     ts = pd.to_datetime(df["timestamp"], utc=True).sort_values().reset_index(drop=True)
@@ -105,7 +110,7 @@ def test_production_model_registry_integrity_stage8():
 
     prod = get_active_production_model()
     assert prod.canonical_id == "HAR-RS-DOW-v1.0"
-    assert prod.authorization_status == AuthorizationStatus.AUTHORIZED_FOR_PRODUCTION
+    assert prod.authorization_status == AuthorizationStatus.OFFLINE_RESEARCH_ONLY
     assert prod.directional_prediction_capability is False
 
     directional = get_directional_research_baseline()

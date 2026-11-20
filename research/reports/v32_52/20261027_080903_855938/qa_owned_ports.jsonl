@@ -1,0 +1,7 @@
+{"action": "bind", "pid": 22432, "port": 56298}
+{"action": "close", "pid": 22432, "port": 56298}
+{"action": "bind", "pid": 22432, "port": 56299}
+{"action": "close", "pid": 22432, "port": 56299}
+{"action": "bind", "pid": 22432, "port": 56298}
+{"action": "bind", "pid": 23148, "port": 58981}
+{"action": "close", "pid": 23148, "port": 58981}

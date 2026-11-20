@@ -1,0 +1,30 @@
+{
+  "created_at_utc": "2026-10-27T16:16:44.912254+00:00",
+  "protected_before": {
+    "data/raw/ohlcv.parquet": "c007cd613bec3012fa427d047b466d5e250bd4451b5062d311f387e8afd0ce3f",
+    "data/raw/ohlcv_pre_backfill_backup.parquet": "c4949e5b5695ffa172677681b15af2ea6167e73317c3496546f2286a6730b1c8",
+    "data/raw/ohlcv_backfilled.parquet": "1e722f33734a89e74764c02fde0552752cc1ea2eff62ca9046c9d6edf2347d5c",
+    "data/prospective_entry_ledger.jsonl": "91c3aed984002f611a59c78a2eb4c342c0970baebbd2e3d6df7973be7acf1dd7",
+    "data/prospective_shadow_v1.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "data/prospective_entry_ledger_v2.jsonl": "e6e33e3c7beb4c255467e967fc819b85481b0afb1052c3ea7bd248c53f87b604"
+  },
+  "protected_after": {
+    "data/raw/ohlcv.parquet": "c007cd613bec3012fa427d047b466d5e250bd4451b5062d311f387e8afd0ce3f",
+    "data/raw/ohlcv_pre_backfill_backup.parquet": "c4949e5b5695ffa172677681b15af2ea6167e73317c3496546f2286a6730b1c8",
+    "data/raw/ohlcv_backfilled.parquet": "1e722f33734a89e74764c02fde0552752cc1ea2eff62ca9046c9d6edf2347d5c",
+    "data/prospective_entry_ledger.jsonl": "91c3aed984002f611a59c78a2eb4c342c0970baebbd2e3d6df7973be7acf1dd7",
+    "data/prospective_shadow_v1.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "data/prospective_entry_ledger_v2.jsonl": "e6e33e3c7beb4c255467e967fc819b85481b0afb1052c3ea7bd248c53f87b604"
+  },
+  "protected_hashes_identical": true,
+  "data_rights": "BLOCKED",
+  "inherited_test_ids": 47,
+  "classification_counts": {
+    "TEST_OR_CONTRACT_MISMATCH": 7,
+    "DATA_PROVENANCE_BLOCKED": 16,
+    "NOT_REPRODUCED": 23,
+    "ENVIRONMENT_OR_FLAKY": 1
+  },
+  "verdict": "BLOCKED",
+  "reason": "No written market-data rights for public use; browser critical-path evidence and targeted failure reproductions remain open."
+}

@@ -1,0 +1,75 @@
+{
+  "protocol": "BTCognitive V32.43 — Regime-Aware Top-Two Strategy Tournament and Smart Entry Lifecycle",
+  "timestamp_utc": "2026-10-25T19:10:00Z",
+  "governance_status": "OFFLINE_RESEARCH_ONLY",
+  "economic_posture": "NO_GO_NO_VALIDATED_EDGE",
+  "live_trading_authorization": "DISABLED",
+  "decision": "SMART_ENTRY_READY_FOR_SHADOW_TEST",
+  "epistemic_warning": "Meeting the 7/10 screening rule does NOT prove a live trading edge or 70% future success rate. Wilson 95% CI is [39.7%, 89.2%].",
+  "components_implemented": {
+    "regime_classifier": "engine/regime_strategy_tournament.py:MarketRegimeClassifier",
+    "versioned_registry": "engine/regime_strategy_tournament.py:VersionedStrategyRegistry",
+    "preliminary_screen": "engine/regime_strategy_tournament.py:evaluate_7_of_10_screen",
+    "tournament_engine": "engine/regime_strategy_tournament.py:run_strategy_tournament_backtest",
+    "decision_engine": "engine/regime_strategy_tournament.py:formulate_smart_entry_decision",
+    "simulator": "engine/smart_entry_simulator.py:SmartEntrySimulator",
+    "api_router": "api/routes_tournament.py",
+    "frontend_view": "SmartEntrySimulatorView in web/app.js",
+    "pytest_suite": "tests/test_v32_43_strategy_tournament_and_smart_entry.py",
+    "cdp_browser_qa": "engine/run_v32_43_smart_entry_browser_qa.py"
+  },
+  "screening_rule_verification": {
+    "TSMOM_DONCHIAN_24H_168H": {
+      "passed": true,
+      "tp_hits": 7,
+      "total_attempts": 10,
+      "tp_hit_rate": 0.70,
+      "wilson_ci_95": [0.3968, 0.8922]
+    },
+    "ATR_VOLATILITY_BREAKOUT_12H": {
+      "passed": true,
+      "tp_hits": 8,
+      "total_attempts": 10,
+      "tp_hit_rate": 0.80,
+      "wilson_ci_95": [0.4902, 0.9433]
+    },
+    "RANGE_BOLLINGER_REVERSION_20H": {
+      "passed": false,
+      "tp_hits": 6,
+      "total_attempts": 10,
+      "tp_hit_rate": 0.60,
+      "wilson_ci_95": [0.3127, 0.8318]
+    },
+    "HTF_RANGE_EXPANSION_BREAKOUT": {
+      "passed": false,
+      "status": "INSUFFICIENT_EVIDENCE",
+      "tp_hits": 3,
+      "total_attempts": 4
+    }
+  },
+  "testing_evidence": {
+    "pytest_status": "ALL_PASSED",
+    "pytest_tests_passed": 14,
+    "pytest_duration_seconds": 14.73,
+    "frontend_node_tests": "ALL_PASSED",
+    "steady_state_polling_budget": "29.5 req/min (server limiter: 60 req/min)"
+  },
+  "browser_qa_results": {
+    "status": "ALL_PASSED",
+    "desktop_1280x800": "PASSED",
+    "tablet_768x1024": "PASSED",
+    "mobile_375x667": "PASSED",
+    "artifacts": [
+      "research/reports/artifacts/browser_qa/v32_43_smart_entry_desktop.png",
+      "research/reports/artifacts/browser_qa/v32_43_smart_entry_tablet.png",
+      "research/reports/artifacts/browser_qa/v32_43_smart_entry_mobile.png"
+    ]
+  },
+  "protected_files_verified": {
+    "data/prospective_entry_ledger.jsonl": "91c3aed984002f611a59c78a2eb4c342c0970baebbd2e3d6df7973be7acf1dd7",
+    "data/prospective_shadow_v1.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "data/prospective_entry_ledger_v2.jsonl": "e6e33e3c7beb4c255467e967fc819b85481b0afb1052c3ea7bd248c53f87b604",
+    "data/raw/ohlcv.parquet": "1e722f33734a89e74764c02fde0552752cc1ea2eff62ca9046c9d6edf2347d5c",
+    "data/raw/ohlcv_pre_backfill_backup.parquet": "c4949e5b5695ffa172677681b15af2ea6167e73317c3496546f2286a6730b1c8"
+  }
+}

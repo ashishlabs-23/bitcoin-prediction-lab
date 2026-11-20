@@ -1,0 +1,136 @@
+{
+  "audit_version": "V32.63",
+  "audit_date": "2026-10-29",
+  "tolerance": {
+    "absolute_eps": 1e-4,
+    "relative_eps": 1e-4
+  },
+  "ema_cases": [
+    {
+      "case_id": "EMA_5_BAR_HAND_CALCULATED",
+      "period": 3,
+      "alpha": 0.5,
+      "input_prices": [10.0, 11.0, 12.0, 13.0, 14.0],
+      "expected_series": [10.0, 10.5, 11.25, 12.125, 13.0625],
+      "final_expected_value": 13.0625
+    },
+    {
+      "case_id": "EMA_FLAT_SERIES",
+      "period": 20,
+      "alpha": 0.095238,
+      "input_prices": [50.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0],
+      "final_expected_value": 50.0
+    }
+  ],
+  "wilson_ci_cases": [
+    {
+      "case_id": "WILSON_7_OF_10_PASS",
+      "successes": 7,
+      "total": 10,
+      "confidence": 0.95,
+      "expected_lower": 0.3968,
+      "expected_upper": 0.8922,
+      "screen_passed": true
+    },
+    {
+      "case_id": "WILSON_8_OF_10_PASS",
+      "successes": 8,
+      "total": 10,
+      "confidence": 0.95,
+      "expected_lower": 0.4902,
+      "expected_upper": 0.9433,
+      "screen_passed": true
+    },
+    {
+      "case_id": "WILSON_6_OF_10_FAIL",
+      "successes": 6,
+      "total": 10,
+      "confidence": 0.95,
+      "expected_lower": 0.3127,
+      "expected_upper": 0.8318,
+      "screen_passed": false
+    },
+    {
+      "case_id": "WILSON_10_OF_10_PERFECT",
+      "successes": 10,
+      "total": 10,
+      "confidence": 0.95,
+      "expected_lower": 0.7225,
+      "expected_upper": 1.0,
+      "screen_passed": true
+    },
+    {
+      "case_id": "WILSON_0_OF_10_ZERO",
+      "successes": 0,
+      "total": 10,
+      "confidence": 0.95,
+      "expected_lower": 0.0,
+      "expected_upper": 0.2775,
+      "screen_passed": false
+    }
+  ],
+  "breakeven_winrate_cases": [
+    {
+      "case_id": "BEP_ZERO_FRICTION",
+      "friction_r": 0.0,
+      "k_tp": 1.5,
+      "k_sl": 1.0,
+      "expected_breakeven_winrate": 0.4000
+    },
+    {
+      "case_id": "BEP_COINBASE_INDIA_27BPS",
+      "friction_r": 0.3226,
+      "k_tp": 1.5,
+      "k_sl": 1.0,
+      "expected_breakeven_winrate": 0.5290
+    },
+    {
+      "case_id": "BEP_COINBASE_ADVANCED_87BPS",
+      "friction_r": 1.0394,
+      "k_tp": 1.5,
+      "k_sl": 1.0,
+      "expected_breakeven_winrate": 0.8158
+    },
+    {
+      "case_id": "BEP_COINBASE_US_187BPS",
+      "friction_r": 2.2342,
+      "k_tp": 1.5,
+      "k_sl": 1.0,
+      "expected_breakeven_winrate": 1.2937
+    }
+  ],
+  "donchian_cases": [
+    {
+      "case_id": "DONCHIAN_CAUSAL_SHIFT_ASSERTION",
+      "lookback": 24,
+      "highs": [
+        100, 102, 101, 105, 103, 104, 106, 108, 107, 105, 
+        104, 103, 102, 101, 100, 99, 98, 97, 96, 95, 
+        96, 97, 98, 99, 150
+      ],
+      "lows": [
+        90, 91, 90, 92, 91, 93, 94, 95, 94, 93, 
+        92, 91, 90, 89, 88, 87, 86, 85, 84, 83, 
+        82, 83, 84, 85, 40
+      ],
+      "note": "Bar index 24 (value 150 high, 40 low) MUST NOT be included in prior 24-bar channel bounds",
+      "expected_prior_upper": 108.0,
+      "expected_prior_lower": 82.0,
+      "expected_prior_mid": 95.0
+    }
+  ],
+  "atr_cases": [
+    {
+      "case_id": "ATR_TRUE_RANGE_GAPS",
+      "candles": [
+        {"high": 100.0, "low": 90.0, "close": 95.0},
+        {"high": 115.0, "low": 105.0, "close": 110.0},
+        {"high": 95.0, "low": 85.0, "close": 90.0}
+      ],
+      "expected_tr_bar1": 10.0,
+      "expected_tr_bar2_gap_up": 20.0,
+      "expected_tr_bar3_gap_down": 25.0
+    }
+  ]
+}
+

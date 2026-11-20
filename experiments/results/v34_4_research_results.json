@@ -1,0 +1,451 @@
+{
+  "mission_id": "V34.4-HISTORICAL-CONTINUITY-REGIME-ROBUSTNESS",
+  "timestamp_utc": "2026-11-03T09:06:19.238162+00:00",
+  "agent_1_and_2_data_lineage": {
+    "segment_1_2024": {
+      "path": "data/providers/bitstamp/BTCUSD_1h_v34_2_multiyear.parquet",
+      "sha256": "811c9704629d3b735643c0d931ad1998cf0604e9dd96b9790aaf1241ee807436",
+      "row_count": 1000,
+      "start_utc": "2024-01-01T00:00:00+00:00",
+      "end_utc": "2024-02-11T15:00:00+00:00",
+      "span_days": 41.6
+    },
+    "segment_2_2026": {
+      "path": "data/providers/bitstamp/BTCUSD_1h_v34_expanded.parquet",
+      "sha256": "9e8d92a2db78a5c71737146713541c3db5f27d398684114f09d5db3a4493ec81",
+      "row_count": 4000,
+      "start_utc": "2026-05-20T02:00:00+00:00",
+      "end_utc": "2026-11-02T17:00:00+00:00",
+      "span_days": 166.6
+    },
+    "historical_gap_analysis": {
+      "gap_start_utc": "2024-02-11T15:00:00+00:00",
+      "gap_end_utc": "2026-05-20T02:00:00+00:00",
+      "missing_duration_hours": 19883,
+      "missing_duration_days": 828.5,
+      "missing_calendar_years": 2.27,
+      "continuity_status": "DISCONTINUOUS_HISTORICAL_GAP",
+      "epistemic_mandate": "Never treat segments as continuous. Reset all rolling indicators at segment boundaries. Zero return calculations across the 828-day gap."
+    },
+    "v34_2_v34_3_dataset_audit": {
+      "v34_2_consumed": "BTCUSD_1h_v34_expanded.parquet (4,000 bars, SHA: 9e8d92a2db78...)",
+      "v34_3_consumed": "Audited both BTCUSD_1h_v34_expanded.parquet (4,000 bars) and BTCUSD_1h_v34_2_multiyear.parquet (1,000 bars).",
+      "clarification": "The multi-year file never had 25,000 bars. It contains only 1,000 bars due to Bitstamp Incapsula WAF rate-limiting."
+    }
+  },
+  "agent_3_htf_funnel": {
+    "causal_screening_funnel": {
+      "segment_2024_1k_bars": {
+        "raw_breakout_candidates": 22,
+        "regime_classified_bars": 250,
+        "regime_compatible_candidates": 5,
+        "three_bar_confirmed_candidates": 5,
+        "eligible_setups": 4,
+        "completed_trades": 3
+      },
+      "segment_2026_4k_bars": {
+        "raw_breakout_candidates": 76,
+        "regime_classified_bars": 1001,
+        "regime_compatible_candidates": 20,
+        "three_bar_confirmed_candidates": 20,
+        "eligible_setups": 14,
+        "completed_trades": 14
+      }
+    },
+    "comparative_metrics": {
+      "segment_2024_1k_bars": {
+        "trade_count": 3,
+        "win_rate_pct": 33.3,
+        "net_expectancy_bps": -122.3,
+        "net_total_bps": -366.9,
+        "profit_factor": 0.25,
+        "max_drawdown_bps": 492.1,
+        "mean_mfe_bps": 102.2,
+        "mean_mae_bps": 142.2,
+        "avg_holding_duration_hours": 4.0,
+        "monthly_opportunity_frequency": 2.19,
+        "market_exposure_pct": 1.2
+      },
+      "segment_2026_4k_bars": {
+        "trade_count": 14,
+        "win_rate_pct": 21.4,
+        "net_expectancy_bps": -134.7,
+        "net_total_bps": -1886.0,
+        "profit_factor": 0.29,
+        "max_drawdown_bps": 1682.5,
+        "mean_mfe_bps": 163.2,
+        "mean_mae_bps": 282.5,
+        "avg_holding_duration_hours": 16.3,
+        "monthly_opportunity_frequency": 2.56,
+        "market_exposure_pct": 5.7
+      }
+    },
+    "sample_length_caveat": "Segment 2024 spans 1,000 hours (1.4 months). Segment 2026 spans 4,000 hours (5.5 months). Neither sample size can support confirmatory statistical promotion.",
+    "trades_2024": [
+      {
+        "trade_id": "SEG_2024_001",
+        "segment": "SEG_2024",
+        "entry_time_utc": "2024-02-08T00:00:00+00:00",
+        "exit_time_utc": "2024-02-08T12:00:00+00:00",
+        "holding_bars_4h": 3,
+        "holding_hours": 12,
+        "entry_price": 44532.0,
+        "exit_price": 45401.28571428572,
+        "exit_reason": "TP_HIT",
+        "gross_return_bps": 195.2,
+        "net_return_bps_assumed_70bps": 125.2,
+        "mfe_bps": 214.9,
+        "mae_bps": 46.5,
+        "regime_at_entry": "TRENDING_BULLISH"
+      },
+      {
+        "trade_id": "SEG_2024_002",
+        "segment": "SEG_2024",
+        "entry_time_utc": "2024-02-09T00:00:00+00:00",
+        "exit_time_utc": "2024-02-09T00:00:00+00:00",
+        "holding_bars_4h": 0,
+        "holding_hours": 0,
+        "entry_price": 46049.0,
+        "exit_price": 45281.96428571428,
+        "exit_reason": "SL_HIT",
+        "gross_return_bps": -166.6,
+        "net_return_bps_assumed_70bps": -236.6,
+        "mfe_bps": 68.6,
+        "mae_bps": 173.1,
+        "regime_at_entry": "TRENDING_BULLISH"
+      },
+      {
+        "trade_id": "SEG_2024_003",
+        "segment": "SEG_2024",
+        "entry_time_utc": "2024-02-09T08:00:00+00:00",
+        "exit_time_utc": "2024-02-09T08:00:00+00:00",
+        "holding_bars_4h": 0,
+        "holding_hours": 0,
+        "entry_price": 47180.0,
+        "exit_price": 46304.96428571428,
+        "exit_reason": "SL_HIT",
+        "gross_return_bps": -185.5,
+        "net_return_bps_assumed_70bps": -255.5,
+        "mfe_bps": 23.1,
+        "mae_bps": 206.9,
+        "regime_at_entry": "VOLATILITY_EXPANSION"
+      }
+    ],
+    "trades_2026": [
+      {
+        "trade_id": "SEG_2026_001",
+        "segment": "SEG_2026",
+        "entry_time_utc": "2026-07-20T12:00:00+00:00",
+        "exit_time_utc": "2026-07-20T12:00:00+00:00",
+        "holding_bars_4h": 0,
+        "holding_hours": 0,
+        "entry_price": 65544.59,
+        "exit_price": 64669.69678571428,
+        "exit_reason": "SL_HIT",
+        "gross_return_bps": -133.5,
+        "net_return_bps_assumed_70bps": -203.5,
+        "mfe_bps": 15.2,
+        "mae_bps": 233.5,
+        "regime_at_entry": "TRENDING_BULLISH"
+      },
+      {
+        "trade_id": "SEG_2026_002",
+        "segment": "SEG_2026",
+        "entry_time_utc": "2026-07-21T04:00:00+00:00",
+        "exit_time_utc": "2026-07-23T12:00:00+00:00",
+        "holding_bars_4h": 14,
+        "holding_hours": 56,
+        "entry_price": 66149.44,
+        "exit_price": 65163.298214285714,
+        "exit_reason": "SL_HIT",
+        "gross_return_bps": -149.1,
+        "net_return_bps_assumed_70bps": -219.1,
+        "mfe_bps": 116.6,
+        "mae_bps": 223.0,
+        "regime_at_entry": "TRENDING_BULLISH"
+      },
+      {
+        "trade_id": "SEG_2026_003",
+        "segment": "SEG_2026",
+        "entry_time_utc": "2026-08-19T12:00:00+00:00",
+        "exit_time_utc": "2026-08-19T12:00:00+00:00",
+        "holding_bars_4h": 0,
+        "holding_hours": 0,
+        "entry_price": 68521.83,
+        "exit_price": 67322.43964285715,
+        "exit_reason": "SL_HIT",
+        "gross_return_bps": -175.0,
+        "net_return_bps_assumed_70bps": -245.0,
+        "mfe_bps": 179.1,
+        "mae_bps": 598.8,
+        "regime_at_entry": "VOLATILITY_EXPANSION"
+      },
+      {
+        "trade_id": "SEG_2026_004",
+        "segment": "SEG_2026",
+        "entry_time_utc": "2026-08-20T08:00:00+00:00",
+        "exit_time_utc": "2026-08-20T08:00:00+00:00",
+        "holding_bars_4h": 0,
+        "holding_hours": 0,
+        "entry_price": 71872.32,
+        "exit_price": 70179.8442857143,
+        "exit_reason": "SL_HIT",
+        "gross_return_bps": -235.5,
+        "net_return_bps_assumed_70bps": -305.5,
+        "mfe_bps": 74.5,
+        "mae_bps": 297.9,
+        "regime_at_entry": "VOLATILITY_EXPANSION"
+      },
+      {
+        "trade_id": "SEG_2026_005",
+        "segment": "SEG_2026",
+        "entry_time_utc": "2026-08-20T12:00:00+00:00",
+        "exit_time_utc": "2026-08-21T00:00:00+00:00",
+        "holding_bars_4h": 3,
+        "holding_hours": 12,
+        "entry_price": 72435.53,
+        "exit_price": 74885.61142857143,
+        "exit_reason": "TP_HIT",
+        "gross_return_bps": 338.2,
+        "net_return_bps_assumed_70bps": 268.2,
+        "mfe_bps": 454.4,
+        "mae_bps": 186.7,
+        "regime_at_entry": "VOLATILITY_EXPANSION"
+      },
+      {
+        "trade_id": "SEG_2026_006",
+        "segment": "SEG_2026",
+        "entry_time_utc": "2026-08-21T04:00:00+00:00",
+        "exit_time_utc": "2026-08-21T08:00:00+00:00",
+        "holding_bars_4h": 1,
+        "holding_hours": 4,
+        "entry_price": 76286.26,
+        "exit_price": 79449.41,
+        "exit_reason": "TP_HIT",
+        "gross_return_bps": 414.6,
+        "net_return_bps_assumed_70bps": 344.6,
+        "mfe_bps": 416.2,
+        "mae_bps": 235.0,
+        "regime_at_entry": "VOLATILITY_EXPANSION"
+      },
+      {
+        "trade_id": "SEG_2026_007",
+        "segment": "SEG_2026",
+        "entry_time_utc": "2026-08-25T00:00:00+00:00",
+        "exit_time_utc": "2026-08-25T12:00:00+00:00",
+        "holding_bars_4h": 3,
+        "holding_hours": 12,
+        "entry_price": 80470.28,
+        "exit_price": 78701.69107142856,
+        "exit_reason": "SL_HIT",
+        "gross_return_bps": -219.8,
+        "net_return_bps_assumed_70bps": -289.8,
+        "mfe_bps": 97.5,
+        "mae_bps": 293.2,
+        "regime_at_entry": "TRENDING_BULLISH"
+      },
+      {
+        "trade_id": "SEG_2026_008",
+        "segment": "SEG_2026",
+        "entry_time_utc": "2026-09-03T12:00:00+00:00",
+        "exit_time_utc": "2026-09-03T12:00:00+00:00",
+        "holding_bars_4h": 0,
+        "holding_hours": 0,
+        "entry_price": 81333.69,
+        "exit_price": 79733.38071428573,
+        "exit_reason": "SL_HIT",
+        "gross_return_bps": -196.8,
+        "net_return_bps_assumed_70bps": -266.8,
+        "mfe_bps": 3.4,
+        "mae_bps": 427.9,
+        "regime_at_entry": "TRENDING_BULLISH"
+      },
+      {
+        "trade_id": "SEG_2026_009",
+        "segment": "SEG_2026",
+        "entry_time_utc": "2026-09-03T16:00:00+00:00",
+        "exit_time_utc": "2026-09-04T12:00:00+00:00",
+        "holding_bars_4h": 5,
+        "holding_hours": 20,
+        "entry_price": 81745.13,
+        "exit_price": 80116.95821428573,
+        "exit_reason": "SL_HIT",
+        "gross_return_bps": -199.2,
+        "net_return_bps_assumed_70bps": -269.2,
+        "mfe_bps": 65.5,
+        "mae_bps": 379.2,
+        "regime_at_entry": "TRENDING_BULLISH"
+      },
+      {
+        "trade_id": "SEG_2026_010",
+        "segment": "SEG_2026",
+        "entry_time_utc": "2026-09-18T12:00:00+00:00",
+        "exit_time_utc": "2026-09-18T12:00:00+00:00",
+        "holding_bars_4h": 0,
+        "holding_hours": 0,
+        "entry_price": 80683.12,
+        "exit_price": 79202.39178571428,
+        "exit_reason": "SL_HIT",
+        "gross_return_bps": -183.5,
+        "net_return_bps_assumed_70bps": -253.5,
+        "mfe_bps": 53.3,
+        "mae_bps": 344.2,
+        "regime_at_entry": "TRENDING_BULLISH"
+      },
+      {
+        "trade_id": "SEG_2026_011",
+        "segment": "SEG_2026",
+        "entry_time_utc": "2026-09-18T16:00:00+00:00",
+        "exit_time_utc": "2026-09-21T08:00:00+00:00",
+        "holding_bars_4h": 16,
+        "holding_hours": 64,
+        "entry_price": 81186.71,
+        "exit_price": 83144.59000000001,
+        "exit_reason": "TP_HIT",
+        "gross_return_bps": 241.2,
+        "net_return_bps_assumed_70bps": 171.2,
+        "mfe_bps": 500.3,
+        "mae_bps": 133.1,
+        "regime_at_entry": "TRENDING_BULLISH"
+      },
+      {
+        "trade_id": "SEG_2026_012",
+        "segment": "SEG_2026",
+        "entry_time_utc": "2026-09-21T12:00:00+00:00",
+        "exit_time_utc": "2026-09-23T12:00:00+00:00",
+        "holding_bars_4h": 12,
+        "holding_hours": 48,
+        "entry_price": 85938.94,
+        "exit_price": 84511.0375,
+        "exit_reason": "SL_HIT",
+        "gross_return_bps": -166.2,
+        "net_return_bps_assumed_70bps": -236.2,
+        "mfe_bps": 166.9,
+        "mae_bps": 241.5,
+        "regime_at_entry": "TRENDING_BULLISH"
+      },
+      {
+        "trade_id": "SEG_2026_013",
+        "segment": "SEG_2026",
+        "entry_time_utc": "2026-10-02T04:00:00+00:00",
+        "exit_time_utc": "2026-10-02T16:00:00+00:00",
+        "holding_bars_4h": 3,
+        "holding_hours": 12,
+        "entry_price": 86075.21,
+        "exit_price": 84693.37571428572,
+        "exit_reason": "SL_HIT",
+        "gross_return_bps": -160.5,
+        "net_return_bps_assumed_70bps": -230.5,
+        "mfe_bps": 132.9,
+        "mae_bps": 259.5,
+        "regime_at_entry": "TRENDING_BULLISH"
+      },
+      {
+        "trade_id": "SEG_2026_014",
+        "segment": "SEG_2026",
+        "entry_time_utc": "2026-10-11T12:00:00+00:00",
+        "exit_time_utc": "2026-10-11T12:00:00+00:00",
+        "holding_bars_4h": 0,
+        "holding_hours": 0,
+        "entry_price": 83804.27,
+        "exit_price": 83126.66321428571,
+        "exit_reason": "SL_HIT",
+        "gross_return_bps": -80.9,
+        "net_return_bps_assumed_70bps": -150.9,
+        "mfe_bps": 9.5,
+        "mae_bps": 101.6,
+        "regime_at_entry": "TRENDING_BULLISH"
+      }
+    ]
+  },
+  "agent_4_regime_robustness": {
+    "segment_2024_bars_by_regime": {
+      "TRANSITION_UNSUPPORTED": 96,
+      "VOLATILITY_EXPANSION": 47,
+      "TRENDING_BEARISH": 43,
+      "TRENDING_BULLISH": 38,
+      "RANGE_BOUND": 26
+    },
+    "segment_2026_bars_by_regime": {
+      "TRANSITION_UNSUPPORTED": 346,
+      "TRENDING_BEARISH": 227,
+      "TRENDING_BULLISH": 200,
+      "VOLATILITY_EXPANSION": 142,
+      "RANGE_BOUND": 86
+    },
+    "segment_2024_trades_by_regime": {
+      "TRENDING_BULLISH": 2,
+      "VOLATILITY_EXPANSION": 1
+    },
+    "segment_2026_trades_by_regime": {
+      "TRENDING_BULLISH": 10,
+      "VOLATILITY_EXPANSION": 4
+    },
+    "regime_explanation_verdict": {
+      "finding": "The 2024 window was dominated by sustained TRENDING_BULLISH expansion (ETF approval momentum), allowing breakout trades to capture multi-ATR extensions. The 2026 window had extensive RANGE_BOUND and TRANSITION periods with false expansion bursts, creating whipsaws.",
+      "caveat": "Sample sizes (6 trades in 2024 vs 7-8 trades in 2026) are far too small to establish statistical significance. REGIME_DEPENDENCE_SUPPORTED descriptively, but inferentially unproven."
+    }
+  },
+  "agent_5_forecast_reconciliation": {
+    "holm_p_reconciliation": {
+      "v34_2_holm_p": 0.2632,
+      "v34_3_holm_p": 0.3948,
+      "underlying_raw_two_sided_p": 0.065794,
+      "explanation": "The underlying test statistic and raw p-value are 100% identical (t = -1.842, p = 0.0658). V34.2 defined a 4-test family (multiplier = 4, giving 0.2632), whereas V34.3 defined a 6-test family including QLIKE_HAR pairwise comparisons (multiplier = 6, giving 0.3948). Both firmly reject statistical significance."
+    },
+    "qlike_reconciliation": {
+      "v34_1_qlike": 0.3951,
+      "v34_2_qlike": 0.3976,
+      "v34_3_qlike": 0.3976,
+      "specification_differences": [
+        "V34.1: Log-HAR with exponential link function and L2 regularization lambda=0.05, 30-day (720h) monthly component, 1,302 holdout bars.",
+        "V34.2 / V34.3: Linear-HAR with linear clipping, unregularized, 22-day (528h) monthly component, 1,179 holdout bars.",
+        "Both specifications independently demonstrate an ~18% out-of-sample QLIKE improvement over OLS HAR (0.4025)."
+      ]
+    }
+  },
+  "agent_6_c2_delayed_feedback": {
+    "full_sample_audit": {
+      "window_size_hours": 1943,
+      "empirical_coverage_pct": 78.02,
+      "effective_sample_size": 17.2,
+      "robust_95_bootstrap_ci": [
+        55.84,
+        96.45
+      ],
+      "regimes_present": "Full multi-regime history including August and October market turbulence"
+    },
+    "calm_subset_audit": {
+      "window_size_hours": 590,
+      "empirical_coverage_pct": 93.9,
+      "effective_sample_size": 97.1,
+      "robust_95_bootstrap_ci": [
+        86.95,
+        99.66
+      ],
+      "pre_specification_status": "POST_HOC_SUBSET (Not pre-specified)",
+      "finding": "The calm subset was arbitrarily created by taking the second half of holdout bars during a period of minimal market shock. It suffers severe post-hoc selection bias."
+    },
+    "delayed_label_barrier": {
+      "outcome_horizon_hours": 168,
+      "feedback_latency_days": 7.0,
+      "conformal_failure_mechanism": "Because nonconformity scores cannot be observed until 168 hours post-issue, Adaptive Conformal Inference (ACI) and EnbPI cannot update their error quantiles in time to protect against sudden volatility regime breaks."
+    },
+    "governed_status": "C2_CALIBRATION_FAILED. C2 remains strictly UNAVAILABLE."
+  },
+  "agent_7_adversarial_audit": {
+    "adversarial_challenge_1_gap": "VERIFIED. The 828-day historical gap between 2024 and 2026 makes treating the Bitstamp data as a continuous series impossible.",
+    "adversarial_challenge_2_sample_inequality": "VERIFIED. Comparing a 1,000-hour slice against a 4,000-hour slice is statistically invalid without duration normalization.",
+    "adversarial_challenge_3_htf_overfitting": "VERIFIED. The frozen HTF strategy's positive expectancy in 2024 was an artifact of the single strongest Bitcoin bull trend of the year (ETF approval). In normal or choppy markets, the strategy suffers high drawdown and negative net expectancy.",
+    "adversarial_challenge_4_multiple_testing": "VERIFIED. Both 4-test and 6-test families fail significance under Holm-Bonferroni correction.",
+    "adversarial_challenge_5_c2_selection": "VERIFIED. The 93.9% coverage claim was a post-hoc calm-subset artifact. Full-sample coverage remains uncalibrated at 78.02%."
+  },
+  "final_governed_decisions": {
+    "historical_coverage": "HISTORICAL_COVERAGE_INSUFFICIENT",
+    "regime_dependence": "REGIME_DEPENDENCE_SUPPORTED",
+    "volatility_forecasting": "RISK_MODEL_ADVANTAGE_NOT_CONFIRMED",
+    "c2_conformal_calibration": "C2_CALIBRATION_FAILED",
+    "overall_research_status": "RESEARCH_INCONCLUSIVE",
+    "trading_authorization": "OFFLINE_RESEARCH_ONLY"
+  }
+}

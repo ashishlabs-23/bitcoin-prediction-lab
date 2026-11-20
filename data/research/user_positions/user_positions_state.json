@@ -1,0 +1,150 @@
+{
+  "version": "V32.42_USER_POSITIONS",
+  "updated_at_utc": "2026-10-26T17:46:48.867189+00:00",
+  "positions_count": 3,
+  "positions": {
+    "api_test_pos_001": {
+      "position_id": "api_test_pos_001",
+      "user_id": "default_user",
+      "instrument": "BTC-USD",
+      "venue": "COINBASE",
+      "market_type": "SPOT",
+      "side": "LONG",
+      "entry_price": 80000.0,
+      "initial_quantity": 0.5,
+      "remaining_quantity": 0.0,
+      "entry_timestamp_utc": "2026-10-25T16:37:24.401379+00:00",
+      "entry_fee_usd": 40.0,
+      "accumulated_fees_usd": 81.3,
+      "stop_loss_price": 75000.0,
+      "take_profit_price": 90000.0,
+      "leverage": 1.0,
+      "margin_usd": 40000.0,
+      "liquidation_price": null,
+      "status": "CLOSED",
+      "notes": "Testing API integration",
+      "partial_exits": [
+        {
+          "exit_id": "pe_dba6c677",
+          "exit_price": 82000.0,
+          "quantity": 0.2,
+          "fee_usd": 16.4,
+          "exit_timestamp_utc": "2026-10-25T16:37:24.971680+00:00",
+          "realized_pnl_usd": 383.6,
+          "reason": null
+        },
+        {
+          "exit_id": "close_f9724517",
+          "exit_price": 83000.0,
+          "quantity": 0.3,
+          "fee_usd": 24.9,
+          "exit_timestamp_utc": "2026-10-25T16:37:24.979799+00:00",
+          "realized_pnl_usd": 875.1,
+          "reason": "USER_REQUESTED_CLOSE"
+        }
+      ],
+      "closed_timestamp_utc": "2026-10-25T16:37:24.979799+00:00",
+      "final_exit_price": 83000.0,
+      "total_realized_pnl_usd": 1258.7,
+      "created_at_epoch": 1792946244.4014385,
+      "updated_at_epoch": 1792946244.9798508
+    },
+    "api_test_pos_f2f80a2c": {
+      "position_id": "api_test_pos_f2f80a2c",
+      "user_id": "default_user",
+      "instrument": "BTC-USD",
+      "venue": "COINBASE",
+      "market_type": "SPOT",
+      "side": "LONG",
+      "entry_price": 80000.0,
+      "initial_quantity": 0.5,
+      "remaining_quantity": 0.0,
+      "entry_timestamp_utc": "2026-10-25T16:50:06.653891+00:00",
+      "entry_fee_usd": 40.0,
+      "accumulated_fees_usd": 81.3,
+      "stop_loss_price": 75000.0,
+      "take_profit_price": 90000.0,
+      "leverage": 1.0,
+      "margin_usd": 40000.0,
+      "liquidation_price": null,
+      "status": "CLOSED",
+      "notes": "Testing API integration",
+      "partial_exits": [
+        {
+          "exit_id": "pe_af3dd756",
+          "exit_price": 82000.0,
+          "quantity": 0.2,
+          "fee_usd": 16.4,
+          "exit_timestamp_utc": "2026-10-25T16:50:08.086386+00:00",
+          "realized_pnl_usd": 383.6,
+          "reason": null
+        },
+        {
+          "exit_id": "close_a725ce3d",
+          "exit_price": 83000.0,
+          "quantity": 0.3,
+          "fee_usd": 24.9,
+          "exit_timestamp_utc": "2026-10-25T16:50:08.105825+00:00",
+          "realized_pnl_usd": 875.1,
+          "reason": "USER_REQUESTED_CLOSE"
+        }
+      ],
+      "closed_timestamp_utc": "2026-10-25T16:50:08.105825+00:00",
+      "final_exit_price": 83000.0,
+      "total_realized_pnl_usd": 1258.7,
+      "created_at_epoch": 1792947006.6539643,
+      "updated_at_epoch": 1792947008.1058922
+    },
+    "api_test_pos_752108ae": {
+      "position_id": "api_test_pos_752108ae",
+      "user_id": "default_user",
+      "instrument": "BTC-USD",
+      "venue": "COINBASE",
+      "market_type": "SPOT",
+      "side": "LONG",
+      "entry_price": 80000.0,
+      "initial_quantity": 0.5,
+      "remaining_quantity": 0.0,
+      "entry_timestamp_utc": "2026-10-26T17:46:48.828947+00:00",
+      "entry_fee_usd": 40.0,
+      "accumulated_fees_usd": 81.3,
+      "stop_loss_price": 75000.0,
+      "take_profit_price": 90000.0,
+      "leverage": 1.0,
+      "margin_usd": 40000.0,
+      "liquidation_price": null,
+      "status": "CLOSED",
+      "notes": "Testing API integration",
+      "partial_exits": [
+        {
+          "exit_id": "pe_f54d2a2a",
+          "exit_price": 82000.0,
+          "quantity": 0.2,
+          "fee_usd": 16.4,
+          "exit_timestamp_utc": "2026-10-26T17:46:48.854148+00:00",
+          "realized_pnl_usd": 383.6,
+          "reason": null
+        },
+        {
+          "exit_id": "close_f94f8876",
+          "exit_price": 83000.0,
+          "quantity": 0.3,
+          "fee_usd": 24.9,
+          "exit_timestamp_utc": "2026-10-26T17:46:48.866458+00:00",
+          "realized_pnl_usd": 875.1,
+          "reason": "USER_REQUESTED_CLOSE"
+        }
+      ],
+      "closed_timestamp_utc": "2026-10-26T17:46:48.866458+00:00",
+      "final_exit_price": 83000.0,
+      "total_realized_pnl_usd": 1258.7,
+      "created_at_epoch": 1793036808.8289945,
+      "updated_at_epoch": 1793036808.8665102
+    }
+  },
+  "governance": {
+    "posture": "OFFLINE_RESEARCH_ONLY",
+    "live_trading": "DISABLED",
+    "purpose": "POSITION_RISK_MONITORING_ONLY"
+  }
+}

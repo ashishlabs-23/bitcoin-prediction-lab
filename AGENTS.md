@@ -24,7 +24,19 @@ On every prompt, the Lead Orchestrator MUST adhere to the **Repeatable Task-Exec
 
 ---
 
-## 3. Seven-Stage Orchestration Lifecycle
+## 3. Product Scope and Feature Preservation
+
+BTCognitive remains an institutional-grade BTCUSD Market Intelligence and Quantitative Risk Analysis system integrating market intelligence and structure, trend and momentum, volatility and HAR forecasting, regime intelligence, range and excursion forecasting, risk and uncertainty analysis, entry/TP/SL intelligence, strategy tournament, historical backtesting, forecast calibration and observability, research engines, and frontend visualization.
+
+1. Do not change the original product vision or remove, replace, or narrow core features.
+2. Reuse existing architecture and engines; do not create duplicate engines where existing modules can be integrated.
+3. Give every functional module a defined role in the integrated application. Frontend visibility must reflect actual capability and validation status; unavailable, experimental, unvalidated, or disabled features must be labeled clearly rather than silently removed.
+4. Improvements must be additive or corrective. Removing, replacing, hiding from users, or redesigning a core capability requires explicit owner approval.
+5. Preserve analysis-only operation and all research-governance restrictions.
+
+---
+
+## 4. Seven-Stage Orchestration Lifecycle
 
 Every task follows these sequential phases:
 

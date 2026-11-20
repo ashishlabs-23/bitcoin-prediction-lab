@@ -37,9 +37,20 @@ from models.signal_contract import ExecutionAuthorization, SignalStatus
 # 1. TIME SERIES CONTINUITY & SEGMENTATION TESTS (AGENT A)
 # =========================================================================
 
+def _load_v4_historical_dataset() -> pd.DataFrame:
+    """Loads the canonical V4 historical dataset (41,273 bars through 2026-10-17 15:00 UTC)."""
+    p = Path("data/raw/ohlcv_pre_backfill_backup.parquet")
+    if not p.exists():
+        p = Path("data/raw/ohlcv.parquet")
+    df = pd.read_parquet(p)
+    df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
+    df = df[df["timestamp"] <= pd.to_datetime("2026-10-17 15:00:00+00:00")].sort_values("timestamp").reset_index(drop=True)
+    return df
+
+
 def test_continuity_segmentation_identifies_all_dataset_gaps():
     """Verify that audit_and_segment correctly partitions the raw dataset into 3 contiguous segments."""
-    df_raw = pd.read_parquet("data/raw/ohlcv.parquet")
+    df_raw = _load_v4_historical_dataset()
     df_clean, summary = continuity_engine.audit_and_segment(df_raw)
 
     # Dataset partition & continuity integrity contract:
@@ -96,7 +107,7 @@ def test_synthetic_gap_detection_and_segment_assignment():
 
 def test_features_reset_at_segment_boundary_no_cross_gap_contamination():
     """Verify that ret_1h, ret_4h, ret_24h and rv_24h are NaN when looking across a gap."""
-    df_raw = pd.read_parquet("data/raw/ohlcv.parquet")
+    df_raw = _load_v4_historical_dataset()
     df_clean, _ = continuity_engine.audit_and_segment(df_raw)
     df_feat = continuity_engine.build_continuity_features(df_clean)
 
@@ -118,7 +129,7 @@ def test_features_reset_at_segment_boundary_no_cross_gap_contamination():
 
 def test_forward_horizon_gap_exclusion_prevents_fake_labels():
     """Verify that candles whose 24-hour forward window crosses a gap are marked EXCLUDED."""
-    df_raw = pd.read_parquet("data/raw/ohlcv.parquet")
+    df_raw = _load_v4_historical_dataset()
     df_clean, _ = continuity_engine.audit_and_segment(df_raw)
     df_feat = continuity_engine.build_continuity_features(df_clean)
     df_labels = continuity_engine.build_gap_safe_triple_barrier_labels(df_feat, horizon_hours=24)

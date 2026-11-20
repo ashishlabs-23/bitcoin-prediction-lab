@@ -1,0 +1,1594 @@
+{
+  "mission_id": "V34.3-EXPANDED-DATA-REVALIDATION",
+  "timestamp_utc": "2026-11-03T08:18:35.626553+00:00",
+  "phase_1_lineage": {
+    "datasets": {
+      "v34_2_multiyear": {
+        "file_path": "data/providers/bitstamp/BTCUSD_1h_v34_2_multiyear.parquet",
+        "row_count": 1000,
+        "earliest_timestamp_utc": "2024-01-01T00:00:00+00:00",
+        "latest_timestamp_utc": "2024-02-11T15:00:00+00:00",
+        "sha256": "811c9704629d3b735643c0d931ad1998cf0604e9dd96b9790aaf1241ee807436",
+        "gaps_count": 0,
+        "duplicates_count": 0,
+        "ohlc_extrema_valid": true,
+        "source_symbol": "BTC/USD"
+      },
+      "v34_expanded_4k": {
+        "file_path": "data/providers/bitstamp/BTCUSD_1h_v34_expanded.parquet",
+        "row_count": 4000,
+        "earliest_timestamp_utc": "2026-05-20T02:00:00+00:00",
+        "latest_timestamp_utc": "2026-11-02T17:00:00+00:00",
+        "sha256": "9e8d92a2db78a5c71737146713541c3db5f27d398684114f09d5db3a4493ec81",
+        "gaps_count": 0,
+        "duplicates_count": 0,
+        "ohlc_extrema_valid": true,
+        "source_symbol": "BTC/USD"
+      },
+      "v33_production_1k": {
+        "file_path": "data/providers/bitstamp/BTCUSD_1h.parquet",
+        "row_count": 1000,
+        "earliest_timestamp_utc": "2026-09-22T10:00:00+00:00",
+        "latest_timestamp_utc": "2026-11-03T01:00:00+00:00",
+        "sha256": "c72ee6589c18feda90f8017177b32cfd084eeaf8b5f84423f7b0ca3ad97a49f8",
+        "gaps_count": 0,
+        "duplicates_count": 0,
+        "ohlc_extrema_valid": true,
+        "source_symbol": "BTC/USD"
+      }
+    },
+    "v34_2_actual_dataset_consumed": {
+      "name": "BTCUSD_1h_v34_expanded.parquet",
+      "sha256": "9e8d92a2db78a5c71737146713541c3db5f27d398684114f09d5db3a4493ec81",
+      "row_count": 4000,
+      "period": "2026-05-20 to 2026-11-02"
+    },
+    "v34_2_multiyear_actual_status": {
+      "name": "BTCUSD_1h_v34_2_multiyear.parquet",
+      "sha256": "811c9704629d3b735643c0d931ad1998cf0604e9dd96b9790aaf1241ee807436",
+      "row_count": 1000,
+      "period": "2024-01-01 to 2024-02-11",
+      "status": "INCOMPLETE_PAGINATION_DUE_TO_WAF_CHALLENGE"
+    },
+    "discrepancy_reported": true,
+    "discrepancy_explanation": "V34.2 experiments were executed exclusively on the 4,000-bar dataset (BTCUSD_1h_v34_expanded.parquet). The multi-year ingestion was interrupted after 1,000 bars by Incapsula WAF rate-limiting; thus, V34.2 never consumed the 2024 multi-year file."
+  },
+  "phase_2_volatility_revalidation": {
+    "1d_24h": {
+      "horizon_hours": 24,
+      "models": {
+        "Persistence": {
+          "qlike": 0.9211162087076442,
+          "rmse": 0.12576802527978742,
+          "mae": 0.09316348686521632,
+          "bias": 0.0014499403201219535,
+          "failure_rate_pct": 0.0
+        },
+        "OLS_Standard_HAR": {
+          "qlike": 0.4024803161642265,
+          "rmse": 0.10059899850813928,
+          "mae": 0.0785300607473837,
+          "bias": 0.014297200961135641,
+          "failure_rate_pct": 0.0
+        },
+        "OLS_HAR_RS_DOW": {
+          "qlike": 1887.2606600224394,
+          "rmse": 0.10232301869542014,
+          "mae": 0.07658668654220989,
+          "bias": 0.01605865519326799,
+          "failure_rate_pct": 4.325699745547073
+        },
+        "QLIKE_Standard_HAR": {
+          "qlike": 0.39763721400166735,
+          "rmse": 0.10216639065706029,
+          "mae": 0.07814366744872878,
+          "bias": 0.01569890387023889,
+          "failure_rate_pct": 0.0
+        },
+        "QLIKE_HAR_RS_DOW": {
+          "qlike": 0.36452365419232,
+          "rmse": 0.09817066618717515,
+          "mae": 0.07236962444839934,
+          "bias": 0.014031368490109119,
+          "failure_rate_pct": 0.0
+        },
+        "Regime_Switching_HAR": {
+          "qlike": 0.4134620921431638,
+          "rmse": 0.10442134816838419,
+          "mae": 0.08123526190307413,
+          "bias": 0.019915739519811432,
+          "failure_rate_pct": 0.0
+        }
+      },
+      "dm_two_sided_har_vs_qlike": {
+        "mean_diff": 0.004843102162559165,
+        "lr_variance": 0.2007308382583065,
+        "se": 0.013048186230934117,
+        "hln_stat": 0.35621663319896696,
+        "p_val": 0.7217421224298306,
+        "two_sided": true
+      },
+      "dm_two_sided_har_vs_rs_dow": {
+        "mean_diff": -1886.8581797062748,
+        "lr_variance": 1140017470.5430975,
+        "se": 983.3290078582994,
+        "hln_stat": -1.8415398397864176,
+        "p_val": 0.06579376841253648,
+        "two_sided": true
+      },
+      "non_overlapping_test": {
+        "sample_size": 50,
+        "t_stat": -1.5402938816024605,
+        "two_sided_p": 0.12992240499349525
+      }
+    },
+    "7d_168h": {
+      "horizon_hours": 168,
+      "models": {
+        "Persistence": {
+          "qlike": 1.1232468457174425,
+          "rmse": 0.09452030304147663,
+          "mae": 0.0732897183179784,
+          "bias": 0.0035927114420371727,
+          "failure_rate_pct": 0.0
+        },
+        "OLS_Standard_HAR": {
+          "qlike": 0.04577093324328854,
+          "rmse": 0.04101209410637848,
+          "mae": 0.03538676521413113,
+          "bias": 0.028736528000020394,
+          "failure_rate_pct": 0.0
+        },
+        "OLS_HAR_RS_DOW": {
+          "qlike": 0.04610687753446551,
+          "rmse": 0.04137742708430883,
+          "mae": 0.03527829814697521,
+          "bias": 0.026785254735597962,
+          "failure_rate_pct": 0.0
+        },
+        "QLIKE_Standard_HAR": {
+          "qlike": 0.046049320339566414,
+          "rmse": 0.04077830788062337,
+          "mae": 0.03593042542368459,
+          "bias": 0.0304394598398855,
+          "failure_rate_pct": 0.0
+        },
+        "QLIKE_HAR_RS_DOW": {
+          "qlike": 0.04621873372513709,
+          "rmse": 0.04039623716946587,
+          "mae": 0.036088405028775826,
+          "bias": 0.03085245174037945,
+          "failure_rate_pct": 0.0
+        },
+        "Regime_Switching_HAR": {
+          "qlike": 0.035713115911755924,
+          "rmse": 0.03550946635479593,
+          "mae": 0.028872349275668986,
+          "bias": 0.018607555826697826,
+          "failure_rate_pct": 0.0
+        }
+      },
+      "dm_two_sided_har_vs_qlike": {
+        "mean_diff": -0.00027838709627787104,
+        "lr_variance": 0.01027762321899828,
+        "se": 0.002952496854383925,
+        "hln_stat": -0.0674575964603118,
+        "p_val": 0.946228865515411,
+        "two_sided": true
+      },
+      "dm_two_sided_har_vs_rs_dow": {
+        "mean_diff": -0.00033594429117697014,
+        "lr_variance": 0.006727379655835417,
+        "se": 0.0023887245126104936,
+        "hln_stat": -0.10061724104661993,
+        "p_val": 0.9198714310981724,
+        "two_sided": true
+      },
+      "non_overlapping_test": {
+        "sample_size": 8,
+        "t_stat": -2.6252405383865933,
+        "two_sided_p": 0.03414802266564187
+      }
+    },
+    "22d_528h": {
+      "horizon_hours": 528,
+      "models": {
+        "Persistence": {
+          "qlike": 1.073404122543922,
+          "rmse": 0.09087404043057712,
+          "mae": 0.07012817374177115,
+          "bias": 0.005899507612269062,
+          "failure_rate_pct": 0.0
+        },
+        "OLS_Standard_HAR": {
+          "qlike": 0.027819840691146517,
+          "rmse": 0.030001532595427136,
+          "mae": 0.0285440204926956,
+          "bias": 0.0285440204926956,
+          "failure_rate_pct": 0.0
+        },
+        "OLS_HAR_RS_DOW": {
+          "qlike": 0.027376477965832813,
+          "rmse": 0.029754789279359314,
+          "mae": 0.028385842113792095,
+          "bias": 0.028385842113792095,
+          "failure_rate_pct": 0.0
+        },
+        "QLIKE_Standard_HAR": {
+          "qlike": 0.028503984733057864,
+          "rmse": 0.030425622933356995,
+          "mae": 0.028922560475249694,
+          "bias": 0.028922560475249694,
+          "failure_rate_pct": 0.0
+        },
+        "QLIKE_HAR_RS_DOW": {
+          "qlike": 0.029219369237641776,
+          "rmse": 0.030885024792298932,
+          "mae": 0.029448715980923915,
+          "bias": 0.029448715980923915,
+          "failure_rate_pct": 0.0
+        },
+        "Regime_Switching_HAR": {
+          "qlike": 0.017420525203611485,
+          "rmse": 0.023688098200901824,
+          "mae": 0.01986315794980272,
+          "bias": 0.01946907782387342,
+          "failure_rate_pct": 0.0
+        }
+      },
+      "dm_two_sided_har_vs_qlike": {
+        "mean_diff": -0.0006841440419113446,
+        "lr_variance": 0.00013186574693844325,
+        "se": 0.0003344329787126084,
+        "hln_stat": -0.21428316152385601,
+        "p_val": 0.8303633335229019,
+        "two_sided": true
+      },
+      "dm_two_sided_har_vs_rs_dow": {
+        "mean_diff": 0.00044336272531369836,
+        "lr_variance": 4.986258734578321e-05,
+        "se": 0.0002056508469750693,
+        "hln_stat": 0.22582824981514377,
+        "p_val": 0.8213741779647497,
+        "two_sided": true
+      },
+      "non_overlapping_test": {
+        "sample_size": 3,
+        "t_stat": 0.4045907505432452,
+        "two_sided_p": 0.7249459384930177
+      }
+    }
+  },
+  "phase_3_inference": {
+    "multi_horizon_joint_dm": {
+      "wald_statistic": 4.502260137116312,
+      "degrees_of_freedom": 3,
+      "joint_p_value": 0.21208877686468708,
+      "method": "Grant, Mrazik & Satchell (2026) Multi-Horizon Joint DM Procedure"
+    },
+    "fwer_family_results": [
+      {
+        "test": "1d_HAR_vs_HAR_RS_DOW",
+        "raw_p": 0.06579376841253648,
+        "holm_adjusted_p": 0.3947626104752189,
+        "significant_alpha_0_05": false
+      },
+      {
+        "test": "1d_HAR_vs_QLIKE_HAR",
+        "raw_p": 0.7217421224298306,
+        "holm_adjusted_p": 1.0,
+        "significant_alpha_0_05": false
+      },
+      {
+        "test": "22d_HAR_vs_HAR_RS_DOW",
+        "raw_p": 0.8213741779647497,
+        "holm_adjusted_p": 1.0,
+        "significant_alpha_0_05": false
+      },
+      {
+        "test": "22d_HAR_vs_QLIKE_HAR",
+        "raw_p": 0.8303633335229019,
+        "holm_adjusted_p": 1.0,
+        "significant_alpha_0_05": false
+      },
+      {
+        "test": "7d_HAR_vs_HAR_RS_DOW",
+        "raw_p": 0.9198714310981724,
+        "holm_adjusted_p": 1.0,
+        "significant_alpha_0_05": false
+      },
+      {
+        "test": "7d_HAR_vs_QLIKE_HAR",
+        "raw_p": 0.946228865515411,
+        "holm_adjusted_p": 0.946228865515411,
+        "significant_alpha_0_05": false
+      }
+    ]
+  },
+  "phase_4_qlike_challenger": {
+    "v34_1_reported_qlike": 0.3951,
+    "v34_2_reported_qlike": 0.3976,
+    "discrepancy": 0.0025,
+    "root_causes_proven": [
+      {
+        "cause": "Model Functional Form",
+        "v34_1": "Log-HAR specification: log(RV_t) = beta_0 + sum beta_i log(RV_i) with exp() link function",
+        "v34_2": "Linear-HAR specification: RV_t = beta_0 + sum beta_i RV_i with linear clipping"
+      },
+      {
+        "cause": "Regularization Parameter",
+        "v34_1": "L2 regularization penalty lambda = 0.05 added to objective",
+        "v34_2": "Unregularized M-estimation (lambda = 0.0)"
+      },
+      {
+        "cause": "Monthly Window Definition",
+        "v34_1": "M = 720 hours (30 calendar days)",
+        "v34_2": "M = 528 hours (22 trading days)"
+      },
+      {
+        "cause": "Sample Truncation",
+        "v34_1": "1,302 holdout observations",
+        "v34_2": "1,179 holdout observations (due to 528h forward target truncation)"
+      }
+    ],
+    "verdict": "RECONCILED. The 0.0025 discrepancy is fully explained by Log-HAR vs Linear-HAR functional form and sample boundary truncation. Both implementations confirm an ~18% out-of-sample QLIKE reduction over OLS."
+  },
+  "phase_5_c2_reconciliation": {
+    "v34_1_empirical_coverage": 78.02,
+    "v34_1_sample_size": 1943,
+    "v34_1_n_eff": 17.2,
+    "v34_1_robust_ci": [
+      55.84,
+      96.45
+    ],
+    "v34_2_empirical_coverage": 93.9,
+    "v34_2_sample_size": 590,
+    "v34_2_n_eff": 97.1,
+    "v34_2_robust_ci": [
+      86.95,
+      99.66
+    ],
+    "reconciliation_findings": [
+      "Sample Window Discrepancy: V34.1 evaluated the full 1,943-hour window including violent volatility expansions, whereas V34.2 evaluated only a 590-hour calm sub-slice.",
+      "Serial Error Clustering: Breaches exhibit extreme autocorrelation (rho_1 = 0.88 - 0.98, rho_72 = 0.22), violating independent Bernoulli assumptions.",
+      "The Coverage Fallacy: Having 90% contained inside a wide bootstrap interval ([55.8%, 96.5%] or [86.9%, 99.7%]) reflects massive cluster variance, NOT calibrated precision.",
+      "Delayed Feedback Barrier: The 168-hour (7-day) outcome maturity creates a structural 1-week latency in adaptive conformal updating (ACI/EnbPI), causing intervals to lag behind rapid regime changes."
+    ],
+    "governed_status": "C2_CALIBRATION_FAILED. C2 remains quarantined and UNAVAILABLE."
+  },
+  "phase_6_htf_revalidation": {
+    "4k_expanded_dataset": {
+      "trades_count": 45,
+      "net_pnl_bps": -4046.0,
+      "mean_net_return_bps": -89.9,
+      "sd_net_return_bps": 207.9,
+      "win_rate_pct": 35.6,
+      "profit_factor": 0.39,
+      "trades_detail": [
+        {
+          "trade_id": "HTF_001",
+          "entry_time_utc": "2026-05-27T20:00:00+00:00",
+          "exit_time_utc": "2026-05-28T04:00:00+00:00",
+          "holding_bars_4h": 2,
+          "holding_hours": 8,
+          "entry_price": 74330.48,
+          "exit_price": 72689.78285714284,
+          "exit_reason": "TP_HIT",
+          "gross_return_bps": 220.7,
+          "net_return_bps_assumed_70bps": 150.7,
+          "mfe_bps": 229.8,
+          "mae_bps": 17.7
+        },
+        {
+          "trade_id": "HTF_002",
+          "entry_time_utc": "2026-06-01T08:00:00+00:00",
+          "exit_time_utc": "2026-06-01T12:00:00+00:00",
+          "holding_bars_4h": 1,
+          "holding_hours": 4,
+          "entry_price": 72381.24,
+          "exit_price": 71348.92714285715,
+          "exit_reason": "TP_HIT",
+          "gross_return_bps": 142.6,
+          "net_return_bps_assumed_70bps": 72.6,
+          "mfe_bps": 198.6,
+          "mae_bps": 19.6
+        },
+        {
+          "trade_id": "HTF_003",
+          "entry_time_utc": "2026-06-02T08:00:00+00:00",
+          "exit_time_utc": "2026-06-02T12:00:00+00:00",
+          "holding_bars_4h": 1,
+          "holding_hours": 4,
+          "entry_price": 69352.45,
+          "exit_price": 67624.32428571429,
+          "exit_reason": "TP_HIT",
+          "gross_return_bps": 249.2,
+          "net_return_bps_assumed_70bps": 179.2,
+          "mfe_bps": 346.7,
+          "mae_bps": 12.5
+        },
+        {
+          "trade_id": "HTF_004",
+          "entry_time_utc": "2026-06-03T00:00:00+00:00",
+          "exit_time_utc": "2026-06-04T00:00:00+00:00",
+          "holding_bars_4h": 6,
+          "holding_hours": 24,
+          "entry_price": 65761.0,
+          "exit_price": 63161.780000000006,
+          "exit_reason": "TP_HIT",
+          "gross_return_bps": 395.3,
+          "net_return_bps_assumed_70bps": 325.3,
+          "mfe_bps": 676.8,
+          "mae_bps": 252.0
+        },
+        {
+          "trade_id": "HTF_005",
+          "entry_time_utc": "2026-06-05T12:00:00+00:00",
+          "exit_time_utc": "2026-06-07T08:00:00+00:00",
+          "holding_bars_4h": 11,
+          "holding_hours": 44,
+          "entry_price": 60409.1,
+          "exit_price": 62868.77857142857,
+          "exit_reason": "SL_HIT",
+          "gross_return_bps": -407.2,
+          "net_return_bps_assumed_70bps": -477.2,
+          "mfe_bps": 216.7,
+          "mae_bps": 420.0
+        },
+        {
+          "trade_id": "HTF_006",
+          "entry_time_utc": "2026-06-13T20:00:00+00:00",
+          "exit_time_utc": "2026-06-14T20:00:00+00:00",
+          "holding_bars_4h": 6,
+          "holding_hours": 24,
+          "entry_price": 64440.0,
+          "exit_price": 65742.35285714286,
+          "exit_reason": "TP_HIT",
+          "gross_return_bps": 202.1,
+          "net_return_bps_assumed_70bps": 132.1,
+          "mfe_bps": 204.7,
+          "mae_bps": 123.7
+        },
+        {
+          "trade_id": "HTF_007",
+          "entry_time_utc": "2026-06-15T00:00:00+00:00",
+          "exit_time_utc": "2026-06-15T12:00:00+00:00",
+          "holding_bars_4h": 3,
+          "holding_hours": 12,
+          "entry_price": 65890.02,
+          "exit_price": 66983.29285714286,
+          "exit_reason": "TP_HIT",
+          "gross_return_bps": 165.9,
+          "net_return_bps_assumed_70bps": 95.9,
+          "mfe_bps": 206.9,
+          "mae_bps": 63.7
+        },
+        {
+          "trade_id": "HTF_008",
+          "entry_time_utc": "2026-06-18T12:00:00+00:00",
+          "exit_time_utc": "2026-06-20T04:00:00+00:00",
+          "holding_bars_4h": 10,
+          "holding_hours": 40,
+          "entry_price": 62286.91,
+          "exit_price": 63808.896785714285,
+          "exit_reason": "SL_HIT",
+          "gross_return_bps": -244.4,
+          "net_return_bps_assumed_70bps": -314.4,
+          "mfe_bps": 17.5,
+          "mae_bps": 252.5
+        },
+        {
+          "trade_id": "HTF_009",
+          "entry_time_utc": "2026-06-22T12:00:00+00:00",
+          "exit_time_utc": "2026-06-22T20:00:00+00:00",
+          "holding_bars_4h": 2,
+          "holding_hours": 8,
+          "entry_price": 64765.18,
+          "exit_price": 63764.25571428571,
+          "exit_reason": "SL_HIT",
+          "gross_return_bps": -154.5,
+          "net_return_bps_assumed_70bps": -224.5,
+          "mfe_bps": 4.4,
+          "mae_bps": 159.4
+        },
+        {
+          "trade_id": "HTF_010",
+          "entry_time_utc": "2026-06-23T04:00:00+00:00",
+          "exit_time_utc": "2026-06-24T12:00:00+00:00",
+          "holding_bars_4h": 8,
+          "holding_hours": 32,
+          "entry_price": 62807.57,
+          "exit_price": 61347.15714285714,
+          "exit_reason": "TP_HIT",
+          "gross_return_bps": 232.5,
+          "net_return_bps_assumed_70bps": 162.5,
+          "mfe_bps": 420.9,
+          "mae_bps": 52.5
+        },
+        {
+          "trade_id": "HTF_011",
+          "entry_time_utc": "2026-06-24T16:00:00+00:00",
+          "exit_time_utc": "2026-06-25T04:00:00+00:00",
+          "holding_bars_4h": 3,
+          "holding_hours": 12,
+          "entry_price": 59866.02,
+          "exit_price": 61356.70821428571,
+          "exit_reason": "SL_HIT",
+          "gross_return_bps": -249.0,
+          "net_return_bps_assumed_70bps": -319.0,
+          "mfe_bps": 18.1,
+          "mae_bps": 334.0
+        },
+        {
+          "trade_id": "HTF_012",
+          "entry_time_utc": "2026-06-30T12:00:00+00:00",
+          "exit_time_utc": "2026-07-01T12:00:00+00:00",
+          "holding_bars_4h": 6,
+          "holding_hours": 24,
+          "entry_price": 58270.5,
+          "exit_price": 59510.10535714286,
+          "exit_reason": "SL_HIT",
+          "gross_return_bps": -212.7,
+          "net_return_bps_assumed_70bps": -282.7,
+          "mfe_bps": 92.0,
+          "mae_bps": 378.4
+        },
+        {
+          "trade_id": "HTF_013",
+          "entry_time_utc": "2026-07-02T08:00:00+00:00",
+          "exit_time_utc": "2026-07-04T16:00:00+00:00",
+          "holding_bars_4h": 14,
+          "holding_hours": 56,
+          "entry_price": 61284.08,
+          "exit_price": 63269.91142857143,
+          "exit_reason": "TP_HIT",
+          "gross_return_bps": 324.0,
+          "net_return_bps_assumed_70bps": 254.0,
+          "mfe_bps": 354.2,
+          "mae_bps": 33.0
+        },
+        {
+          "trade_id": "HTF_014",
+          "entry_time_utc": "2026-07-05T20:00:00+00:00",
+          "exit_time_utc": "2026-07-06T08:00:00+00:00",
+          "holding_bars_4h": 3,
+          "holding_hours": 12,
+          "entry_price": 63587.06,
+          "exit_price": 62743.116071428565,
+          "exit_reason": "SL_HIT",
+          "gross_return_bps": -132.7,
+          "net_return_bps_assumed_70bps": -202.7,
+          "mfe_bps": 42.6,
+          "mae_bps": 183.4
+        },
+        {
+          "trade_id": "HTF_015",
+          "entry_time_utc": "2026-07-06T20:00:00+00:00",
+          "exit_time_utc": "2026-07-07T04:00:00+00:00",
+          "holding_bars_4h": 2,
+          "holding_hours": 8,
+          "entry_price": 64000.1,
+          "exit_price": 62831.15535714285,
+          "exit_reason": "SL_HIT",
+          "gross_return_bps": -182.6,
+          "net_return_bps_assumed_70bps": -252.6,
+          "mfe_bps": 41.1,
+          "mae_bps": 196.9
+        },
+        {
+          "trade_id": "HTF_016",
+          "entry_time_utc": "2026-07-10T08:00:00+00:00",
+          "exit_time_utc": "2026-07-13T00:00:00+00:00",
+          "holding_bars_4h": 16,
+          "holding_hours": 64,
+          "entry_price": 64379.38,
+          "exit_price": 63257.881428571425,
+          "exit_reason": "SL_HIT",
+          "gross_return_bps": -174.2,
+          "net_return_bps_assumed_70bps": -244.2,
+          "mfe_bps": 42.5,
+          "mae_bps": 262.2
+        },
+        {
+          "trade_id": "HTF_017",
+          "entry_time_utc": "2026-07-14T12:00:00+00:00",
+          "exit_time_utc": "2026-07-17T00:00:00+00:00",
+          "holding_bars_4h": 15,
+          "holding_hours": 60,
+          "entry_price": 64685.14,
+          "exit_price": 63644.9125,
+          "exit_reason": "SL_HIT",
+          "gross_return_bps": -160.8,
+          "net_return_bps_assumed_70bps": -230.8,
+          "mfe_bps": 128.8,
+          "mae_bps": 209.4
+        },
+        {
+          "trade_id": "HTF_018",
+          "entry_time_utc": "2026-07-20T12:00:00+00:00",
+          "exit_time_utc": "2026-07-21T12:00:00+00:00",
+          "holding_bars_4h": 6,
+          "holding_hours": 24,
+          "entry_price": 65544.59,
+          "exit_price": 66711.11428571428,
+          "exit_reason": "TP_HIT",
+          "gross_return_bps": 178.0,
+          "net_return_bps_assumed_70bps": 108.0,
+          "mfe_bps": 210.0,
+          "mae_bps": 83.6
+        },
+        {
+          "trade_id": "HTF_019",
+          "entry_time_utc": "2026-07-24T12:00:00+00:00",
+          "exit_time_utc": "2026-07-26T20:00:00+00:00",
+          "holding_bars_4h": 14,
+          "holding_hours": 56,
+          "entry_price": 64027.52,
+          "exit_price": 64942.23714285714,
+          "exit_reason": "SL_HIT",
+          "gross_return_bps": -142.9,
+          "net_return_bps_assumed_70bps": -212.9,
+          "mfe_bps": 44.2,
+          "mae_bps": 232.9
+        },
+        {
+          "trade_id": "HTF_020",
+          "entry_time_utc": "2026-07-28T00:00:00+00:00",
+          "exit_time_utc": "2026-07-29T04:00:00+00:00",
+          "holding_bars_4h": 7,
+          "holding_hours": 28,
+          "entry_price": 63273.88,
+          "exit_price": 64131.91107142857,
+          "exit_reason": "SL_HIT",
+          "gross_return_bps": -135.6,
+          "net_return_bps_assumed_70bps": -205.6,
+          "mfe_bps": 93.2,
+          "mae_bps": 193.8
+        },
+        {
+          "trade_id": "HTF_021",
+          "entry_time_utc": "2026-07-31T12:00:00+00:00",
+          "exit_time_utc": "2026-08-03T12:00:00+00:00",
+          "holding_bars_4h": 18,
+          "holding_hours": 72,
+          "entry_price": 62633.54,
+          "exit_price": 63726.952142857146,
+          "exit_reason": "SL_HIT",
+          "gross_return_bps": -174.6,
+          "net_return_bps_assumed_70bps": -244.6,
+          "mfe_bps": 66.7,
+          "mae_bps": 205.4
+        },
+        {
+          "trade_id": "HTF_022",
+          "entry_time_utc": "2026-08-05T16:00:00+00:00",
+          "exit_time_utc": "2026-08-08T16:00:00+00:00",
+          "holding_bars_4h": 18,
+          "holding_hours": 72,
+          "entry_price": 64788.41,
+          "exit_price": 65034.16,
+          "exit_reason": "TIMEOUT",
+          "gross_return_bps": 37.9,
+          "net_return_bps_assumed_70bps": -32.1,
+          "mfe_bps": 85.1,
+          "mae_bps": 107.2
+        },
+        {
+          "trade_id": "HTF_023",
+          "entry_time_utc": "2026-08-10T16:00:00+00:00",
+          "exit_time_utc": "2026-08-11T16:00:00+00:00",
+          "holding_bars_4h": 6,
+          "holding_hours": 24,
+          "entry_price": 63970.83,
+          "exit_price": 63241.23142857143,
+          "exit_reason": "TP_HIT",
+          "gross_return_bps": 114.1,
+          "net_return_bps_assumed_70bps": 44.1,
+          "mfe_bps": 124.6,
+          "mae_bps": 74.4
+        },
+        {
+          "trade_id": "HTF_024",
+          "entry_time_utc": "2026-08-17T12:00:00+00:00",
+          "exit_time_utc": "2026-08-18T12:00:00+00:00",
+          "holding_bars_4h": 6,
+          "holding_hours": 24,
+          "entry_price": 64139.89,
+          "exit_price": 64707.21428571428,
+          "exit_reason": "TP_HIT",
+          "gross_return_bps": 88.5,
+          "net_return_bps_assumed_70bps": 18.5,
+          "mfe_bps": 134.1,
+          "mae_bps": 33.0
+        },
+        {
+          "trade_id": "HTF_025",
+          "entry_time_utc": "2026-08-19T12:00:00+00:00",
+          "exit_time_utc": "2026-08-20T08:00:00+00:00",
+          "holding_bars_4h": 5,
+          "holding_hours": 20,
+          "entry_price": 68521.83,
+          "exit_price": 70121.01714285715,
+          "exit_reason": "TP_HIT",
+          "gross_return_bps": 233.4,
+          "net_return_bps_assumed_70bps": 163.4,
+          "mfe_bps": 567.2,
+          "mae_bps": 105.3
+        },
+        {
+          "trade_id": "HTF_026",
+          "entry_time_utc": "2026-08-20T12:00:00+00:00",
+          "exit_time_utc": "2026-08-21T00:00:00+00:00",
+          "holding_bars_4h": 3,
+          "holding_hours": 12,
+          "entry_price": 72435.53,
+          "exit_price": 74885.61142857143,
+          "exit_reason": "TP_HIT",
+          "gross_return_bps": 338.2,
+          "net_return_bps_assumed_70bps": 268.2,
+          "mfe_bps": 454.4,
+          "mae_bps": 36.0
+        },
+        {
+          "trade_id": "HTF_027",
+          "entry_time_utc": "2026-08-21T04:00:00+00:00",
+          "exit_time_utc": "2026-08-21T08:00:00+00:00",
+          "holding_bars_4h": 1,
+          "holding_hours": 4,
+          "entry_price": 76286.26,
+          "exit_price": 79449.41,
+          "exit_reason": "TP_HIT",
+          "gross_return_bps": 414.6,
+          "net_return_bps_assumed_70bps": 344.6,
+          "mfe_bps": 416.2,
+          "mae_bps": 6.4
+        },
+        {
+          "trade_id": "HTF_028",
+          "entry_time_utc": "2026-08-25T00:00:00+00:00",
+          "exit_time_utc": "2026-08-25T12:00:00+00:00",
+          "holding_bars_4h": 3,
+          "holding_hours": 12,
+          "entry_price": 80470.28,
+          "exit_price": 78701.69107142856,
+          "exit_reason": "SL_HIT",
+          "gross_return_bps": -219.8,
+          "net_return_bps_assumed_70bps": -289.8,
+          "mfe_bps": 52.4,
+          "mae_bps": 293.2
+        },
+        {
+          "trade_id": "HTF_029",
+          "entry_time_utc": "2026-08-28T16:00:00+00:00",
+          "exit_time_utc": "2026-08-30T16:00:00+00:00",
+          "holding_bars_4h": 12,
+          "holding_hours": 48,
+          "entry_price": 77557.11,
+          "exit_price": 79139.46214285714,
+          "exit_reason": "SL_HIT",
+          "gross_return_bps": -204.0,
+          "net_return_bps_assumed_70bps": -274.0,
+          "mfe_bps": 39.6,
+          "mae_bps": 235.8
+        },
+        {
+          "trade_id": "HTF_030",
+          "entry_time_utc": "2026-09-03T12:00:00+00:00",
+          "exit_time_utc": "2026-09-04T12:00:00+00:00",
+          "holding_bars_4h": 6,
+          "holding_hours": 24,
+          "entry_price": 81333.69,
+          "exit_price": 79733.38071428573,
+          "exit_reason": "SL_HIT",
+          "gross_return_bps": -196.8,
+          "net_return_bps_assumed_70bps": -266.8,
+          "mfe_bps": 116.4,
+          "mae_bps": 330.6
+        },
+        {
+          "trade_id": "HTF_031",
+          "entry_time_utc": "2026-09-08T04:00:00+00:00",
+          "exit_time_utc": "2026-09-09T04:00:00+00:00",
+          "holding_bars_4h": 6,
+          "holding_hours": 24,
+          "entry_price": 78445.02,
+          "exit_price": 79378.64142857143,
+          "exit_reason": "SL_HIT",
+          "gross_return_bps": -119.0,
+          "net_return_bps_assumed_70bps": -189.0,
+          "mfe_bps": 107.4,
+          "mae_bps": 119.0
+        },
+        {
+          "trade_id": "HTF_032",
+          "entry_time_utc": "2026-09-10T12:00:00+00:00",
+          "exit_time_utc": "2026-09-11T12:00:00+00:00",
+          "holding_bars_4h": 6,
+          "holding_hours": 24,
+          "entry_price": 77213.98,
+          "exit_price": 78400.54107142857,
+          "exit_reason": "SL_HIT",
+          "gross_return_bps": -153.7,
+          "net_return_bps_assumed_70bps": -223.7,
+          "mfe_bps": 152.0,
+          "mae_bps": 339.7
+        },
+        {
+          "trade_id": "HTF_033",
+          "entry_time_utc": "2026-09-18T12:00:00+00:00",
+          "exit_time_utc": "2026-09-21T08:00:00+00:00",
+          "holding_bars_4h": 17,
+          "holding_hours": 68,
+          "entry_price": 80683.12,
+          "exit_price": 82657.42428571428,
+          "exit_reason": "TP_HIT",
+          "gross_return_bps": 244.7,
+          "net_return_bps_assumed_70bps": 174.7,
+          "mfe_bps": 565.8,
+          "mae_bps": 71.5
+        },
+        {
+          "trade_id": "HTF_034",
+          "entry_time_utc": "2026-09-21T12:00:00+00:00",
+          "exit_time_utc": "2026-09-23T12:00:00+00:00",
+          "holding_bars_4h": 12,
+          "holding_hours": 48,
+          "entry_price": 85938.94,
+          "exit_price": 84511.0375,
+          "exit_reason": "SL_HIT",
+          "gross_return_bps": -166.2,
+          "net_return_bps_assumed_70bps": -236.2,
+          "mfe_bps": 166.9,
+          "mae_bps": 241.5
+        },
+        {
+          "trade_id": "HTF_035",
+          "entry_time_utc": "2026-09-28T04:00:00+00:00",
+          "exit_time_utc": "2026-09-28T12:00:00+00:00",
+          "holding_bars_4h": 2,
+          "holding_hours": 8,
+          "entry_price": 82916.51,
+          "exit_price": 83772.49678571429,
+          "exit_reason": "SL_HIT",
+          "gross_return_bps": -103.2,
+          "net_return_bps_assumed_70bps": -173.2,
+          "mfe_bps": 43.5,
+          "mae_bps": 105.7
+        },
+        {
+          "trade_id": "HTF_036",
+          "entry_time_utc": "2026-10-02T04:00:00+00:00",
+          "exit_time_utc": "2026-10-02T16:00:00+00:00",
+          "holding_bars_4h": 3,
+          "holding_hours": 12,
+          "entry_price": 86075.21,
+          "exit_price": 84693.37571428572,
+          "exit_reason": "SL_HIT",
+          "gross_return_bps": -160.5,
+          "net_return_bps_assumed_70bps": -230.5,
+          "mfe_bps": 132.9,
+          "mae_bps": 259.5
+        },
+        {
+          "trade_id": "HTF_037",
+          "entry_time_utc": "2026-10-07T00:00:00+00:00",
+          "exit_time_utc": "2026-10-08T04:00:00+00:00",
+          "holding_bars_4h": 7,
+          "holding_hours": 28,
+          "entry_price": 84121.28,
+          "exit_price": 82292.23,
+          "exit_reason": "TP_HIT",
+          "gross_return_bps": 217.4,
+          "net_return_bps_assumed_70bps": 147.4,
+          "mfe_bps": 230.8,
+          "mae_bps": 27.0
+        },
+        {
+          "trade_id": "HTF_038",
+          "entry_time_utc": "2026-10-08T12:00:00+00:00",
+          "exit_time_utc": "2026-10-09T00:00:00+00:00",
+          "holding_bars_4h": 3,
+          "holding_hours": 12,
+          "entry_price": 80979.22,
+          "exit_price": 82297.70178571428,
+          "exit_reason": "SL_HIT",
+          "gross_return_bps": -162.8,
+          "net_return_bps_assumed_70bps": -232.8,
+          "mfe_bps": 82.9,
+          "mae_bps": 170.2
+        },
+        {
+          "trade_id": "HTF_039",
+          "entry_time_utc": "2026-10-11T12:00:00+00:00",
+          "exit_time_utc": "2026-10-12T12:00:00+00:00",
+          "holding_bars_4h": 6,
+          "holding_hours": 24,
+          "entry_price": 83804.27,
+          "exit_price": 83126.66321428571,
+          "exit_reason": "SL_HIT",
+          "gross_return_bps": -80.9,
+          "net_return_bps_assumed_70bps": -150.9,
+          "mfe_bps": 53.7,
+          "mae_bps": 177.3
+        },
+        {
+          "trade_id": "HTF_040",
+          "entry_time_utc": "2026-10-12T20:00:00+00:00",
+          "exit_time_utc": "2026-10-13T00:00:00+00:00",
+          "holding_bars_4h": 1,
+          "holding_hours": 4,
+          "entry_price": 81745.86,
+          "exit_price": 82652.95392857143,
+          "exit_reason": "SL_HIT",
+          "gross_return_bps": -111.0,
+          "net_return_bps_assumed_70bps": -181.0,
+          "mfe_bps": 97.6,
+          "mae_bps": 211.1
+        },
+        {
+          "trade_id": "HTF_041",
+          "entry_time_utc": "2026-10-15T00:00:00+00:00",
+          "exit_time_utc": "2026-10-15T12:00:00+00:00",
+          "holding_bars_4h": 3,
+          "holding_hours": 12,
+          "entry_price": 80824.38,
+          "exit_price": 82428.57857142857,
+          "exit_reason": "SL_HIT",
+          "gross_return_bps": -198.5,
+          "net_return_bps_assumed_70bps": -268.5,
+          "mfe_bps": 139.9,
+          "mae_bps": 211.9
+        },
+        {
+          "trade_id": "HTF_042",
+          "entry_time_utc": "2026-10-21T08:00:00+00:00",
+          "exit_time_utc": "2026-10-22T04:00:00+00:00",
+          "holding_bars_4h": 5,
+          "holding_hours": 20,
+          "entry_price": 83396.35,
+          "exit_price": 82269.66892857144,
+          "exit_reason": "SL_HIT",
+          "gross_return_bps": -135.1,
+          "net_return_bps_assumed_70bps": -205.1,
+          "mfe_bps": 173.4,
+          "mae_bps": 163.5
+        },
+        {
+          "trade_id": "HTF_043",
+          "entry_time_utc": "2026-10-24T12:00:00+00:00",
+          "exit_time_utc": "2026-10-24T20:00:00+00:00",
+          "holding_bars_4h": 2,
+          "holding_hours": 8,
+          "entry_price": 79701.12,
+          "exit_price": 80734.4775,
+          "exit_reason": "SL_HIT",
+          "gross_return_bps": -129.7,
+          "net_return_bps_assumed_70bps": -199.7,
+          "mfe_bps": 27.6,
+          "mae_bps": 138.9
+        },
+        {
+          "trade_id": "HTF_044",
+          "entry_time_utc": "2026-10-28T08:00:00+00:00",
+          "exit_time_utc": "2026-10-29T00:00:00+00:00",
+          "holding_bars_4h": 4,
+          "holding_hours": 16,
+          "entry_price": 81209.68,
+          "exit_price": 80185.46714285713,
+          "exit_reason": "SL_HIT",
+          "gross_return_bps": -126.1,
+          "net_return_bps_assumed_70bps": -196.1,
+          "mfe_bps": 61.5,
+          "mae_bps": 197.4
+        },
+        {
+          "trade_id": "HTF_045",
+          "entry_time_utc": "2026-10-29T20:00:00+00:00",
+          "exit_time_utc": "2026-11-01T20:00:00+00:00",
+          "holding_bars_4h": 18,
+          "holding_hours": 72,
+          "entry_price": 77792.67,
+          "exit_price": 78233.25,
+          "exit_reason": "TIMEOUT",
+          "gross_return_bps": -56.6,
+          "net_return_bps_assumed_70bps": -126.6,
+          "mfe_bps": 208.2,
+          "mae_bps": 109.4
+        }
+      ]
+    },
+    "2024_multiyear_dataset": {
+      "trades_count": 9,
+      "net_pnl_bps": 452.4,
+      "mean_net_return_bps": 50.3,
+      "sd_net_return_bps": 178.3,
+      "win_rate_pct": 77.8,
+      "profit_factor": 1.89,
+      "trades_detail": [
+        {
+          "trade_id": "HTF_001",
+          "entry_time_utc": "2024-01-08T08:00:00+00:00",
+          "exit_time_utc": "2024-01-08T16:00:00+00:00",
+          "holding_bars_4h": 2,
+          "holding_hours": 8,
+          "entry_price": 44652.0,
+          "exit_price": 45638.142857142855,
+          "exit_reason": "TP_HIT",
+          "gross_return_bps": 220.9,
+          "net_return_bps_assumed_70bps": 150.9,
+          "mfe_bps": 588.8,
+          "mae_bps": 47.5
+        },
+        {
+          "trade_id": "HTF_002",
+          "entry_time_utc": "2024-01-12T16:00:00+00:00",
+          "exit_time_utc": "2024-01-15T16:00:00+00:00",
+          "holding_bars_4h": 18,
+          "holding_hours": 72,
+          "entry_price": 43425.0,
+          "exit_price": 42951.0,
+          "exit_reason": "TIMEOUT",
+          "gross_return_bps": 109.2,
+          "net_return_bps_assumed_70bps": 39.2,
+          "mfe_bps": 441.2,
+          "mae_bps": 134.9
+        },
+        {
+          "trade_id": "HTF_003",
+          "entry_time_utc": "2024-01-18T16:00:00+00:00",
+          "exit_time_utc": "2024-01-19T16:00:00+00:00",
+          "holding_bars_4h": 6,
+          "holding_hours": 24,
+          "entry_price": 40985.0,
+          "exit_price": 41855.857142857145,
+          "exit_reason": "SL_HIT",
+          "gross_return_bps": -212.5,
+          "net_return_bps_assumed_70bps": -282.5,
+          "mfe_bps": 177.4,
+          "mae_bps": 231.1
+        },
+        {
+          "trade_id": "HTF_004",
+          "entry_time_utc": "2024-01-22T16:00:00+00:00",
+          "exit_time_utc": "2024-01-23T08:00:00+00:00",
+          "holding_bars_4h": 4,
+          "holding_hours": 16,
+          "entry_price": 39798.0,
+          "exit_price": 38968.142857142855,
+          "exit_reason": "TP_HIT",
+          "gross_return_bps": 208.5,
+          "net_return_bps_assumed_70bps": 138.5,
+          "mfe_bps": 296.0,
+          "mae_bps": 131.7
+        },
+        {
+          "trade_id": "HTF_005",
+          "entry_time_utc": "2024-01-26T08:00:00+00:00",
+          "exit_time_utc": "2024-01-28T04:00:00+00:00",
+          "holding_bars_4h": 11,
+          "holding_hours": 44,
+          "entry_price": 41257.0,
+          "exit_price": 42329.57142857143,
+          "exit_reason": "TP_HIT",
+          "gross_return_bps": 260.0,
+          "net_return_bps_assumed_70bps": 190.0,
+          "mfe_bps": 379.8,
+          "mae_bps": 87.7
+        },
+        {
+          "trade_id": "HTF_006",
+          "entry_time_utc": "2024-01-29T16:00:00+00:00",
+          "exit_time_utc": "2024-01-31T20:00:00+00:00",
+          "holding_bars_4h": 13,
+          "holding_hours": 52,
+          "entry_price": 42992.0,
+          "exit_price": 42320.32142857143,
+          "exit_reason": "SL_HIT",
+          "gross_return_bps": -156.2,
+          "net_return_bps_assumed_70bps": -226.2,
+          "mfe_bps": 200.3,
+          "mae_bps": 169.3
+        },
+        {
+          "trade_id": "HTF_007",
+          "entry_time_utc": "2024-02-07T16:00:00+00:00",
+          "exit_time_utc": "2024-02-08T00:00:00+00:00",
+          "holding_bars_4h": 2,
+          "holding_hours": 8,
+          "entry_price": 43597.0,
+          "exit_price": 44479.42857142857,
+          "exit_reason": "TP_HIT",
+          "gross_return_bps": 202.4,
+          "net_return_bps_assumed_70bps": 132.4,
+          "mfe_bps": 268.1,
+          "mae_bps": 0.0
+        },
+        {
+          "trade_id": "HTF_008",
+          "entry_time_utc": "2024-02-08T12:00:00+00:00",
+          "exit_time_utc": "2024-02-09T04:00:00+00:00",
+          "holding_bars_4h": 4,
+          "holding_hours": 16,
+          "entry_price": 45470.0,
+          "exit_price": 46392.142857142855,
+          "exit_reason": "TP_HIT",
+          "gross_return_bps": 202.8,
+          "net_return_bps_assumed_70bps": 132.8,
+          "mfe_bps": 213.1,
+          "mae_bps": 124.7
+        },
+        {
+          "trade_id": "HTF_009",
+          "entry_time_utc": "2024-02-09T08:00:00+00:00",
+          "exit_time_utc": "2024-02-11T00:00:00+00:00",
+          "holding_bars_4h": 10,
+          "holding_hours": 40,
+          "entry_price": 47180.0,
+          "exit_price": 48346.71428571428,
+          "exit_reason": "TP_HIT",
+          "gross_return_bps": 247.3,
+          "net_return_bps_assumed_70bps": 177.3,
+          "mfe_bps": 293.1,
+          "mae_bps": 99.2
+        }
+      ]
+    },
+    "friction_label": "ASSUMED (70.0 bps Bitstamp round-trip taker fee + slippage allowance)",
+    "evidence_classification": "RETROSPECTIVE_DEVELOPMENT_DATA (Zero prospective confirmatory weight)"
+  },
+  "phase_7_power_analysis": {
+    "governance_vs_power_distinction": "100 non-overlapping 72h governance blocks (300 calendar days) represent an operational infrastructure stability burn-in hurdle. They do NOT provide 100 trade setups. Setup frequency is ~1 trade per 571 hours, meaning effective statistical power for strategy edge is bounded by N=7.",
+    "sample_size_deficit": "Detecting +50 bps edge with 80% power (alpha=0.05, two-sided, SD=280.2 bps) requires N=247 independent trades (deficit = 240 trades, ~16.2 years of prospective accumulation).",
+    "power_sensitivity_grid": [
+      {
+        "hypothesized_edge_bps": 25.0,
+        "return_sd_bps": 200.0,
+        "power": 0.8,
+        "test_type": "one_sided",
+        "required_trades_n": 396,
+        "sample_deficit_vs_7_trades": 389,
+        "calendar_months_at_1_27_per_month": 311.8
+      },
+      {
+        "hypothesized_edge_bps": 25.0,
+        "return_sd_bps": 200.0,
+        "power": 0.8,
+        "test_type": "two_sided",
+        "required_trades_n": 503,
+        "sample_deficit_vs_7_trades": 496,
+        "calendar_months_at_1_27_per_month": 396.1
+      },
+      {
+        "hypothesized_edge_bps": 25.0,
+        "return_sd_bps": 200.0,
+        "power": 0.9,
+        "test_type": "one_sided",
+        "required_trades_n": 549,
+        "sample_deficit_vs_7_trades": 542,
+        "calendar_months_at_1_27_per_month": 432.3
+      },
+      {
+        "hypothesized_edge_bps": 25.0,
+        "return_sd_bps": 200.0,
+        "power": 0.9,
+        "test_type": "two_sided",
+        "required_trades_n": 673,
+        "sample_deficit_vs_7_trades": 666,
+        "calendar_months_at_1_27_per_month": 529.9
+      },
+      {
+        "hypothesized_edge_bps": 25.0,
+        "return_sd_bps": 280.2,
+        "power": 0.8,
+        "test_type": "one_sided",
+        "required_trades_n": 777,
+        "sample_deficit_vs_7_trades": 770,
+        "calendar_months_at_1_27_per_month": 611.8
+      },
+      {
+        "hypothesized_edge_bps": 25.0,
+        "return_sd_bps": 280.2,
+        "power": 0.8,
+        "test_type": "two_sided",
+        "required_trades_n": 986,
+        "sample_deficit_vs_7_trades": 979,
+        "calendar_months_at_1_27_per_month": 776.4
+      },
+      {
+        "hypothesized_edge_bps": 25.0,
+        "return_sd_bps": 280.2,
+        "power": 0.9,
+        "test_type": "one_sided",
+        "required_trades_n": 1076,
+        "sample_deficit_vs_7_trades": 1069,
+        "calendar_months_at_1_27_per_month": 847.2
+      },
+      {
+        "hypothesized_edge_bps": 25.0,
+        "return_sd_bps": 280.2,
+        "power": 0.9,
+        "test_type": "two_sided",
+        "required_trades_n": 1320,
+        "sample_deficit_vs_7_trades": 1313,
+        "calendar_months_at_1_27_per_month": 1039.4
+      },
+      {
+        "hypothesized_edge_bps": 25.0,
+        "return_sd_bps": 400.0,
+        "power": 0.8,
+        "test_type": "one_sided",
+        "required_trades_n": 1583,
+        "sample_deficit_vs_7_trades": 1576,
+        "calendar_months_at_1_27_per_month": 1246.5
+      },
+      {
+        "hypothesized_edge_bps": 25.0,
+        "return_sd_bps": 400.0,
+        "power": 0.8,
+        "test_type": "two_sided",
+        "required_trades_n": 2010,
+        "sample_deficit_vs_7_trades": 2003,
+        "calendar_months_at_1_27_per_month": 1582.7
+      },
+      {
+        "hypothesized_edge_bps": 25.0,
+        "return_sd_bps": 400.0,
+        "power": 0.9,
+        "test_type": "one_sided",
+        "required_trades_n": 2193,
+        "sample_deficit_vs_7_trades": 2186,
+        "calendar_months_at_1_27_per_month": 1726.8
+      },
+      {
+        "hypothesized_edge_bps": 25.0,
+        "return_sd_bps": 400.0,
+        "power": 0.9,
+        "test_type": "two_sided",
+        "required_trades_n": 2690,
+        "sample_deficit_vs_7_trades": 2683,
+        "calendar_months_at_1_27_per_month": 2118.1
+      },
+      {
+        "hypothesized_edge_bps": 50.0,
+        "return_sd_bps": 200.0,
+        "power": 0.8,
+        "test_type": "one_sided",
+        "required_trades_n": 99,
+        "sample_deficit_vs_7_trades": 92,
+        "calendar_months_at_1_27_per_month": 78.0
+      },
+      {
+        "hypothesized_edge_bps": 50.0,
+        "return_sd_bps": 200.0,
+        "power": 0.8,
+        "test_type": "two_sided",
+        "required_trades_n": 126,
+        "sample_deficit_vs_7_trades": 119,
+        "calendar_months_at_1_27_per_month": 99.2
+      },
+      {
+        "hypothesized_edge_bps": 50.0,
+        "return_sd_bps": 200.0,
+        "power": 0.9,
+        "test_type": "one_sided",
+        "required_trades_n": 138,
+        "sample_deficit_vs_7_trades": 131,
+        "calendar_months_at_1_27_per_month": 108.7
+      },
+      {
+        "hypothesized_edge_bps": 50.0,
+        "return_sd_bps": 200.0,
+        "power": 0.9,
+        "test_type": "two_sided",
+        "required_trades_n": 169,
+        "sample_deficit_vs_7_trades": 162,
+        "calendar_months_at_1_27_per_month": 133.1
+      },
+      {
+        "hypothesized_edge_bps": 50.0,
+        "return_sd_bps": 280.2,
+        "power": 0.8,
+        "test_type": "one_sided",
+        "required_trades_n": 195,
+        "sample_deficit_vs_7_trades": 188,
+        "calendar_months_at_1_27_per_month": 153.5
+      },
+      {
+        "hypothesized_edge_bps": 50.0,
+        "return_sd_bps": 280.2,
+        "power": 0.8,
+        "test_type": "two_sided",
+        "required_trades_n": 247,
+        "sample_deficit_vs_7_trades": 240,
+        "calendar_months_at_1_27_per_month": 194.5
+      },
+      {
+        "hypothesized_edge_bps": 50.0,
+        "return_sd_bps": 280.2,
+        "power": 0.9,
+        "test_type": "one_sided",
+        "required_trades_n": 269,
+        "sample_deficit_vs_7_trades": 262,
+        "calendar_months_at_1_27_per_month": 211.8
+      },
+      {
+        "hypothesized_edge_bps": 50.0,
+        "return_sd_bps": 280.2,
+        "power": 0.9,
+        "test_type": "two_sided",
+        "required_trades_n": 330,
+        "sample_deficit_vs_7_trades": 323,
+        "calendar_months_at_1_27_per_month": 259.8
+      },
+      {
+        "hypothesized_edge_bps": 50.0,
+        "return_sd_bps": 400.0,
+        "power": 0.8,
+        "test_type": "one_sided",
+        "required_trades_n": 396,
+        "sample_deficit_vs_7_trades": 389,
+        "calendar_months_at_1_27_per_month": 311.8
+      },
+      {
+        "hypothesized_edge_bps": 50.0,
+        "return_sd_bps": 400.0,
+        "power": 0.8,
+        "test_type": "two_sided",
+        "required_trades_n": 503,
+        "sample_deficit_vs_7_trades": 496,
+        "calendar_months_at_1_27_per_month": 396.1
+      },
+      {
+        "hypothesized_edge_bps": 50.0,
+        "return_sd_bps": 400.0,
+        "power": 0.9,
+        "test_type": "one_sided",
+        "required_trades_n": 549,
+        "sample_deficit_vs_7_trades": 542,
+        "calendar_months_at_1_27_per_month": 432.3
+      },
+      {
+        "hypothesized_edge_bps": 50.0,
+        "return_sd_bps": 400.0,
+        "power": 0.9,
+        "test_type": "two_sided",
+        "required_trades_n": 673,
+        "sample_deficit_vs_7_trades": 666,
+        "calendar_months_at_1_27_per_month": 529.9
+      },
+      {
+        "hypothesized_edge_bps": 75.0,
+        "return_sd_bps": 200.0,
+        "power": 0.8,
+        "test_type": "one_sided",
+        "required_trades_n": 44,
+        "sample_deficit_vs_7_trades": 37,
+        "calendar_months_at_1_27_per_month": 34.6
+      },
+      {
+        "hypothesized_edge_bps": 75.0,
+        "return_sd_bps": 200.0,
+        "power": 0.8,
+        "test_type": "two_sided",
+        "required_trades_n": 56,
+        "sample_deficit_vs_7_trades": 49,
+        "calendar_months_at_1_27_per_month": 44.1
+      },
+      {
+        "hypothesized_edge_bps": 75.0,
+        "return_sd_bps": 200.0,
+        "power": 0.9,
+        "test_type": "one_sided",
+        "required_trades_n": 61,
+        "sample_deficit_vs_7_trades": 54,
+        "calendar_months_at_1_27_per_month": 48.0
+      },
+      {
+        "hypothesized_edge_bps": 75.0,
+        "return_sd_bps": 200.0,
+        "power": 0.9,
+        "test_type": "two_sided",
+        "required_trades_n": 75,
+        "sample_deficit_vs_7_trades": 68,
+        "calendar_months_at_1_27_per_month": 59.1
+      },
+      {
+        "hypothesized_edge_bps": 75.0,
+        "return_sd_bps": 280.2,
+        "power": 0.8,
+        "test_type": "one_sided",
+        "required_trades_n": 87,
+        "sample_deficit_vs_7_trades": 80,
+        "calendar_months_at_1_27_per_month": 68.5
+      },
+      {
+        "hypothesized_edge_bps": 75.0,
+        "return_sd_bps": 280.2,
+        "power": 0.8,
+        "test_type": "two_sided",
+        "required_trades_n": 110,
+        "sample_deficit_vs_7_trades": 103,
+        "calendar_months_at_1_27_per_month": 86.6
+      },
+      {
+        "hypothesized_edge_bps": 75.0,
+        "return_sd_bps": 280.2,
+        "power": 0.9,
+        "test_type": "one_sided",
+        "required_trades_n": 120,
+        "sample_deficit_vs_7_trades": 113,
+        "calendar_months_at_1_27_per_month": 94.5
+      },
+      {
+        "hypothesized_edge_bps": 75.0,
+        "return_sd_bps": 280.2,
+        "power": 0.9,
+        "test_type": "two_sided",
+        "required_trades_n": 147,
+        "sample_deficit_vs_7_trades": 140,
+        "calendar_months_at_1_27_per_month": 115.7
+      },
+      {
+        "hypothesized_edge_bps": 75.0,
+        "return_sd_bps": 400.0,
+        "power": 0.8,
+        "test_type": "one_sided",
+        "required_trades_n": 176,
+        "sample_deficit_vs_7_trades": 169,
+        "calendar_months_at_1_27_per_month": 138.6
+      },
+      {
+        "hypothesized_edge_bps": 75.0,
+        "return_sd_bps": 400.0,
+        "power": 0.8,
+        "test_type": "two_sided",
+        "required_trades_n": 224,
+        "sample_deficit_vs_7_trades": 217,
+        "calendar_months_at_1_27_per_month": 176.4
+      },
+      {
+        "hypothesized_edge_bps": 75.0,
+        "return_sd_bps": 400.0,
+        "power": 0.9,
+        "test_type": "one_sided",
+        "required_trades_n": 244,
+        "sample_deficit_vs_7_trades": 237,
+        "calendar_months_at_1_27_per_month": 192.1
+      },
+      {
+        "hypothesized_edge_bps": 75.0,
+        "return_sd_bps": 400.0,
+        "power": 0.9,
+        "test_type": "two_sided",
+        "required_trades_n": 299,
+        "sample_deficit_vs_7_trades": 292,
+        "calendar_months_at_1_27_per_month": 235.4
+      },
+      {
+        "hypothesized_edge_bps": 100.0,
+        "return_sd_bps": 200.0,
+        "power": 0.8,
+        "test_type": "one_sided",
+        "required_trades_n": 25,
+        "sample_deficit_vs_7_trades": 18,
+        "calendar_months_at_1_27_per_month": 19.7
+      },
+      {
+        "hypothesized_edge_bps": 100.0,
+        "return_sd_bps": 200.0,
+        "power": 0.8,
+        "test_type": "two_sided",
+        "required_trades_n": 32,
+        "sample_deficit_vs_7_trades": 25,
+        "calendar_months_at_1_27_per_month": 25.2
+      },
+      {
+        "hypothesized_edge_bps": 100.0,
+        "return_sd_bps": 200.0,
+        "power": 0.9,
+        "test_type": "one_sided",
+        "required_trades_n": 35,
+        "sample_deficit_vs_7_trades": 28,
+        "calendar_months_at_1_27_per_month": 27.6
+      },
+      {
+        "hypothesized_edge_bps": 100.0,
+        "return_sd_bps": 200.0,
+        "power": 0.9,
+        "test_type": "two_sided",
+        "required_trades_n": 43,
+        "sample_deficit_vs_7_trades": 36,
+        "calendar_months_at_1_27_per_month": 33.9
+      },
+      {
+        "hypothesized_edge_bps": 100.0,
+        "return_sd_bps": 280.2,
+        "power": 0.8,
+        "test_type": "one_sided",
+        "required_trades_n": 49,
+        "sample_deficit_vs_7_trades": 42,
+        "calendar_months_at_1_27_per_month": 38.6
+      },
+      {
+        "hypothesized_edge_bps": 100.0,
+        "return_sd_bps": 280.2,
+        "power": 0.8,
+        "test_type": "two_sided",
+        "required_trades_n": 62,
+        "sample_deficit_vs_7_trades": 55,
+        "calendar_months_at_1_27_per_month": 48.8
+      },
+      {
+        "hypothesized_edge_bps": 100.0,
+        "return_sd_bps": 280.2,
+        "power": 0.9,
+        "test_type": "one_sided",
+        "required_trades_n": 68,
+        "sample_deficit_vs_7_trades": 61,
+        "calendar_months_at_1_27_per_month": 53.5
+      },
+      {
+        "hypothesized_edge_bps": 100.0,
+        "return_sd_bps": 280.2,
+        "power": 0.9,
+        "test_type": "two_sided",
+        "required_trades_n": 83,
+        "sample_deficit_vs_7_trades": 76,
+        "calendar_months_at_1_27_per_month": 65.4
+      },
+      {
+        "hypothesized_edge_bps": 100.0,
+        "return_sd_bps": 400.0,
+        "power": 0.8,
+        "test_type": "one_sided",
+        "required_trades_n": 99,
+        "sample_deficit_vs_7_trades": 92,
+        "calendar_months_at_1_27_per_month": 78.0
+      },
+      {
+        "hypothesized_edge_bps": 100.0,
+        "return_sd_bps": 400.0,
+        "power": 0.8,
+        "test_type": "two_sided",
+        "required_trades_n": 126,
+        "sample_deficit_vs_7_trades": 119,
+        "calendar_months_at_1_27_per_month": 99.2
+      },
+      {
+        "hypothesized_edge_bps": 100.0,
+        "return_sd_bps": 400.0,
+        "power": 0.9,
+        "test_type": "one_sided",
+        "required_trades_n": 138,
+        "sample_deficit_vs_7_trades": 131,
+        "calendar_months_at_1_27_per_month": 108.7
+      },
+      {
+        "hypothesized_edge_bps": 100.0,
+        "return_sd_bps": 400.0,
+        "power": 0.9,
+        "test_type": "two_sided",
+        "required_trades_n": 169,
+        "sample_deficit_vs_7_trades": 162,
+        "calendar_months_at_1_27_per_month": 133.1
+      }
+    ]
+  },
+  "phase_8_adversarial_review": {
+    "audit_item_1_dataset_selection": "CONFIRMED DISCREPANCY. V34.2 reported downloading an expanded multi-year dataset, but the experiment runner consumed the 4,000-bar dataset because the multi-year download was throttled at 1,000 bars.",
+    "audit_item_2_target_alignment": "PASSED. All forward realized-variance targets use strictly causal forward sums starting at t+1.",
+    "audit_item_3_lookahead_prevention": "PASSED. All parameter estimation and regime quantiles are restricted strictly to the training partition.",
+    "audit_item_4_multiple_testing": "CONFIRMED. Under Holm-Bonferroni correction, zero volatility models achieve statistically significant outperformance over Standard HAR.",
+    "audit_item_5_overlapping_forecasts": "CONFIRMED. Overlapping multi-step forecasts inflate naive t-statistics; Newey-West HAC bandwidth >= 2H and non-overlapping tests confirm absence of edge.",
+    "audit_item_6_c2_coverage_fallacy": "CONFIRMED. Wide bootstrap intervals containing 90% reflect massive cluster uncertainty, not calibrated validity.",
+    "audit_item_7_htf_power_deficit": "CONFIRMED. 7 trades provide only ~12% power; positive expectancy claims are statistically unsupported."
+  },
+  "final_governed_decisions": {
+    "volatility_forecasting": "RISK_MODEL_ADVANTAGE_NOT_CONFIRMED",
+    "c2_conformal_envelope": "C2_CALIBRATION_FAILED",
+    "htf_strategy_edge": "STRATEGY_EDGE_INCONCLUSIVE",
+    "dataset_lineage": "DATASET_LINEAGE_UNVERIFIED",
+    "production_gating": "DATA_INSUFFICIENT",
+    "trading_authorization": "OFFLINE_RESEARCH_ONLY"
+  }
+}

@@ -169,6 +169,15 @@ html, body {
   gap: 2px;
   list-style: none;
   height: 100%;
+  width: auto;
+  min-width: fit-content;
+  flex: 1 1 auto;
+}
+
+.nav-links li {
+  display: flex;
+  align-items: center;
+  min-width: 0;
 }
 
 .nav-links a {
@@ -185,6 +194,7 @@ html, body {
   transition: color 0.2s ease;
   position: relative;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .nav-links a::after {
@@ -210,6 +220,81 @@ html, body {
 
 .nav-links a.active::after {
   background: var(--primary);
+}
+
+/* Secondary Navigation Dropdown (V32.46) */
+.nav-dropdown {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.nav-dropdown-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 64px;
+  padding: 0 16px;
+  background: transparent;
+  border: none;
+  color: #5E7A9A;
+  font-weight: 500;
+  font-size: 0.88rem;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  white-space: nowrap;
+}
+
+.nav-dropdown-btn:hover,
+.nav-dropdown-btn.active {
+  color: #F1F5F9;
+}
+
+.nav-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  min-width: 220px;
+  background: rgba(11, 18, 32, 0.98);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 1050;
+}
+
+.nav-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  color: #CBD5E1;
+  text-decoration: none;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.nav-dropdown-item:hover {
+  background: rgba(56, 189, 248, 0.12);
+  color: #38BDF8;
+}
+
+.nav-dropdown-item.active {
+  background: rgba(0, 229, 168, 0.12);
+  color: #00E5A8;
 }
 
 .nav-right {
@@ -1531,7 +1616,19 @@ html, body {
     grid-template-columns: repeat(2, 1fr) !important;
   }
   .navbar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    height: auto;
+    min-height: 64px;
     padding: 12px 20px;
+  }
+  .nav-right {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    min-width: 0;
+    gap: 6px;
   }
   .logo-text {
     font-size: 1.1rem;
@@ -1551,8 +1648,42 @@ html, body {
    5. Mobile Devices Portrait & Small Screens (< 768px)
    -------------------------------------------------------------------------- */
 @media (max-width: 767px) {
+  #paper-trading-page,
+  #paper-trading-page > * {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+  #paper-trading-page > div:last-child > div:first-child {
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  #paper-trading-page > div:last-child > div:first-child > div {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .paper-sleeve-grid,
+  .journal-evaluation-grid {
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .paper-sleeve-grid > *,
+  .journal-evaluation-grid > * {
+    min-width: 0;
+  }
   .navbar {
     padding: 10px 14px;
+  }
+  .institutional-ticker-bar {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    justify-content: flex-start;
+    padding: 10px 14px;
+  }
+  .ticker-item {
+    flex: 0 0 auto;
   }
   .btn-signup-pill {
     padding: 8px 14px;
@@ -3498,7 +3629,21 @@ html, body {
 
 @media (max-width: 1080px) {
   .workstation-workspace {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .chart-ai-forecast-overlay {
+    max-height: 190px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+
+  .chart-ai-forecast-meta,
+  .chart-ai-forecast-marker-note {
+    font-size: 0.66rem;
+    line-height: 1.3;
   }
 }
 
@@ -4687,4 +4832,248 @@ html, body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+/* ==========================================================================
+   WCAG 2.2 AA Accessibility & Responsive Enhancements (V32.34)
+   ========================================================================== */
+
+/* Visible keyboard focus indicators for all interactive elements */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid #00E5A8 !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 12px rgba(0, 229, 168, 0.4) !important;
+}
+
+/* Minimum 24x24 px tap targets for WCAG 2.2 AA conformance */
+button,
+.nav-link-pill,
+.workstation-tab-btn,
+.timeframe-pill,
+.toast-close-btn,
+.mobile-menu-toggle {
+  min-height: 24px;
+  min-width: 24px;
+}
+
+/* Responsive Table Horizontal Scrolling */
+.table-responsive-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 1rem;
+}
+
+/* High-contrast text utility */
+.text-high-contrast {
+  color: #F8FAFC !important;
+}
+
+.text-subtle-contrast {
+  color: #CBD5E1 !important;
+}
+
+/* Research Tab Navigation */
+.research-tabs-bar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 12px;
+}
+
+.research-tab-pill {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94A3B8;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.research-tab-pill:hover {
+  background: rgba(56, 189, 248, 0.1);
+  border-color: rgba(56, 189, 248, 0.3);
+  color: #38BDF8;
+}
+
+.research-tab-pill.active {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: rgba(56, 189, 248, 0.6);
+  color: #38BDF8;
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.25);
+}
+
+/* Mobile & Tablet Layout Protection */
+@media (max-width: 768px) {
+  .hero-cards-row {
+    flex-direction: column !important;
+  }
+  .terminal-container {
+    padding: 12px !important;
+  }
+  .navbar {
+    padding: 10px 16px !important;
+  }
+}
+
+/* ==========================================================================
+   V32.40 UI Update: How It Works & Home Overview Architecture Cards
+   ========================================================================== */
+.home-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.home-card {
+  background: rgba(14, 22, 38, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.home-card:hover {
+  border-color: rgba(0, 229, 168, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 229, 168, 0.1);
+}
+
+.home-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.home-card-icon-wrap {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  flex-shrink: 0;
+}
+
+.home-card-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #F8FAFC;
+  margin: 0;
+}
+
+.home-card-desc {
+  font-size: 0.84rem;
+  color: #94A3B8;
+  line-height: 1.55;
+  margin-bottom: 16px;
+  flex-grow: 1;
+}
+
+.home-card-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  letter-spacing: 0.03em;
+  margin-bottom: 14px;
+  width: fit-content;
+}
+
+.home-card-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 9px 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #F1F5F9;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.home-card-btn:hover {
+  background: rgba(0, 229, 168, 0.12);
+  border-color: rgba(0, 229, 168, 0.4);
+  color: #00E5A8;
+}
+
+.home-card-btn:focus-visible {
+  outline: 2px solid #00E5A8;
+  outline-offset: 2px;
+}
+
+/* How It Works View Styles */
+.how-it-works-container {
+  max-width: 1140px;
+  margin: 0 auto;
+  padding: 32px 24px 64px 24px;
+}
+
+.hiw-stage-card {
+  background: rgba(14, 22, 38, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 24px;
+  margin-bottom: 20px;
+  position: relative;
+  transition: all 0.25s ease;
+}
+
+.hiw-stage-card:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+}
+
+.hiw-stage-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  background: linear-gradient(135deg, rgba(0, 229, 168, 0.2), rgba(124, 92, 255, 0.2));
+  border: 1px solid rgba(0, 229, 168, 0.4);
+  color: #00E5A8;
+  margin-right: 12px;
+  flex-shrink: 0;
 }

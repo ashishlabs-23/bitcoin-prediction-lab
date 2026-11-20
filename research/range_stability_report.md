@@ -4,13 +4,13 @@
 
 | Market Regime | Block Count | Mean MFE Error % | Mean MAE Error % | MFE P90 Coverage % | Joint Path Containment % | Mean Range Width % | Stability Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Sideways | 33 | 1.4833 | 1.0204 | 87.9% | 81.8% | 5.92% | STABLE |
+| Sideways | 33 | 0.7627 | 0.8982 | 93.9% | 84.8% | 5.93% | STABLE |
 
 ## 2. Volatility Tier Partition Stability
 
 | Volatility Tier | Block Count | Mean MFE Error % | Mean MAE Error % | MFE P90 Coverage % | Joint Path Containment % | Mean Range Width % | Stability Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Normal Volatility | 33 | 1.4833 | 1.0204 | 87.9% | 81.8% | 5.92% | STABLE |
+| Normal Volatility | 33 | 0.7627 | 0.8982 | 93.9% | 84.8% | 5.93% | STABLE |
 
 ## 3. Findings
 

@@ -24,6 +24,32 @@ from api.routes_arena import get_scenario_preview
 from models.calibrated_signal_classifier import evaluate_governed_signal_gate
 
 
+def _fresh_scenario_market_state():
+    latest = datetime.now(timezone.utc).isoformat()
+    return {
+        "is_valid": True,
+        "source": "LOCAL_PARQUET_UNVERIFIED",
+        "instrument": "BTC/USD",
+        "source_timeframe": "1h",
+        "reference_price": 80_000.0,
+        "price_timestamp": latest,
+        "reference_price_timestamp_utc": latest,
+        "price_freshness_seconds": 0.0,
+        "reference_price_age_seconds": 0.0,
+        "volatility_data_age_seconds": 0.0,
+        "latest_volatility_candle_timestamp_utc": latest,
+        "volatility_lookback_start_utc": latest,
+        "volatility_lookback_end_utc": latest,
+        "volatility_observation_count": 24,
+        "continuity_segment_id": 1,
+        "segment_bars_available": 25,
+        "sigma_1h": 0.01,
+        "lookback_bars": 24,
+        "staleness_threshold_seconds": DEFAULT_MAX_STALENESS_SECONDS,
+        "market_source": "Local parquet; exchange provenance unavailable",
+    }
+
+
 def test_scenario_known_answer_mathematical_verification():
     """
     Known-answer fixture (Log-return volatility formulation):
@@ -76,17 +102,24 @@ def test_scenario_known_answer_mathematical_verification():
     assert rr_short == 1.46
 
 
-def test_supported_horizons_provenance_and_metadata():
+def test_supported_horizons_provenance_and_metadata(monkeypatch):
     """
     Verify 1h, 4h, and 24h supported horizons produce valid output with full provenance metadata.
     """
     planner = HypotheticalScenarioPlanner()
+    monkeypatch.setattr(
+        planner,
+        "get_latest_verified_market_state",
+        lambda as_of_time=None: _fresh_scenario_market_state(),
+    )
     for hz in ["1h", "4h", "24h"]:
         result = planner.compute_scenario_preview(horizon=hz)
         assert result["status"] == "SUCCESS", f"Failed for horizon {hz}: {result.get('rejection_narrative')}"
         assert result["selected_horizon"] == hz
         assert result["contract_version"] == "SCENARIO_PLANNER_v1.0"
-        assert result["source"] == "Coinbase Spot"
+        assert result["source"] == "LOCAL_PARQUET_UNVERIFIED"
+        assert result["calibration_status"] == "UNAVAILABLE"
+        assert result["scenario_estimate_status"] == "UNVALIDATED_HEURISTIC"
         assert result["instrument"] == "BTC/USD"
         assert result["source_timeframe"] == "1h"
         assert result["volatility_units"] == "LOG_RETURN_STANDARD_DEVIATION"
@@ -114,11 +147,16 @@ def test_supported_horizons_provenance_and_metadata():
         assert short_s["gross_reward_to_risk"] > 1.0
 
 
-def test_custom_entry_valid_and_invalid():
+def test_custom_entry_valid_and_invalid(monkeypatch):
     """
     Verify custom entry anchor behavior: valid positive number vs invalid (0, negative, NaN, inf).
     """
     planner = HypotheticalScenarioPlanner()
+    monkeypatch.setattr(
+        planner,
+        "get_latest_verified_market_state",
+        lambda as_of_time=None: _fresh_scenario_market_state(),
+    )
 
     # Valid custom entry
     custom_res = planner.compute_scenario_preview(horizon="24h", entry_price=95000.0)
@@ -217,10 +255,17 @@ def test_missing_parquet_adapter_error(tmp_path):
     assert res["rejection_code"] == "MARKET_DATA_UNAVAILABLE"
 
 
-def test_api_route_scenario_preview_contract():
+def test_api_route_scenario_preview_contract(monkeypatch):
     """
     Verify FastAPI scenario preview endpoint contract via direct route function.
     """
+    from engine.scenario_contract_engine import scenario_planner
+
+    monkeypatch.setattr(
+        scenario_planner,
+        "get_latest_verified_market_state",
+        lambda as_of_time=None: _fresh_scenario_market_state(),
+    )
     # Valid 4h request
     resp = get_scenario_preview(horizon="4h", entry_price=None)
     assert resp["status"] == "SUCCESS"
@@ -235,7 +280,7 @@ def test_api_route_scenario_preview_contract():
     assert resp_15m["rejection_code"] == "DATA_FREQUENCY_UNSUPPORTED"
 
 
-def test_scenario_does_not_pollute_signal_gate():
+def test_scenario_does_not_pollute_signal_gate(monkeypatch):
     """
     Governance assertion: Calling scenario planner must never mutate
     or populate directional signal or model authorization state.
@@ -248,10 +293,18 @@ def test_scenario_does_not_pollute_signal_gate():
 
     # Run scenario planner
     planner = HypotheticalScenarioPlanner()
+    monkeypatch.setattr(
+        planner,
+        "get_latest_verified_market_state",
+        lambda as_of_time=None: {
+            "is_valid": False,
+            "error_code": "MARKET_DATA_STALE",
+            "narrative": "Test snapshot is stale.",
+        },
+    )
     res = planner.compute_scenario_preview(horizon="24h")
-    assert res["status"] == "SUCCESS"
-    assert res["is_actionable"] is False
-    assert res["execution_authorization"] == "DISABLED"
+    assert res["status"] == "UNAVAILABLE"
+    assert res["rejection_code"] == "MARKET_DATA_STALE"
 
     # Re-verify classifier gate is still strictly ABSTAIN and live trading DISABLED
     gate_after = evaluate_governed_signal_gate()

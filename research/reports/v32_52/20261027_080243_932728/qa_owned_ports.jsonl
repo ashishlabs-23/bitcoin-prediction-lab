@@ -1,0 +1,11 @@
+{"action": "bind", "pid": 36108, "port": 52559}
+{"action": "close", "pid": 36108, "port": 52559}
+{"action": "bind", "pid": 36108, "port": 52560}
+{"action": "close", "pid": 36108, "port": 52560}
+{"action": "bind", "pid": 36108, "port": 52559}
+{"action": "bind", "pid": 36108, "port": 64813}
+{"action": "close", "pid": 36108, "port": 64813}
+{"action": "bind", "pid": 36108, "port": 61102}
+{"action": "close", "pid": 36108, "port": 61102}
+{"action": "bind", "pid": 36108, "port": 59463}
+{"action": "close", "pid": 36108, "port": 59463}

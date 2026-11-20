@@ -40,16 +40,16 @@ def test_missing_market_data_fails_closed_without_synthetic_fallbacks(monkeypatc
     assert res_meie.status_code == 503
     assert "Market price unavailable" in res_meie.json()["detail"]
 
-    # 2. Multiscale prediction endpoint must return 503 instead of 65,000.0
+    # 2. Multiscale prediction endpoint must fail closed without an authenticated model.
     res_multi = client.get("/prediction/multiscale")
     assert res_multi.status_code == 503
-    assert "Market price unavailable" in res_multi.json()["detail"]
+    assert res_multi.json()["detail"]["status"] == "UNAVAILABLE"
 
     # 3. Active paper position must report MARKET_DATA_UNAVAILABLE instead of 64,250.0
     res_pos = client.get("/api/arena/active-paper-position")
     assert res_pos.status_code == 200
     pos_data = res_pos.json()
-    assert pos_data.get("status") == "MARKET_DATA_UNAVAILABLE"
+    assert pos_data.get("status") == "UNAVAILABLE"
     assert pos_data.get("live_price") is None
 
     # 4. Adaptive evidence router must fail closed with SPOT_PRICE_UNAVAILABLE instead of 64,000.0

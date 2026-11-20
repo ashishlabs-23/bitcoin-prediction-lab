@@ -8,6 +8,26 @@
 
 ## 1. Prime Directive & Epistemic Boundaries
 
+### V32.54 authorization decision
+
+Runtime integrity and model-readiness checks do not authorize production serving.
+Until a separate governance decision is documented, the canonical volatility model
+and every derived forecast remain `OFFLINE_RESEARCH_ONLY`; runtime readiness reports
+`authorized: false` and `reason_code: MODEL_UNAUTHORIZED`. Research status remains
+`NO_GO_NO_VALIDATED_EDGE`, and live trading/order submission remain `DISABLED`.
+The `/api/terminal/live` inference route and candle-close model inference fail closed
+under this policy. A passing artifact or data check must never promote authorization.
+
+### V32.54 isolated dataset policy
+
+The QA runner accepts the versioned Coinbase parquet only with its matching acquisition
+manifest and SHA-256. It copies that parquet to `data/raw/ohlcv.parquet` inside the
+disposable sandbox only; the working tree's canonical dataset and backups remain
+unchanged. When the acquisition manifest is `ACQUIRED_WITH_REVIEW_REQUIRED`, tests
+require an explicit exploratory override, and each run records that status and hash.
+The runner's protected-file checks continue to verify the real working-tree files
+before and after the sandbox run.
+
 BTCognitive is an open-source probabilistic volatility risk intelligence system for BTC/USD. It is governed by a permanent operating contract that strictly separates three functional domains:
 
 ```mermaid
@@ -15,7 +35,7 @@ graph TD
     subgraph Volatility Domain [1. Volatility Risk Intelligence]
         V1[HAR-RS-DOW-v1.0] --> V2[Annualized 7-Day Realized Variance rv7d_var_ann]
         V2 --> V3[Conformal C2 Dependence-Aware Risk Envelopes]
-        V3 --> V4[Status: AUTHORIZED_FOR_PRODUCTION]
+        V3 --> V4[Status: OFFLINE_RESEARCH_ONLY]
     end
 
     subgraph Directional Domain [2. Directional Return Forecasting]
@@ -33,7 +53,7 @@ graph TD
 
 ### Invariant Rules
 1. **Strict Non-Execution:** Zero live trading, broker execution, or order placement pathways exist (`live_capital_authorized: False`, `trading_enabled: False`).
-2. **Target Decoupling:** Authorization of the canonical volatility model (`HAR-RS-DOW-v1.0` on `rv7d_var_ann` 168h) does NOT authorize directional trading or live capital.
+2. **Target Decoupling:** The canonical volatility model (`HAR-RS-DOW-v1.0` on `rv7d_var_ann` 168h) is `OFFLINE_RESEARCH_ONLY`. Any future authorization would not authorize directional trading or live capital.
 3. **Fail-Closed Default:** Any missing artifact, hash mismatch, data discontinuity, unverified prospective ledger, or unhandled exception must immediately revert the system to fail-closed state (`BLOCKED`, `DATA_UNAVAILABLE`, or startup abort).
 4. **No Health Tautology:** An HTTP 200 on `/health` or `/api/health` indicates solely that the HTTP service is operational and monitoring market feeds. It does **not** imply that production forecasting is authorized or that directional signals exist.
 
@@ -52,7 +72,7 @@ graph TD
 - **Invocation Point:** Startup lifespan & `/api/readiness`, `/api/terminal/readiness`
 - **Purpose:** Generates structured diagnostic state with standardized machine-readable reason codes.
 - **Structured Reason Codes:**
-  - `NONE`: All 8 checks passed; authorized for volatility intelligence.
+  - `MODEL_UNAUTHORIZED`: Integrity/readiness checks pass, but production authorization is withheld by governance.
   - `FROZEN_INPUT_MISSING`: Manifest or artifact missing on disk.
   - `FROZEN_INPUT_HASH_MISMATCH`: SHA-256 of artifact or manifest altered.
   - `FROZEN_RUNTIME_MISMATCH`: Environment or dependency drift.
@@ -62,12 +82,11 @@ graph TD
   - `CALIBRATION_UNAVAILABLE`: Insufficient or corrupt calibration parameters.
   - `DATA_STALE`: Market feed exceeding latency threshold.
   - `INSUFFICIENT_HISTORY`: Fewer than required lookback bars.
-  - `MODEL_UNAUTHORIZED`: Model lacks production authorization.
 
 ### Gate 3: API Request Gate (`_gate`)
 - **Location:** `api/market_monitor_routes.py:_gate()`
 - **Invocation Point:** Every endpoint in `market_monitor_routes.py` (`/prediction/latest`, `/market/latest`, etc.)
-- **Purpose:** Safely reads `request.app.state.research_gate`. If uninitialized or invalid, falls back to safe fail-closed dictionary (`authorized: False`, `status: "BLOCKED_PROVENANCE_UNVERIFIED"`).
+- **Purpose:** Requires explicit runtime approval and an `AUTHORIZED_FOR_PRODUCTION` status in the authoritative model registry. A runtime gate alone cannot grant serving authorization. If uninitialized or invalid, falls back to a safe fail-closed dictionary.
 
 ### Gate 4: Research Trade Entry / TP / SL Gate (`research_entry_tp_sl`)
 - **Location:** `api/market_monitor_routes.py:research_entry_tp_sl()`
@@ -94,8 +113,8 @@ graph TD
 | Gate | Enforcement Function | Allowed / Passing Condition | Expected Result (Allowed) | Denied / Failing Condition | Expected Result (Denied) | Test Coverage |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Startup Freeze** | `verify_scientific_contract` | Uncorrupted artifact & manifest with matching SHA-256 | Returns `True`; server continues initialization | Corrupted artifact byte or missing manifest | Raises `RuntimeError("SCIENTIFIC STARTUP GATE FAILED...")` | `test_phase_01_1_adversarial_integrity.py` |
-| **Runtime Readiness** | `evaluate_runtime_readiness` | Clean artifact & valid features | `authorized: True`, `status: "READY"`, `reason_code: "NONE"` | Missing `ohlcv.parquet` or altered hash | `authorized: False`, `status: "BLOCKED"`, `reason_code: "FROZEN_INPUT_MISSING"` | `test_forecast_activation_and_readiness.py` |
-| **Prediction Route** | `/prediction/latest` | Gate authorized in `app.state.research_gate` | `research.authorized: True`, `production_forecast_available: True`, `trading_enabled: False` | Gate blocked or uninitialized | `research.authorized: False`, `production_forecast_available: False`, `trading_enabled: False` | `test_frontend_contracts.py` |
+| **Runtime Readiness** | `evaluate_runtime_readiness` | Clean artifact & valid features | `authorized: False`, `status: "OFFLINE_RESEARCH_ONLY"`, `reason_code: "MODEL_UNAUTHORIZED"` | Missing `ohlcv.parquet` or altered hash | `authorized: False`, `status: "BLOCKED"`, precise failure reason | `test_forecast_activation_and_readiness.py` |
+| **Prediction Route** | `/prediction/latest` | Empirical baseline only; canonical model remains offline | `research.authorized: False`, `production_forecast_available: False`, `trading_enabled: False` | Gate blocked or uninitialized | `research.authorized: False`, `production_forecast_available: False`, `trading_enabled: False` | `test_frontend_contracts.py` |
 | **Trade Execution** | App Route Table | Read-only research routes | HTTP 200 with `execution_mode: READ_ONLY_RESEARCH` | Attempt to call `/api/order/buy`, `/api/broker/execute` | Route does not exist (HTTP 404 / route table assertion) | `test_frontend_contracts.py` |
 | **Directional Entry** | `/api/research/entry-tp-sl` | Volatility gate authorized | `status: "BLOCKED"`, `hypothetical_signal: null`, `live_capital_authorized: False` | Volatility gate blocked | `status: "BLOCKED"`, `hypothetical_signal: null`, `live_capital_authorized: False` | `test_frontend_contracts.py` |
 | **Prospective Evidence** | `/prediction/intelligence/health` | Resolved post-repair blocks $\ge 5$ | `production_status: "VALIDATED_PRODUCTION_RANGE_SYSTEM"`, `overall_reliability: "VERY_HIGH"` | Zero resolved post-repair blocks ($N=0$) | `production_status: "INSUFFICIENT_EVIDENCE"`, `overall_reliability: "INSUFFICIENT_EVIDENCE"` | `test_forecast_intelligence.py` |
@@ -113,8 +132,7 @@ graph TD
      - `"order_submission_enabled": false`
      - `"product_mode": "ANALYSIS_ONLY"`
      - `"execution_status": "DISABLED_ANALYSIS_ONLY"`
-   - If `research_gate["authorized"]` is False, `/health` sets `"mode": "MARKET_MONITOR_ONLY"`, `"production_forecast_available": false`, and `"models_loaded": false`.
-   - If `research_gate["authorized"]` is True, `/health` sets `"mode": "PRODUCTION_VOLATILITY_INTELLIGENCE"`, `"production_forecast_available": true`, and `"models_loaded": true`.
+   - Production authorization requires both `research_gate["authorized"] == true` and explicit registry authorization. Under V32.54 the registry remains `OFFLINE_RESEARCH_ONLY`, so the service reports `"mode": "MARKET_MONITOR_ONLY"`, `"production_forecast_available": false`, and `"models_loaded": false`.
 
 2. **`/api/readiness` vs. `/prediction/latest`**:
    - Both derive authority from `validation.startup_gate.evaluate_runtime_readiness`.

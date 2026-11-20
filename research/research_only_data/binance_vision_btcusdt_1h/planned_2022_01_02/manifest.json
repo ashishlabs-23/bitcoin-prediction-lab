@@ -1,0 +1,45 @@
+{
+  "dataset_status": "RESEARCH_ONLY_NOT_FOR_PUBLIC_DISPLAY",
+  "provider": "BINANCE_VISION",
+  "venue": "BINANCE_SPOT",
+  "symbol": "BTCUSDT",
+  "base_currency": "BTC",
+  "quote_currency": "USDT",
+  "market_type": "SPOT",
+  "interval": "1h",
+  "start": "2022-01-01T00:00:00Z",
+  "end": "2022-02-28T23:00:00Z",
+  "download_enabled": false,
+  "terms_url": "https://github.com/binance/binance-public-data/blob/master/TERMS_AND_CONDITIONS.md",
+  "terms_version": "2026-08-26 / CC-BY-NC-SA-4.0 / research-only screening",
+  "segments": [
+    {
+      "month": "2022-01",
+      "source_url": "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/1h/BTCUSDT-1h-2022-01.zip",
+      "source_symbol": "BTCUSDT",
+      "quote_currency": "USDT",
+      "venue": "BINANCE_SPOT",
+      "interval": "1h",
+      "terms_url": "https://github.com/binance/binance-public-data/blob/master/TERMS_AND_CONDITIONS.md",
+      "terms_version": "2026-08-26 / CC-BY-NC-SA-4.0 / research-only screening",
+      "retrieved_at_utc": null,
+      "status": "NOT_DOWNLOADED"
+    },
+    {
+      "month": "2022-02",
+      "source_url": "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/1h/BTCUSDT-1h-2022-02.zip",
+      "source_symbol": "BTCUSDT",
+      "quote_currency": "USDT",
+      "venue": "BINANCE_SPOT",
+      "interval": "1h",
+      "terms_url": "https://github.com/binance/binance-public-data/blob/master/TERMS_AND_CONDITIONS.md",
+      "terms_version": "2026-08-26 / CC-BY-NC-SA-4.0 / research-only screening",
+      "retrieved_at_utc": null,
+      "status": "NOT_DOWNLOADED"
+    }
+  ],
+  "join_gaps": [],
+  "no_gap_filling_or_synthetic_candles": true,
+  "production_use_prohibited": true,
+  "model_pipeline_use_prohibited": true
+}

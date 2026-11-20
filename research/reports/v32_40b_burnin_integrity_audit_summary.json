@@ -1,0 +1,125 @@
+{
+  "audit_id": "V32_40B_BURNIN_INTEGRITY_AUDIT",
+  "evaluated_at_utc": "2026-10-25T15:15:00Z",
+  "audit_verdict": "BURNIN_QUALIFIED",
+  "governed_decisions": {
+    "economic_verdict": "NO_GO_NO_VALIDATED_EDGE",
+    "model_authorization": "OFFLINE_RESEARCH_ONLY",
+    "live_trading_state": "DISABLED"
+  },
+  "task1_burnin_audit": {
+    "target_product": "BTC-USD",
+    "venue": "Coinbase Exchange Spot",
+    "events_log_file": "data/research/l2_stream/l2_burnin_events_20261025_140437.jsonl",
+    "events_log_bytes": 52326510,
+    "planned_duration_sec": 3600.0,
+    "actual_elapsed_sec": 3681.68,
+    "run_completed_successfully": true,
+    "event_counts": {
+      "total_events": 69627,
+      "snapshot": 1,
+      "l2update": 55750,
+      "match": 10278,
+      "heartbeat": 3598
+    },
+    "stream_integrity_metrics": {
+      "sequence_gaps": 0,
+      "dropped_duplicates": 0,
+      "dropped_out_of_order": 0,
+      "heartbeat_stalls": 0,
+      "reconnect_count": 0,
+      "stream_continuous": true,
+      "checksum_integrity_valid": true
+    },
+    "deterministic_replay": {
+      "events_replayed": 69627,
+      "replay_duration_seconds": 76.402,
+      "replay_throughput_events_per_sec": 911.32,
+      "final_best_bid": 80664.43,
+      "final_best_ask": 80664.44,
+      "final_mid_price": 80664.435,
+      "final_spread_bps": 0.0012,
+      "replay_passed": true
+    },
+    "comparison_smoke_vs_full_burnin": {
+      "smoke_test_15s": {
+        "file": "data/research/l2_stream/l2_burnin_events_20261025_135844.jsonl",
+        "duration_sec": 12.76,
+        "total_events": 254,
+        "events_by_type": { "snapshot": 1, "l2update": 205, "match": 34, "heartbeat": 14 },
+        "window_status": "DEFECT_DEMONSTRATED: 15-minute OFI was prematurely emitted after 12.8s without 900s continuous event history."
+      },
+      "full_burnin_1h": {
+        "file": "data/research/l2_stream/l2_burnin_events_20261025_140437.jsonl",
+        "duration_sec": 3681.68,
+        "total_events": 69627,
+        "events_by_type": { "snapshot": 1, "l2update": 55750, "match": 10278, "heartbeat": 3598 },
+        "window_status": "QUALIFIED: Satisfied full 3,600s continuous sequence without gaps, allowing full warm-up of 1m, 5m, and 15m windows."
+      }
+    }
+  },
+  "task2_feature_window_warmup_audit": {
+    "repair_status": "IMPLEMENTED_AND_VERIFIED",
+    "feature_specifications": {
+      "obi_5": { "required_history_sec": 0.0, "source": "Instantaneous L2 snapshot top 5 levels", "status_on_snapshot": "READY" },
+      "spread_bps": { "required_history_sec": 0.0, "source": "Instantaneous best bid/ask", "status_on_snapshot": "READY" },
+      "ofi_1m": { "required_history_sec": 60.0, "source": "Continuous delta event stream >= 60s", "status_during_warmup": "UNAVAILABLE_WARMING_UP" },
+      "ofi_5m": { "required_history_sec": 300.0, "source": "Continuous delta event stream >= 300s", "status_during_warmup": "UNAVAILABLE_WARMING_UP" },
+      "ofi_15m": { "required_history_sec": 900.0, "source": "Continuous delta event stream >= 900s", "status_during_warmup": "UNAVAILABLE_WARMING_UP" }
+    },
+    "invalidation_triggers": [
+      "Sequence gap detected -> invalidates continuity epoch, forces re-warmup",
+      "WebSocket reconnect -> clears rolling history, requires snapshot, forces re-warmup",
+      "Heartbeat stall (>5.0s) -> marks feed stale, fails closed",
+      "Snapshot receipt -> provides instantaneous book state only, does NOT supply historical order flow"
+    ],
+    "shadow_gating_behavior": {
+      "action_on_warmup": "GATE_ABSTAIN_L2_UNAVAILABLE",
+      "action_on_toxic_flow": "GATE_REJECTED_TOXIC_OFI",
+      "zero_bias_contract_preserved": true
+    },
+    "unit_tests_added": [
+      "test_snapshot_supplies_book_state_not_order_flow",
+      "test_exact_window_boundary_transitions",
+      "test_sequence_gap_invalidates_continuous_history_and_forces_rewarm",
+      "test_reconnect_reset_forces_rewarm",
+      "test_heartbeat_staleness_fails_closed",
+      "test_gating_abstains_during_warmup_without_toxic_rejection"
+    ]
+  },
+  "task3_ui_truthfulness_and_browser_qa": {
+    "browser_qa_status": "PASSED",
+    "viewports_tested": [
+      { "device": "desktop", "width": 1280, "height": 800, "screenshot": "real_landing_desktop.png" },
+      { "device": "tablet", "width": 768, "height": 1024, "screenshot": "real_landing_tablet.png" },
+      { "device": "mobile", "width": 375, "height": 667, "screenshot": "real_landing_mobile.png" }
+    ],
+    "navigation_and_routes_tested": {
+      "smart_entry_removed_from_primary_nav": true,
+      "how_it_works_route_functional": true,
+      "all_home_overview_cards_present": true,
+      "all_card_navigation_buttons_present": true
+    },
+    "truthful_operational_badges": {
+      "market_status_distinguishes_live_vs_historical": true,
+      "l2_microstructure_distinguishes_streaming_vs_stopped": true,
+      "governance_guardrails_truthfully_rendered": {
+        "no_go_no_validated_edge": true,
+        "offline_research_only": true,
+        "live_trading_disabled": true
+      }
+    }
+  },
+  "task4_regression_and_integrity": {
+    "frontend_unit_tests": { "runner": "node tests_frontend.js", "status": "PASSED" },
+    "backend_regression_tests": { "runner": "pytest", "tests_run": 38, "passed": 38, "failed": 0 },
+    "protected_files_sha256": {
+      "data/prospective_entry_ledger.jsonl": "91c3aed984002f611a59c78a2eb4c342c0970baebbd2e3d6df7973be7acf1dd7",
+      "data/prospective_shadow_v1.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "data/prospective_entry_ledger_v2.jsonl": "e6e33e3c7beb4c255467e967fc819b85481b0afb1052c3ea7bd248c53f87b604",
+      "data/raw/ohlcv.parquet": "1e722f33734a89e74764c02fde0552752cc1ea2eff62ca9046c9d6edf2347d5c",
+      "data/raw/ohlcv_pre_backfill_backup.parquet": "c4949e5b5695ffa172677681b15af2ea6167e73317c3496546f2286a6730b1c8"
+    },
+    "protected_files_status": "BIT_IDENTICAL_ALL_PASS"
+  }
+}

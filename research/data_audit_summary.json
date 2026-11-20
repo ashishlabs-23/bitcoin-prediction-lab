@@ -1,0 +1,85 @@
+{
+  "dataset_file": "data/raw/ohlcv.parquet",
+  "file_size_bytes": 2326699,
+  "sha256": "1e722f33734a89e74764c02fde0552752cc1ea2eff62ca9046c9d6edf2347d5c",
+  "exchange_source": "Coinbase Spot (Coinbase Exchange API)",
+  "product_id": "BTC-USD",
+  "cadence": "1 hour (60m candles)",
+  "total_rows": 42177,
+  "is_monotonic_increasing": true,
+  "duplicate_timestamps": 0,
+  "first_timestamp_utc": "2022-01-01T00:00:00+00:00",
+  "last_timestamp_utc": "2026-10-24T08:00:00+00:00",
+  "total_gaps_found": 0,
+  "gaps": [],
+  "contiguous_segments_count": 1,
+  "segments": [
+    {
+      "segment_id": 1,
+      "start_index": 0,
+      "end_index": 42176,
+      "start_timestamp": "2022-01-01T00:00:00+00:00",
+      "end_timestamp": "2026-10-24T08:00:00+00:00",
+      "total_bars": 42177
+    }
+  ],
+  "yearly_breakdown": {
+    "2022": {
+      "bars": 8760,
+      "start_utc": "2022-01-01T00:00:00+00:00",
+      "end_utc": "2022-12-31T23:00:00+00:00"
+    },
+    "2023": {
+      "bars": 8760,
+      "start_utc": "2023-01-01T00:00:00+00:00",
+      "end_utc": "2023-12-31T23:00:00+00:00"
+    },
+    "2024": {
+      "bars": 8784,
+      "start_utc": "2024-01-01T00:00:00+00:00",
+      "end_utc": "2024-12-31T23:00:00+00:00"
+    },
+    "2025": {
+      "bars": 8760,
+      "start_utc": "2025-01-01T00:00:00+00:00",
+      "end_utc": "2025-12-31T23:00:00+00:00"
+    },
+    "2026": {
+      "bars": 7113,
+      "start_utc": "2026-01-01T00:00:00+00:00",
+      "end_utc": "2026-10-24T08:00:00+00:00"
+    }
+  },
+  "data_sanity": {
+    "open": {
+      "nulls": 0,
+      "min": 15648.23,
+      "max": 126011.18,
+      "mean": 59142.39531024018
+    },
+    "high": {
+      "nulls": 0,
+      "min": 15769.99,
+      "max": 126199.63,
+      "mean": 59339.02404248761
+    },
+    "low": {
+      "nulls": 0,
+      "min": 15476.0,
+      "max": 125252.74,
+      "mean": 58939.05670365365
+    },
+    "close": {
+      "nulls": 0,
+      "min": 15649.52,
+      "max": 126011.18,
+      "mean": 59143.21773359889
+    },
+    "volume": {
+      "nulls": 0,
+      "min": 0.0,
+      "max": 137207.1886,
+      "mean": 2739.355217624651
+    }
+  }
+}

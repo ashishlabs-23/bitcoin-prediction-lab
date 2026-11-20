@@ -111,7 +111,9 @@ def test_v26_api_endpoints_operational_and_fail_closed():
     res_ready = client.get("/api/readiness")
     assert res_ready.status_code == 200
     ready_json = res_ready.json()
-    assert ready_json.get("authorized") is True
+    assert ready_json.get("authorized") is False
+    assert ready_json.get("authorization_status") == "OFFLINE_RESEARCH_ONLY"
+    assert ready_json.get("research_edge_status") == "NO_GO_NO_VALIDATED_EDGE"
     assert "HAR-RS-DOW" in ready_json.get("canonical_model_id", "")
     
     # 2. Prospective ledger check
@@ -127,3 +129,37 @@ def test_v26_api_endpoints_operational_and_fail_closed():
     
     res_paper = client.post("/api/paper/order", json={"amount": 100})
     assert res_paper.status_code in (404, 405)
+
+
+def test_v26_diebold_mariano_bartlett_kernel_positive_definite():
+    """Verify Bartlett triangular kernel guarantees positive semi-definiteness on negative autocovariance."""
+    from engine.price_forecast_engine import compute_diebold_mariano_hln
+    # Alternating error series produces negative autocorrelation at odd lags
+    np.random.seed(123)
+    T = 200
+    e_bench = np.array([2.0, 0.5] * (T // 2))
+    e_cand = np.array([0.5, 2.0] * (T // 2))
+    stat, p = compute_diebold_mariano_hln(e_bench, e_cand, h=5)
+    assert not np.isnan(stat)
+    assert not np.isnan(p)
+    assert 0.0 <= p <= 1.0
+
+
+def test_v26_diebold_mariano_horizon_validation():
+    """Verify horizon parameter validation raises ValueError when h < 1."""
+    from engine.price_forecast_engine import compute_diebold_mariano_hln
+    with pytest.raises(ValueError, match="Forecast horizon h must be >= 1"):
+        compute_diebold_mariano_hln(np.ones(20), np.zeros(20), h=0)
+
+
+def test_v26_holm_bonferroni_multiple_testing_correction():
+    """Verify Holm-Bonferroni step-down correction controls FWER monotonically."""
+    from engine.price_forecast_engine import holm_bonferroni
+    raw_p = [0.01, 0.04, 0.03, 0.005]
+    adj_p = holm_bonferroni(raw_p)
+    assert len(adj_p) == len(raw_p)
+    assert adj_p == [0.03, 0.06, 0.06, 0.02]
+    # Verify edge cases: empty and single element
+    assert holm_bonferroni([]) == []
+    assert holm_bonferroni([0.03]) == [0.03]
+    assert holm_bonferroni([1.5]) == [1.0]

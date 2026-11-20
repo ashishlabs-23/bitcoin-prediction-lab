@@ -1,0 +1,2 @@
+{"action": "connect", "address": "('127.0.0.1', 56107)", "allowed": true, "owned_ports": [56107], "pid": 3496}
+{"action": "connect", "address": "('127.0.0.1', 56106)", "allowed": false, "owned_ports": [], "pid": 3496}

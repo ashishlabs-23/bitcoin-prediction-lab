@@ -63,6 +63,8 @@ class Coinbase15mAdapter:
         Fetches up to 300 15m candles from Coinbase Exchange REST API.
         Response format per candle: [ time, low, high, open, close, volume ]
         """
+        from engine.data_mode import assert_no_external_network
+        assert_no_external_network("Coinbase 15m REST fetch")
         params = [f"granularity={GRANULARITY_15M}"]
         if start_iso:
             params.append(f"start={start_iso}")
@@ -355,6 +357,13 @@ class Coinbase15mAdapter:
                     meta["cache_hit"] = True
                     meta["cache_age_seconds"] = round(age, 1)
                     return df, meta
+
+        from engine.data_mode import is_external_network_permitted
+        if not is_external_network_permitted():
+            if cached is not None:
+                df, manifest = cached
+                return df, manifest.get("metadata", {})
+            raise RuntimeError("External network blocked: Coinbase 15m sync unavailable in offline/fixture mode.")
 
         # Otherwise perform live sync and merge with cached history
         logger.info("Syncing fresh 15-minute candles from Coinbase...")

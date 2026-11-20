@@ -1,0 +1,132 @@
+{
+  "version": "V32.51",
+  "run_id": "20261027_072352_0530",
+  "run_started_at": "2026-10-27T07:22:55.4741664+05:30",
+  "repository": "C:\\Projects\\BTCognitive\\BTCognitive",
+  "branch": "main",
+  "head": "25d483f4c3646661b57311de9d0b53d2be881adb",
+  "release_verdict": "FAIL",
+  "integrity_incident": {
+    "status": "OPEN_ROOT_CAUSE_UNRESOLVED",
+    "historical_expected_primary_ohlcv_sha256": "1e722f33734a89e74764c02fde0552752cc1ea2eff62ca9046c9d6edf2347d5c",
+    "current_primary_ohlcv_sha256": "c007cd613bec3012fa427d047b466d5e250bd4451b5062d311f387e8afd0ce3f",
+    "writer_attribution": "unknown",
+    "recovery_decision": "not provided",
+    "backup_used": false,
+    "primary_file_modified_this_run": false
+  },
+  "workspace": {
+    "initial_dirty_or_untracked_paths": 453,
+    "initial_tracked_modifications": 46,
+    "initial_untracked_paths": 407,
+    "baseline_paths_missing_after_run": 0,
+    "baseline_status_changes_after_run": 0,
+    "additional_paths_created": 16,
+    "created_paths_scope": "research/reports/v32_51/QA deliverables and timestamped run evidence only",
+    "source_code_changed_this_run": false,
+    "files_deleted_this_run": 0
+  },
+  "feature_matrix": {
+    "path": "feature_matrix.csv",
+    "feature_count": 36,
+    "pass": 5,
+    "fail": 0,
+    "blocked": 15,
+    "not_run": 16
+  },
+  "tests": {
+    "node_syntax": {
+      "command": "node --check web\\app.js",
+      "result": "PASS",
+      "exit_code": 0,
+      "duration_ms": 267
+    },
+    "frontend_script": {
+      "command": "node tests_frontend.js",
+      "result": "PASS",
+      "exit_code": 0,
+      "duration_ms": 450,
+      "test_case_count_reported": null,
+      "note": "The script reports all frontend assertions passed but does not print an assertion count."
+    },
+    "python_ast_parse": {
+      "files": 87,
+      "errors": 0,
+      "result": "PASS",
+      "duration_ms": 5213
+    },
+    "python_in_memory_compile": {
+      "files": 87,
+      "errors": 0,
+      "result": "PASS",
+      "duration_ms": 1549
+    },
+    "focused_forecast_freshness": {
+      "command": ".venv_win\\Scripts\\pytest.exe -q -p no:cacheprovider --basetemp \"<run-dir>\\pytest_tmp\" tests/test_v32_50_chart_forecast_runtime.py",
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "blocked": 0,
+      "pytest_reported_duration_seconds": 0.72,
+      "wrapper_wall_duration_ms": 129739,
+      "exit_code": 0,
+      "isolated_from_protected_data": true
+    },
+    "broad_suite": {
+      "prior_reported_passed": 1604,
+      "prior_reported_failed": 51,
+      "prior_reported_deselected": 1,
+      "prior_reported_warnings": 9,
+      "rerun_this_session": false,
+      "failure_id_reconciliation": "BLOCKED: available pytest cache has 57 IDs; available full logs are from 2026-10-20"
+    },
+    "current_run_totals": {
+      "pytest_tests_passed": 2,
+      "pytest_tests_failed": 0,
+      "pytest_tests_skipped": 0,
+      "pytest_tests_blocked": 0,
+      "non_pytest_check_groups_passed": 4,
+      "non_pytest_check_groups_failed": 0,
+      "application_integration_tests_run": 0,
+      "browser_e2e_tests_run": 0
+    }
+  },
+  "services": {
+    "api_process": "not running/visible",
+    "port_8096": "no listener",
+    "port_8102": "no listener",
+    "port_9222": "pre-existing headless Chrome PID 23872; not used or stopped",
+    "matching_collector_processes": 0,
+    "matching_scheduled_tasks": 0,
+    "shadow_lock": "stale PID 31676 from 2026-10-23; PID not running; file preserved"
+  },
+  "performance": {
+    "current_application_latency_samples": 0,
+    "comparable_before_after_measurement": false,
+    "historical_measurements": "listed separately and labeled non-comparable in performance.csv"
+  },
+  "dead_file_cleanup": {
+    "candidates_deleted": 0,
+    "files_removed": [],
+    "audit_scope": "Protected-parquet dataflow writers and the explicitly considered user artifacts; no repository-wide dead-source candidate was proven safe to remove."
+  },
+  "governance": {
+    "research_experiment": "INCONCLUSIVE",
+    "prospective_evidence": "UNVERIFIED; last available status is stale COLLECTING telemetry dated 2026-10-17",
+    "model_authorization": "OFFLINE_RESEARCH_ONLY",
+    "live_trading": "DISABLED",
+    "validated_trading_edge_claimed": false
+  },
+  "deliverables": {
+    "report": "qa_report.md",
+    "feature_matrix": "feature_matrix.csv",
+    "performance": "performance.csv",
+    "failure_triage": "failure_triage.csv",
+    "dead_file_audit": "dead_file_audit.csv",
+    "deleted_file_manifest": "deleted_file_manifest.csv",
+    "protected_file_integrity": "protected_file_integrity.json",
+    "browser_status": "browser_traces/browser_status.json",
+    "screenshot_status": "screenshots/capture_status.json",
+    "timestamped_run_evidence": "20261027_072352_0530/"
+  }
+}

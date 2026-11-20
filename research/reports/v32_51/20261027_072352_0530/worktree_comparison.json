@@ -1,0 +1,20 @@
+{
+  "initial_paths": 453,
+  "current_status_paths": 463,
+  "baseline_paths_missing": [],
+  "baseline_status_changed": [],
+  "additional_paths": [
+    "research/reports/v32_51/20261027_072352_0530/baseline_untracked.txt",
+    "research/reports/v32_51/20261027_072352_0530/final_git_status.txt",
+    "research/reports/v32_51/20261027_072352_0530/baseline_diff_stat.txt",
+    "research/reports/v32_51/20261027_072352_0530/pytest_v32_50_isolated_result.json",
+    "research/reports/v32_51/20261027_072352_0530/initial_readonly_capture.txt",
+    "research/reports/v32_51/20261027_072352_0530/baseline_worktree.diff",
+    "research/reports/v32_51/20261027_072352_0530/baseline_git_status.txt",
+    "research/reports/v32_51/20261027_072352_0530/pytest_cache_lastfailed_ids.txt",
+    "research/reports/v32_51/20261027_072352_0530/safe_static_test_results.json",
+    "research/reports/v32_51/20261027_072352_0530/initial_git_status_exact.txt"
+  ],
+  "branch": "main",
+  "head": "25d483f4c3646661b57311de9d0b53d2be881adb"
+}

@@ -6,7 +6,7 @@ target semantics, required features, and operational authorization across BTCogn
 
 Architectural Principles:
 1. Strict Role Segregation:
-   - PRODUCTION_VOLATILITY: Actively authorized for production volatility forecasting and C2 risk envelopes.
+   - PRODUCTION_VOLATILITY: Volatility-risk model role; runtime authorization is a separate gate.
    - DIRECTIONAL_RESEARCH_BENCHMARK: Strictly offline research; NOT authorized for live capital or production inference.
    - ARCHIVED_RESEARCH_CANDIDATE: Historical candidate whose provenance was superseded; fails closed.
    - FOUNDATION_RESEARCH: Research exploration foundation time-series models.
@@ -27,6 +27,8 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 class ModelClassification(str, Enum):
     PRODUCTION_VOLATILITY = "PRODUCTION_VOLATILITY"
+    BASELINE_VOLATILITY = "BASELINE_VOLATILITY"
+    RESEARCH_CHALLENGER_UNPROMOTED = "RESEARCH_CHALLENGER_UNPROMOTED"
     DIRECTIONAL_RESEARCH_BENCHMARK = "DIRECTIONAL_RESEARCH_BENCHMARK"
     ARCHIVED_RESEARCH_CANDIDATE = "ARCHIVED_RESEARCH_CANDIDATE"
     FOUNDATION_RESEARCH = "FOUNDATION_RESEARCH"
@@ -41,6 +43,16 @@ class AuthorizationStatus(str, Enum):
     BLOCKED_AUDIT_FAILURE = "BLOCKED_AUDIT_FAILURE"
 
 
+class ArtifactStatus(str, Enum):
+    UNVERIFIED = "UNVERIFIED"
+    AVAILABLE_VERIFIED = "AVAILABLE_VERIFIED"
+    UNAVAILABLE_BLOCKED = "UNAVAILABLE_BLOCKED"
+
+
+class ModelArtifactUnavailableError(RuntimeError):
+    """Raised when an artifact cannot be safely resolved from verified registry metadata."""
+
+
 @dataclass(frozen=True)
 class ModelIdentityRecord:
     canonical_id: str
@@ -50,7 +62,7 @@ class ModelIdentityRecord:
     authorization_status: AuthorizationStatus
     model_architecture: str
     artifact_rel_path: str
-    artifact_sha256: str
+    artifact_sha256: Optional[str]
     scientific_contract_hash: Optional[str]
     forecast_target: str
     forecast_horizon: str
@@ -63,22 +75,58 @@ class ModelIdentityRecord:
     empirical_validation_summary: str
     applicable_limitations: str
     production_endpoints: List[str]
+    artifact_status: ArtifactStatus = ArtifactStatus.UNVERIFIED
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
         d["classification"] = self.classification.value
         d["authorization_status"] = self.authorization_status.value
+        d["artifact_status"] = self.artifact_status.value
         return d
 
 
 # ── Authoritative Model Catalog ──────────────────────────────────────────
 
-ACTIVE_PRODUCTION_MODEL = ModelIdentityRecord(
+STANDARD_HAR_BASELINE = ModelIdentityRecord(
+    canonical_id="Standard-HAR-v1.0",
+    version="1.0.0",
+    display_name="Standard Corsi Heterogeneous Autoregressive Realized Variance Baseline (HAR-RV)",
+    classification=ModelClassification.BASELINE_VOLATILITY,
+    authorization_status=AuthorizationStatus.OFFLINE_RESEARCH_ONLY,
+    model_architecture="Corsi (2009) Heterogeneous Autoregressive OLS with Daily, Weekly, and Monthly Realized Variances",
+    artifact_rel_path="experiments/results/freeze/standard_har_v1.joblib",
+    artifact_sha256=None,
+    scientific_contract_hash=None,
+    forecast_target="Annualized 7-Day Realized Variance (rv7d_var_ann)",
+    forecast_horizon="168h (7 calendar days)",
+    output_units="Annualized Variance (decimal) and equivalent Annualized Volatility (%)",
+    output_interpretation=(
+        "Registered identity for a Standard Corsi HAR-RV benchmark. Its exact artifact and "
+        "scientific contract have not been verified; it is unavailable and blocked. "
+        "No inference or empirical claim is attributed to this identity."
+    ),
+    directional_prediction_capability=False,
+    feature_schema=["rv_1d", "rv_7d", "rv_30d"],
+    data_source_dependencies=["data/raw/ohlcv.parquet"],
+    uncertainty_engine="Standard OLS residuals with Bartlett HAC kernel",
+    empirical_validation_summary=(
+        "Unavailable: the registered artifact was not found and no verified artifact or "
+        "scientific-contract digest is recorded."
+    ),
+    applicable_limitations=(
+        "BLOCKED_ARTIFACT_UNAVAILABLE. Do not load, infer from, or treat as an evaluated "
+        "baseline. Live trading disabled."
+    ),
+    production_endpoints=[],
+    artifact_status=ArtifactStatus.UNAVAILABLE_BLOCKED
+)
+
+CHALLENGER_HAR_RS_DOW = ModelIdentityRecord(
     canonical_id="HAR-RS-DOW-v1.0",
     version="1.0.0",
-    display_name="HAR Realized Semivariance with Day-of-Week Seasonality (HAR-RS-DOW)",
-    classification=ModelClassification.PRODUCTION_VOLATILITY,
-    authorization_status=AuthorizationStatus.AUTHORIZED_FOR_PRODUCTION,
+    display_name="HAR Realized Semivariance with Day-of-Week Seasonality (HAR-RS-DOW Challenger)",
+    classification=ModelClassification.RESEARCH_CHALLENGER_UNPROMOTED,
+    authorization_status=AuthorizationStatus.OFFLINE_RESEARCH_ONLY,
     model_architecture="Heterogeneous Autoregressive OLS with Semivariances and Day-of-Week Seasonality",
     artifact_rel_path="experiments/results/freeze/har_rs_dow_v1.joblib",
     artifact_sha256="750b5d15ed84c3cf24b8484ae928ff7c8098cab0c35eafe310ab28bf57ed285b",
@@ -87,9 +135,10 @@ ACTIVE_PRODUCTION_MODEL = ModelIdentityRecord(
     forecast_horizon="168h (7 calendar days)",
     output_units="Annualized Variance (decimal, e.g. 0.1930) and equivalent Annualized Volatility (%)",
     output_interpretation=(
-        "Parametric point forecast of 7-day integrated volatility. "
-        "Does NOT predict price direction (+/- return sign). "
-        "Used exclusively for volatility regime assessment and risk envelopes."
+        "Research challenger model for 7-day volatility. "
+        "Unpromoted research challenger: after Holm-Bonferroni multiple testing correction, "
+        "out-of-sample loss differential against Standard-HAR-v1.0 is statistically insignificant (adj p = 0.2632). "
+        "Does NOT predict price direction (+/- return sign)."
     ),
     directional_prediction_capability=False,
     feature_schema=[
@@ -105,11 +154,15 @@ ACTIVE_PRODUCTION_MODEL = ModelIdentityRecord(
         "dow_6",
     ],
     data_source_dependencies=["data/raw/ohlcv.parquet"],
-    uncertainty_engine="C2 Dependence-Aware Conformal Prediction (alpha=0.10, 90% nominal envelope, strictly causal delayed resolution)",
-    empirical_validation_summary="84.89% causal holdout containment (95% CI: [73.14%, 93.14%]) | 92.84% pre-2026 calibration (QLIKE: 0.19300). Validated in VOL-EDGE-01 & Stage 12 audit.",
-    applicable_limitations="Not a directional alpha model; does not recommend buy/sell positions; requires hourly OHLCV. Serves 168h realized variance volatility intelligence only. Live trading is strictly disabled.",
-    production_endpoints=["/api/terminal/live", "/api/terminal/model-identity"]
+    uncertainty_engine="C2 Dependence-Aware Conformal Prediction (alpha=0.10, strictly causal delayed resolution)",
+    empirical_validation_summary="Historical retrospective metrics only. Failed promotion gate: Holm-Bonferroni adjusted p=0.2632 >= 0.05 vs Standard-HAR-v1.0 baseline.",
+    applicable_limitations="RESEARCH_CHALLENGER_UNPROMOTED. Offline research only; live trading permanently disabled.",
+    production_endpoints=[]
 )
+
+# Active baseline model alias
+ACTIVE_BASELINE_MODEL = STANDARD_HAR_BASELINE
+ACTIVE_PRODUCTION_MODEL = ACTIVE_BASELINE_MODEL
 
 DIRECTIONAL_RESEARCH_BASELINE = ModelIdentityRecord(
     canonical_id="directional-gbm-4lag-v1",
@@ -341,8 +394,10 @@ PRICE_FORECAST_DRIFT = ModelIdentityRecord(
 
 # Registry dictionary
 _REGISTRY: Dict[str, ModelIdentityRecord] = {
-    ACTIVE_PRODUCTION_MODEL.canonical_id: ACTIVE_PRODUCTION_MODEL,
-    ACTIVE_PRODUCTION_MODEL.version: ACTIVE_PRODUCTION_MODEL,
+    STANDARD_HAR_BASELINE.canonical_id: STANDARD_HAR_BASELINE,
+    STANDARD_HAR_BASELINE.version: STANDARD_HAR_BASELINE,
+    CHALLENGER_HAR_RS_DOW.canonical_id: CHALLENGER_HAR_RS_DOW,
+    CHALLENGER_HAR_RS_DOW.version: CHALLENGER_HAR_RS_DOW,
     DIRECTIONAL_RESEARCH_BASELINE.canonical_id: DIRECTIONAL_RESEARCH_BASELINE,
     DIRECTIONAL_RESEARCH_BASELINE.version: DIRECTIONAL_RESEARCH_BASELINE,
     ARCHIVED_EXCURSION_CANDIDATE.canonical_id: ARCHIVED_EXCURSION_CANDIDATE,
@@ -361,6 +416,13 @@ _REGISTRY: Dict[str, ModelIdentityRecord] = {
     PRICE_FORECAST_RIDGE.version: PRICE_FORECAST_RIDGE,
 }
 
+AUTHORITATIVE_MODEL_REGISTRY = _REGISTRY
+
+
+def get_active_baseline_model() -> ModelIdentityRecord:
+    """Returns the registered Standard-HAR identity; its artifact is currently blocked."""
+    return STANDARD_HAR_BASELINE
+
 
 def get_active_production_model(runtime_readiness: Optional[Dict[str, Any]] = None) -> ModelIdentityRecord:
     """
@@ -374,7 +436,9 @@ def get_active_production_model(runtime_readiness: Optional[Dict[str, Any]] = No
         reason = runtime_readiness.get("reason", "Runtime gate verification failed.")
         code = runtime_readiness.get("reason_code", "BLOCKED_AUDIT_FAILURE")
         status = AuthorizationStatus.BLOCKED_AUDIT_FAILURE
-        if "PROVENANCE" in code:
+        if runtime_readiness.get("authorization_status") == AuthorizationStatus.OFFLINE_RESEARCH_ONLY.value:
+            status = AuthorizationStatus.OFFLINE_RESEARCH_ONLY
+        elif "PROVENANCE" in code:
             status = AuthorizationStatus.BLOCKED_PROVENANCE_UNVERIFIED
         return replace(
             ACTIVE_PRODUCTION_MODEL,
@@ -382,6 +446,22 @@ def get_active_production_model(runtime_readiness: Optional[Dict[str, Any]] = No
             applicable_limitations=f"Production inference gated ({code}): {reason}"
         )
     return ACTIVE_PRODUCTION_MODEL
+
+
+def is_production_authorized(runtime_readiness: Optional[Dict[str, Any]] = None) -> bool:
+    """Require both explicit runtime approval and registry authorization to serve."""
+    if (
+        ACTIVE_PRODUCTION_MODEL.artifact_status != ArtifactStatus.AVAILABLE_VERIFIED
+        or ACTIVE_PRODUCTION_MODEL.authorization_status != AuthorizationStatus.AUTHORIZED_FOR_PRODUCTION
+    ):
+        return False
+    if runtime_readiness is None:
+        return True
+    return (
+        runtime_readiness.get("authorized") is True
+        and runtime_readiness.get("authorization_status")
+        == AuthorizationStatus.AUTHORIZED_FOR_PRODUCTION.value
+    )
 
 
 def get_directional_research_baseline() -> ModelIdentityRecord:
@@ -392,6 +472,32 @@ def get_directional_research_baseline() -> ModelIdentityRecord:
 def get_model_identity(identifier: str) -> Optional[ModelIdentityRecord]:
     """Retrieves model identity by canonical ID or version string."""
     return _REGISTRY.get(identifier)
+
+
+def resolve_model_artifact_path(identifier: str) -> str:
+    """Resolve only artifacts explicitly verified as available in the authoritative registry."""
+    model = get_model_identity(identifier)
+    if model is None:
+        raise ModelArtifactUnavailableError(f"Unknown model identity: {identifier}")
+    if model.artifact_status != ArtifactStatus.AVAILABLE_VERIFIED:
+        raise ModelArtifactUnavailableError(
+            f"Model artifact is not verified and available: {model.canonical_id} "
+            f"({model.artifact_status.value})."
+        )
+    if (
+        not model.artifact_sha256
+        or len(model.artifact_sha256) != 64
+        or any(char not in "0123456789abcdefABCDEF" for char in model.artifact_sha256)
+    ):
+        raise ModelArtifactUnavailableError(
+            f"Model artifact digest is unavailable or invalid: {model.canonical_id}."
+        )
+    artifact_path = os.path.abspath(os.path.join(REPO_ROOT, model.artifact_rel_path))
+    if not os.path.isfile(artifact_path):
+        raise ModelArtifactUnavailableError(
+            f"Verified model artifact is missing: {model.canonical_id}."
+        )
+    return artifact_path
 
 
 def list_authoritative_models() -> List[Dict[str, Any]]:
@@ -418,7 +524,10 @@ def verify_production_model_alignment(endpoint: str, requested_model_id: str) ->
     Returns True only if the requested model matches the authorized production model.
     """
     prod = get_active_production_model()
-    if requested_model_id in [prod.canonical_id, prod.version]:
+    if (
+        prod.authorization_status == AuthorizationStatus.AUTHORIZED_FOR_PRODUCTION
+        and requested_model_id in [prod.canonical_id, prod.version]
+    ):
         return True
     return False
 
@@ -440,4 +549,3 @@ def get_active_model_registry() -> Dict[str, Dict[str, Any]]:
         d["directional_trading_authorized"] = False
         reg[m.canonical_id] = d
     return reg
-

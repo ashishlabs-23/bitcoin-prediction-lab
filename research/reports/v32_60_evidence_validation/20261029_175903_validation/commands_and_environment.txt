@@ -1,0 +1,23 @@
+BTCognitive V32.60 Environment & Commands Audit Manifest
+========================================================
+Timestamp UTC: 2026-10-29T12:29:29Z
+Repository Root: C:\Projects\BTCognitive\BTCognitive
+Git Branch: main
+Git Commit SHA: 25d483f4c3646661b57311de9d0b53d2be881adb
+Python Version: Python 3.13.14
+Chrome Version: 
+OS: Windows 10 / Server (PowerShell Core)
+
+Baseline Input Files:
+- research/reports/v32_59_analyse_e2e_and_strategy_audit/20261029_172800_audit/report.md
+- research/reports/v32_59_analyse_e2e_and_strategy_audit/20261029_172800_audit/analyse_e2e_matrix.csv
+- research/reports/v32_59_analyse_e2e_and_strategy_audit/20261029_172800_audit/strategy_compatibility_matrix.csv
+- research/reports/v32_59_analyse_e2e_and_strategy_audit/20261029_172800_audit/v32_58_failure_reconciliation_final.csv
+- research/reports/v32_59_analyse_e2e_and_strategy_audit/20261029_172800_audit/provider_rights_matrix.md
+- research/reports/v32_59_analyse_e2e_and_strategy_audit/20261029_172800_audit/forecast_contract_audit.md
+- research/reports/v32_59_analyse_e2e_and_strategy_audit/20261029_172800_audit/next_actions.md
+- research/reports/v32_59_analyse_e2e_and_strategy_audit/20261029_172800_audit/screenshots/
+
+Validation Commands:
+- scripts/qa/v32_59_analyse_e2e_runner.py
+- .venv_win\Scripts\python.exe -m pytest

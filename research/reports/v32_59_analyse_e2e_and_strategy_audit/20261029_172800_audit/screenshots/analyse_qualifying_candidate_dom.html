@@ -1,0 +1,2102 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BTCognitive — Analyse E2E Test Harness</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+  <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin=""></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin=""></script>
+</head>
+<body style="background: #0B0E14; color: #F8FAFC; margin: 0; padding: 0;">
+  <div id="harness-header" style="background: #111827; border-bottom: 1px solid #374151; padding: 8px 16px; font-family: monospace; font-size: 13px; display: flex; justify-content: space-between;">
+    <span>BTCognitive Analyse E2E Test Harness</span>
+    <span id="qa-scenario-badge" style="color: #38BDF8; font-weight: bold;">SCENARIO: ANALYSE_QUALIFYING_CANDIDATE</span>
+  </div>
+
+  <div id="root"></div>
+
+  <!-- QA Result Container -->
+  <div id="qa-results-container" style="display: none;">
+    <div id="qa-scenario-status">FAIL</div>
+    <pre id="qa-results-json">{
+  "scenario": "ANALYSE_QUALIFYING_CANDIDATE",
+  "started_at": "2026-10-29T12:12:53.201Z",
+  "button_clicked": true,
+  "click_timestamp": "2026-10-29T12:12:55.049Z",
+  "requests_intercepted": [
+    {
+      "endpoint": "COINBASE_CANDLES",
+      "url": "https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=3600"
+    },
+    {
+      "endpoint": "ANALYSE",
+      "payload": {
+        "instrument": "BTC-USD",
+        "timeframe": "1h",
+        "data_source": "COINBASE_EXCHANGE_REST",
+        "request_id": "f18307fd-995e-451b-ac89-d837ce47db89",
+        "live_price": 103808.8,
+        "enforce_freshness": true,
+        "max_age_hours": 2,
+        "candles": [
+          {
+            "timestamp_utc": "2026-10-21T05:00:00.000Z",
+            "open": 84915,
+            "high": 85340,
+            "low": 84660,
+            "close": 85085,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T06:00:00.000Z",
+            "open": 84999.91,
+            "high": 85425.34,
+            "low": 84744.66,
+            "close": 85170.08,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T07:00:00.000Z",
+            "open": 85084.91,
+            "high": 85510.76,
+            "low": 84829.4,
+            "close": 85255.25,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T08:00:00.000Z",
+            "open": 85169.99,
+            "high": 85596.27,
+            "low": 84914.23,
+            "close": 85340.51,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T09:00:00.000Z",
+            "open": 85255.17,
+            "high": 85681.87,
+            "low": 84999.15,
+            "close": 85425.85,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T10:00:00.000Z",
+            "open": 85340.42,
+            "high": 85767.55,
+            "low": 85084.15,
+            "close": 85511.28,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T11:00:00.000Z",
+            "open": 85425.77,
+            "high": 85853.33,
+            "low": 85169.23,
+            "close": 85596.79,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T12:00:00.000Z",
+            "open": 85511.19,
+            "high": 85939.18,
+            "low": 85254.4,
+            "close": 85682.39,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T13:00:00.000Z",
+            "open": 85596.71,
+            "high": 86025.12,
+            "low": 85339.66,
+            "close": 85768.07,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T14:00:00.000Z",
+            "open": 85682.3,
+            "high": 86111.14,
+            "low": 85425,
+            "close": 85853.84,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T15:00:00.000Z",
+            "open": 85767.99,
+            "high": 86197.26,
+            "low": 85510.42,
+            "close": 85939.69,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T16:00:00.000Z",
+            "open": 85853.75,
+            "high": 86283.45,
+            "low": 85595.93,
+            "close": 86025.63,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T17:00:00.000Z",
+            "open": 85939.6,
+            "high": 86369.73,
+            "low": 85681.53,
+            "close": 86111.66,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T18:00:00.000Z",
+            "open": 86025.55,
+            "high": 86456.11,
+            "low": 85767.21,
+            "close": 86197.77,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T19:00:00.000Z",
+            "open": 86111.57,
+            "high": 86542.56,
+            "low": 85852.98,
+            "close": 86283.97,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T20:00:00.000Z",
+            "open": 86197.69,
+            "high": 86629.11,
+            "low": 85938.83,
+            "close": 86370.25,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T21:00:00.000Z",
+            "open": 86283.88,
+            "high": 86715.73,
+            "low": 86024.77,
+            "close": 86456.62,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T22:00:00.000Z",
+            "open": 86370.16,
+            "high": 86802.45,
+            "low": 86110.79,
+            "close": 86543.08,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T23:00:00.000Z",
+            "open": 86456.54,
+            "high": 86889.25,
+            "low": 86196.91,
+            "close": 86629.62,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T00:00:00.000Z",
+            "open": 86542.99,
+            "high": 86976.14,
+            "low": 86283.1,
+            "close": 86716.25,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T01:00:00.000Z",
+            "open": 86629.53,
+            "high": 87063.12,
+            "low": 86369.38,
+            "close": 86802.97,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T02:00:00.000Z",
+            "open": 86716.17,
+            "high": 87150.18,
+            "low": 86455.76,
+            "close": 86889.77,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T03:00:00.000Z",
+            "open": 86802.88,
+            "high": 87237.33,
+            "low": 86542.21,
+            "close": 86976.66,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T04:00:00.000Z",
+            "open": 86889.68,
+            "high": 87324.57,
+            "low": 86628.75,
+            "close": 87063.64,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T05:00:00.000Z",
+            "open": 86976.58,
+            "high": 87411.89,
+            "low": 86715.39,
+            "close": 87150.7,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T06:00:00.000Z",
+            "open": 87063.55,
+            "high": 87499.3,
+            "low": 86802.1,
+            "close": 87237.85,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T07:00:00.000Z",
+            "open": 87150.61,
+            "high": 87586.8,
+            "low": 86888.9,
+            "close": 87325.09,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T08:00:00.000Z",
+            "open": 87237.76,
+            "high": 87674.39,
+            "low": 86975.79,
+            "close": 87412.42,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T09:00:00.000Z",
+            "open": 87325.01,
+            "high": 87762.07,
+            "low": 87062.77,
+            "close": 87499.83,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T10:00:00.000Z",
+            "open": 87412.33,
+            "high": 87849.83,
+            "low": 87149.83,
+            "close": 87587.33,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T11:00:00.000Z",
+            "open": 87499.74,
+            "high": 87937.68,
+            "low": 87236.98,
+            "close": 87674.92,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T12:00:00.000Z",
+            "open": 87587.25,
+            "high": 88025.62,
+            "low": 87324.22,
+            "close": 87762.59,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T13:00:00.000Z",
+            "open": 87674.83,
+            "high": 88113.64,
+            "low": 87411.54,
+            "close": 87850.35,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T14:00:00.000Z",
+            "open": 87762.5,
+            "high": 88201.75,
+            "low": 87498.95,
+            "close": 87938.2,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T15:00:00.000Z",
+            "open": 87850.26,
+            "high": 88289.95,
+            "low": 87586.45,
+            "close": 88026.14,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T16:00:00.000Z",
+            "open": 87938.11,
+            "high": 88378.24,
+            "low": 87674.04,
+            "close": 88114.17,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T17:00:00.000Z",
+            "open": 88026.06,
+            "high": 88466.63,
+            "low": 87761.71,
+            "close": 88202.28,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T18:00:00.000Z",
+            "open": 88114.08,
+            "high": 88555.09,
+            "low": 87849.47,
+            "close": 88290.48,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T19:00:00.000Z",
+            "open": 88202.19,
+            "high": 88643.64,
+            "low": 87937.32,
+            "close": 88378.77,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T20:00:00.000Z",
+            "open": 88290.39,
+            "high": 88732.29,
+            "low": 88025.25,
+            "close": 88467.15,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T21:00:00.000Z",
+            "open": 88378.68,
+            "high": 88821.02,
+            "low": 88113.28,
+            "close": 88555.62,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T22:00:00.000Z",
+            "open": 88467.06,
+            "high": 88909.84,
+            "low": 88201.4,
+            "close": 88644.18,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T23:00:00.000Z",
+            "open": 88555.54,
+            "high": 88998.76,
+            "low": 88289.6,
+            "close": 88732.82,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T00:00:00.000Z",
+            "open": 88644.09,
+            "high": 89087.75,
+            "low": 88377.89,
+            "close": 88821.55,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T01:00:00.000Z",
+            "open": 88732.73,
+            "high": 89176.84,
+            "low": 88466.26,
+            "close": 88910.37,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T02:00:00.000Z",
+            "open": 88821.46,
+            "high": 89266.01,
+            "low": 88554.73,
+            "close": 88999.28,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T03:00:00.000Z",
+            "open": 88910.28,
+            "high": 89355.28,
+            "low": 88643.28,
+            "close": 89088.28,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T04:00:00.000Z",
+            "open": 88999.19,
+            "high": 89444.63,
+            "low": 88731.93,
+            "close": 89177.37,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T05:00:00.000Z",
+            "open": 89088.19,
+            "high": 89534.08,
+            "low": 88820.66,
+            "close": 89266.55,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T06:00:00.000Z",
+            "open": 89177.28,
+            "high": 89623.62,
+            "low": 88909.48,
+            "close": 89355.82,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T07:00:00.000Z",
+            "open": 89266.46,
+            "high": 89713.24,
+            "low": 88998.4,
+            "close": 89445.18,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T08:00:00.000Z",
+            "open": 89355.73,
+            "high": 89802.96,
+            "low": 89087.4,
+            "close": 89534.63,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T09:00:00.000Z",
+            "open": 89445.1,
+            "high": 89892.77,
+            "low": 89176.49,
+            "close": 89624.16,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T10:00:00.000Z",
+            "open": 89534.54,
+            "high": 89982.66,
+            "low": 89265.66,
+            "close": 89713.78,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T11:00:00.000Z",
+            "open": 89624.07,
+            "high": 90072.64,
+            "low": 89354.92,
+            "close": 89803.49,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T12:00:00.000Z",
+            "open": 89713.69,
+            "high": 90162.7,
+            "low": 89444.28,
+            "close": 89893.29,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T13:00:00.000Z",
+            "open": 89803.4,
+            "high": 90252.86,
+            "low": 89533.72,
+            "close": 89983.18,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T14:00:00.000Z",
+            "open": 89893.2,
+            "high": 90343.11,
+            "low": 89623.25,
+            "close": 90073.16,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T15:00:00.000Z",
+            "open": 89983.09,
+            "high": 90433.45,
+            "low": 89712.87,
+            "close": 90163.23,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T16:00:00.000Z",
+            "open": 90073.07,
+            "high": 90523.88,
+            "low": 89802.58,
+            "close": 90253.39,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T17:00:00.000Z",
+            "open": 90163.14,
+            "high": 90614.4,
+            "low": 89892.38,
+            "close": 90343.64,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T18:00:00.000Z",
+            "open": 90253.3,
+            "high": 90705.01,
+            "low": 89982.27,
+            "close": 90433.98,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T19:00:00.000Z",
+            "open": 90343.55,
+            "high": 90795.72,
+            "low": 90072.24,
+            "close": 90524.41,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T20:00:00.000Z",
+            "open": 90433.89,
+            "high": 90886.51,
+            "low": 90162.31,
+            "close": 90614.93,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T21:00:00.000Z",
+            "open": 90524.32,
+            "high": 90977.39,
+            "low": 90252.47,
+            "close": 90705.54,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T22:00:00.000Z",
+            "open": 90614.83,
+            "high": 91068.36,
+            "low": 90342.72,
+            "close": 90796.25,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T23:00:00.000Z",
+            "open": 90705.45,
+            "high": 91159.43,
+            "low": 90433.07,
+            "close": 90887.05,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T00:00:00.000Z",
+            "open": 90796.16,
+            "high": 91250.6,
+            "low": 90523.5,
+            "close": 90977.94,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T01:00:00.000Z",
+            "open": 90886.96,
+            "high": 91341.85,
+            "low": 90614.03,
+            "close": 91068.92,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T02:00:00.000Z",
+            "open": 90977.85,
+            "high": 91433.2,
+            "low": 90704.64,
+            "close": 91159.99,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T03:00:00.000Z",
+            "open": 91068.83,
+            "high": 91524.63,
+            "low": 90795.35,
+            "close": 91251.15,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T04:00:00.000Z",
+            "open": 91159.9,
+            "high": 91616.15,
+            "low": 90886.15,
+            "close": 91342.4,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T05:00:00.000Z",
+            "open": 91251.06,
+            "high": 91707.77,
+            "low": 90977.03,
+            "close": 91433.74,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T06:00:00.000Z",
+            "open": 91342.31,
+            "high": 91799.47,
+            "low": 91068.01,
+            "close": 91525.17,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T07:00:00.000Z",
+            "open": 91433.64,
+            "high": 91891.27,
+            "low": 91159.07,
+            "close": 91616.7,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T08:00:00.000Z",
+            "open": 91525.08,
+            "high": 91983.17,
+            "low": 91250.23,
+            "close": 91708.32,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T09:00:00.000Z",
+            "open": 91616.61,
+            "high": 92075.15,
+            "low": 91341.49,
+            "close": 91800.03,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T10:00:00.000Z",
+            "open": 91708.23,
+            "high": 92167.23,
+            "low": 91432.83,
+            "close": 91891.83,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T11:00:00.000Z",
+            "open": 91799.94,
+            "high": 92259.4,
+            "low": 91524.26,
+            "close": 91983.72,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T12:00:00.000Z",
+            "open": 91891.74,
+            "high": 92351.65,
+            "low": 91615.79,
+            "close": 92075.7,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T13:00:00.000Z",
+            "open": 91983.62,
+            "high": 92444,
+            "low": 91707.4,
+            "close": 92167.78,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T14:00:00.000Z",
+            "open": 92075.61,
+            "high": 92536.45,
+            "low": 91799.11,
+            "close": 92259.95,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T15:00:00.000Z",
+            "open": 92167.69,
+            "high": 92628.99,
+            "low": 91890.91,
+            "close": 92352.21,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T16:00:00.000Z",
+            "open": 92259.86,
+            "high": 92721.62,
+            "low": 91982.8,
+            "close": 92444.56,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T17:00:00.000Z",
+            "open": 92352.12,
+            "high": 92814.34,
+            "low": 92074.78,
+            "close": 92537,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T18:00:00.000Z",
+            "open": 92444.46,
+            "high": 92907.15,
+            "low": 92166.85,
+            "close": 92629.54,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T19:00:00.000Z",
+            "open": 92536.91,
+            "high": 93000.06,
+            "low": 92259.02,
+            "close": 92722.17,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T20:00:00.000Z",
+            "open": 92629.45,
+            "high": 93093.06,
+            "low": 92351.28,
+            "close": 92814.89,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T21:00:00.000Z",
+            "open": 92722.08,
+            "high": 93186.15,
+            "low": 92443.63,
+            "close": 92907.7,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T22:00:00.000Z",
+            "open": 92814.79,
+            "high": 93279.33,
+            "low": 92536.07,
+            "close": 93000.61,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T23:00:00.000Z",
+            "open": 92907.61,
+            "high": 93372.61,
+            "low": 92628.61,
+            "close": 93093.61,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T00:00:00.000Z",
+            "open": 93000.52,
+            "high": 93465.98,
+            "low": 92721.24,
+            "close": 93186.7,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T01:00:00.000Z",
+            "open": 93093.51,
+            "high": 93559.45,
+            "low": 92813.95,
+            "close": 93279.89,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T02:00:00.000Z",
+            "open": 93186.61,
+            "high": 93653.01,
+            "low": 92906.77,
+            "close": 93373.17,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T03:00:00.000Z",
+            "open": 93279.8,
+            "high": 93746.66,
+            "low": 92999.68,
+            "close": 93466.54,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T04:00:00.000Z",
+            "open": 93373.07,
+            "high": 93840.41,
+            "low": 93092.67,
+            "close": 93560.01,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T05:00:00.000Z",
+            "open": 93466.45,
+            "high": 93934.25,
+            "low": 93185.77,
+            "close": 93653.57,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T06:00:00.000Z",
+            "open": 93559.92,
+            "high": 94028.18,
+            "low": 93278.96,
+            "close": 93747.22,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T07:00:00.000Z",
+            "open": 93653.47,
+            "high": 94122.21,
+            "low": 93372.23,
+            "close": 93840.97,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T08:00:00.000Z",
+            "open": 93747.13,
+            "high": 94216.33,
+            "low": 93465.61,
+            "close": 93934.81,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T09:00:00.000Z",
+            "open": 93840.88,
+            "high": 94310.55,
+            "low": 93559.07,
+            "close": 94028.74,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T10:00:00.000Z",
+            "open": 93934.71,
+            "high": 94404.85,
+            "low": 93652.63,
+            "close": 94122.77,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T11:00:00.000Z",
+            "open": 94028.65,
+            "high": 94499.26,
+            "low": 93746.28,
+            "close": 94216.89,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T12:00:00.000Z",
+            "open": 94122.67,
+            "high": 94593.76,
+            "low": 93840.02,
+            "close": 94311.11,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T13:00:00.000Z",
+            "open": 94216.8,
+            "high": 94688.35,
+            "low": 93933.87,
+            "close": 94405.42,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T14:00:00.000Z",
+            "open": 94311.01,
+            "high": 94783.04,
+            "low": 94027.8,
+            "close": 94499.83,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T15:00:00.000Z",
+            "open": 94405.33,
+            "high": 94877.83,
+            "low": 94121.83,
+            "close": 94594.33,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T16:00:00.000Z",
+            "open": 94499.74,
+            "high": 94972.71,
+            "low": 94215.95,
+            "close": 94688.92,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T17:00:00.000Z",
+            "open": 94594.23,
+            "high": 95067.68,
+            "low": 94310.16,
+            "close": 94783.61,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T18:00:00.000Z",
+            "open": 94688.83,
+            "high": 95162.74,
+            "low": 94404.48,
+            "close": 94878.39,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T19:00:00.000Z",
+            "open": 94783.51,
+            "high": 95257.9,
+            "low": 94498.88,
+            "close": 94973.27,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T20:00:00.000Z",
+            "open": 94878.3,
+            "high": 95353.16,
+            "low": 94593.38,
+            "close": 95068.24,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T21:00:00.000Z",
+            "open": 94973.17,
+            "high": 95448.51,
+            "low": 94687.97,
+            "close": 95163.31,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T22:00:00.000Z",
+            "open": 95068.15,
+            "high": 95543.96,
+            "low": 94782.66,
+            "close": 95258.47,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T23:00:00.000Z",
+            "open": 95163.21,
+            "high": 95639.5,
+            "low": 94877.44,
+            "close": 95353.73,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T00:00:00.000Z",
+            "open": 95258.38,
+            "high": 95735.14,
+            "low": 94972.32,
+            "close": 95449.08,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T01:00:00.000Z",
+            "open": 95353.63,
+            "high": 95830.88,
+            "low": 95067.28,
+            "close": 95544.53,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T02:00:00.000Z",
+            "open": 95448.99,
+            "high": 95926.71,
+            "low": 95162.35,
+            "close": 95640.07,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T03:00:00.000Z",
+            "open": 95544.43,
+            "high": 96022.63,
+            "low": 95257.51,
+            "close": 95735.71,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T04:00:00.000Z",
+            "open": 95639.97,
+            "high": 96118.65,
+            "low": 95352.77,
+            "close": 95831.45,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T05:00:00.000Z",
+            "open": 95735.62,
+            "high": 96214.78,
+            "low": 95448.12,
+            "close": 95927.28,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T06:00:00.000Z",
+            "open": 95831.35,
+            "high": 96310.99,
+            "low": 95543.57,
+            "close": 96023.21,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T07:00:00.000Z",
+            "open": 95927.19,
+            "high": 96407.3,
+            "low": 95639.12,
+            "close": 96119.23,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T08:00:00.000Z",
+            "open": 96023.11,
+            "high": 96503.71,
+            "low": 95734.75,
+            "close": 96215.35,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T09:00:00.000Z",
+            "open": 96119.13,
+            "high": 96600.21,
+            "low": 95830.49,
+            "close": 96311.57,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T10:00:00.000Z",
+            "open": 96215.26,
+            "high": 96696.82,
+            "low": 95926.32,
+            "close": 96407.88,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T11:00:00.000Z",
+            "open": 96311.47,
+            "high": 96793.51,
+            "low": 96022.25,
+            "close": 96504.29,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T12:00:00.000Z",
+            "open": 96407.79,
+            "high": 96890.31,
+            "low": 96118.27,
+            "close": 96600.79,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T13:00:00.000Z",
+            "open": 96504.19,
+            "high": 96987.19,
+            "low": 96214.39,
+            "close": 96697.39,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T14:00:00.000Z",
+            "open": 96600.69,
+            "high": 97084.18,
+            "low": 96310.6,
+            "close": 96794.09,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T15:00:00.000Z",
+            "open": 96697.3,
+            "high": 97181.27,
+            "low": 96406.91,
+            "close": 96890.88,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T16:00:00.000Z",
+            "open": 96793.99,
+            "high": 97278.44,
+            "low": 96503.32,
+            "close": 96987.77,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T17:00:00.000Z",
+            "open": 96890.78,
+            "high": 97375.72,
+            "low": 96599.82,
+            "close": 97084.76,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T18:00:00.000Z",
+            "open": 96987.68,
+            "high": 97473.1,
+            "low": 96696.42,
+            "close": 97181.84,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T19:00:00.000Z",
+            "open": 97084.66,
+            "high": 97570.57,
+            "low": 96793.11,
+            "close": 97279.02,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T20:00:00.000Z",
+            "open": 97181.74,
+            "high": 97668.14,
+            "low": 96889.9,
+            "close": 97376.3,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T21:00:00.000Z",
+            "open": 97278.92,
+            "high": 97765.81,
+            "low": 96986.79,
+            "close": 97473.68,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T22:00:00.000Z",
+            "open": 97376.21,
+            "high": 97863.57,
+            "low": 97083.79,
+            "close": 97571.15,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T23:00:00.000Z",
+            "open": 97473.58,
+            "high": 97961.43,
+            "low": 97180.87,
+            "close": 97668.72,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T00:00:00.000Z",
+            "open": 97571.05,
+            "high": 98059.39,
+            "low": 97278.05,
+            "close": 97766.39,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T01:00:00.000Z",
+            "open": 97668.62,
+            "high": 98157.46,
+            "low": 97375.32,
+            "close": 97864.16,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T02:00:00.000Z",
+            "open": 97766.3,
+            "high": 98255.62,
+            "low": 97472.7,
+            "close": 97962.02,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T03:00:00.000Z",
+            "open": 97864.06,
+            "high": 98353.87,
+            "low": 97570.17,
+            "close": 98059.98,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T04:00:00.000Z",
+            "open": 97961.92,
+            "high": 98452.22,
+            "low": 97667.74,
+            "close": 98158.04,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T05:00:00.000Z",
+            "open": 98059.88,
+            "high": 98550.67,
+            "low": 97765.41,
+            "close": 98256.2,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T06:00:00.000Z",
+            "open": 98157.94,
+            "high": 98649.22,
+            "low": 97863.18,
+            "close": 98354.46,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T07:00:00.000Z",
+            "open": 98256.11,
+            "high": 98747.88,
+            "low": 97961.04,
+            "close": 98452.81,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T08:00:00.000Z",
+            "open": 98354.36,
+            "high": 98846.62,
+            "low": 98059,
+            "close": 98551.26,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T09:00:00.000Z",
+            "open": 98452.71,
+            "high": 98945.47,
+            "low": 98157.05,
+            "close": 98649.81,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T10:00:00.000Z",
+            "open": 98551.16,
+            "high": 99044.41,
+            "low": 98255.21,
+            "close": 98748.46,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T11:00:00.000Z",
+            "open": 98649.71,
+            "high": 99143.45,
+            "low": 98353.47,
+            "close": 98847.21,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T12:00:00.000Z",
+            "open": 98748.36,
+            "high": 99242.6,
+            "low": 98451.82,
+            "close": 98946.06,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T13:00:00.000Z",
+            "open": 98847.11,
+            "high": 99341.84,
+            "low": 98550.28,
+            "close": 99045.01,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T14:00:00.000Z",
+            "open": 98945.96,
+            "high": 99441.19,
+            "low": 98648.83,
+            "close": 99144.06,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T15:00:00.000Z",
+            "open": 99044.92,
+            "high": 99540.64,
+            "low": 98747.48,
+            "close": 99243.2,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T16:00:00.000Z",
+            "open": 99143.96,
+            "high": 99640.17,
+            "low": 98846.23,
+            "close": 99342.44,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T17:00:00.000Z",
+            "open": 99243.1,
+            "high": 99739.81,
+            "low": 98945.07,
+            "close": 99441.78,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T18:00:00.000Z",
+            "open": 99342.34,
+            "high": 99839.55,
+            "low": 99044.01,
+            "close": 99541.22,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T19:00:00.000Z",
+            "open": 99441.68,
+            "high": 99939.38,
+            "low": 99143.06,
+            "close": 99640.76,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T20:00:00.000Z",
+            "open": 99541.12,
+            "high": 100039.32,
+            "low": 99242.2,
+            "close": 99740.4,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T21:00:00.000Z",
+            "open": 99640.66,
+            "high": 100139.36,
+            "low": 99341.44,
+            "close": 99840.14,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T22:00:00.000Z",
+            "open": 99740.3,
+            "high": 100239.5,
+            "low": 99440.78,
+            "close": 99939.98,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T23:00:00.000Z",
+            "open": 99840.04,
+            "high": 100339.74,
+            "low": 99540.22,
+            "close": 100039.92,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T00:00:00.000Z",
+            "open": 99939.88,
+            "high": 100440.08,
+            "low": 99639.76,
+            "close": 100139.96,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T01:00:00.000Z",
+            "open": 100039.82,
+            "high": 100540.52,
+            "low": 99739.4,
+            "close": 100240.1,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T02:00:00.000Z",
+            "open": 100139.86,
+            "high": 100641.06,
+            "low": 99839.14,
+            "close": 100340.34,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T03:00:00.000Z",
+            "open": 100240,
+            "high": 100741.7,
+            "low": 99938.98,
+            "close": 100440.68,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T04:00:00.000Z",
+            "open": 100340.24,
+            "high": 100842.44,
+            "low": 100038.92,
+            "close": 100541.12,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T05:00:00.000Z",
+            "open": 100440.58,
+            "high": 100943.28,
+            "low": 100138.96,
+            "close": 100641.66,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T06:00:00.000Z",
+            "open": 100541.02,
+            "high": 101044.23,
+            "low": 100239.09,
+            "close": 100742.3,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T07:00:00.000Z",
+            "open": 100641.56,
+            "high": 101145.27,
+            "low": 100339.33,
+            "close": 100843.04,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T08:00:00.000Z",
+            "open": 100742.2,
+            "high": 101246.41,
+            "low": 100439.67,
+            "close": 100943.88,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T09:00:00.000Z",
+            "open": 100842.94,
+            "high": 101347.66,
+            "low": 100540.1,
+            "close": 101044.82,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T10:00:00.000Z",
+            "open": 100943.78,
+            "high": 101449,
+            "low": 100640.64,
+            "close": 101145.86,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T11:00:00.000Z",
+            "open": 101044.71,
+            "high": 101550.44,
+            "low": 100741.28,
+            "close": 101247.01,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T12:00:00.000Z",
+            "open": 101145.76,
+            "high": 101652,
+            "low": 100842.02,
+            "close": 101348.26,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T13:00:00.000Z",
+            "open": 101246.91,
+            "high": 101753.65,
+            "low": 100942.87,
+            "close": 101449.61,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T14:00:00.000Z",
+            "open": 101348.16,
+            "high": 101855.41,
+            "low": 101043.81,
+            "close": 101551.06,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T15:00:00.000Z",
+            "open": 101449.51,
+            "high": 101957.26,
+            "low": 101144.86,
+            "close": 101652.61,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T16:00:00.000Z",
+            "open": 101550.96,
+            "high": 102059.22,
+            "low": 101246,
+            "close": 101754.26,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T17:00:00.000Z",
+            "open": 101652.51,
+            "high": 102161.28,
+            "low": 101347.24,
+            "close": 101856.01,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T18:00:00.000Z",
+            "open": 101754.15,
+            "high": 102263.43,
+            "low": 101448.59,
+            "close": 101957.87,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T19:00:00.000Z",
+            "open": 101855.91,
+            "high": 102365.7,
+            "low": 101550.04,
+            "close": 102059.83,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T20:00:00.000Z",
+            "open": 101957.77,
+            "high": 102468.07,
+            "low": 101651.59,
+            "close": 102161.89,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T21:00:00.000Z",
+            "open": 102059.73,
+            "high": 102570.54,
+            "low": 101753.24,
+            "close": 102264.05,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T22:00:00.000Z",
+            "open": 102161.79,
+            "high": 102673.11,
+            "low": 101854.99,
+            "close": 102366.31,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T23:00:00.000Z",
+            "open": 102263.94,
+            "high": 102775.78,
+            "low": 101956.84,
+            "close": 102468.68,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-29T00:00:00.000Z",
+            "open": 102366.21,
+            "high": 102878.55,
+            "low": 102058.81,
+            "close": 102571.15,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-29T01:00:00.000Z",
+            "open": 102468.58,
+            "high": 102981.43,
+            "low": 102160.87,
+            "close": 102673.72,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-29T02:00:00.000Z",
+            "open": 102571.05,
+            "high": 103084.41,
+            "low": 102263.03,
+            "close": 102776.39,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-29T03:00:00.000Z",
+            "open": 102673.61,
+            "high": 103187.5,
+            "low": 102365.28,
+            "close": 102879.17,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-29T04:00:00.000Z",
+            "open": 102776.29,
+            "high": 103290.69,
+            "low": 102467.65,
+            "close": 102982.05,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-29T05:00:00.000Z",
+            "open": 102879.07,
+            "high": 103393.98,
+            "low": 102570.12,
+            "close": 103085.03,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-29T06:00:00.000Z",
+            "open": 102981.94,
+            "high": 103497.37,
+            "low": 102672.69,
+            "close": 103188.12,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-29T07:00:00.000Z",
+            "open": 103084.93,
+            "high": 103600.87,
+            "low": 102775.37,
+            "close": 103291.31,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-29T08:00:00.000Z",
+            "open": 103188.02,
+            "high": 103704.48,
+            "low": 102878.14,
+            "close": 103394.6,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-29T09:00:00.000Z",
+            "open": 103291.21,
+            "high": 103808.18,
+            "low": 102981.02,
+            "close": 103497.99,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-29T10:00:00.000Z",
+            "open": 103394.49,
+            "high": 103911.98,
+            "low": 103084,
+            "close": 103601.49,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-29T11:00:00.000Z",
+            "open": 103497.89,
+            "high": 104015.9,
+            "low": 103187.08,
+            "close": 103705.09,
+            "volume": 22,
+            "is_closed": true
+          }
+        ],
+        "auto_tournament": true
+      }
+    }
+  ],
+  "responses_received": [
+    {
+      "status": 200,
+      "body": {
+        "status": "SUCCESS",
+        "analysis_id": "ana_v32_59_qualifying_winner",
+        "timestamp_utc": "2026-10-29T12:12:55.042190+00:00",
+        "is_read_only": true,
+        "attempts_created": 0,
+        "market_regime": {
+          "regime": "TRENDING_BULLISH",
+          "is_valid": true,
+          "rationale": "Close &gt; EMA50 &gt; EMA200 with ADX=26.4 &gt;= 22.0"
+        },
+        "shortlisted_candidates": [
+          {
+            "strategy_id": "TSMOM_DONCHIAN_24H_168H",
+            "strategy_name": "Donchian Trend Breakout (168h Trend / 24h Channel)",
+            "version": "1.0.0",
+            "rank": 1,
+            "screen_7_of_10": {
+              "passed": true,
+              "tp_hits": 7,
+              "total_attempts": 10
+            }
+          }
+        ],
+        "tournament": {
+          "execution_source": "CACHED_WALK_FORWARD_EVALUATION",
+          "tournament_winner": {
+            "strategy_id": "TSMOM_DONCHIAN_24H_168H",
+            "strategy_name": "Donchian Trend Breakout (168h Trend / 24h Channel)",
+            "win_rate": 0.7,
+            "sharpe_ratio": 1.45,
+            "max_drawdown": 0.082
+          },
+          "final_verdict": "QUALIFIED_WINNER_FOUND"
+        },
+        "smart_entry_decision": {
+          "status": "SMART_ENTRY_AVAILABLE",
+          "strategy_id": "TSMOM_DONCHIAN_24H_168H",
+          "strategy_name": "Donchian Trend Breakout",
+          "direction": "LONG",
+          "proposed_entry_price": 85250,
+          "proposed_tp_price": 86950,
+          "proposed_sl_price": 84100,
+          "risk_reward_ratio": 1.5,
+          "rationale": "Bullish trend channel breakout confirmed by 168h macro EMA filter."
+        }
+      }
+    }
+  ],
+  "analysis_stage_transitions": [],
+  "final_outcome": "TIMEOUT_OR_UNRESOLVED",
+  "error_message": null,
+  "simulated_attempts_created": 0,
+  "passed": false
+}</pre>
+  </div>
+
+  <script>
+    // Extract scenario from query parameter
+    const params = new URLSearchParams(window.location.search);
+    const scenario = params.get("scenario") || "ANALYSE_NORMAL";
+    document.getElementById("qa-scenario-badge").textContent = "SCENARIO: " + scenario;
+    window.__QA_SCENARIO__ = scenario;
+    window.__QA_RESULTS__ = {
+      scenario: scenario,
+      started_at: new Date().toISOString(),
+      button_clicked: false,
+      click_timestamp: null,
+      requests_intercepted: [],
+      responses_received: [],
+      analysis_stage_transitions: [],
+      final_outcome: null,
+      error_message: null,
+      simulated_attempts_created: 0,
+      passed: false
+    };
+
+    // Pre-flight Mock Interceptor for Coinbase REST & WS
+    const origFetch = window.fetch;
+    window.fetch = async function(url, options = {}) {
+      const urlStr = typeof url === "string" ? url : (url.url || "");
+      
+      // Intercept Coinbase candles
+      if (urlStr.includes("api.exchange.coinbase.com/products/BTC-USD/candles")) {
+        window.__QA_RESULTS__.requests_intercepted.push({ endpoint: "COINBASE_CANDLES", url: urlStr });
+        if (scenario === "ANALYSE_PROVIDER_UNAVAILABLE") {
+          return new Response(JSON.stringify([]), { status: 503, headers: { "Content-Type": "application/json" } });
+        }
+        // Fetch deterministic seed candles from local QA server
+        const res = await origFetch("/api/qa/seed-candles?scenario=" + scenario);
+        const data = await res.json();
+        // Coinbase REST format: [[time, low, high, open, close, volume], ...] in descending order
+        const cbCandles = data.map(c => [c.time, c.low, c.high, c.open, c.close, c.volume]).reverse();
+        return new Response(JSON.stringify(cbCandles), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+
+      // Intercept Analyse API calls to log telemetry
+      if (urlStr.includes("/api/tournament/analyse")) {
+        window.__QA_RESULTS__.requests_intercepted.push({
+          endpoint: "ANALYSE",
+          payload: options.body ? JSON.parse(options.body) : null
+        });
+      }
+
+      const resp = await origFetch(url, options);
+      if (urlStr.includes("/api/tournament/analyse")) {
+        const clone = resp.clone();
+        try {
+          const body = await clone.json();
+          window.__QA_RESULTS__.responses_received.push({ status: resp.status, body: body });
+        } catch(e) {}
+      }
+      return resp;
+    };
+
+    // Mock WebSocket for Coinbase feed
+    window.WebSocket = function(url) {
+      return {
+        readyState: 1, // OPEN
+        send: function() {},
+        close: function() {},
+        addEventListener: function() {},
+        removeEventListener: function() {}
+      };
+    };
+  </script>
+
+  <!-- Load Real Application Script -->
+  <script src="/app.js"></script>
+
+  <!-- Automated Scenario Driver -->
+  <script>
+    (async function runTestDriver() {
+      // Set hash route to smart entry
+      window.location.hash = "#/smart-entry";
+
+      // Wait for app mount and button presence
+      let btn = null;
+      for (let i = 0; i < 40; i++) {
+        await new Promise(r => setTimeout(r, 100));
+        btn = document.getElementById("btn-analyse-setup");
+        if (btn) break;
+      }
+
+      if (!btn) {
+        window.__QA_RESULTS__.error_message = "btn-analyse-setup not found in DOM within 4s";
+        finalize(false);
+        return;
+      }
+
+      // Allow 300ms for candle feed state propagation
+      await new Promise(r => setTimeout(r, 300));
+
+      // Execute scenario-specific click behavior
+      window.__QA_RESULTS__.button_clicked = true;
+      window.__QA_RESULTS__.click_timestamp = new Date().toISOString();
+
+      if (scenario === "ANALYSE_DOUBLE_CLICK") {
+        btn.click();
+        await new Promise(r => setTimeout(r, 20));
+        btn.click(); // rapid double-click
+      } else {
+        btn.click();
+      }
+
+      // Poll for completion or terminal state
+      let terminalStateReached = false;
+      for (let j = 0; j < 35; j++) {
+        await new Promise(r => setTimeout(r, 150));
+        const errEl = document.getElementById("analysis-error");
+        const outcomeEl = document.querySelector("#v32-43-smart-entry-view h2, #v32-43-smart-entry-view h3, [role='status']");
+        const statusText = document.body.innerText;
+
+        if (errEl && errEl.textContent.trim()) {
+          window.__QA_RESULTS__.error_message = errEl.textContent.trim();
+          terminalStateReached = true;
+          break;
+        }
+
+        if (statusText.includes("ENTRY CANDIDATE FOUND") ||
+            statusText.includes("NO QUALIFYING SETUP") ||
+            statusText.includes("ANALYSIS ABSTAINED") ||
+            statusText.includes("Analysis complete") ||
+            statusText.includes("Analysis did not start") ||
+            statusText.includes("Analysis request failed")) {
+          terminalStateReached = true;
+          break;
+        }
+      }
+
+      // Capture final rendered outcome
+      const bodyText = document.body.innerText;
+      if (bodyText.includes("ENTRY CANDIDATE FOUND")) {
+        window.__QA_RESULTS__.final_outcome = "ENTRY_CANDIDATE_FOUND";
+      } else if (bodyText.includes("NO QUALIFYING SETUP")) {
+        window.__QA_RESULTS__.final_outcome = "NO_QUALIFYING_SETUP";
+      } else if (bodyText.includes("ANALYSIS ABSTAINED")) {
+        window.__QA_RESULTS__.final_outcome = "ANALYSIS_ABSTAINED";
+      } else if (bodyText.includes("Analysis did not start")) {
+        window.__QA_RESULTS__.final_outcome = "BLOCKED_PREFLIGHT";
+      } else if (bodyText.includes("Analysis request failed")) {
+        window.__QA_RESULTS__.final_outcome = "ERROR_HANDLED";
+      } else {
+        window.__QA_RESULTS__.final_outcome = "TIMEOUT_OR_UNRESOLVED";
+      }
+
+      // Check invariant: zero simulated attempts created
+      const attemptsCount = document.querySelectorAll(".simulated-trade-card, #active-simulated-trade").length;
+      window.__QA_RESULTS__.simulated_attempts_created = attemptsCount;
+
+      // Evaluate scenario pass/fail
+      let passed = false;
+      switch (scenario) {
+        case "ANALYSE_NORMAL":
+          passed = (window.__QA_RESULTS__.final_outcome === "NO_QUALIFYING_SETUP" || window.__QA_RESULTS__.final_outcome === "ENTRY_CANDIDATE_FOUND") && attemptsCount === 0;
+          break;
+        case "ANALYSE_NO_ELIGIBLE_STRATEGY":
+          passed = (window.__QA_RESULTS__.final_outcome === "NO_QUALIFYING_SETUP" || window.__QA_RESULTS__.final_outcome === "ANALYSIS_ABSTAINED") && attemptsCount === 0;
+          break;
+        case "ANALYSE_GAPS":
+          passed = (window.__QA_RESULTS__.final_outcome === "BLOCKED_PREFLIGHT" || window.__QA_RESULTS__.final_outcome === "ERROR_HANDLED" || Boolean(window.__QA_RESULTS__.error_message)) && attemptsCount === 0;
+          break;
+        case "ANALYSE_DUPLICATE_OR_INVALID_OHLCV":
+          passed = (window.__QA_RESULTS__.final_outcome === "ERROR_HANDLED" || Boolean(window.__QA_RESULTS__.error_message)) && attemptsCount === 0;
+          break;
+        case "ANALYSE_STALE_DATA":
+          passed = (window.__QA_RESULTS__.final_outcome === "BLOCKED_PREFLIGHT" || window.__QA_RESULTS__.final_outcome === "ERROR_HANDLED" || Boolean(window.__QA_RESULTS__.error_message)) && attemptsCount === 0;
+          break;
+        case "ANALYSE_PROVIDER_UNAVAILABLE":
+          passed = (window.__QA_RESULTS__.final_outcome === "BLOCKED_PREFLIGHT" || Boolean(window.__QA_RESULTS__.error_message)) && !bodyText.includes("$80,000") && attemptsCount === 0;
+          break;
+        case "ANALYSE_MALFORMED_OR_MISSING_FORECAST":
+          passed = (window.__QA_RESULTS__.final_outcome !== "TIMEOUT_OR_UNRESOLVED") && attemptsCount === 0;
+          break;
+        case "ANALYSE_TIMEOUT_OR_SERVER_ERROR":
+          passed = (window.__QA_RESULTS__.final_outcome === "ERROR_HANDLED" || Boolean(window.__QA_RESULTS__.error_message)) && attemptsCount === 0;
+          break;
+        case "ANALYSE_DOUBLE_CLICK":
+          passed = (window.__QA_RESULTS__.requests_intercepted.filter(r => r.endpoint === "ANALYSE").length <= 1) && attemptsCount === 0;
+          break;
+        case "ANALYSE_QUALIFYING_CANDIDATE":
+          passed = (window.__QA_RESULTS__.final_outcome === "ENTRY_CANDIDATE_FOUND") && attemptsCount === 0;
+          break;
+        default:
+          passed = false;
+      }
+
+      window.__QA_RESULTS__.passed = passed;
+      finalize(passed);
+    })();
+
+    function finalize(passed) {
+      document.getElementById("qa-scenario-status").textContent = passed ? "PASS" : "FAIL";
+      document.getElementById("qa-results-json").textContent = JSON.stringify(window.__QA_RESULTS__, null, 2);
+      window.__QA_DONE__ = true;
+    }
+  </script>
+
+
+</body></html>

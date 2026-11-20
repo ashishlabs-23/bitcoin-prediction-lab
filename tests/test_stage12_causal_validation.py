@@ -151,7 +151,7 @@ def test_active_production_model_target_and_units():
     model = get_active_production_model()
     assert model.canonical_id == "HAR-RS-DOW-v1.0"
     assert model.classification == ModelClassification.PRODUCTION_VOLATILITY
-    assert model.authorization_status == AuthorizationStatus.AUTHORIZED_FOR_PRODUCTION
+    assert model.authorization_status == AuthorizationStatus.OFFLINE_RESEARCH_ONLY
     assert model.forecast_horizon == "168h (7 calendar days)"
     assert model.forecast_target == "Annualized 7-Day Realized Variance (rv7d_var_ann)"
     assert model.directional_prediction_capability is False

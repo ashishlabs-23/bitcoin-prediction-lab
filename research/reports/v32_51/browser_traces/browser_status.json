@@ -1,0 +1,25 @@
+{
+  "run_id": "20261027_072352_0530",
+  "status": "NOT_RUN",
+  "reason": "No normal application listener was available on the attached browser URLs.",
+  "observed_ports": {
+    "8096": "no listener",
+    "8102": "no listener",
+    "9222": "pre-existing headless Chrome PID 23872; not used or controlled"
+  },
+  "browser_sessions_started": 0,
+  "browser_sessions_reused": 0,
+  "screenshots_captured": 0,
+  "network_traces_captured": 0,
+  "required_scenarios_not_run": [
+    "Terminal desktop/tablet/mobile forecast overlay",
+    "Normal API health/offline state",
+    "Forecast retry by real pointer and keyboard interaction",
+    "Forecast success, unavailable, stale, malformed, timeout and 5xx states",
+    "Analysis and tournament",
+    "Explicit simulated entry and active attempt monitor",
+    "Research, journal, position monitor and paper-trading navigation",
+    "Browser console/network error collection"
+  ],
+  "existing_prior_artifacts": "V32.50 screenshots and summarized network trace were preserved and are not represented as V32.51 captures."
+}

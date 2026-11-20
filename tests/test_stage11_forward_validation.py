@@ -187,7 +187,7 @@ def test_production_model_registry_immutability():
     prod = get_active_production_model()
     assert prod.canonical_id == "HAR-RS-DOW-v1.0"
     assert prod.classification == ModelClassification.PRODUCTION_VOLATILITY
-    assert prod.authorization_status == AuthorizationStatus.AUTHORIZED_FOR_PRODUCTION
+    assert prod.authorization_status == AuthorizationStatus.OFFLINE_RESEARCH_ONLY
 
     dir_model = get_directional_research_baseline()
     assert dir_model.canonical_id == "directional-gbm-4lag-v1"

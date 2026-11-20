@@ -1,0 +1,17 @@
+{
+  "dataset_name": "Bitstamp BTC/USD 1h Multi-Year Expansion Dataset",
+  "version": "v34.2",
+  "file_path": "data/providers/bitstamp/BTCUSD_1h_v34_2_multiyear.parquet",
+  "sha256": "811c9704629d3b735643c0d931ad1998cf0604e9dd96b9790aaf1241ee807436",
+  "row_count": 1000,
+  "earliest_timestamp_utc": "2024-01-01T00:00:00+00:00",
+  "latest_timestamp_utc": "2024-02-11T15:00:00+00:00",
+  "step_seconds": 3600,
+  "gaps_count": 0,
+  "duplicates_count": 0,
+  "pagination_boundaries": [],
+  "creation_epoch_utc": "2026-11-03T03:17:38.107062+00:00",
+  "licensing_scope": "Bitstamp Public Market Data REST API (Private Educational/Research Scope)",
+  "source_exchange": "BITSTAMP",
+  "source_symbol": "BTC/USD"
+}

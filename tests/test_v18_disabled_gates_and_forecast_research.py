@@ -96,11 +96,14 @@ class TestAnalysisOnlyProductBoundary:
 class TestEliminationOfFabricatedDecisionsAndReadSideEffects:
     """Verifies GET /api/arena/context never writes to ledger and never fabricates LONG."""
 
-    def test_get_arena_context_no_ledger_side_effects(self):
+    def test_get_arena_context_no_ledger_side_effects(self, tmp_path, monkeypatch):
         """Verifies repeated GET requests do NOT append records to decision context ledger."""
-        from engine.arena_runner import arena_runner
+        from api import routes_arena
+        from engine.arena_runner import ArenaRunner
 
-        initial_count = len(arena_runner.decision_context_ledger) if hasattr(arena_runner, "decision_context_ledger") else 0
+        runner = ArenaRunner(db_path=str(tmp_path / "arena_context_test.db"))
+        monkeypatch.setattr(routes_arena, "arena_runner", runner)
+        initial_count = len(runner.decision_context_ledger) if hasattr(runner, "decision_context_ledger") else 0
 
         resp1 = client.get("/api/arena/context")
         assert resp1.status_code == 200
@@ -108,7 +111,7 @@ class TestEliminationOfFabricatedDecisionsAndReadSideEffects:
         resp2 = client.get("/api/arena/context")
         assert resp2.status_code == 200
 
-        final_count = len(arena_runner.decision_context_ledger) if hasattr(arena_runner, "decision_context_ledger") else 0
+        final_count = len(runner.decision_context_ledger) if hasattr(runner, "decision_context_ledger") else 0
         assert final_count == initial_count, "GET endpoint must NOT mutate ledger as a side-effect of inspection"
 
     def test_get_arena_context_no_fabricated_long(self):
@@ -186,10 +189,19 @@ class TestFuturePriceForecastingResearchTrack:
     def test_target_separation_verified(self):
         """Verifies Realized Volatility is strictly separated from Future Price prediction."""
         prod_model = get_active_production_model()
-        assert prod_model.canonical_id == "HAR-RS-DOW-v1.0"
-        assert prod_model.classification == ModelClassification.PRODUCTION_VOLATILITY
+        assert prod_model.canonical_id == "Standard-HAR-v1.0"
+        assert prod_model.classification == ModelClassification.BASELINE_VOLATILITY
+        assert prod_model.artifact_status.value == "UNAVAILABLE_BLOCKED"
+        assert prod_model.authorization_status == AuthorizationStatus.OFFLINE_RESEARCH_ONLY
         assert prod_model.directional_prediction_capability is False
         assert "rv7d_var_ann" in prod_model.forecast_target.lower()
+
+        challenger = get_model_identity("HAR-RS-DOW-v1.0")
+        assert challenger is not None
+        assert challenger.canonical_id != prod_model.canonical_id
+        assert challenger.classification == ModelClassification.RESEARCH_CHALLENGER_UNPROMOTED
+        assert challenger.authorization_status == AuthorizationStatus.OFFLINE_RESEARCH_ONLY
+        assert challenger.directional_prediction_capability is False
 
         # Check that price forecast models are registered separately
         rw_model = get_model_identity("price-forecast-persistence-rw")

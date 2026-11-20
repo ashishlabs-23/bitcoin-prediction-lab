@@ -1,0 +1,2432 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BTCognitive — Analyse E2E Test Harness</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+  <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin=""></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin=""></script>
+</head>
+<body style="background: #0B0E14; color: #F8FAFC; margin: 0; padding: 0;">
+  <div id="harness-header" style="background: #111827; border-bottom: 1px solid #374151; padding: 8px 16px; font-family: monospace; font-size: 13px; display: flex; justify-content: space-between;">
+    <span>BTCognitive Analyse E2E Test Harness</span>
+    <span id="qa-scenario-badge" style="color: #38BDF8; font-weight: bold;">SCENARIO: ANALYSE_DUPLICATE_OR_INVALID_OHLCV</span>
+  </div>
+
+  <div id="root"><div><div class="three-bg-canvas" style="position: fixed; top: 0px; left: 0px; width: 100%; height: 100%; pointer-events: none; z-index: 0; opacity: 1; transition: opacity 0.4s;"><canvas width="1255" height="804" style="display: block; width: 1255px; height: 804px;"></canvas></div><div class="institutional-ticker-bar"><div class="ticker-item"><span style="color: rgb(248, 250, 252); font-weight: 800;">BTC/USD · Coinbase</span><span class="val down">$103,808.80</span><span style="font-size: 0.72rem; padding: 1px 6px; border-radius: 4px; background: rgba(255, 92, 124, 0.15); color: rgb(255, 92, 124); font-weight: 700;">—</span></div><div class="ticker-item"><span>24h Range:</span><span class="val">Unavailable · insufficient history</span></div><div class="ticker-item"><span>24h Realized Volatility:</span><span class="val cyan">Unavailable · insufficient verified history</span></div><div class="ticker-item"><span>Funding:</span><span class="val up">Unavailable · no verified feed</span></div><div class="ticker-item"><span>Telemetry:</span><span class="val purple">Unavailable</span></div><div class="ticker-item" style="margin-left: auto;"><span style="background: rgba(0, 240, 255, 0.12); border: 1px solid rgba(0, 240, 255, 0.3); color: rgb(0, 240, 255); padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 800;">READ-ONLY MONITOR · TRADING DISABLED</span></div></div><nav class="navbar"><div style="display: flex; align-items: center; gap: 10px;"><button class="mobile-menu-toggle" aria-label="Toggle Menu">☰</button><a href="#/terminal" class="logo"><div class="logo-icon">B</div><span class="logo-text">BTCognitive</span></a></div><ul class="nav-links "><li><a id="nav-terminal" href="#/terminal" class="nav-link-pill active"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>Terminal</a></li><li><a id="nav-research" href="#/research" class="nav-link-pill "><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>Research</a></li><li><a id="nav-manual-journal" href="#/journal" class="nav-link-pill "><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>Journal</a></li><li class="nav-dropdown"><button id="nav-more-menu-btn" class="nav-dropdown-btn " aria-expanded="false" aria-label="More utilities and settings"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>More ▾</button></li></ul><div class="nav-right"><div class="notification-bell-wrapper"><button class="notification-bell-btn" title="Market observations and notification history"><span style="font-size: 1.05rem;">🔔</span><span>Observations</span></button></div><button title="Disable 3D Background FX (saves battery/CPU)" style="background: rgba(167, 139, 250, 0.15); border: 1px solid rgba(167, 139, 250, 0.4); color: rgb(167, 139, 250); padding: 5px 10px; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: 0.2s;">✨ 3D FX: ON</button><button title="Toggle Audio Feedback" style="background: transparent; border: 1px solid rgba(255, 255, 255, 0.1); color: rgb(0, 229, 168); padding: 5px 11px; border-radius: 8px; font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 5px; line-height: 1;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></g></svg>Audio</button><div class="status-badge warming-up" role="button" tabindex="0" aria-label="System status: Warming Up. Press Enter to configure API endpoint." title="Configure API endpoint" style="cursor: pointer; white-space: nowrap;"><div class="status-dot"></div><span class="status-text">Warming Up</span></div></div></nav><div class="research-status-banner" style="background: linear-gradient(90deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98)); border-bottom: 1px solid rgba(56, 189, 248, 0.25); padding: 8px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; font-size: 0.8rem; z-index: 90;"><div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;"><div style="display: flex; align-items: center; gap: 6px;"><span style="font-size: 0.95rem;">🔬</span><strong style="color: rgb(248, 250, 252); font-size: 0.84rem; letter-spacing: 0.02em;">BTCognitive Research Terminal</strong></div><span style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); color: rgb(56, 189, 248); padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.5px;">MARKET MONITOR · RESEARCH BLOCKED</span><span style="color: rgb(148, 163, 184); font-size: 0.74rem;">No verified market signal · Forecasts and trading are disabled</span></div><div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;"><div style="display: flex; align-items: center; gap: 6px; font-size: 0.74rem;"><span style="color: rgb(203, 213, 225);">Research status:</span><span style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: rgb(248, 113, 113); padding: 2px 8px; border-radius: 4px; font-weight: 800; font-family: var(--font-mono); font-size: 0.72rem;">BLOCKED · PROVENANCE UNVERIFIED</span></div><span style="color: rgb(148, 163, 184); font-size: 0.72rem; max-width: 340px; line-height: 1.2;">Frozen model inputs and evaluation provenance are not authenticated.</span><button id="banner-forecast-btn" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: rgb(56, 189, 248); padding: 3px 10px; border-radius: 4px; cursor: pointer; font-weight: 700; font-size: 0.72rem;">AI Forecasts &amp; Risk 📈</button><button id="banner-how-it-works-btn" style="background: rgba(167, 139, 250, 0.15); border: 1px solid rgba(167, 139, 250, 0.4); color: rgb(167, 139, 250); padding: 3px 10px; border-radius: 4px; cursor: pointer; font-weight: 700; font-size: 0.72rem;">How It Works 💡</button><button id="banner-research-btn" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: rgb(56, 189, 248); padding: 3px 10px; border-radius: 4px; cursor: pointer; font-weight: 700; font-size: 0.72rem;">View Research Evidence ↗</button></div></div><div class="terminal-container"><div class="terminal-view-root" style="max-width: 1600px; margin: 0px auto; padding: 10px 16px;"><div id="v19-area-btc-now" class="workstation-workspace"><div class="workstation-chart-wrapper"><div class="glass-card chart-card" style="margin: 0px;"><div class="chart-topbar-wrapper"><div class="chart-topbar"><div class="chart-info"><span class="chart-symbol">BTC / USD · Coinbase Exchange</span><span style="font-family: var(--font-mono); font-weight: 700; font-size: 1.1rem; color: rgb(248, 250, 252); margin-left: 14px;">$103,808.80</span><span style="margin-left: 14px;"><span style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 0.82rem; color: rgb(245, 158, 11); letter-spacing: 0.05em;"><span style="width: 8px; height: 8px; border-radius: 50%; background: rgb(245, 158, 11); box-shadow: rgb(245, 158, 11) 0px 0px 8px; display: inline-block; animation: auto ease 0s 1 normal none running none;"></span>RECONNECTING</span></span></div><div class="tf-buttons" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;"><button id="tf-btn-1m" class="tf-btn">1m</button><button id="tf-btn-5m" class="tf-btn">5m</button><button id="tf-btn-15m" class="tf-btn">15m</button><button id="tf-btn-1H" class="tf-btn active">1H</button><button id="tf-btn-4H" class="tf-btn">4H</button><button id="tf-btn-1D" class="tf-btn">1D</button><div style="width: 1px; height: 16px; background: rgba(148, 163, 184, 0.2); margin: 0px 4px;"></div><button id="toggle-ema-btn" class="chart-ind-toggle-btn active" title="Toggle EMA 20 / 50 Trend Ribbons">EMA 20/50</button><button id="toggle-bb-btn" class="chart-ind-toggle-btn active" title="Toggle Bollinger Bands (20, 2)">BB (20,2)</button><button id="toggle-bands-btn" class="chart-ind-toggle-btn active" title="Toggle Diffusion / Conformal Uncertainty Bands">Bands</button><button id="toggle-rsi-btn" class="chart-ind-toggle-btn " title="Toggle RSI (14) Relative Strength Index">RSI (14)</button><button id="toggle-atr-btn" class="chart-ind-toggle-btn " title="Toggle ATR (14) Average True Range">ATR (14)</button><button id="toggle-adx-btn" class="chart-ind-toggle-btn " title="Toggle ADX (14) Trend Strength Indicator">ADX (14)</button><button id="toggle-ai-forecast-btn" class="chart-ind-toggle-btn active" aria-pressed="true" title="Show or hide the research-only directional forecast overlay">AI Forecast ON</button><div style="width: 1px; height: 16px; background: rgba(148, 163, 184, 0.2); margin: 0px 4px;"></div><button id="toggle-research-markers-btn" class="chart-ind-toggle-btn " title="Toggle Optional Historical Research Setup Markers &amp; Legend">🔬 Research Markers</button><div style="width: 1px; height: 16px; background: rgba(148, 163, 184, 0.2); margin: 0px 4px;"></div><button id="open-alerts-btn" class="chart-ind-toggle-btn" title="Configure Custom Price, Indicator, and Strategy Alerts">🔔 Alerts</button></div></div><div class="chart-time-subbar"><div class="time-subbar-left" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><div class="time-pill live-clock-pill"><span class="pill-icon">🕒</span><span class="pill-label">Real-Time:</span><strong class="pill-value">2026-10-29 12:11:50 UTC (17:41:50 Local)</strong></div><div class="time-pill bar-open-pill"><span class="pill-icon">🕯️</span><span class="pill-label">Active Bar (1h):</span><strong class="pill-value">2026-10-29 12:00 UTC</strong></div><div class="time-pill countdown-pill "><span class="pill-icon">⏳</span><span class="pill-label">Bar Closes in:</span><strong class="pill-value font-mono">48m 10s · 13:00 UTC</strong></div><div class="time-pill quote-freshness-pill urgent"><span class="pill-icon">◉</span><span class="pill-label">Coinbase quote:</span><strong class="pill-value font-mono">Waiting for first quote</strong></div><div id="spot-comparator-pill" class="time-pill spot-comparator-pill " title="Click to inspect cross-exchange quotes &amp; divergence (Coinbase, Kraken, Bitstamp)" style="cursor: pointer;"><span class="pill-icon">🌐</span><span class="pill-label">Spot:</span><strong class="pill-value font-mono">Coinbase Spot</strong></div><div class="indicator-badge-ribbon"><span style="color: rgb(148, 163, 184); font-weight: 700;">INDICATORS:</span><span class="ind-badge active-rsi-overbought" title="RSI(14) Momentum: &lt;30 Oversold, &gt;70 Overbought">RSI(14): 100</span><span class="ind-badge" title="ATR(14) Average True Range Volatility">ATR(14): $819.01</span><span class="ind-badge" title="ADX(14) Trend Strength (&gt;25 Trending)">ADX(14): 100</span><span class="ind-badge" title="Bollinger Bandwidth (BBW)">BBW: 2.31%</span></div></div></div></div><div><div id="btc-lwc-chart" style="width: 100%; height: 520px; border-radius: 0px 0px 12px 12px; position: relative;"><section id="chart-ai-forecast-overlay" class="chart-ai-forecast-overlay" data-forecast-status="FORECAST_MALFORMED" role="region" aria-label="Research-only directional forecast on the Bitcoin price chart" style="position: absolute; top: 12px; left: 12px; z-index: 10; box-sizing: border-box; width: min(330px, 100% - 24px); max-width: calc(100% - 24px); background: rgba(11, 18, 32, 0.94); border: 1px solid rgba(245, 158, 11, 0.55); border-radius: 8px; padding: 9px 11px; color: rgb(253, 230, 138); font-size: 0.72rem; line-height: 1.45; font-family: &quot;JetBrains Mono&quot;, monospace; overflow-wrap: anywhere;"><div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;"><strong id="chart-ai-forecast-status" role="status" aria-live="polite" aria-atomic="true" style="color: rgb(226, 232, 240); font-size: 0.78rem;">Forecast response was invalid; no direction is shown.</strong><button id="chart-ai-forecast-retry" type="button" aria-label="Retry directional forecast request" title="Fetch the latest research-only directional forecast" style="border: 1px solid rgba(148, 163, 184, 0.45); border-radius: 5px; background: rgba(148, 163, 184, 0.12); color: rgb(226, 232, 240); padding: 3px 7px; font-size: 0.66rem; cursor: pointer; flex-shrink: 0;">Retry</button></div><div class="chart-ai-forecast-meta" style="margin-top: 3px; color: rgb(148, 163, 184);">Model: unavailable · Generated: timestamp unavailable</div><div class="chart-ai-forecast-meta" style="margin-top: 2px; color: rgb(148, 163, 184);">Input freshness: UNKNOWN · Governance: OFFLINE_RESEARCH_ONLY · Live trading disabled</div><p style="margin: 4px 0px 0px; color: rgb(253, 230, 138);">What happened: The forecast response has no valid generation timestamp. No directional marker is shown while this output is unavailable or stale. The price chart remains usable; retry or inspect diagnostics.</p><details style="margin-top: 4px; color: rgb(148, 163, 184);"><summary style="cursor: pointer; min-height: 24px;">Forecast details and limitations</summary><div style="padding-top: 3px;">Status code: FORECAST_MALFORMED. Classifier probabilities are not calibrated confidence or a future price path. The displayed persistence baseline and nominal bands are separate, non-directional research context; bands are uncalibrated. No validated edge is claimed.</div></details></section><div class="tv-lightweight-charts" style="overflow: hidden; direction: ltr; width: 796px; height: 520px; user-select: none; -webkit-tap-highlight-color: transparent;"><table cellspacing="0" style="height: 520px; width: 796px;"><tr><td style="padding: 0px;"></td><td style="padding: 0px; position: relative; width: 712px; height: 492px;"><div style="width: 100%; height: 100%; position: relative; overflow: hidden;"><canvas width="716" height="492" style="width: 712px; height: 492px; position: absolute; z-index: 1; left: 0px; top: 0px;"></canvas><canvas width="716" height="492" style="width: 712px; height: 492px; position: absolute; z-index: 2; left: 0px; top: 0px;"></canvas></div></td><td style="padding: 0px;"><div style="height: 492px; overflow: hidden; width: 84px; left: 0px; position: relative;"><canvas width="84" height="492" style="width: 84px; height: 492px; position: absolute; z-index: 1; left: 0px; top: 0px;"></canvas><canvas width="84" height="492" style="width: 84px; height: 492px; position: absolute; z-index: 2; left: 0px; top: 0px;"></canvas></div></td></tr><tr><td style="padding: 0px;"></td><td style="height: 28px; padding: 0px; width: 712px;"><div style="width: 100%; height: 100%; position: relative; overflow: hidden;"><canvas width="716" height="28" style="width: 712px; height: 28px; position: absolute; z-index: 1; left: 0px; top: 0px;"></canvas><canvas width="716" height="28" style="width: 712px; height: 28px; position: absolute; z-index: 2; left: 0px; top: 0px;"></canvas></div></td><td style="padding: 0px;"><div style="width: 84px; height: 28px; overflow: hidden;"><canvas width="84" height="28" style="width: 84px; height: 28px;"></canvas></div></td></tr></table></div></div><div class="chart-overlay-diagnostic-banner off"><div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span style="color: rgb(148, 163, 184); font-weight: 800;">○ STRATEGY OVERLAY: OFF (USER-DIRECTED)</span><span style="color: rgb(100, 116, 139); font-size: 0.7rem;">Select a candidate in Strategy Tournament to inspect rules, preview setup, or enable chart monitoring</span></div><div style="display: flex; align-items: center; gap: 8px; font-size: 0.68rem;"><span style="color: rgb(100, 116, 139);">LIVE TRADING: DISABLED</span></div></div><div style="background: rgba(11, 18, 32, 0.95); border-top: 1px solid rgba(255, 255, 255, 0.08); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; font-size: 0.74rem; border-radius: 0px 0px 12px 12px;"><div style="display: flex; align-items: center; gap: 8px;"><span style="color: rgb(126, 149, 181); font-weight: 700;">DECISION ANATOMY:</span><span style="background: rgba(0, 240, 255, 0.1); color: rgb(0, 240, 255); padding: 2px 8px; border-radius: 4px; font-weight: 700;">Event: RESEARCH_BLOCKED</span><span style="color: rgb(203, 213, 225);">Evidence: Frozen provenance is unverified</span></div><div style="display: flex; align-items: center; gap: 12px; font-family: var(--font-mono);"><span><span style="color: rgb(126, 149, 181);">Est. Cost: </span><strong style="color: rgb(203, 213, 225);">Unavailable</strong></span><span><span style="color: rgb(126, 149, 181);">EV Aggregation: </span><strong style="color: rgb(148, 163, 184);">DISABLED (TIER 0)</strong></span><span style="background: rgba(245, 158, 11, 0.15); color: rgb(245, 158, 11); border: 1px solid rgba(245, 158, 11, 0.3); padding: 2px 8px; border-radius: 4px; font-weight: 800;">ABSTAIN</span></div></div></div><div class="chart-contract-badge" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;"><div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span style="color: rgb(56, 189, 248); font-weight: 700;">PRICE OVERLAY: NON-DIRECTIONAL PERSISTENCE BASELINE (1h) · NOMINAL UNCALIBRATED BANDS</span><span style="color: rgb(148, 163, 184); font-size: 0.72rem;">DIRECTIONAL CLASSIFIER: SHOWN SEPARATELY · OFFLINE_RESEARCH_ONLY · NO VALIDATED EDGE · LIVE TRADING DISABLED</span></div><span style="color: rgb(0, 229, 168); font-family: var(--font-mono); font-size: 0.72rem;">DATA: COINBASE SPOT 1h VERIFIED</span></div></div><div class="glass-card ai-prediction-engine-panel" role="status" style="padding: 18px; margin-bottom: 16px; border: 1px solid rgba(56, 189, 248, 0.25);"><div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;"><div style="max-width: 780px;"><div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;"><span style="font-size: 1.1rem;">🔬</span><strong style="color: rgb(56, 189, 248); font-size: 0.95rem;">Directional Trade Execution Gated · Offline Research Governance Active</strong><span style="background: rgba(56, 189, 248, 0.15); color: rgb(56, 189, 248); padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 700;">RESEARCH ONLY</span></div><p style="color: rgb(203, 213, 225); font-size: 0.82rem; margin: 0px; line-height: 1.4;">Live trading and broker order execution remain permanently disabled. Directional LightGBM models (1h/4h/24h), HAR-RS-DOW 168h volatility envelopes, and price tournaments are actively visible in the AI Forecasts &amp; Risk Outlook workspace.</p></div><div style="display: flex; gap: 8px; flex-wrap: wrap;"><button id="btn-open-forecast-tab" style="background: linear-gradient(135deg, rgb(2, 132, 199), rgb(3, 105, 161)); border: 1px solid rgb(56, 189, 248); color: rgb(255, 255, 255); padding: 7px 14px; border-radius: 6px; cursor: pointer; font-weight: 700; font-size: 0.8rem;">AI Forecasts &amp; Risk Outlook 📈</button><button id="btn-open-smart-entry-tab" style="background: rgba(167, 139, 250, 0.15); border: 1px solid rgba(167, 139, 250, 0.4); color: rgb(167, 139, 250); padding: 7px 14px; border-radius: 6px; cursor: pointer; font-weight: 700; font-size: 0.8rem;">Smart Entry ⚡</button></div></div></div><div class="glass-card" role="status" style="padding: 20px; margin-bottom: 16px;"><strong style="color: rgb(251, 191, 36);">Scenario analysis unavailable · research authorization is blocked.</strong><p style="color: rgb(203, 213, 225); margin-bottom: 0px;">No probability, conformal range, or execution-cost estimate is shown without authenticated provenance.</p></div></div><aside class="workstation-sidebar tournament-sidebar-container" role="region" aria-label="Strategy Tournament"><div class="tournament-header-card"><div style="display: flex; justify-content: space-between; align-items: flex-start;"><div><div style="font-size: 0.68rem; font-weight: 800; color: rgb(0, 240, 255); letter-spacing: 0.06em; text-transform: uppercase;">BTCUSD STRATEGY TOURNAMENT</div><div style="font-size: 0.82rem; font-weight: 700; color: rgb(241, 245, 249); margin-top: 2px;">V13 User-Controlled Strategy &amp; Risk Selection</div></div><div style="text-align: right; font-family: var(--font-mono);"><div style="font-size: 0.82rem; font-weight: 800; color: rgb(0, 229, 168);">$103,808.8</div><div style="font-size: 0.62rem; color: rgb(100, 116, 139);">Coinbase Spot 1h</div></div></div><div class="tournament-badge-row"><span class="tournament-badge regime" style="border-color: rgb(56, 189, 248); color: rgb(56, 189, 248); background: rgba(56, 189, 248, 0.094);">REGIME: EVALUATING</span><span class="tournament-badge decision">DECISION: ABSTAIN</span><span class="tournament-badge disabled">LIVE TRADING: DISABLED</span></div><div style="margin-top: 10px; padding: 8px; background: rgba(0, 0, 0, 0.25); border-radius: 4px; font-size: 0.68rem; font-family: var(--font-mono); color: rgb(203, 213, 225);"><div style="display: flex; justify-content: space-between; margin-bottom: 3px;"><span style="color: rgb(148, 163, 184);">Wilder ADX(14):</span><span style="font-weight: 700; color: rgb(203, 213, 225);">-- (Hurdle: 25.0)</span></div><div style="display: flex; justify-content: space-between; margin-bottom: 3px;"><span style="color: rgb(148, 163, 184);">1h EMA 200:</span><span style="font-weight: 700;">$0</span></div><div style="display: flex; justify-content: space-between; margin-bottom: 3px;"><span style="color: rgb(148, 163, 184);">Bollinger Bandwidth:</span><span style="font-weight: 700;">-- (Pct: 0%)</span></div><div style="display: flex; justify-content: space-between;"><span style="color: rgb(148, 163, 184);">Hysteresis Status:</span><span style="font-weight: 700; color: rgb(251, 191, 36);">PENDING (3-Bar Minimum)</span></div></div><div class="tournament-cost-tabs"><button class="tournament-cost-tab active">Retail Spot (87 bps)</button><button class="tournament-cost-tab ">Inst. Spot (18.6 bps)</button><button class="tournament-cost-tab ">Binance Perp (15 bps)</button></div></div><div style="display: flex; justify-content: space-between; align-items: center; padding: 0px 4px; margin-top: 12px; margin-bottom: 6px;"><div style="font-size: 0.72rem; font-weight: 800; color: rgb(148, 163, 184); letter-spacing: 0.05em; text-transform: uppercase;">TOP 5 STRATEGY CANDIDATES</div><button style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.15); color: rgb(148, 163, 184); border-radius: 4px; padding: 2px 8px; font-size: 0.65rem; cursor: pointer; font-family: var(--font-mono);">Compare Baselines</button></div><div class="tournament-candidates-list"></div><div style="background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(0, 240, 255, 0.12); border-radius: 6px; padding: 8px 10px; margin-top: 8px; font-size: 0.65rem; font-family: var(--font-mono);"><div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;"><span style="font-weight: 800; color: rgb(0, 240, 255); letter-spacing: 0.05em; text-transform: uppercase; font-size: 0.66rem;">⚡ ALERT SYSTEM DIAGNOSTICS</span><span style="color: rgb(251, 191, 36); font-weight: 700;">UNKNOWN ▼</span></div><div role="note" style="color: rgb(148, 163, 184); margin-top: 4px;">Diagnostics report worker and delivery status only; they do not represent validated market observations or notification-test history.</div><div style="color: rgb(148, 163, 184); margin-top: 4px;">Unavailable</div></div><div style="text-align: center; padding: 6px; font-size: 0.62rem; color: rgb(100, 116, 139); border-top: 1px solid rgba(255, 255, 255, 0.06); margin-top: 10px;">BTCognitive V13 Strategy Tournament · User-Controlled Research Overlay · No Automated Execution</div></aside></div><div class="workstation-intent-command-bar" role="status">Research evidence controls are unavailable until input provenance and evaluation are verified.</div><div class="workstation-tabs-container" style="margin-top: 16px;"><div class="workstation-tabs-nav"><button id="tab-btn-live" class="workstation-tab-btn ">🔴 LIVE</button><button id="tab-btn-smart-entry" class="workstation-tab-btn active">🎯 SMART ENTRY</button><button id="tab-btn-forecast" class="workstation-tab-btn ">📈 AI FORECASTS &amp; RISK</button><button id="tab-btn-market" class="workstation-tab-btn ">🟩 MARKET</button><button id="tab-btn-strategies" class="workstation-tab-btn ">⚙️ STRATEGIES</button><button id="tab-btn-trades" class="workstation-tab-btn ">📜 TRADES</button><button id="tab-btn-research" class="workstation-tab-btn ">🔬 RESEARCH</button><button id="tab-btn-replay" class="workstation-tab-btn ">🔁 REPLAY</button><button id="tab-btn-arena" class="workstation-tab-btn ">🏟️ ARENA</button></div><div class="workstation-tab-pane"><div id="v19-area-smart-entry" class="terminal-smart-entry-section" style="padding: 8px 0px;"><div id="v32-43-smart-entry-view" style="padding: 24px 32px; max-width: 1400px; margin: 0px auto; color: rgb(248, 250, 252);"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;"><div><div style="font-size: 0.78rem; color: rgb(148, 163, 184); font-family: var(--font-mono); margin-bottom: 4px;"><span style="cursor: pointer; color: rgb(56, 189, 248);">Home</span> / Smart Entry Simulator</div><h1 style="font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em; margin: 0px;">AI-Assisted Smart Entry Simulator &amp; Strategy Tournament</h1><p style="color: rgb(203, 213, 225); margin: 6px 0px 0px; font-size: 0.84rem;">Analyses the chart, screens strategies and runs the tournament automatically.</p></div><div style="display: flex; gap: 10px; align-items: center;"><button id="btn-analyse-setup" style="background: linear-gradient(135deg, rgb(139, 92, 246), rgb(109, 40, 217)); color: rgb(255, 255, 255); border-width: medium; border-style: none; border-color: currentcolor; border-image: none; font-weight: 700; font-size: 0.88rem; padding: 10px 18px; border-radius: 8px; cursor: pointer; box-shadow: rgba(139, 92, 246, 0.4) 0px 4px 14px; display: flex; align-items: center; gap: 8px; opacity: 1; min-height: 44px; min-width: 44px;"><span style="font-size: 1.1rem;">🔬</span>Analyse Setup</button><button style="background: rgba(255, 255, 255, 0.06); border: 1px solid var(--card-border); color: rgb(203, 213, 225); padding: 9px 14px; border-radius: 8px; cursor: pointer; font-size: 0.82rem;">Market Terminal 📈</button></div></div><div id="smart-entry-warning-banner" style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(139, 92, 246, 0.35); border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; display: flex; align-items: flex-start; gap: 14px;"><span style="font-size: 1.5rem; line-height: 1;">🛡️</span><div style="flex: 1 1 0%;"><div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px;"><strong style="color: rgb(167, 139, 250); font-size: 0.88rem; letter-spacing: 0.04em;">RESEARCH-ONLY SMART ENTRY SIMULATOR · STRICT NON-EXECUTION</strong><span style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: rgb(248, 113, 113); font-size: 0.68rem; font-weight: 800; padding: 2px 8px; border-radius: 4px;">NO BROKER ROUTING</span><span style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: rgb(16, 185, 129); font-size: 0.68rem; font-weight: 800; padding: 2px 8px; border-radius: 4px;">ZERO REAL CAPITAL</span></div><p style="font-size: 0.82rem; color: rgb(148, 163, 184); margin: 0px; line-height: 1.5;">This simulator tests whether AI directional forecasts combined with regime-tailored strategies make superior entry and exit decisions. There is no trading account, no live execution, and no monetary P&amp;L. Simulated trades freeze fixed TP/SL levels upon entry and record whether TP is reached first.</p></div></div><div id="analysis-progress" role="status" aria-live="polite" aria-atomic="true" style="padding: 12px 14px; border-radius: 8px; margin-bottom: 14px; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(148, 163, 184, 0.25);"><div style="font-size: 0.82rem; color: rgb(203, 213, 225); margin-bottom: 8px;">Analysis completed, but verified tournament-arm evidence is unavailable. No winner or simulated entry is shown.</div><ol style="display: flex; gap: 8px; flex-wrap: wrap; list-style: none; margin: 0px; padding: 0px;"><li style="border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 6px; padding: 4px 8px; font-size: 0.7rem; color: rgb(167, 243, 208);">Validate closed candles: Complete</li><li style="border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 6px; padding: 4px 8px; font-size: 0.7rem; color: rgb(167, 243, 208);">Compute features/regime and rank candidates: Complete · 133.3 ms</li><li style="border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 6px; padding: 4px 8px; font-size: 0.7rem; color: rgb(203, 213, 225);">Verify or run eligible tournament: Not run — verified arm evidence unavailable · 0.1 ms</li><li style="border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 6px; padding: 4px 8px; font-size: 0.7rem; color: rgb(167, 243, 208);">Form final decision: Complete · 0.0 ms</li></ol><div id="analysis-runtime-timings" style="margin-top: 8px; color: rgb(148, 163, 184); font-size: 0.68rem; overflow-wrap: anywhere;">Request ID unavailable · Total 133.4 ms · Tournament arms: NOT_RUN_UNVERIFIED_EVIDENCE (per-arm values are null when no verified arm ran).</div></div><div id="analysis-market-state" style="margin-bottom: 14px; color: rgb(203, 213, 225); font-size: 0.78rem;">BTC-USD · 1h · Feed: Coinbase REST candles ready · Latest chart bar: 2026-10-29T12:00:00.000Z · Live price: $103,808.8</div><section id="analysis-outcome-summary" aria-live="polite" style="padding: 16px 18px; border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 10px; margin-bottom: 18px; background: rgba(15, 23, 42, 0.8);"><h2 style="margin: 0px 0px 8px; font-size: 1rem;">BACKTEST EVIDENCE UNAVAILABLE</h2><p style="margin: 0px; color: rgb(203, 213, 225); font-size: 0.82rem;">No verified walk-forward manifest matches the registered candidate strategies and frozen protocol. A fresh three-arm evaluation is also unavailable because aligned point-in-time AI forecasts and a matched baseline series are not supplied. No arm metrics were computed or reused.</p><div style="margin-top: 8px; color: rgb(148, 163, 184); font-size: 0.72rem;">BTC-USD · 1h · source unavailable · closed through unavailable</div><div style="margin-top: 5px; color: rgb(148, 163, 184); font-size: 0.72rem;">Tournament evidence: Not run — verified evidence unavailable · Historical evidence is not a profitability claim.</div><div style="margin-top: 5px; color: rgb(148, 163, 184); font-size: 0.7rem; overflow-wrap: anywhere;">Evaluation window: not reported – not reported · Dataset unavailable · Protocol 4e8021437f984349</div><details style="margin-top: 10px;"><summary style="cursor: pointer; min-height: 24px; color: rgb(203, 213, 225);">Why candidates were rejected (3)</summary><ul style="margin: 8px 0px 0px; padding-left: 20px; color: rgb(148, 163, 184); font-size: 0.75rem;"><li>Bollinger &amp; RSI Mean Reversion (20h): Regime mismatch: requires ['RANGE_BOUND'] but observed regime is VOLATILITY_EXPANSION</li><li>Amazon Chronos-2 Foundation Model: Strategy quarantined (QUARANTINED)</li><li>High-Timeframe Range Expansion (4h / 20-bar): Failed preliminary 7/10 screen: 3/10 TP hits &lt; 7 required</li></ul></details></section><div id="smart-entry-forecast-panel" class="glass-card" style="padding: 18px 24px; border-radius: 12px; border: 1px solid rgba(56, 189, 248, 0.3); background: rgba(15, 23, 42, 0.75); margin-bottom: 24px;"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;"><div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 1.1rem;">📡</span><strong style="color: rgb(56, 189, 248); font-size: 0.95rem;">ALWAYS-VISIBLE AI FORECAST CONTEXT</strong><span style="background: rgba(0, 229, 168, 0.15); color: rgb(0, 229, 168); font-size: 0.68rem; font-weight: 800; padding: 2px 6px; border-radius: 4px;">FORECAST RECEIVED</span></div><div style="font-size: 0.72rem; color: rgb(148, 163, 184); font-family: var(--font-mono);">Model: not reported · timestamp unavailable</div></div><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;"><div style="background: rgba(0, 0, 0, 0.25); padding: 12px; border-radius: 8px;"><div style="font-size: 0.7rem; color: rgb(148, 163, 184);">DIRECTION ESTIMATE (1h / 4h / 24h)</div><div style="font-size: 1.2rem; font-weight: 800; color: rgb(203, 213, 225);">UNAVAILABLE · P(UP)=n/a</div><div style="font-size: 0.68rem; color: rgb(100, 116, 139);">P(DOWN) = n/a · Directional probability is not TP-first probability.</div></div><div style="background: rgba(0, 0, 0, 0.25); padding: 12px; border-radius: 8px;"><div style="font-size: 0.7rem; color: rgb(148, 163, 184);">CURRENT MARKET REGIME</div><div style="font-size: 1.2rem; font-weight: 800; color: rgb(167, 139, 250);">VOLATILITY_EXPANSION</div><div style="font-size: 0.68rem; color: rgb(100, 116, 139);">Regime unavailable until analysis completes.</div></div><div style="background: rgba(0, 0, 0, 0.25); padding: 12px; border-radius: 8px;"><div style="font-size: 0.7rem; color: rgb(148, 163, 184);">CALIBRATION STATUS</div><div style="font-size: 1.1rem; font-weight: 800; color: rgb(251, 191, 36);">NOT CALIBRATED (TP-FIRST)</div><div style="font-size: 0.68rem; color: rgb(148, 163, 184);">P(UP) is price sign only; NOT trade success probability.</div></div></div></div><div id="smart-entry-analyse-section" style="margin-bottom: 32px;"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;"><h2 style="font-size: 1.2rem; font-weight: 700; margin: 0px;">1. Current Market Analysis &amp; Top-Two Candidate Shortlist</h2><div style="font-size: 0.78rem; color: rgb(148, 163, 184);">Analyse does not create a simulated trade</div></div><div style=""><div style="background: rgba(30, 41, 59, 0.5); border: 1px solid var(--card-border); border-radius: 10px; padding: 12px 18px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;"><div><strong style="color: rgb(56, 189, 248);">Detected Regime: </strong><span style="font-weight: 700;">VOLATILITY_EXPANSION</span><span style="color: rgb(148, 163, 184); margin-left: 10px; font-size: 0.78rem;">High directional index ADX=100.0 with moving average divergence</span></div><button id="btn-run-tournament" style="background: linear-gradient(135deg, rgb(16, 185, 129), rgb(5, 150, 105)); color: rgb(255, 255, 255); border-width: medium; border-style: none; border-color: currentcolor; border-image: none; font-weight: 700; font-size: 0.82rem; padding: 8px 16px; border-radius: 6px; cursor: pointer; opacity: 1;">Re-run Tournament Backtest ⚔️</button></div><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 16px;"><div id="candidate-card-ATR_VOLATILITY_BREAKOUT_12H" class="glass-card" style="padding: 20px; border-radius: 12px; border: 1px solid rgba(16, 185, 129, 0.4); background: rgba(15, 23, 42, 0.65);"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;"><div><span style="background: rgba(56, 189, 248, 0.15); color: rgb(56, 189, 248); padding: 2px 8px; border-radius: 4px; font-weight: 800; font-size: 0.7rem;">CANDIDATE #1</span><h3 style="margin: 4px 0px 0px; font-size: 1.1rem;">ATR Volatility Expansion Breakout (12h)</h3></div><span id="badge-7-of-10-ATR_VOLATILITY_BREAKOUT_12H" style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgb(16, 185, 129); color: rgb(16, 185, 129); padding: 3px 8px; border-radius: 6px; font-weight: 800; font-size: 0.72rem;">7/10 SCREEN PASSED</span></div><div style="background: rgba(0, 0, 0, 0.25); padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; font-size: 0.78rem;"><div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><span style="color: rgb(148, 163, 184);">Recent 10-Attempt Screen:</span><strong style="color: rgb(16, 185, 129);">8/10 TP Hits (80%)</strong></div><div style="font-size: 0.72rem; color: rgb(148, 163, 184); line-height: 1.4;">Passed preliminary screen (8/10 = 80.0% TP hits &gt;= 7/10 required; source: HISTORICAL_WALKFORWARD_SCREENING). Wilson 95% CI is [49.0%, 94.3%].</div></div><div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 0.75rem; margin-bottom: 12px;"><div><div style="color: rgb(148, 163, 184);">PROPOSED ENTRY</div><div style="font-weight: 700;">$103,705.09</div></div><div><div style="color: rgb(16, 185, 129);">PROPOSED TP</div><div style="font-weight: 700; color: rgb(16, 185, 129);">$105,352.03</div></div><div><div style="color: rgb(239, 68, 68);">PROPOSED SL</div><div style="font-weight: 700; color: rgb(239, 68, 68);">$102,881.62</div></div></div><div style="font-size: 0.72rem; color: rgb(100, 116, 139); font-style: italic;">Anomaly: Hourly down bar with volume &gt; 3.5x 50-bar baseline</div></div><div id="candidate-card-TSMOM_DONCHIAN_24H_168H" class="glass-card" style="padding: 20px; border-radius: 12px; border: 1px solid rgba(16, 185, 129, 0.4); background: rgba(15, 23, 42, 0.65);"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;"><div><span style="background: rgba(56, 189, 248, 0.15); color: rgb(56, 189, 248); padding: 2px 8px; border-radius: 4px; font-weight: 800; font-size: 0.7rem;">CANDIDATE #2</span><h3 style="margin: 4px 0px 0px; font-size: 1.1rem;">Donchian Trend Breakout (168h Trend / 24h Channel)</h3></div><span id="badge-7-of-10-TSMOM_DONCHIAN_24H_168H" style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgb(16, 185, 129); color: rgb(16, 185, 129); padding: 3px 8px; border-radius: 6px; font-weight: 800; font-size: 0.72rem;">7/10 SCREEN PASSED</span></div><div style="background: rgba(0, 0, 0, 0.25); padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; font-size: 0.78rem;"><div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><span style="color: rgb(148, 163, 184);">Recent 10-Attempt Screen:</span><strong style="color: rgb(16, 185, 129);">7/10 TP Hits (70%)</strong></div><div style="font-size: 0.72rem; color: rgb(148, 163, 184); line-height: 1.4;">Passed preliminary screen (7/10 = 70.0% TP hits &gt;= 7/10 required; source: HISTORICAL_WALKFORWARD_SCREENING). Wilson 95% CI is [39.7%, 89.2%].</div></div><div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 0.75rem; margin-bottom: 12px;"><div><div style="color: rgb(148, 163, 184);">PROPOSED ENTRY</div><div style="font-weight: 700;">$103,705.09</div></div><div><div style="color: rgb(16, 185, 129);">PROPOSED TP</div><div style="font-weight: 700; color: rgb(16, 185, 129);">$105,557.9</div></div><div><div style="color: rgb(239, 68, 68);">PROPOSED SL</div><div style="font-weight: 700; color: rgb(239, 68, 68);">$102,469.88</div></div></div><div style="font-size: 0.72rem; color: rgb(100, 116, 139); font-style: italic;">Anomaly: 3 consecutive hourly closes below 50h EMA, or adverse volume spike &gt; 3.0x</div></div></div></div></div><div id="smart-entry-tournament-section" style="margin-bottom: 32px;"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;"><h2 style="font-size: 1.2rem; font-weight: 700; margin: 0px;">2. Tournament Evaluation</h2><span style="background: rgba(56, 189, 248, 0.15); color: rgb(56, 189, 248); padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700;">Protocol: WALK_FORWARD_CAUSAL_SPLIT_v1</span></div><div class="glass-card" style="padding: 0px; border-radius: 12px; overflow-x: auto; margin-bottom: 16px;"><table style="width: 100%; border-collapse: collapse; font-size: 0.8rem;"><thead><tr style="background: rgba(0, 0, 0, 0.3); border-bottom: 1px solid var(--card-border); color: rgb(148, 163, 184); text-align: left;"><th style="padding: 12px 14px;">STRATEGY</th><th style="padding: 12px 14px;">7/10 SCREEN</th><th style="padding: 12px 14px;">ARM 1: RAW STRATEGY</th><th style="padding: 12px 14px;">ARM 2: STRATEGY + AI FILTER</th><th style="padding: 12px 14px;">AI LIFT</th><th style="padding: 12px 14px;">ARM 3: BASELINE</th><th style="padding: 12px 14px;">VERDICT</th></tr></thead><tbody><tr role="status"><td colspan="7" style="padding: 16px; color: rgb(203, 213, 225); text-align: left;">No verified walk-forward manifest matches the registered candidate strategies and frozen protocol. A fresh three-arm evaluation is also unavailable because aligned point-in-time AI forecasts and a matched baseline series are not supplied. No arm metrics were computed or reused.</td></tr></tbody></table></div></div><div id="smart-entry-decision-card" class="glass-card" style="padding: 24px; border-radius: 14px; border: 1px solid rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.06); margin-bottom: 32px;"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;"><div style="display: flex; align-items: center; gap: 10px;"><span style="font-size: 1.4rem;">🎯</span><h2 style="font-size: 1.3rem; font-weight: 800; margin: 0px;">3. Smart Entry Decision</h2></div><span id="badge-smart-entry-status" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgb(239, 68, 68); color: rgb(239, 68, 68); padding: 4px 10px; border-radius: 6px; font-weight: 800; font-size: 0.76rem;">NO_SMART_ENTRY</span></div><div><p style="font-size: 0.88rem; color: rgb(252, 165, 165); margin: 0px 0px 8px;">Pipeline Verdict: ABSTAIN (No verified walk-forward manifest matches the registered candidate strategies and frozen protocol. A fresh three-arm evaluation is also unavailable because aligned point-in-time AI forecasts and a matched baseline series are not supplied. No arm metrics were computed or reused.)</p><p style="font-size: 0.78rem; color: rgb(148, 163, 184); margin: 0px;">Preliminary screening returned candidates, but verified tournament evidence is unavailable. No winner is known, so entry remains disabled. No simulated attempt was created.</p></div></div><div id="smart-entry-evaluation-section" style="margin-bottom: 40px;"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;"><h2 style="font-size: 1.2rem; font-weight: 700; margin: 0px;">4. Simulated Attempts History &amp; TP-First Outcome Evaluation</h2><div style="font-size: 0.78rem; color: rgb(148, 163, 184);">No monetary P&amp;L displayed</div></div><div class="glass-card" style="padding: 24px; text-align: center; color: rgb(148, 163, 184); border-radius: 12px;">No completed simulated trade attempts recorded yet.</div></div></div></div></div></div></div></div><footer style="padding: 20px 40px; border-top: 1px solid var(--card-border); display: flex; justify-content: space-between; align-items: center; background: rgba(5, 8, 22, 0.85); margin-top: 40px;"><div style="font-size: 0.85rem; color: var(--text-muted);">© 2026 BTCognitive AI Market Intelligence Engine · Powered by Adaptive Regimes</div><div class="footer-latency"><span class="latency-item">Market: <span class="latency-val">n/a</span></span><span>·</span><span class="latency-item">Model: <span class="latency-val">n/a</span></span><span>·</span><span class="latency-item">WS: <span class="latency-val">n/a</span></span></div></footer></div></div>
+
+  <!-- QA Result Container -->
+  <div id="qa-results-container" style="display: none;">
+    <div id="qa-scenario-status">FAIL</div>
+    <pre id="qa-results-json">{
+  "scenario": "ANALYSE_DUPLICATE_OR_INVALID_OHLCV",
+  "started_at": "2026-10-29T12:11:43.072Z",
+  "button_clicked": true,
+  "click_timestamp": "2026-10-29T12:11:44.883Z",
+  "requests_intercepted": [
+    {
+      "endpoint": "COINBASE_CANDLES",
+      "url": "https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=3600"
+    },
+    {
+      "endpoint": "ANALYSE",
+      "payload": {
+        "instrument": "BTC-USD",
+        "timeframe": "1h",
+        "data_source": "COINBASE_EXCHANGE_REST",
+        "request_id": "7fc06a1f-f858-451a-8075-3066c9800bd7",
+        "live_price": 103808.8,
+        "enforce_freshness": true,
+        "max_age_hours": 2,
+        "candles": [
+          {
+            "timestamp_utc": "2026-10-21T05:00:00.000Z",
+            "open": 84915,
+            "high": 85340,
+            "low": 84660,
+            "close": 85085,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T06:00:00.000Z",
+            "open": 84999.91,
+            "high": 85425.34,
+            "low": 84744.66,
+            "close": 85170.08,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T07:00:00.000Z",
+            "open": 85084.91,
+            "high": 85510.76,
+            "low": 84829.4,
+            "close": 85255.25,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T08:00:00.000Z",
+            "open": 85169.99,
+            "high": 85596.27,
+            "low": 84914.23,
+            "close": 85340.51,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T09:00:00.000Z",
+            "open": 85255.17,
+            "high": 85681.87,
+            "low": 84999.15,
+            "close": 85425.85,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T10:00:00.000Z",
+            "open": 85340.42,
+            "high": 85767.55,
+            "low": 85084.15,
+            "close": 85511.28,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T11:00:00.000Z",
+            "open": 85425.77,
+            "high": 85853.33,
+            "low": 85169.23,
+            "close": 85596.79,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T12:00:00.000Z",
+            "open": 85511.19,
+            "high": 85939.18,
+            "low": 85254.4,
+            "close": 85682.39,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T13:00:00.000Z",
+            "open": 85596.71,
+            "high": 86025.12,
+            "low": 85339.66,
+            "close": 85768.07,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T14:00:00.000Z",
+            "open": 85682.3,
+            "high": 86111.14,
+            "low": 85425,
+            "close": 85853.84,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T15:00:00.000Z",
+            "open": 85767.99,
+            "high": 86197.26,
+            "low": 85510.42,
+            "close": 85939.69,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T16:00:00.000Z",
+            "open": 85853.75,
+            "high": 86283.45,
+            "low": 85595.93,
+            "close": 86025.63,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T17:00:00.000Z",
+            "open": 85939.6,
+            "high": 86369.73,
+            "low": 85681.53,
+            "close": 86111.66,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T18:00:00.000Z",
+            "open": 86025.55,
+            "high": 86456.11,
+            "low": 85767.21,
+            "close": 86197.77,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T19:00:00.000Z",
+            "open": 86111.57,
+            "high": 86542.56,
+            "low": 85852.98,
+            "close": 86283.97,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T20:00:00.000Z",
+            "open": 86197.69,
+            "high": 86629.11,
+            "low": 85938.83,
+            "close": 86370.25,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T21:00:00.000Z",
+            "open": 86283.88,
+            "high": 86715.73,
+            "low": 86024.77,
+            "close": 86456.62,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T22:00:00.000Z",
+            "open": 86370.16,
+            "high": 86802.45,
+            "low": 86110.79,
+            "close": 86543.08,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-21T23:00:00.000Z",
+            "open": 86456.54,
+            "high": 86889.25,
+            "low": 86196.91,
+            "close": 86629.62,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T00:00:00.000Z",
+            "open": 86542.99,
+            "high": 86976.14,
+            "low": 86283.1,
+            "close": 86716.25,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T01:00:00.000Z",
+            "open": 86629.53,
+            "high": 87063.12,
+            "low": 86369.38,
+            "close": 86802.97,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T02:00:00.000Z",
+            "open": 86716.17,
+            "high": 87150.18,
+            "low": 86455.76,
+            "close": 86889.77,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T03:00:00.000Z",
+            "open": 86802.88,
+            "high": 87237.33,
+            "low": 86542.21,
+            "close": 86976.66,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T04:00:00.000Z",
+            "open": 86889.68,
+            "high": 87324.57,
+            "low": 86628.75,
+            "close": 87063.64,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T05:00:00.000Z",
+            "open": 86976.58,
+            "high": 87411.89,
+            "low": 86715.39,
+            "close": 87150.7,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T06:00:00.000Z",
+            "open": 87063.55,
+            "high": 87499.3,
+            "low": 86802.1,
+            "close": 87237.85,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T07:00:00.000Z",
+            "open": 87150.61,
+            "high": 87586.8,
+            "low": 86888.9,
+            "close": 87325.09,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T08:00:00.000Z",
+            "open": 87237.76,
+            "high": 87674.39,
+            "low": 86975.79,
+            "close": 87412.42,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T09:00:00.000Z",
+            "open": 87325.01,
+            "high": 87762.07,
+            "low": 87062.77,
+            "close": 87499.83,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T10:00:00.000Z",
+            "open": 87412.33,
+            "high": 87849.83,
+            "low": 87149.83,
+            "close": 87587.33,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T11:00:00.000Z",
+            "open": 87499.74,
+            "high": 87937.68,
+            "low": 87236.98,
+            "close": 87674.92,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T12:00:00.000Z",
+            "open": 87587.25,
+            "high": 88025.62,
+            "low": 87324.22,
+            "close": 87762.59,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T13:00:00.000Z",
+            "open": 87674.83,
+            "high": 88113.64,
+            "low": 87411.54,
+            "close": 87850.35,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T14:00:00.000Z",
+            "open": 87762.5,
+            "high": 88201.75,
+            "low": 87498.95,
+            "close": 87938.2,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T15:00:00.000Z",
+            "open": 87850.26,
+            "high": 88289.95,
+            "low": 87586.45,
+            "close": 88026.14,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T16:00:00.000Z",
+            "open": 87938.11,
+            "high": 88378.24,
+            "low": 87674.04,
+            "close": 88114.17,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T17:00:00.000Z",
+            "open": 88026.06,
+            "high": 88466.63,
+            "low": 87761.71,
+            "close": 88202.28,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T18:00:00.000Z",
+            "open": 88114.08,
+            "high": 88555.09,
+            "low": 87849.47,
+            "close": 88290.48,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T19:00:00.000Z",
+            "open": 88202.19,
+            "high": 88643.64,
+            "low": 87937.32,
+            "close": 88378.77,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T20:00:00.000Z",
+            "open": 88290.39,
+            "high": 88732.29,
+            "low": 88025.25,
+            "close": 88467.15,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T21:00:00.000Z",
+            "open": 88378.68,
+            "high": 88821.02,
+            "low": 88113.28,
+            "close": 88555.62,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T22:00:00.000Z",
+            "open": 88467.06,
+            "high": 88909.84,
+            "low": 88201.4,
+            "close": 88644.18,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-22T23:00:00.000Z",
+            "open": 88555.54,
+            "high": 88998.76,
+            "low": 88289.6,
+            "close": 88732.82,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T00:00:00.000Z",
+            "open": 88644.09,
+            "high": 89087.75,
+            "low": 88377.89,
+            "close": 88821.55,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T01:00:00.000Z",
+            "open": 88732.73,
+            "high": 89176.84,
+            "low": 88466.26,
+            "close": 88910.37,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T02:00:00.000Z",
+            "open": 88821.46,
+            "high": 89266.01,
+            "low": 88554.73,
+            "close": 88999.28,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T03:00:00.000Z",
+            "open": 88910.28,
+            "high": 89355.28,
+            "low": 88643.28,
+            "close": 89088.28,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T04:00:00.000Z",
+            "open": 88999.19,
+            "high": 89444.63,
+            "low": 88731.93,
+            "close": 89177.37,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T05:00:00.000Z",
+            "open": 89088.19,
+            "high": 89534.08,
+            "low": 88820.66,
+            "close": 89266.55,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T06:00:00.000Z",
+            "open": 89177.28,
+            "high": 89623.62,
+            "low": 88909.48,
+            "close": 89355.82,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T07:00:00.000Z",
+            "open": 89266.46,
+            "high": 89713.24,
+            "low": 88998.4,
+            "close": 89445.18,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T08:00:00.000Z",
+            "open": 89355.73,
+            "high": 89802.96,
+            "low": 89087.4,
+            "close": 89534.63,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T09:00:00.000Z",
+            "open": 89445.1,
+            "high": 89892.77,
+            "low": 89176.49,
+            "close": 89624.16,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T10:00:00.000Z",
+            "open": 89534.54,
+            "high": 89982.66,
+            "low": 89265.66,
+            "close": 89713.78,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T11:00:00.000Z",
+            "open": 89624.07,
+            "high": 90072.64,
+            "low": 89354.92,
+            "close": 89803.49,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T12:00:00.000Z",
+            "open": 89713.69,
+            "high": 90162.7,
+            "low": 89444.28,
+            "close": 89893.29,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T13:00:00.000Z",
+            "open": 89803.4,
+            "high": 90252.86,
+            "low": 89533.72,
+            "close": 89983.18,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T14:00:00.000Z",
+            "open": 89893.2,
+            "high": 90343.11,
+            "low": 89623.25,
+            "close": 90073.16,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T15:00:00.000Z",
+            "open": 89983.09,
+            "high": 90433.45,
+            "low": 89712.87,
+            "close": 90163.23,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T16:00:00.000Z",
+            "open": 90073.07,
+            "high": 90523.88,
+            "low": 89802.58,
+            "close": 90253.39,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T17:00:00.000Z",
+            "open": 90163.14,
+            "high": 90614.4,
+            "low": 89892.38,
+            "close": 90343.64,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T18:00:00.000Z",
+            "open": 90253.3,
+            "high": 90705.01,
+            "low": 89982.27,
+            "close": 90433.98,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T19:00:00.000Z",
+            "open": 90343.55,
+            "high": 90795.72,
+            "low": 90072.24,
+            "close": 90524.41,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T20:00:00.000Z",
+            "open": 90433.89,
+            "high": 90886.51,
+            "low": 90162.31,
+            "close": 90614.93,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T21:00:00.000Z",
+            "open": 90524.32,
+            "high": 90977.39,
+            "low": 90252.47,
+            "close": 90705.54,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T22:00:00.000Z",
+            "open": 90614.83,
+            "high": 91068.36,
+            "low": 90342.72,
+            "close": 90796.25,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-23T23:00:00.000Z",
+            "open": 90705.45,
+            "high": 91159.43,
+            "low": 90433.07,
+            "close": 90887.05,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T00:00:00.000Z",
+            "open": 90796.16,
+            "high": 91250.6,
+            "low": 90523.5,
+            "close": 90977.94,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T01:00:00.000Z",
+            "open": 90886.96,
+            "high": 91341.85,
+            "low": 90614.03,
+            "close": 91068.92,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T02:00:00.000Z",
+            "open": 90977.85,
+            "high": 91433.2,
+            "low": 90704.64,
+            "close": 91159.99,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T03:00:00.000Z",
+            "open": 91068.83,
+            "high": 91524.63,
+            "low": 90795.35,
+            "close": 91251.15,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T04:00:00.000Z",
+            "open": 91159.9,
+            "high": 91616.15,
+            "low": 90886.15,
+            "close": 91342.4,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T05:00:00.000Z",
+            "open": 91251.06,
+            "high": 91707.77,
+            "low": 90977.03,
+            "close": 91433.74,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T06:00:00.000Z",
+            "open": 91342.31,
+            "high": 91799.47,
+            "low": 91068.01,
+            "close": 91525.17,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T07:00:00.000Z",
+            "open": 91433.64,
+            "high": 91891.27,
+            "low": 91159.07,
+            "close": 91616.7,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T08:00:00.000Z",
+            "open": 91525.08,
+            "high": 91983.17,
+            "low": 91250.23,
+            "close": 91708.32,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T09:00:00.000Z",
+            "open": 91616.61,
+            "high": 92075.15,
+            "low": 91341.49,
+            "close": 91800.03,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T10:00:00.000Z",
+            "open": 91708.23,
+            "high": 92167.23,
+            "low": 91432.83,
+            "close": 91891.83,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T11:00:00.000Z",
+            "open": 91799.94,
+            "high": 92259.4,
+            "low": 91524.26,
+            "close": 91983.72,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T12:00:00.000Z",
+            "open": 91891.74,
+            "high": 92351.65,
+            "low": 91615.79,
+            "close": 92075.7,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T13:00:00.000Z",
+            "open": 91983.62,
+            "high": 92444,
+            "low": 91707.4,
+            "close": 92167.78,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T14:00:00.000Z",
+            "open": 92075.61,
+            "high": 92536.45,
+            "low": 91799.11,
+            "close": 92259.95,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T15:00:00.000Z",
+            "open": 92167.69,
+            "high": 92628.99,
+            "low": 91890.91,
+            "close": 92352.21,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T16:00:00.000Z",
+            "open": 92259.86,
+            "high": 92721.62,
+            "low": 91982.8,
+            "close": 92444.56,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T17:00:00.000Z",
+            "open": 92352.12,
+            "high": 92814.34,
+            "low": 92074.78,
+            "close": 92537,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T18:00:00.000Z",
+            "open": 92444.46,
+            "high": 92907.15,
+            "low": 92166.85,
+            "close": 92629.54,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T19:00:00.000Z",
+            "open": 92536.91,
+            "high": 93000.06,
+            "low": 92259.02,
+            "close": 92722.17,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T20:00:00.000Z",
+            "open": 92629.45,
+            "high": 93093.06,
+            "low": 92351.28,
+            "close": 92814.89,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T21:00:00.000Z",
+            "open": 92722.08,
+            "high": 93186.15,
+            "low": 92443.63,
+            "close": 92907.7,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T22:00:00.000Z",
+            "open": 92814.79,
+            "high": 93279.33,
+            "low": 92536.07,
+            "close": 93000.61,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-24T23:00:00.000Z",
+            "open": 92907.61,
+            "high": 93372.61,
+            "low": 92628.61,
+            "close": 93093.61,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T00:00:00.000Z",
+            "open": 93000.52,
+            "high": 93465.98,
+            "low": 92721.24,
+            "close": 93186.7,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T01:00:00.000Z",
+            "open": 93093.51,
+            "high": 93559.45,
+            "low": 92813.95,
+            "close": 93279.89,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T02:00:00.000Z",
+            "open": 93186.61,
+            "high": 93653.01,
+            "low": 92906.77,
+            "close": 93373.17,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T03:00:00.000Z",
+            "open": 93279.8,
+            "high": 93746.66,
+            "low": 92999.68,
+            "close": 93466.54,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T04:00:00.000Z",
+            "open": 93373.07,
+            "high": 93840.41,
+            "low": 93092.67,
+            "close": 93560.01,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T05:00:00.000Z",
+            "open": 93466.45,
+            "high": 93934.25,
+            "low": 93185.77,
+            "close": 93653.57,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T06:00:00.000Z",
+            "open": 93559.92,
+            "high": 94028.18,
+            "low": 93278.96,
+            "close": 93747.22,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T07:00:00.000Z",
+            "open": 93653.47,
+            "high": 94122.21,
+            "low": 93372.23,
+            "close": 93840.97,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T08:00:00.000Z",
+            "open": 93747.13,
+            "high": 94216.33,
+            "low": 93465.61,
+            "close": 93934.81,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T09:00:00.000Z",
+            "open": 93840.88,
+            "high": 94310.55,
+            "low": 93559.07,
+            "close": 94028.74,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T10:00:00.000Z",
+            "open": 93934.71,
+            "high": 94404.85,
+            "low": 93652.63,
+            "close": 94122.77,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T11:00:00.000Z",
+            "open": 94028.65,
+            "high": 94499.26,
+            "low": 93746.28,
+            "close": 94216.89,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T12:00:00.000Z",
+            "open": 94122.67,
+            "high": 94593.76,
+            "low": 93840.02,
+            "close": 94311.11,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T13:00:00.000Z",
+            "open": 94216.8,
+            "high": 94688.35,
+            "low": 93933.87,
+            "close": 94405.42,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T14:00:00.000Z",
+            "open": 94311.01,
+            "high": 94783.04,
+            "low": 94027.8,
+            "close": 94499.83,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T15:00:00.000Z",
+            "open": 94405.33,
+            "high": 94877.83,
+            "low": 94121.83,
+            "close": 94594.33,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T16:00:00.000Z",
+            "open": 94499.74,
+            "high": 94972.71,
+            "low": 94215.95,
+            "close": 94688.92,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T17:00:00.000Z",
+            "open": 94594.23,
+            "high": 95067.68,
+            "low": 94310.16,
+            "close": 94783.61,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T18:00:00.000Z",
+            "open": 94688.83,
+            "high": 95162.74,
+            "low": 94404.48,
+            "close": 94878.39,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T19:00:00.000Z",
+            "open": 94783.51,
+            "high": 95257.9,
+            "low": 94498.88,
+            "close": 94973.27,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T20:00:00.000Z",
+            "open": 94878.3,
+            "high": 95353.16,
+            "low": 94593.38,
+            "close": 95068.24,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T21:00:00.000Z",
+            "open": 94973.17,
+            "high": 95448.51,
+            "low": 94687.97,
+            "close": 95163.31,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T22:00:00.000Z",
+            "open": 95068.15,
+            "high": 95543.96,
+            "low": 94782.66,
+            "close": 95258.47,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-25T23:00:00.000Z",
+            "open": 95163.21,
+            "high": 95639.5,
+            "low": 94877.44,
+            "close": 95353.73,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T00:00:00.000Z",
+            "open": 95258.38,
+            "high": 95735.14,
+            "low": 94972.32,
+            "close": 95449.08,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T01:00:00.000Z",
+            "open": 95353.63,
+            "high": 95830.88,
+            "low": 95067.28,
+            "close": 95544.53,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T02:00:00.000Z",
+            "open": 95448.99,
+            "high": 95926.71,
+            "low": 95162.35,
+            "close": 95640.07,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T03:00:00.000Z",
+            "open": 95544.43,
+            "high": 96022.63,
+            "low": 95257.51,
+            "close": 95735.71,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T04:00:00.000Z",
+            "open": 95639.97,
+            "high": 96118.65,
+            "low": 95352.77,
+            "close": 95831.45,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T05:00:00.000Z",
+            "open": 95735.62,
+            "high": 96214.78,
+            "low": 95448.12,
+            "close": 95927.28,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T06:00:00.000Z",
+            "open": 95831.35,
+            "high": 96310.99,
+            "low": 95543.57,
+            "close": 96023.21,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T07:00:00.000Z",
+            "open": 95927.19,
+            "high": 96407.3,
+            "low": 95639.12,
+            "close": 96119.23,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T08:00:00.000Z",
+            "open": 96023.11,
+            "high": 96503.71,
+            "low": 95734.75,
+            "close": 96215.35,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T09:00:00.000Z",
+            "open": 96119.13,
+            "high": 96600.21,
+            "low": 95830.49,
+            "close": 96311.57,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T10:00:00.000Z",
+            "open": 96215.26,
+            "high": 96696.82,
+            "low": 95926.32,
+            "close": 96407.88,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T11:00:00.000Z",
+            "open": 96311.47,
+            "high": 96793.51,
+            "low": 96022.25,
+            "close": 96504.29,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T12:00:00.000Z",
+            "open": 96407.79,
+            "high": 96890.31,
+            "low": 96118.27,
+            "close": 96600.79,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T13:00:00.000Z",
+            "open": 96504.19,
+            "high": 96987.19,
+            "low": 96214.39,
+            "close": 96697.39,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T14:00:00.000Z",
+            "open": 96600.69,
+            "high": 97084.18,
+            "low": 96310.6,
+            "close": 96794.09,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T15:00:00.000Z",
+            "open": 96697.3,
+            "high": 97181.27,
+            "low": 96406.91,
+            "close": 96890.88,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T16:00:00.000Z",
+            "open": 96793.99,
+            "high": 97278.44,
+            "low": 96503.32,
+            "close": 96987.77,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T17:00:00.000Z",
+            "open": 96890.78,
+            "high": 97375.72,
+            "low": 96599.82,
+            "close": 97084.76,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T18:00:00.000Z",
+            "open": 96987.68,
+            "high": 97473.1,
+            "low": 96696.42,
+            "close": 97181.84,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T19:00:00.000Z",
+            "open": 97084.66,
+            "high": 97570.57,
+            "low": 96793.11,
+            "close": 97279.02,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T20:00:00.000Z",
+            "open": 97181.74,
+            "high": 97668.14,
+            "low": 96889.9,
+            "close": 97376.3,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T21:00:00.000Z",
+            "open": 97278.92,
+            "high": 97765.81,
+            "low": 96986.79,
+            "close": 97473.68,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T22:00:00.000Z",
+            "open": 97376.21,
+            "high": 97863.57,
+            "low": 97083.79,
+            "close": 97571.15,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-26T23:00:00.000Z",
+            "open": 97473.58,
+            "high": 97961.43,
+            "low": 97180.87,
+            "close": 97668.72,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T00:00:00.000Z",
+            "open": 97571.05,
+            "high": 98059.39,
+            "low": 97278.05,
+            "close": 97766.39,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T01:00:00.000Z",
+            "open": 97668.62,
+            "high": 98157.46,
+            "low": 97375.32,
+            "close": 97864.16,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T02:00:00.000Z",
+            "open": 97766.3,
+            "high": 98255.62,
+            "low": 97472.7,
+            "close": 97962.02,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T03:00:00.000Z",
+            "open": 97864.06,
+            "high": 98353.87,
+            "low": 97570.17,
+            "close": 98059.98,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T04:00:00.000Z",
+            "open": 97961.92,
+            "high": 98452.22,
+            "low": 97667.74,
+            "close": 98158.04,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T05:00:00.000Z",
+            "open": 98059.88,
+            "high": 98550.67,
+            "low": 97765.41,
+            "close": 98256.2,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T06:00:00.000Z",
+            "open": 98157.94,
+            "high": 98649.22,
+            "low": 97863.18,
+            "close": 98354.46,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T07:00:00.000Z",
+            "open": 98256.11,
+            "high": 98747.88,
+            "low": 97961.04,
+            "close": 98452.81,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T08:00:00.000Z",
+            "open": 98354.36,
+            "high": 98846.62,
+            "low": 98059,
+            "close": 98551.26,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T09:00:00.000Z",
+            "open": 98452.71,
+            "high": 98945.47,
+            "low": 98157.05,
+            "close": 98649.81,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T10:00:00.000Z",
+            "open": 98551.16,
+            "high": 99044.41,
+            "low": 98255.21,
+            "close": 98748.46,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T11:00:00.000Z",
+            "open": 98649.71,
+            "high": 99143.45,
+            "low": 98353.47,
+            "close": 98847.21,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T12:00:00.000Z",
+            "open": 98748.36,
+            "high": 99242.6,
+            "low": 98451.82,
+            "close": 98946.06,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T13:00:00.000Z",
+            "open": 98847.11,
+            "high": 99341.84,
+            "low": 98550.28,
+            "close": 99045.01,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T14:00:00.000Z",
+            "open": 98945.96,
+            "high": 99441.19,
+            "low": 98648.83,
+            "close": 99144.06,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T15:00:00.000Z",
+            "open": 99044.92,
+            "high": 99540.64,
+            "low": 98747.48,
+            "close": 99243.2,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T16:00:00.000Z",
+            "open": 99143.96,
+            "high": 99640.17,
+            "low": 98846.23,
+            "close": 99342.44,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T17:00:00.000Z",
+            "open": 99243.1,
+            "high": 99739.81,
+            "low": 98945.07,
+            "close": 99441.78,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T18:00:00.000Z",
+            "open": 99342.34,
+            "high": 99839.55,
+            "low": 99044.01,
+            "close": 99541.22,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T19:00:00.000Z",
+            "open": 99441.68,
+            "high": 99939.38,
+            "low": 99143.06,
+            "close": 99640.76,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T20:00:00.000Z",
+            "open": 99541.12,
+            "high": 100039.32,
+            "low": 99242.2,
+            "close": 99740.4,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T21:00:00.000Z",
+            "open": 99640.66,
+            "high": 100139.36,
+            "low": 99341.44,
+            "close": 99840.14,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T22:00:00.000Z",
+            "open": 99740.3,
+            "high": 100239.5,
+            "low": 99440.78,
+            "close": 99939.98,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-27T23:00:00.000Z",
+            "open": 99840.04,
+            "high": 100339.74,
+            "low": 99540.22,
+            "close": 100039.92,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T00:00:00.000Z",
+            "open": 99939.88,
+            "high": 100440.08,
+            "low": 99639.76,
+            "close": 100139.96,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T01:00:00.000Z",
+            "open": 100039.82,
+            "high": 100540.52,
+            "low": 99739.4,
+            "close": 100240.1,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T02:00:00.000Z",
+            "open": 100139.86,
+            "high": 100641.06,
+            "low": 99839.14,
+            "close": 100340.34,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T03:00:00.000Z",
+            "open": 100240,
+            "high": 100741.7,
+            "low": 99938.98,
+            "close": 100440.68,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T04:00:00.000Z",
+            "open": 100340.24,
+            "high": 100842.44,
+            "low": 100038.92,
+            "close": 100541.12,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T05:00:00.000Z",
+            "open": 100440.58,
+            "high": 100943.28,
+            "low": 100138.96,
+            "close": 100641.66,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T06:00:00.000Z",
+            "open": 100541.02,
+            "high": 101044.23,
+            "low": 100239.09,
+            "close": 100742.3,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T07:00:00.000Z",
+            "open": 100641.56,
+            "high": 101145.27,
+            "low": 100339.33,
+            "close": 100843.04,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T08:00:00.000Z",
+            "open": 100742.2,
+            "high": 101246.41,
+            "low": 100439.67,
+            "close": 100943.88,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T09:00:00.000Z",
+            "open": 100842.94,
+            "high": 101347.66,
+            "low": 100540.1,
+            "close": 101044.82,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T10:00:00.000Z",
+            "open": 100943.78,
+            "high": 101449,
+            "low": 100640.64,
+            "close": 101145.86,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T11:00:00.000Z",
+            "open": 101044.71,
+            "high": 101550.44,
+            "low": 100741.28,
+            "close": 101247.01,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T12:00:00.000Z",
+            "open": 101145.76,
+            "high": 101652,
+            "low": 100842.02,
+            "close": 101348.26,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T13:00:00.000Z",
+            "open": 101246.91,
+            "high": 101753.65,
+            "low": 100942.87,
+            "close": 101449.61,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T14:00:00.000Z",
+            "open": 101348.16,
+            "high": 101855.41,
+            "low": 101043.81,
+            "close": 101551.06,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T15:00:00.000Z",
+            "open": 101449.51,
+            "high": 101957.26,
+            "low": 101144.86,
+            "close": 101652.61,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T16:00:00.000Z",
+            "open": 101550.96,
+            "high": 102059.22,
+            "low": 101246,
+            "close": 101754.26,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T17:00:00.000Z",
+            "open": 101652.51,
+            "high": 102161.28,
+            "low": 101347.24,
+            "close": 101856.01,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T18:00:00.000Z",
+            "open": 101754.15,
+            "high": 102263.43,
+            "low": 101448.59,
+            "close": 101957.87,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T19:00:00.000Z",
+            "open": 101855.91,
+            "high": 102365.7,
+            "low": 101550.04,
+            "close": 102059.83,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T20:00:00.000Z",
+            "open": 101957.77,
+            "high": 102468.07,
+            "low": 101651.59,
+            "close": 102161.89,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T21:00:00.000Z",
+            "open": 102059.73,
+            "high": 102570.54,
+            "low": 101753.24,
+            "close": 102264.05,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T22:00:00.000Z",
+            "open": 102161.79,
+            "high": 102673.11,
+            "low": 101854.99,
+            "close": 102366.31,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-28T23:00:00.000Z",
+            "open": 102263.94,
+            "high": 102775.78,
+            "low": 101956.84,
+            "close": 102468.68,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-29T00:00:00.000Z",
+            "open": 102366.21,
+            "high": 102878.55,
+            "low": 102058.81,
+            "close": 102571.15,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-29T01:00:00.000Z",
+            "open": 102468.58,
+            "high": 102981.43,
+            "low": 102160.87,
+            "close": 102673.72,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-29T02:00:00.000Z",
+            "open": 102571.05,
+            "high": 103084.41,
+            "low": 102263.03,
+            "close": 102776.39,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-29T03:00:00.000Z",
+            "open": 102673.61,
+            "high": 103187.5,
+            "low": 102365.28,
+            "close": 102879.17,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-29T04:00:00.000Z",
+            "open": 102776.29,
+            "high": 103290.69,
+            "low": 102467.65,
+            "close": 102982.05,
+            "volume": 22,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-29T05:00:00.000Z",
+            "open": 102879.07,
+            "high": 103393.98,
+            "low": 102570.12,
+            "close": 103085.03,
+            "volume": 23,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-29T06:00:00.000Z",
+            "open": 102981.94,
+            "high": 103497.37,
+            "low": 102672.69,
+            "close": 103188.12,
+            "volume": 24,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-29T07:00:00.000Z",
+            "open": 103084.93,
+            "high": 103600.87,
+            "low": 102775.37,
+            "close": 103291.31,
+            "volume": 25,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-29T08:00:00.000Z",
+            "open": 103188.02,
+            "high": 103704.48,
+            "low": 102878.14,
+            "close": 103394.6,
+            "volume": 26,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-29T09:00:00.000Z",
+            "open": 103291.21,
+            "high": 103808.18,
+            "low": 102981.02,
+            "close": 103497.99,
+            "volume": 20,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-29T10:00:00.000Z",
+            "open": 103394.49,
+            "high": 103911.98,
+            "low": 103084,
+            "close": 103601.49,
+            "volume": 21,
+            "is_closed": true
+          },
+          {
+            "timestamp_utc": "2026-10-29T11:00:00.000Z",
+            "open": 103497.89,
+            "high": 104015.9,
+            "low": 103187.08,
+            "close": 103705.09,
+            "volume": 22,
+            "is_closed": true
+          }
+        ],
+        "auto_tournament": true
+      }
+    }
+  ],
+  "responses_received": [
+    {
+      "status": 200,
+      "body": {
+        "analysis_id": "ana_c4cb55e73392",
+        "timestamp_utc": "2026-10-29T12:11:45.034800+00:00",
+        "is_read_only": true,
+        "attempts_created": 0,
+        "candle_watermark": {
+          "last_closed_timestamp": "2026-10-29T11:00:00+00:00",
+          "last_closed_close": 103705.09,
+          "candle_watermark_hash": "75b2cd3985044c83",
+          "candle_window_sha256": "018f09b3e9639fbee370848a896e337f954beaf5fa34f366c82bb86c308f89d2",
+          "total_closed_candles": 199
+        },
+        "candle_watermark_hash": "75b2cd3985044c83",
+        "freshness_status": "FRESH",
+        "data_freshness": {
+          "is_fresh": true,
+          "freshness_status": "FRESH",
+          "observed_age_seconds": 4305.2,
+          "freshness_threshold_seconds": 7200,
+          "latest_candle_time_utc": "2026-10-29T11:00:00+00:00",
+          "has_candle_gaps": false,
+          "candle_gap_count": 0,
+          "dataset_fingerprint": "018f09b3e9639fbee370848a896e337f954beaf5fa34f366c82bb86c308f89d2"
+        },
+        "data_integrity": {
+          "is_valid": true,
+          "reason": "VALID"
+        },
+        "market_regime": {
+          "regime": "VOLATILITY_EXPANSION",
+          "is_valid": true,
+          "rationale": "High directional index ADX=100.0 with moving average divergence",
+          "close": 103705.09,
+          "ema20": 102730.13,
+          "ema50": 101228.24,
+          "ema200": 103705.09,
+          "adx": 100,
+          "atr": 823.47,
+          "bbw": 0.0231,
+          "bb_upper": 103910.86,
+          "bb_mid": 102726.75,
+          "bb_lower": 101542.64
+        },
+        "shortlisted_candidates": [
+          {
+            "rank": 1,
+            "candidate_id": "ATR_VOLATILITY_BREAKOUT_12H",
+            "strategy_id": "ATR_VOLATILITY_BREAKOUT_12H",
+            "strategy_name": "ATR Volatility Expansion Breakout (12h)",
+            "version": "1.0.0",
+            "family": "Volatility Breakout",
+            "intended_regime": [
+              "VOLATILITY_EXPANSION",
+              "TRENDING_BULLISH"
+            ],
+            "direction": "LONG",
+            "holding_horizon_hours": 12,
+            "proposed_geometry": {
+              "reference_entry_price": 103705.09,
+              "proposed_tp_price": 105352.03,
+              "proposed_sl_price": 102881.62,
+              "reward_usd": 1646.94,
+              "risk_usd": 823.47,
+              "reward_risk_ratio": 2,
+              "anomaly_policy": "Hourly down bar with volume &gt; 3.5x 50-bar baseline"
+            },
+            "screen_7_of_10": {
+              "passed": true,
+              "status": "SCREEN_PASSED",
+              "evidence_source": "HISTORICAL_WALKFORWARD_SCREENING",
+              "strategy_id": "ATR_VOLATILITY_BREAKOUT_12H",
+              "strategy_version": "1.0.0",
+              "tp_hits": 8,
+              "total_attempts": 10,
+              "numerator_tp_hits": 8,
+              "denominator_eligible_attempts": 10,
+              "tp_hit_rate": 0.8,
+              "wilson_ci_95": [
+                0.4902,
+                0.9433
+              ],
+              "evaluation_dates": [
+                "2026-09-09",
+                "2026-10-21"
+              ],
+              "breakdown": {
+                "tp_hits": 8,
+                "sl_hits": 2,
+                "anomaly_exits": 0,
+                "timeouts": 0
+              },
+              "separately_reported": {
+                "pending_attempts": 0,
+                "user_exited_early": 0,
+                "unresolved_intrabar": 0,
+                "partial_exits": 0
+              },
+              "uncertainty_caveat": "Passing 7/10 preliminary screen (8/10 = 80.0%) is an initial gating hurdle, NOT proof of a future 70% success probability. Under binomial assumptions, Wilson 95% CI is [49.0%, 94.3%]. Financial time-series serial dependence expands true uncertainty further.",
+              "explanation": "Passed preliminary screen (8/10 = 80.0% TP hits &gt;= 7/10 required; source: HISTORICAL_WALKFORWARD_SCREENING). Wilson 95% CI is [49.0%, 94.3%]."
+            },
+            "latest_10_eligible_outcomes": {
+              "tp_hits": 8,
+              "sl_hits": 2,
+              "anomaly_exits": 0,
+              "timeouts": 0
+            },
+            "success_count": 8,
+            "evaluation_period": [
+              "2026-09-09",
+              "2026-10-21"
+            ],
+            "confidence_interval": [
+              0.4902,
+              0.9433
+            ],
+            "sample_provenance": "HISTORICAL_WALKFORWARD_SCREENING",
+            "qualification_state": "SCREEN_PASSED",
+            "historical_evidence": {
+              "historical_tp_hit_rate": 0.612,
+              "sample_size": 215,
+              "status": "QUALIFICATION_CANDIDATE"
+            }
+          },
+          {
+            "rank": 2,
+            "candidate_id": "TSMOM_DONCHIAN_24H_168H",
+            "strategy_id": "TSMOM_DONCHIAN_24H_168H",
+            "strategy_name": "Donchian Trend Breakout (168h Trend / 24h Channel)",
+            "version": "1.0.0",
+            "family": "Trend-Following",
+            "intended_regime": [
+              "TRENDING_BULLISH",
+              "VOLATILITY_EXPANSION"
+            ],
+            "direction": "LONG",
+            "holding_horizon_hours": 24,
+            "proposed_geometry": {
+              "reference_entry_price": 103705.09,
+              "proposed_tp_price": 105557.9,
+              "proposed_sl_price": 102469.88,
+              "reward_usd": 1852.81,
+              "risk_usd": 1235.2,
+              "reward_risk_ratio": 1.5,
+              "anomaly_policy": "3 consecutive hourly closes below 50h EMA, or adverse volume spike &gt; 3.0x"
+            },
+            "screen_7_of_10": {
+              "passed": true,
+              "status": "SCREEN_PASSED",
+              "evidence_source": "HISTORICAL_WALKFORWARD_SCREENING",
+              "strategy_id": "TSMOM_DONCHIAN_24H_168H",
+              "strategy_version": "1.0.0",
+              "tp_hits": 7,
+              "total_attempts": 10,
+              "numerator_tp_hits": 7,
+              "denominator_eligible_attempts": 10,
+              "tp_hit_rate": 0.7,
+              "wilson_ci_95": [
+                0.3968,
+                0.8922
+              ],
+              "evaluation_dates": [
+                "2026-09-10",
+                "2026-10-22"
+              ],
+              "breakdown": {
+                "tp_hits": 7,
+                "sl_hits": 2,
+                "anomaly_exits": 1,
+                "timeouts": 0
+              },
+              "separately_reported": {
+                "pending_attempts": 0,
+                "user_exited_early": 0,
+                "unresolved_intrabar": 0,
+                "partial_exits": 0
+              },
+              "uncertainty_caveat": "Passing 7/10 preliminary screen (7/10 = 70.0%) is an initial gating hurdle, NOT proof of a future 70% success probability. Under binomial assumptions, Wilson 95% CI is [39.7%, 89.2%]. Financial time-series serial dependence expands true uncertainty further.",
+              "explanation": "Passed preliminary screen (7/10 = 70.0% TP hits &gt;= 7/10 required; source: HISTORICAL_WALKFORWARD_SCREENING). Wilson 95% CI is [39.7%, 89.2%]."
+            },
+            "latest_10_eligible_outcomes": {
+              "tp_hits": 7,
+              "sl_hits": 2,
+              "anomaly_exits": 1,
+              "timeouts": 0
+            },
+            "success_count": 7,
+            "evaluation_period": [
+              "2026-09-10",
+              "2026-10-22"
+            ],
+            "confidence_interval": [
+              0.3968,
+              0.8922
+            ],
+            "sample_provenance": "HISTORICAL_WALKFORWARD_SCREENING",
+            "qualification_state": "SCREEN_PASSED",
+            "historical_evidence": {
+              "historical_tp_hit_rate": 0.584,
+              "sample_size": 342,
+              "status": "QUALIFICATION_CANDIDATE"
+            }
+          }
+        ],
+        "candidate_rejections": [
+          {
+            "strategy_id": "RANGE_BOLLINGER_REVERSION_20H",
+            "strategy_name": "Bollinger &amp; RSI Mean Reversion (20h)",
+            "version": "1.0.0",
+            "rejection_reason": "Regime mismatch: requires ['RANGE_BOUND'] but observed regime is VOLATILITY_EXPANSION"
+          },
+          {
+            "strategy_id": "CHRONOS2_FOUNDATION",
+            "strategy_name": "Amazon Chronos-2 Foundation Model",
+            "version": "2.0.0",
+            "rejection_reason": "Strategy quarantined (QUARANTINED)"
+          },
+          {
+            "strategy_id": "HTF_RANGE_EXPANSION_BREAKOUT",
+            "strategy_name": "High-Timeframe Range Expansion (4h / 20-bar)",
+            "version": "1.0.0",
+            "rejection_reason": "Failed preliminary 7/10 screen: 3/10 TP hits &lt; 7 required"
+          }
+        ],
+        "top_qualifying_candidate": {
+          "rank": 1,
+          "candidate_id": "ATR_VOLATILITY_BREAKOUT_12H",
+          "strategy_id": "ATR_VOLATILITY_BREAKOUT_12H",
+          "strategy_name": "ATR Volatility Expansion Breakout (12h)",
+          "version": "1.0.0",
+          "family": "Volatility Breakout",
+          "intended_regime": [
+            "VOLATILITY_EXPANSION",
+            "TRENDING_BULLISH"
+          ],
+          "direction": "LONG",
+          "holding_horizon_hours": 12,
+          "proposed_geometry": {
+            "reference_entry_price": 103705.09,
+            "proposed_tp_price": 105352.03,
+            "proposed_sl_price": 102881.62,
+            "reward_usd": 1646.94,
+            "risk_usd": 823.47,
+            "reward_risk_ratio": 2,
+            "anomaly_policy": "Hourly down bar with volume &gt; 3.5x 50-bar baseline"
+          },
+          "screen_7_of_10": {
+            "passed": true,
+            "status": "SCREEN_PASSED",
+            "evidence_source": "HISTORICAL_WALKFORWARD_SCREENING",
+            "strategy_id": "ATR_VOLATILITY_BREAKOUT_12H",
+            "strategy_version": "1.0.0",
+            "tp_hits": 8,
+            "total_attempts": 10,
+            "numerator_tp_hits": 8,
+            "denominator_eligible_attempts": 10,
+            "tp_hit_rate": 0.8,
+            "wilson_ci_95": [
+              0.4902,
+              0.9433
+            ],
+            "evaluation_dates": [
+              "2026-09-09",
+              "2026-10-21"
+            ],
+            "breakdown": {
+              "tp_hits": 8,
+              "sl_hits": 2,
+              "anomaly_exits": 0,
+              "timeouts": 0
+            },
+            "separately_reported": {
+              "pending_attempts": 0,
+              "user_exited_early": 0,
+              "unresolved_intrabar": 0,
+              "partial_exits": 0
+            },
+            "uncertainty_caveat": "Passing 7/10 preliminary screen (8/10 = 80.0%) is an initial gating hurdle, NOT proof of a future 70% success probability. Under binomial assumptions, Wilson 95% CI is [49.0%, 94.3%]. Financial time-series serial dependence expands true uncertainty further.",
+            "explanation": "Passed preliminary screen (8/10 = 80.0% TP hits &gt;= 7/10 required; source: HISTORICAL_WALKFORWARD_SCREENING). Wilson 95% CI is [49.0%, 94.3%]."
+          },
+          "latest_10_eligible_outcomes": {
+            "tp_hits": 8,
+            "sl_hits": 2,
+            "anomaly_exits": 0,
+            "timeouts": 0
+          },
+          "success_count": 8,
+          "evaluation_period": [
+            "2026-09-09",
+            "2026-10-21"
+          ],
+          "confidence_interval": [
+            0.4902,
+            0.9433
+          ],
+          "sample_provenance": "HISTORICAL_WALKFORWARD_SCREENING",
+          "qualification_state": "SCREEN_PASSED",
+          "historical_evidence": {
+            "historical_tp_hit_rate": 0.612,
+            "sample_size": 215,
+            "status": "QUALIFICATION_CANDIDATE"
+          }
+        },
+        "action": "RUN_TOURNAMENT_AVAILABLE",
+        "reason": "Regime VOLATILITY_EXPANSION identified. 2 compatible candidate(s) shortlisted.",
+        "tournament": {
+          "tournament_id": "trn_4165562519f7",
+          "executed_at_utc": "2026-10-29T12:11:45.168117+00:00",
+          "evaluation_regime": "VOLATILITY_EXPANSION",
+          "evaluation_protocol": "WALK_FORWARD_CAUSAL_SPLIT_v1",
+          "protocol_hash": "4e8021437f984349",
+          "dataset_hash": null,
+          "date_window": null,
+          "strategy_versions": {
+            "ATR_VOLATILITY_BREAKOUT_12H": "1.0.0",
+            "TSMOM_DONCHIAN_24H_168H": "1.0.0"
+          },
+          "execution_source": "CACHED_WALK_FORWARD_UNAVAILABLE",
+          "cache_validation": {
+            "validation_status": "UNAVAILABLE",
+            "hashes_matched": false,
+            "source_label": "No verified walk-forward manifest matches the registered candidate strategies and frozen protocol. A fresh three-arm evaluation is also unavailable because aligned point-in-time AI forecasts and a matched baseline series are not supplied. No arm metrics were computed or reused.",
+            "newly_executed": false
+          },
+          "is_read_only": true,
+          "attempts_created": 0,
+          "candidate_results": [],
+          "baseline_comparator": null,
+          "sequential_evaluation_log": [
+            {
+              "step": 1,
+              "candidate_rank": 1,
+              "strategy_id": "ATR_VOLATILITY_BREAKOUT_12H",
+              "status": "BLOCKED_UNVERIFIED_EVIDENCE",
+              "reason": "No verified walk-forward manifest matches the registered candidate strategies and frozen protocol. A fresh three-arm evaluation is also unavailable because aligned point-in-time AI forecasts and a matched baseline series are not supplied. No arm metrics were computed or reused."
+            },
+            {
+              "step": 2,
+              "candidate_rank": 2,
+              "strategy_id": "TSMOM_DONCHIAN_24H_168H",
+              "status": "BLOCKED_UNVERIFIED_EVIDENCE",
+              "reason": "No verified walk-forward manifest matches the registered candidate strategies and frozen protocol. A fresh three-arm evaluation is also unavailable because aligned point-in-time AI forecasts and a matched baseline series are not supplied. No arm metrics were computed or reused."
+            }
+          ],
+          "tournament_winner": null,
+          "final_verdict": "ABSTAIN",
+          "verdict_explanation": "No verified walk-forward manifest matches the registered candidate strategies and frozen protocol. A fresh three-arm evaluation is also unavailable because aligned point-in-time AI forecasts and a matched baseline series are not supplied. No arm metrics were computed or reused."
+        },
+        "smart_entry_decision": {
+          "decision_id": "dec_1dea63da09fc",
+          "decision_timestamp_utc": "2026-10-29T12:11:45.168190+00:00",
+          "status": "NO_SMART_ENTRY",
+          "action": "ABSTAIN",
+          "market_regime": "VOLATILITY_EXPANSION",
+          "reason": "No verified walk-forward manifest matches the registered candidate strategies and frozen protocol. A fresh three-arm evaluation is also unavailable because aligned point-in-time AI forecasts and a matched baseline series are not supplied. No arm metrics were computed or reused.",
+          "candidate_setup": null
+        },
+        "decision": {
+          "decision_id": "dec_1dea63da09fc",
+          "decision_timestamp_utc": "2026-10-29T12:11:45.168190+00:00",
+          "status": "NO_SMART_ENTRY",
+          "action": "ABSTAIN",
+          "market_regime": "VOLATILITY_EXPANSION",
+          "reason": "No verified walk-forward manifest matches the registered candidate strategies and frozen protocol. A fresh three-arm evaluation is also unavailable because aligned point-in-time AI forecasts and a matched baseline series are not supplied. No arm metrics were computed or reused.",
+          "candidate_setup": null
+        },
+        "integrated_workflow": true,
+        "runtime_timings_ms": {
+          "analysis_screening": 133.297,
+          "tournament_or_evidence_check": 0.097,
+          "final_decision": 0.023,
+          "total": 133.428,
+          "tournament_arm_1": null,
+          "tournament_arm_2": null,
+          "tournament_arm_3": null
+        },
+        "tournament_arm_timing_status": "NOT_RUN_UNVERIFIED_EVIDENCE"
+      }
+    }
+  ],
+  "analysis_stage_transitions": [],
+  "final_outcome": "TIMEOUT_OR_UNRESOLVED",
+  "error_message": null,
+  "simulated_attempts_created": 0,
+  "passed": false
+}</pre>
+  </div>
+
+  <script>
+    // Extract scenario from query parameter
+    const params = new URLSearchParams(window.location.search);
+    const scenario = params.get("scenario") || "ANALYSE_NORMAL";
+    document.getElementById("qa-scenario-badge").textContent = "SCENARIO: " + scenario;
+    window.__QA_SCENARIO__ = scenario;
+    window.__QA_RESULTS__ = {
+      scenario: scenario,
+      started_at: new Date().toISOString(),
+      button_clicked: false,
+      click_timestamp: null,
+      requests_intercepted: [],
+      responses_received: [],
+      analysis_stage_transitions: [],
+      final_outcome: null,
+      error_message: null,
+      simulated_attempts_created: 0,
+      passed: false
+    };
+
+    // Pre-flight Mock Interceptor for Coinbase REST & WS
+    const origFetch = window.fetch;
+    window.fetch = async function(url, options = {}) {
+      const urlStr = typeof url === "string" ? url : (url.url || "");
+      
+      // Intercept Coinbase candles
+      if (urlStr.includes("api.exchange.coinbase.com/products/BTC-USD/candles")) {
+        window.__QA_RESULTS__.requests_intercepted.push({ endpoint: "COINBASE_CANDLES", url: urlStr });
+        if (scenario === "ANALYSE_PROVIDER_UNAVAILABLE") {
+          return new Response(JSON.stringify([]), { status: 503, headers: { "Content-Type": "application/json" } });
+        }
+        // Fetch deterministic seed candles from local QA server
+        const res = await origFetch("/api/qa/seed-candles?scenario=" + scenario);
+        const data = await res.json();
+        // Coinbase REST format: [[time, low, high, open, close, volume], ...] in descending order
+        const cbCandles = data.map(c => [c.time, c.low, c.high, c.open, c.close, c.volume]).reverse();
+        return new Response(JSON.stringify(cbCandles), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+
+      // Intercept Analyse API calls to log telemetry
+      if (urlStr.includes("/api/tournament/analyse")) {
+        window.__QA_RESULTS__.requests_intercepted.push({
+          endpoint: "ANALYSE",
+          payload: options.body ? JSON.parse(options.body) : null
+        });
+      }
+
+      const resp = await origFetch(url, options);
+      if (urlStr.includes("/api/tournament/analyse")) {
+        const clone = resp.clone();
+        try {
+          const body = await clone.json();
+          window.__QA_RESULTS__.responses_received.push({ status: resp.status, body: body });
+        } catch(e) {}
+      }
+      return resp;
+    };
+
+    // Mock WebSocket for Coinbase feed
+    window.WebSocket = function(url) {
+      return {
+        readyState: 1, // OPEN
+        send: function() {},
+        close: function() {},
+        addEventListener: function() {},
+        removeEventListener: function() {}
+      };
+    };
+  </script>
+
+  <!-- Load Real Application Script -->
+  <script src="/app.js"></script>
+
+  <!-- Automated Scenario Driver -->
+  <script>
+    (async function runTestDriver() {
+      // Set hash route to smart entry
+      window.location.hash = "#/smart-entry";
+
+      // Wait for app mount and button presence
+      let btn = null;
+      for (let i = 0; i < 40; i++) {
+        await new Promise(r => setTimeout(r, 100));
+        btn = document.getElementById("btn-analyse-setup");
+        if (btn) break;
+      }
+
+      if (!btn) {
+        window.__QA_RESULTS__.error_message = "btn-analyse-setup not found in DOM within 4s";
+        finalize(false);
+        return;
+      }
+
+      // Allow 300ms for candle feed state propagation
+      await new Promise(r => setTimeout(r, 300));
+
+      // Execute scenario-specific click behavior
+      window.__QA_RESULTS__.button_clicked = true;
+      window.__QA_RESULTS__.click_timestamp = new Date().toISOString();
+
+      if (scenario === "ANALYSE_DOUBLE_CLICK") {
+        btn.click();
+        await new Promise(r => setTimeout(r, 20));
+        btn.click(); // rapid double-click
+      } else {
+        btn.click();
+      }
+
+      // Poll for completion or terminal state
+      let terminalStateReached = false;
+      for (let j = 0; j < 35; j++) {
+        await new Promise(r => setTimeout(r, 150));
+        const errEl = document.getElementById("analysis-error");
+        const outcomeEl = document.querySelector("#v32-43-smart-entry-view h2, #v32-43-smart-entry-view h3, [role='status']");
+        const statusText = document.body.innerText;
+
+        if (errEl && errEl.textContent.trim()) {
+          window.__QA_RESULTS__.error_message = errEl.textContent.trim();
+          terminalStateReached = true;
+          break;
+        }
+
+        if (statusText.includes("ENTRY CANDIDATE FOUND") ||
+            statusText.includes("NO QUALIFYING SETUP") ||
+            statusText.includes("ANALYSIS ABSTAINED") ||
+            statusText.includes("Analysis complete") ||
+            statusText.includes("Analysis did not start") ||
+            statusText.includes("Analysis request failed")) {
+          terminalStateReached = true;
+          break;
+        }
+      }
+
+      // Capture final rendered outcome
+      const bodyText = document.body.innerText;
+      if (bodyText.includes("ENTRY CANDIDATE FOUND")) {
+        window.__QA_RESULTS__.final_outcome = "ENTRY_CANDIDATE_FOUND";
+      } else if (bodyText.includes("NO QUALIFYING SETUP")) {
+        window.__QA_RESULTS__.final_outcome = "NO_QUALIFYING_SETUP";
+      } else if (bodyText.includes("ANALYSIS ABSTAINED")) {
+        window.__QA_RESULTS__.final_outcome = "ANALYSIS_ABSTAINED";
+      } else if (bodyText.includes("Analysis did not start")) {
+        window.__QA_RESULTS__.final_outcome = "BLOCKED_PREFLIGHT";
+      } else if (bodyText.includes("Analysis request failed")) {
+        window.__QA_RESULTS__.final_outcome = "ERROR_HANDLED";
+      } else {
+        window.__QA_RESULTS__.final_outcome = "TIMEOUT_OR_UNRESOLVED";
+      }
+
+      // Check invariant: zero simulated attempts created
+      const attemptsCount = document.querySelectorAll(".simulated-trade-card, #active-simulated-trade").length;
+      window.__QA_RESULTS__.simulated_attempts_created = attemptsCount;
+
+      // Evaluate scenario pass/fail
+      let passed = false;
+      switch (scenario) {
+        case "ANALYSE_NORMAL":
+          passed = (window.__QA_RESULTS__.final_outcome === "NO_QUALIFYING_SETUP" || window.__QA_RESULTS__.final_outcome === "ENTRY_CANDIDATE_FOUND") && attemptsCount === 0;
+          break;
+        case "ANALYSE_NO_ELIGIBLE_STRATEGY":
+          passed = (window.__QA_RESULTS__.final_outcome === "NO_QUALIFYING_SETUP" || window.__QA_RESULTS__.final_outcome === "ANALYSIS_ABSTAINED") && attemptsCount === 0;
+          break;
+        case "ANALYSE_GAPS":
+          passed = (window.__QA_RESULTS__.final_outcome === "BLOCKED_PREFLIGHT" || window.__QA_RESULTS__.final_outcome === "ERROR_HANDLED" || Boolean(window.__QA_RESULTS__.error_message)) && attemptsCount === 0;
+          break;
+        case "ANALYSE_DUPLICATE_OR_INVALID_OHLCV":
+          passed = (window.__QA_RESULTS__.final_outcome === "ERROR_HANDLED" || Boolean(window.__QA_RESULTS__.error_message)) && attemptsCount === 0;
+          break;
+        case "ANALYSE_STALE_DATA":
+          passed = (window.__QA_RESULTS__.final_outcome === "BLOCKED_PREFLIGHT" || window.__QA_RESULTS__.final_outcome === "ERROR_HANDLED" || Boolean(window.__QA_RESULTS__.error_message)) && attemptsCount === 0;
+          break;
+        case "ANALYSE_PROVIDER_UNAVAILABLE":
+          passed = (window.__QA_RESULTS__.final_outcome === "BLOCKED_PREFLIGHT" || Boolean(window.__QA_RESULTS__.error_message)) && !bodyText.includes("$80,000") && attemptsCount === 0;
+          break;
+        case "ANALYSE_MALFORMED_OR_MISSING_FORECAST":
+          passed = (window.__QA_RESULTS__.final_outcome !== "TIMEOUT_OR_UNRESOLVED") && attemptsCount === 0;
+          break;
+        case "ANALYSE_TIMEOUT_OR_SERVER_ERROR":
+          passed = (window.__QA_RESULTS__.final_outcome === "ERROR_HANDLED" || Boolean(window.__QA_RESULTS__.error_message)) && attemptsCount === 0;
+          break;
+        case "ANALYSE_DOUBLE_CLICK":
+          passed = (window.__QA_RESULTS__.requests_intercepted.filter(r => r.endpoint === "ANALYSE").length <= 1) && attemptsCount === 0;
+          break;
+        case "ANALYSE_QUALIFYING_CANDIDATE":
+          passed = (window.__QA_RESULTS__.final_outcome === "ENTRY_CANDIDATE_FOUND") && attemptsCount === 0;
+          break;
+        default:
+          passed = false;
+      }
+
+      window.__QA_RESULTS__.passed = passed;
+      finalize(passed);
+    })();
+
+    function finalize(passed) {
+      document.getElementById("qa-scenario-status").textContent = passed ? "PASS" : "FAIL";
+      document.getElementById("qa-results-json").textContent = JSON.stringify(window.__QA_RESULTS__, null, 2);
+      window.__QA_DONE__ = true;
+    }
+  </script>
+
+
+</body></html>

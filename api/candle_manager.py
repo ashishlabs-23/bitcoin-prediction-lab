@@ -8,8 +8,10 @@ Guarantees that AI predictions are ONLY generated on closed candles.
 import os
 import sys
 import time
+import math
 import pandas as pd
 import numpy as np
+from collections import deque
 from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime, timezone
 
@@ -30,6 +32,12 @@ class CandleStateManager:
         self.interval_seconds = interval_seconds
         self.current_candle: Optional[Dict[str, Any]] = None
         self.closed_candles: List[Dict[str, Any]] = []
+        self.ingestion_candles: Dict[int, Dict[str, Any]] = {}
+        self._ingestion_candle_first_order: Dict[int, Tuple[int, int]] = {}
+        self._ingestion_candle_last_order: Dict[int, Tuple[int, int]] = {}
+        self._ingestion_candle_quantities: Dict[int, Dict[int, float]] = {}
+        self._ingestion_trade_ids: Dict[int, int] = {}
+        self._ingestion_trade_id_order = deque()
         self.last_prediction: Optional[Dict[str, Any]] = None
         self.last_tick_time: Optional[float] = None
         self.model_ensemble = None
@@ -37,6 +45,121 @@ class CandleStateManager:
     def set_ensemble_model(self, ensemble):
         """Sets the active AI model ensemble for inference on candle close."""
         self.model_ensemble = ensemble
+
+    def process_trade_ingestion_only(
+        self,
+        price: float,
+        quantity: float,
+        timestamp_ms: int,
+        trade_id: int,
+        event_timestamp: Optional[str] = None,
+        received_timestamp: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Add one trade to its event-time candle without closing or inferring.
+
+        Candles are keyed by the event-time interval. Late trades update their
+        original candle, and open/close are selected by (event time, trade ID)
+        so arrival order cannot change the result. This path is intentionally
+        separate from ``process_tick``, which may trigger model inference.
+        """
+        if self.interval_seconds <= 0:
+            raise ValueError("interval_seconds must be positive")
+        if not np.isfinite(price) or price <= 0:
+            raise ValueError("price must be finite and positive")
+        if not np.isfinite(quantity) or quantity <= 0:
+            raise ValueError("quantity must be finite and positive")
+
+        event_ms = int(timestamp_ms)
+        trade_key = int(trade_id)
+        if trade_key in self._ingestion_trade_ids:
+            candle_start = self._ingestion_trade_ids[trade_key]
+            return dict(self.ingestion_candles.get(candle_start, {}))
+
+        interval_ms = self.interval_seconds * 1000
+        candle_start = (event_ms // interval_ms) * interval_ms
+        self._ingestion_trade_ids[trade_key] = candle_start
+        order_key = (event_ms, trade_key)
+        candle = self.ingestion_candles.get(candle_start)
+        if candle is None:
+            candle = {
+                "time": candle_start,
+                "open": float(price),
+                "high": float(price),
+                "low": float(price),
+                "close": float(price),
+                "volume": float(quantity),
+                "is_closed": False,
+                "quality_status": "VALID",
+                "source": "bitstamp",
+                "symbol": "BTC/USD",
+                "event_timestamp": event_timestamp,
+                "received_timestamp": received_timestamp,
+            }
+            self.ingestion_candles[candle_start] = candle
+            self._ingestion_candle_first_order[candle_start] = order_key
+            self._ingestion_candle_last_order[candle_start] = order_key
+        else:
+            candle["high"] = max(candle["high"], float(price))
+            candle["low"] = min(candle["low"], float(price))
+            if order_key < self._ingestion_candle_first_order[candle_start]:
+                candle["open"] = float(price)
+                self._ingestion_candle_first_order[candle_start] = order_key
+                candle["event_timestamp"] = event_timestamp
+                candle["received_timestamp"] = received_timestamp
+            if order_key > self._ingestion_candle_last_order[candle_start]:
+                candle["close"] = float(price)
+                self._ingestion_candle_last_order[candle_start] = order_key
+                candle["event_timestamp"] = event_timestamp
+                candle["received_timestamp"] = received_timestamp
+
+        quantities = self._ingestion_candle_quantities.setdefault(candle_start, {})
+        quantities[trade_key] = float(quantity)
+        candle["volume"] = math.fsum(quantities[key] for key in sorted(quantities))
+        self._ingestion_trade_id_order.append(trade_key)
+        if len(self._ingestion_trade_id_order) > 100_000:
+            expired_id = self._ingestion_trade_id_order.popleft()
+            self._ingestion_trade_ids.pop(expired_id, None)
+        candle["is_closed"] = (
+            candle_start + interval_ms <= int(time.time() * 1000)
+        )
+        self._prune_ingestion_candles()
+        return dict(candle)
+
+    def _prune_ingestion_candles(self) -> None:
+        """Bound in-memory stream state while retaining recent candle history."""
+        expired = sorted(self.ingestion_candles)[:-1_000]
+        if not expired:
+            return
+        expired_set = set(expired)
+        for key in expired:
+            self.ingestion_candles.pop(key, None)
+            self._ingestion_candle_first_order.pop(key, None)
+            self._ingestion_candle_last_order.pop(key, None)
+            self._ingestion_candle_quantities.pop(key, None)
+        for trade_id, candle_start in list(self._ingestion_trade_ids.items()):
+            if candle_start in expired_set:
+                self._ingestion_trade_ids.pop(trade_id, None)
+        self._ingestion_trade_id_order = deque(
+            trade_id for trade_id in self._ingestion_trade_id_order
+            if trade_id in self._ingestion_trade_ids
+        )
+
+    def get_ingestion_candles(self, limit: int = 500) -> List[Dict[str, Any]]:
+        """Return the most recent ingestion-only candles in event-time order."""
+        count = max(0, int(limit))
+        ordered = sorted(self.ingestion_candles)
+        if not count:
+            return []
+        now_ms = int(time.time() * 1000)
+        return [
+            {
+                **self.ingestion_candles[key],
+                "time": key // 1000,
+                "is_closed": key + self.interval_seconds * 1000 <= now_ms,
+                "quality_status": self.ingestion_candles[key].get("quality_status", "VALID"),
+            }
+            for key in ordered[-count:]
+        ]
 
     def seed_historical_candles(self, klines: List[Dict[str, Any]]):
         """Seeds state with recent historical OHLCV klines without duplicating seed candles."""
@@ -174,7 +297,11 @@ class CandleStateManager:
         try:
             from models.authoritative_model_registry import get_active_production_model, AuthorizationStatus
             active_model = get_active_production_model()
-            is_authorized = (active_model is not None and active_model.authorization_status == AuthorizationStatus.PRODUCTION_AUTHORIZED)
+            is_authorized = (
+                active_model is not None
+                and active_model.authorization_status
+                == AuthorizationStatus.AUTHORIZED_FOR_PRODUCTION
+            )
         except Exception:
             is_authorized = False
 
@@ -230,4 +357,3 @@ class CandleStateManager:
 # Aliases for backward compatibility
 CandleManager = CandleStateManager
 candle_manager = CandleStateManager()
-

@@ -124,7 +124,7 @@ def test_production_model_registry_integrity():
     active_prod = get_active_production_model()
     assert active_prod.canonical_id == "HAR-RS-DOW-v1.0"
     assert active_prod.classification == ModelClassification.PRODUCTION_VOLATILITY
-    assert active_prod.authorization_status == AuthorizationStatus.AUTHORIZED_FOR_PRODUCTION
+    assert active_prod.authorization_status == AuthorizationStatus.OFFLINE_RESEARCH_ONLY
     assert active_prod.directional_prediction_capability is False
 
     directional_base = get_directional_research_baseline()

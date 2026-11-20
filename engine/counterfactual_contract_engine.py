@@ -101,8 +101,9 @@ def generate_counterfactual_lab_contracts(
             if obs_snap:
                 snap = {
                     "spot_price": live_price,
-                    "volatility_regime": getattr(obs_snap, "volatility_regime", "VOL_NORMAL"),
-                    "calibration_health": getattr(obs_snap, "calibration_health", "CALIBRATED"),
+                    "volatility_regime": getattr(obs_snap, "volatility_regime", "VOL_EXPANDING"),
+                    "calibration_health": "UNAVAILABLE",
+
                     "order_flow_imbalance": getattr(obs_snap, "order_flow_imbalance", 0.65),
                     "hawkes_intensity": getattr(obs_snap, "hawkes_intensity", 2.2),
                     "vpin": getattr(obs_snap, "vpin", 0.28),
@@ -114,10 +115,15 @@ def generate_counterfactual_lab_contracts(
 
     snap["spot_price"] = live_price
     market_regime = snap.get("volatility_regime", "VOL_EXPANDING")
-    c2_health = snap.get("calibration_health", "CALIBRATED")
+    c2_health = "UNAVAILABLE"
     vpin_val = float(snap.get("vpin", snap.get("order_flow_toxicity", 0.28)))
     hawkes_val = float(snap.get("hawkes_intensity", snap.get("hawkes", 2.2)))
     ofi_val = float(snap.get("order_flow_imbalance", snap.get("ofi", 0.65)))
+    snap["ofi"] = ofi_val
+    snap["hawkes"] = hawkes_val
+    snap["vpin"] = vpin_val
+    snap["is_expansion"] = ("EXPAND" in market_regime.upper()) or ("TREND" in market_regime.upper())
+
 
     # 3. Toxicity Filter State Evaluation
     if toxicity_override in ["PASS", "BLOCK"]:

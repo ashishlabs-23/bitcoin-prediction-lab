@@ -1,0 +1,75 @@
+{
+  "worker_version": "PROSPECTIVE-WORKER-v2.0",
+  "last_cycle_timestamp_utc": "2026-10-27T03:18:35.678494+00:00",
+  "last_successful_cycle_utc": "2026-10-27T03:18:35.678494+00:00",
+  "last_market_data_timestamp_utc": "2026-10-25T16:00:00+00:00",
+  "worker_operational_state": "STANDALONE_CLI_SCHEDULED",
+  "is_autonomous_process_running": false,
+  "single_instance_lock": {
+    "lock_path": "C:\\Users\\Ashish\\AppData\\Local\\Temp\\btcognitive_v32_52_g9ybp63q\\repository\\data\\.prospective_worker.lock",
+    "is_locked": false
+  },
+  "last_cycle_status": "SUCCESS",
+  "last_cycle_error": null,
+  "last_forecast_issued": true,
+  "forecasts_issued": [
+    {
+      "target": "rv24h_var_ann",
+      "horizon": "24h",
+      "forecast_id": "960db6a8-7d75-41e8-bac7-dc357a4a8113",
+      "status": "PENDING"
+    },
+    {
+      "target": "rv7d_var_ann",
+      "horizon": "168h",
+      "forecast_id": "276344d7-f0fa-4049-835f-f2a166ac0651",
+      "status": "PENDING"
+    }
+  ],
+  "candle_sync": null,
+  "explicit_record_counts": {
+    "total_logged": 2,
+    "pending_resolution": 2,
+    "matured_resolved": 0,
+    "excluded_gap_records": 0,
+    "failed_records": 0
+  },
+  "ledger_record_counts": {
+    "total_records": 2,
+    "pending_maturation": 2,
+    "matured_records": 0,
+    "excluded_records": 0,
+    "failed_records": 0
+  },
+  "governed_prospective_progress": {
+    "clean_blocks_count": 0,
+    "confirmatory_threshold": 100,
+    "definitive_threshold": 2160,
+    "prospective_status": "COLLECTING",
+    "is_sufficient_for_confirmatory": false
+  },
+  "ledger_summary": {
+    "ledger_path": "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\v32_52\\20261027_082310_447603\\tmp\\pytest-of-unknown\\pytest-0\\test_dual_target_prospective_i0\\dual_ledger.jsonl",
+    "total_logged_forecasts": 2,
+    "pending_resolution": 2,
+    "resolved_outcomes": 0,
+    "excluded_records": 0,
+    "clean_prospective_blocks_count": 0,
+    "clean_prospective_blocks_24h": 0,
+    "clean_prospective_blocks_168h": 0,
+    "confirmatory_hurdle_threshold": 100,
+    "definitive_hurdle_threshold": 2160,
+    "prospective_status": "COLLECTING",
+    "epistemic_notice": "Prospective forecasts are committed to the append-only ledger prior to outcome maturity. Outcomes are resolved strictly after the forward window has fully elapsed using closed market candles. A minimum of 100 non-overlapping clean blocks (approx 100 calendar days for 24h, ~2 years for 168h) is required for confirmatory model validation."
+  },
+  "runtime_environment": {
+    "os": "win32",
+    "python_version": "3.13.14",
+    "continuous_daemon_supported": true,
+    "supported_schedulers": {
+      "windows": "schtasks /Create /SC HOURLY /TN BTCognitiveProspectiveWorker /TR 'powershell.exe -ExecutionPolicy Bypass -File scripts\\run_prospective_worker.ps1'",
+      "linux": "cron: 0 * * * * cd /path/to/BTCognitive && python -m engine.prospective_worker --once",
+      "systemd": "systemd timer / service configured for hourly execution"
+    }
+  }
+}

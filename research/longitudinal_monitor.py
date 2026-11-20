@@ -21,7 +21,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 RESULTS_DIR = os.path.join(ROOT_DIR, "results")
 DB_PATH = os.path.join(RESULTS_DIR, "longitudinal_evidence.db")
-os.makedirs(RESULTS_DIR, exist_ok=True)
 
 # HARD SAFETY INVARIANT
 LONGITUDINAL_MONITORING_ONLY = True
@@ -36,6 +35,7 @@ class LongitudinalEvidenceStore:
         self._init_db()
 
     def _init_db(self):
+        os.makedirs(os.path.dirname(os.path.abspath(self.db_path)), exist_ok=True)
         conn = sqlite3.connect(self.db_path)
         cur = conn.cursor()
         cur.execute("""
@@ -78,9 +78,9 @@ class LongitudinalEvidenceStore:
         conn = sqlite3.connect(self.db_path)
         cur = conn.cursor()
         cur.execute("""
-            INSERT OR REPLACE INTO longitudinal_forecasts VALUES (
+            INSERT INTO longitudinal_forecasts VALUES (
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-            )
+            ) ON CONFLICT(forecast_id) DO NOTHING
         """, (
             record["forecast_id"],
             record["forecast_timestamp"],
@@ -106,8 +106,9 @@ class LongitudinalEvidenceStore:
             record["block_id"]
         ))
         conn.commit()
+        inserted = cur.rowcount > 0
         conn.close()
-        return True
+        return inserted
 
     def count_records(self) -> int:
         conn = sqlite3.connect(self.db_path)
@@ -118,4 +119,17 @@ class LongitudinalEvidenceStore:
         return count
 
 
-longitudinal_evidence_store = LongitudinalEvidenceStore()
+class _LazyLongitudinalEvidenceStore:
+    def __init__(self):
+        self._store: Optional[LongitudinalEvidenceStore] = None
+
+    def _get_store(self) -> LongitudinalEvidenceStore:
+        if self._store is None:
+            self._store = LongitudinalEvidenceStore()
+        return self._store
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._get_store(), name)
+
+
+longitudinal_evidence_store = _LazyLongitudinalEvidenceStore()

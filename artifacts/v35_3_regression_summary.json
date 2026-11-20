@@ -1,0 +1,46 @@
+{
+  "timestamp_utc": "2026-11-03T15:08:47Z",
+  "total_inventory_files": 363,
+  "total_inventory_functions": 1704,
+  "executed_categories": [
+    "platform",
+    "econometric",
+    "strategy"
+  ],
+  "overall": {
+    "passed": 320,
+    "failed": 0,
+    "skipped": 0,
+    "duration_sec": 485.06,
+    "status": "PASS"
+  },
+  "by_category": {
+    "platform": {
+      "files_run": 24,
+      "exit_code": 0,
+      "passed": 143,
+      "failed": 0,
+      "skipped": 0,
+      "duration_sec": 263.68,
+      "raw_output": "3: StarletteDeprecationWarning: 'HTTP_413_REQUEST_ENTITY_TOO_LARGE' is deprecated. Use 'HTTP_413_CONTENT_TOO_LARGE' instead.\n    response = await self.dispatch_func(request, call_next)\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n143 passed, 1 warning in 239.87s (0:03:59)"
+    },
+    "econometric": {
+      "files_run": 41,
+      "exit_code": 0,
+      "passed": 87,
+      "failed": 0,
+      "skipped": 0,
+      "duration_sec": 134.83,
+      "raw_output": "........................................................................ [ 82%]\n...............                                                          [100%]\n87 passed in 111.28s (0:01:51)"
+    },
+    "strategy": {
+      "files_run": 10,
+      "exit_code": 0,
+      "passed": 90,
+      "failed": 0,
+      "skipped": 0,
+      "duration_sec": 86.55,
+      "raw_output": "........................................................................ [ 80%]\n..................                                                       [100%]\n90 passed in 65.03s (0:01:05)"
+    }
+  }
+}

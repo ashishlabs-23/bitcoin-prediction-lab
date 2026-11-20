@@ -329,10 +329,8 @@ class TestProspectiveWorkerHardening:
 
     def test_candle_sync_bounded_backoff(self):
         """Verifies that sync_live_candles handles API failures gracefully with retry backoff."""
-        with patch("engine.prospective_worker.requests.get") as mock_get:
-            mock_resp = MagicMock()
-            mock_resp.status_code = 503
-            mock_get.return_value = mock_resp
+        with patch("urllib.request.urlopen") as mock_urlopen:
+            mock_urlopen.side_effect = Exception("Coinbase 503 Service Unavailable")
 
             # Should exhaust max_retries and return without crashing
             res = sync_live_candles(max_retries=2, base_backoff=0.01)

@@ -1,0 +1,1045 @@
+=== CAPTURE_TIME ===
+2026-10-27T07:22:55.4741664+05:30
+=== REPO_ROOT ===
+C:/Projects/BTCognitive/BTCognitive
+=== BRANCH ===
+main
+=== HEAD ===
+25d483f4c3646661b57311de9d0b53d2be881adb
+=== GIT_STATUS ===
+ M CHANGES.md
+ M README.md
+ M api/notifications.py
+ M api/routes_research.py
+ M api/routes_tournament.py
+ M api/server.py
+ M backtest/market_memory.py
+ M data/prospective_forecast_ledger.jsonl
+ M data/research_alert_state.json
+ M engine/__init__.py
+ M engine/counterfactual_contract_engine.py
+ M engine/evidence_router.py
+ M engine/execution_cost_model.py
+ M engine/forecast_engine_15m.py
+ M engine/probabilistic_entry_engine.py
+ M engine/smart_entry_engine.py
+ M engine/strategy_selection.py
+ M experiments/results/multi_regime_validation_report.json
+ M experiments/results/post_repair_milestone_5_lock.json
+ M experiments/results/stage10_shadow_validation/shadow_prediction_ledger.jsonl
+ M experiments/results/stage11_forward_validation/forward_prediction_ledger.jsonl
+ M research/baseline_challenge_report.md
+ M research/challenger_bakeoff_report.md
+ M research/hawkes_latency_report.md
+ M research/hawkes_shadow_report.md
+ M research/independent_block_report.md
+ M research/information_inventory_report.md
+ M research/interval_sharpness_report.md
+ M research/live_baseline_comparison.md
+ M research/live_long_validation_report.md
+ M research/live_metric_reconciliation_report.md
+ M research/production_review_block_10.md
+ M research/range_stability_report.md
+ M research/reports/post_repair_5_block_observed.md
+ M research/reports/post_repair_baseline.md
+ M research/reports/post_repair_restart_review.md
+ M research/reports/pre_post_repair_comparison.md
+ M results/challenger_bakeoff_manifest.json
+ M results/live_validation_manifest.json
+ M results/mamba_trial_manifest.json
+ M results/model_change_request.json
+ M tests_frontend.js
+ M web/app.js
+ M web/index.html
+ M web/styles.css
+ M web_src/api_client.js
+?? api/routes_manual_journal.py
+?? api/routes_user_positions.py
+?? data/.prospective_shadow_runner.lock
+?? data/manual_trades/manual_trades_ledger.jsonl
+?? data/prospective_entry_ledger_v1_quarantined.jsonl
+?? data/prospective_entry_ledger_v2.jsonl
+?? data/prospective_shadow_status.json
+?? data/prospective_shadow_v1.jsonl
+?? data/research/coinbase_btc_usd_hourly_v1/acquisition_log.jsonl
+?? data/research/coinbase_btc_usd_hourly_v1/coinbase_hourly_manifest.json
+?? data/research/l2_stream/l2_burnin_events_20261025_135844.jsonl
+?? data/research/l2_stream/l2_burnin_events_20261025_140347.jsonl
+?? data/research/l2_stream/l2_burnin_events_20261025_140437.jsonl
+?? data/research/prospective_l2_gated_ledger_v1.jsonl
+?? data/research/user_positions/user_position_events.jsonl
+?? data/research/user_positions/user_positions_state.json
+?? data/smart_entry/smart_entry_attempts.jsonl
+?? engine/adaptive_risk_copilot.py
+?? engine/check_browser_state.py
+?? engine/coinbase_l2_collector.py
+?? engine/data_verification.py
+?? engine/directional_forecast_service.py
+?? engine/drift_evaluator.py
+?? engine/l2_event_recorder.py
+?? engine/l2_microstructure_features.py
+?? engine/manual_trade_journal.py
+?? engine/model_evaluation_interface.py
+?? engine/paper_trading_engine.py
+?? engine/prospective_l2_evaluation_protocol.py
+?? engine/prospective_l2_qualification.py
+?? engine/prospective_l2_shadow_gating.py
+?? engine/prospective_shadow_collector.py
+?? engine/regime_strategy_tournament.py
+?? engine/run_browser_qa.py
+?? engine/run_l2_prospective_burnin.py
+?? engine/run_real_cdp_browser_qa.py
+?? engine/run_v32_42_cdp_browser_qa.py
+?? engine/run_v32_42_journal_browser_qa.py
+?? engine/run_v32_43_smart_entry_browser_qa.py
+?? engine/run_v32_44_smart_entry_browser_qa.py
+?? engine/run_v32_45_workflow_acceptance_browser_qa.py
+?? engine/run_v32_46_vigorous_browser_qa.py
+?? engine/run_v32_47_real_backend_qa.py
+?? engine/run_v32_48_real_backend_qa.py
+?? engine/shadow_feed_runner.py
+?? engine/smart_entry_pipeline.py
+?? engine/smart_entry_simulator.py
+?? engine/strategy_signal_engine.py
+?? engine/trade_outcome_evaluator.py
+?? engine/user_position_tracker.py
+?? engine/v32_46_test_mock_server.py
+?? engine/v32_48_test_backend_server.py
+?? requirements-research.txt
+?? research/data_acquisition/acquire_coinbase_hourly.py
+?? research/data_audit_summary.json
+?? research/drift_model_walkforward_results.json
+?? research/execution_cost_eligibility_contract.md
+?? research/experiments/run_phase2_strategy_baseline.py
+?? research/experiments/run_phase3_forecast_evaluation.py
+?? research/experiments/run_phase4_meta_model.py
+?? research/experiments/run_phase5_ablation.py
+?? research/experiments/run_v32_28_master_pipeline.py
+?? research/experiments/run_v32_30_horizon_study.py
+?? research/experiments/run_v32_37_chronos2_benchmark.py
+?? research/experiments/verify_isolated_api_server.py
+?? research/har_calibration_results.json
+?? research/historical_replay_results.json
+?? research/protocol_v1_1.md
+?? research/protocol_v1_2_decision_matrix_v31_1.md
+?? research/protocol_v1_2_proposal.md
+?? research/reports/artifacts/browser_qa/how_it_works_desktop.png
+?? research/reports/artifacts/browser_qa/how_it_works_desktop_dom.html
+?? research/reports/artifacts/browser_qa/how_it_works_mobile.png
+?? research/reports/artifacts/browser_qa/how_it_works_mobile_dom.html
+?? research/reports/artifacts/browser_qa/how_it_works_tablet.png
+?? research/reports/artifacts/browser_qa/how_it_works_tablet_dom.html
+?? research/reports/artifacts/browser_qa/landing_desktop.png
+?? research/reports/artifacts/browser_qa/landing_desktop_dom.html
+?? research/reports/artifacts/browser_qa/landing_mobile.png
+?? research/reports/artifacts/browser_qa/landing_mobile_dom.html
+?? research/reports/artifacts/browser_qa/landing_tablet.png
+?? research/reports/artifacts/browser_qa/landing_tablet_dom.html
+?? research/reports/artifacts/browser_qa/mobile_viewport_1792992879740.png
+?? research/reports/artifacts/browser_qa/paper_trading_tab_1792992860827.png
+?? research/reports/artifacts/browser_qa/real_how_it_works_desktop.png
+?? research/reports/artifacts/browser_qa/real_how_it_works_mobile.png
+?? research/reports/artifacts/browser_qa/real_how_it_works_tablet.png
+?? research/reports/artifacts/browser_qa/real_landing_desktop.png
+?? research/reports/artifacts/browser_qa/real_landing_mobile.png
+?? research/reports/artifacts/browser_qa/real_landing_tablet.png
+?? research/reports/artifacts/browser_qa/research_page_1792992832118.png
+?? research/reports/artifacts/browser_qa/research_subtabs_1792992841483.png
+?? research/reports/artifacts/browser_qa/tablet_viewport_1792992870482.png
+?? research/reports/artifacts/browser_qa/terminal_desktop_1792992760727.png
+?? research/reports/artifacts/browser_qa/terminal_lower_1792992775557.png
+?? research/reports/artifacts/browser_qa/terminal_scrolled_1792992769197.png
+?? research/reports/artifacts/browser_qa/terminal_smart_entry_1792992781923.png
+?? research/reports/artifacts/browser_qa/terminal_top_1792992789558.png
+?? research/reports/artifacts/browser_qa/v32_42_manual_journal_desktop.png
+?? research/reports/artifacts/browser_qa/v32_42_manual_journal_mobile.png
+?? research/reports/artifacts/browser_qa/v32_42_manual_journal_tablet.png
+?? research/reports/artifacts/browser_qa/v32_42_position_copilot_desktop.png
+?? research/reports/artifacts/browser_qa/v32_42_position_copilot_mobile.png
+?? research/reports/artifacts/browser_qa/v32_42_position_copilot_tablet.png
+?? research/reports/artifacts/browser_qa/v32_43_smart_entry_desktop.png
+?? research/reports/artifacts/browser_qa/v32_43_smart_entry_mobile.png
+?? research/reports/artifacts/browser_qa/v32_43_smart_entry_tablet.png
+?? research/reports/artifacts/browser_qa/v32_44_smart_entry_desktop.png
+?? research/reports/artifacts/browser_qa/v32_44_smart_entry_mobile.png
+?? research/reports/artifacts/browser_qa/v32_44_smart_entry_tablet.png
+?? research/reports/artifacts/browser_qa/v32_45_smart_entry_desktop.png
+?? research/reports/artifacts/browser_qa/v32_45_smart_entry_mobile.png
+?? research/reports/artifacts/browser_qa/v32_45_smart_entry_tablet.png
+?? research/reports/artifacts/browser_qa/v32_46_vigorous/v32_46_vigorous_browser_qa_results.json
+?? research/reports/artifacts/browser_qa/v32_46_vigorous/v32_46_vigorous_manual_journal.png
+?? research/reports/artifacts/browser_qa/v32_46_vigorous/v32_46_vigorous_research_paper_trading.png
+?? research/reports/artifacts/browser_qa/v32_46_vigorous/v32_46_vigorous_terminal_desktop.png
+?? research/reports/artifacts/browser_qa/v32_46_vigorous/v32_46_vigorous_terminal_mobile.png
+?? research/reports/artifacts/browser_qa/v32_46_vigorous/v32_46_vigorous_terminal_stale_abstain.png
+?? research/reports/artifacts/browser_qa/v32_46_vigorous/v32_46_vigorous_terminal_tablet.png
+?? research/reports/artifacts/browser_qa/v32_47_real_backend/v32_47_desktop_smart_entry_monitor.png
+?? research/reports/artifacts/browser_qa/v32_47_real_backend/v32_47_mobile_smart_entry_monitor.png
+?? research/reports/artifacts/browser_qa/v32_47_real_backend/v32_47_tablet_smart_entry_monitor.png
+?? research/reports/artifacts/browser_qa/v32_48_real_backend/v32_48_test_a_one_click_integrated_workflow.png
+?? research/reports/artifacts/browser_qa/v32_48_real_backend/v32_48_test_b_chart_data_integrity.png
+?? research/reports/artifacts/browser_qa/v32_48_real_backend/v32_48_test_c_d_tournament_provenance.png
+?? research/reports/artifacts/browser_qa/v32_48_real_backend/v32_48_test_e_entry_and_ai_monitoring.png
+?? research/reports/artifacts/browser_qa/v32_48_real_backend/v32_48_test_f_desktop_1280.png
+?? research/reports/artifacts/browser_qa/v32_48_real_backend/v32_48_test_f_mobile_375.png
+?? research/reports/artifacts/browser_qa/v32_48_real_backend/v32_48_test_f_tablet_768.png
+?? research/reports/artifacts/browser_qa/v32_49/normal_app_analyse_network_trace.json
+?? research/reports/artifacts/browser_qa/v32_49/terminal_desktop_1280x800.png
+?? research/reports/artifacts/browser_qa/v32_49/terminal_mobile_375x667.png
+?? research/reports/artifacts/browser_qa/v32_49/terminal_tablet_768x1024.png
+?? research/reports/artifacts/v32_34/after_smart_entry_click_1792915336250.png
+?? research/reports/artifacts/v32_34/after_terminal_click_1792915398530.png
+?? research/reports/artifacts/v32_34/arena_tab_view_1792911798632.png
+?? research/reports/artifacts/v32_34/base_page_1792915381975.png
+?? research/reports/artifacts/v32_34/desktop_terminal_initial_1792911705548.png
+?? research/reports/artifacts/v32_34/final_terminal_verification_1792827185171.png
+?? research/reports/artifacts/v32_34/l2_gating_panel_1792913667670.png
+?? research/reports/artifacts/v32_34/l2_gating_panel_scrolled_1792913673748.png
+?? research/reports/artifacts/v32_34/l2_gating_status_api_1792913732626.png
+?? research/reports/artifacts/v32_34/l2_shadow_evaluation_api_1792913738541.png
+?? research/reports/artifacts/v32_34/landing_desktop_1792921198647.png
+?? research/reports/artifacts/v32_34/landing_desktop_new_1792921256462.png
+?? research/reports/artifacts/v32_34/landing_desktop_scrolled_1792921205061.png
+?? research/reports/artifacts/v32_34/landing_reload_1792921244677.png
+?? research/reports/artifacts/v32_34/live_terminal_loaded_1792826811624.png
+?? research/reports/artifacts/v32_34/live_terminal_scrolled_1792826825854.png
+?? research/reports/artifacts/v32_34/live_terminal_top_1792826841429.png
+?? research/reports/artifacts/v32_34/market_tab_view_1792911719450.png
+?? research/reports/artifacts/v32_34/maximized_terminal_1792826873504.png
+?? research/reports/artifacts/v32_34/maximized_top_1792826890573.png
+?? research/reports/artifacts/v32_34/notification_modal_1792921235005.png
+?? research/reports/artifacts/v32_34/replay_tab_view_1792911784505.png
+?? research/reports/artifacts/v32_34/research_page_1792913691121.png
+?? research/reports/artifacts/v32_34/research_page_1792921333469.png
+?? research/reports/artifacts/v32_34/research_page_evaluate_1792921368609.png
+?? research/reports/artifacts/v32_34/research_page_scrolled_1792921354864.png
+?? research/reports/artifacts/v32_34/research_results_view_1792916160876.png
+?? research/reports/artifacts/v32_34/research_tab_view_1792911754134.png
+?? research/reports/artifacts/v32_34/research_tab_view_2_1792911772323.png
+?? research/reports/artifacts/v32_34/responsive_1024x768_1792911809107.png
+?? research/reports/artifacts/v32_34/responsive_800x600_1792911823085.png
+?? research/reports/artifacts/v32_34/root_home_1792915316311.png
+?? research/reports/artifacts/v32_34/root_page_1792915270085.png
+?? research/reports/artifacts/v32_34/root_view_1792915236613.png
+?? research/reports/artifacts/v32_34/smart_entry_desktop_1792921285602.png
+?? research/reports/artifacts/v32_34/smart_entry_direct_1792915886546.png
+?? research/reports/artifacts/v32_34/smart_entry_evaluated_1792913761112.png
+?? research/reports/artifacts/v32_34/smart_entry_full_page_1792913726026.png
+?? research/reports/artifacts/v32_34/smart_entry_initial_1792915717291.png
+?? research/reports/artifacts/v32_34/smart_entry_loaded_1792915285315.png
+?? research/reports/artifacts/v32_34/smart_entry_loaded_1792915736595.png
+?? research/reports/artifacts/v32_34/smart_entry_maximized_1792913771003.png
+?? research/reports/artifacts/v32_34/smart_entry_page_1792913661611.png
+?? research/reports/artifacts/v32_34/smart_entry_page_1792915295929.png
+?? research/reports/artifacts/v32_34/smart_entry_page_1792921320756.png
+?? research/reports/artifacts/v32_34/smart_entry_reloaded_1792913777389.png
+?? research/reports/artifacts/v32_34/smart_entry_result_1792862556855.png
+?? research/reports/artifacts/v32_34/smart_entry_route_1792915354864.png
+?? research/reports/artifacts/v32_34/smart_entry_view_1792915255887.png
+?? research/reports/artifacts/v32_34/smart_entry_wait_1792921296578.png
+?? research/reports/artifacts/v32_34/strategies_tab_view_1792911731506.png
+?? research/reports/artifacts/v32_34/terminal_bottom_1792827110239.png
+?? research/reports/artifacts/v32_34/terminal_controls_1792854814930.png
+?? research/reports/artifacts/v32_34/terminal_controls_2_1792854847629.png
+?? research/reports/artifacts/v32_34/terminal_desktop_1792921262604.png
+?? research/reports/artifacts/v32_34/terminal_final_1792913784059.png
+?? research/reports/artifacts/v32_34/terminal_forecast_view_1792862500683.png
+?? research/reports/artifacts/v32_34/terminal_fresh_1792827145416.png
+?? research/reports/artifacts/v32_34/terminal_header_1792854094527.png
+?? research/reports/artifacts/v32_34/terminal_horizon_bar_1792854964243.png
+?? research/reports/artifacts/v32_34/terminal_horizon_bar_2_1792854985465.png
+?? research/reports/artifacts/v32_34/terminal_horizon_bar_3_1792855006437.png
+?? research/reports/artifacts/v32_34/terminal_initial_1792854757796.png
+?? research/reports/artifacts/v32_34/terminal_initial_1792915651401.png
+?? research/reports/artifacts/v32_34/terminal_page_1792913654515.png
+?? research/reports/artifacts/v32_34/terminal_page_view_1792855091267.png
+?? research/reports/artifacts/v32_34/terminal_reloaded_1792827073922.png
+?? research/reports/artifacts/v32_34/terminal_route_1792915367328.png
+?? research/reports/artifacts/v32_34/terminal_scrolled_1792854873429.png
+?? research/reports/artifacts/v32_34/terminal_tabs_view_1792826905013.png
+?? research/reports/artifacts/v32_34/terminal_timeframes_1792854935199.png
+?? research/reports/artifacts/v32_34/terminal_top_1792854072401.png
+?? research/reports/artifacts/v32_34/terminal_top_chart_1792854781990.png
+?? research/reports/artifacts/v32_34/terminal_top_scrolled_1792827089966.png
+?? research/reports/artifacts/v32_34/terminal_top_view_1792854906754.png
+?? research/reports/artifacts/v32_34/terminal_top_view_1792855123101.png
+?? research/reports/artifacts/v32_34/terminal_topbar_1792854082741.png
+?? research/reports/artifacts/v32_34/terminal_view_1792854067502.png
+?? research/reports/artifacts/v32_34/terminal_view_1792915246604.png
+?? research/reports/artifacts/v32_34/terminal_view_initial_1792915198811.png
+?? research/reports/artifacts/v32_34/terminal_view_loaded_1792915225564.png
+?? research/reports/artifacts/v32_34/terminal_view_success_1792915423958.png
+?? research/reports/artifacts/v32_34/terminal_viewport_1792855100336.png
+?? research/reports/artifacts/v32_34/top_navbar_visible_1792826956600.png
+?? research/reports/artifacts/v32_34/top_of_page_1792827041173.png
+?? research/reports/artifacts/v32_34/top_scrolled_fully_1792827163762.png
+?? research/reports/artifacts/v32_34/trades_tab_view_1792911742520.png
+?? research/reports/artifacts/v32_35/baseline_forecast_route_1792923309789.png
+?? research/reports/artifacts/v32_35/baseline_landing_1792923226655.png
+?? research/reports/artifacts/v32_35/baseline_landing_1792923231924.png
+?? research/reports/artifacts/v32_35/baseline_landing_1792923277842.png
+?? research/reports/artifacts/v32_35/baseline_terminal_market_1792923286277.png
+?? research/reports/artifacts/v32_35/baseline_terminal_market_scrolled_1792923293522.png
+?? research/reports/artifacts/v32_35/desktop_viewport_1792924473378.png
+?? research/reports/artifacts/v32_35/landing_page_1792924258392.png
+?? research/reports/artifacts/v32_35/mobile_viewport_1792924462199.png
+?? research/reports/artifacts/v32_35/tablet_viewport_1792924455412.png
+?? research/reports/artifacts/v32_35/terminal_viewport_1792855100336.png
+?? research/reports/artifacts/v32_35/v32_35_browser_qa_1792924241806.webp
+?? research/reports/artifacts/v32_50/normal_browser_network_trace.json
+?? research/reports/artifacts/v32_50/terminal_desktop_1280x800.png
+?? research/reports/artifacts/v32_50/terminal_mobile_375x667.png
+?? research/reports/artifacts/v32_50/terminal_tablet_768x1024.png
+?? research/reports/v32_26_evidence_first_pipeline_and_provenance_audit.md
+?? research/reports/v32_27_bounded_self_loop_execution_report.md
+?? research/reports/v32_28_feature_inventory_and_disposition_matrix.md
+?? research/reports/v32_28_feature_qa_matrix.md
+?? research/reports/v32_28_master_refactor_qa_report.md
+?? research/reports/v32_29_evidence_based_repair_report.md
+?? research/reports/v32_29_feature_qa_matrix.md
+?? research/reports/v32_29_repair_evidence_ledger.md
+?? research/reports/v32_30_current_state_and_discrepancy_ledger.md
+?? research/reports/v32_30_final_qa_and_red_team_report.md
+?? research/reports/v32_30_frontend_browser_qa_matrix.md
+?? research/reports/v32_30_horizon_research_preregistration.md
+?? research/reports/v32_30_horizon_research_results.md
+?? research/reports/v32_30_l2_data_and_feature_design.md
+?? research/reports/v32_31_feature_qa_matrix.md
+?? research/reports/v32_31_l2_entry_gating_report.md
+?? research/reports/v32_31_l2_preregistration_protocol.md
+?? research/reports/v32_32_feature_qa_matrix.md
+?? research/reports/v32_32_master_analysis_and_repair_report.md
+?? research/reports/v32_33_feature_verification_matrix.md
+?? research/reports/v32_33_independent_qa_report.md
+?? research/reports/v32_33_market_data_integrity_report.md
+?? research/reports/v32_33_master_improvement_report.md
+?? research/reports/v32_33_priority_defect_register.md
+?? research/reports/v32_33_quantitative_research_audit.md
+?? research/reports/v32_33_rating_scorecard.md
+?? research/reports/v32_34_defect_repair_ledger.md
+?? research/reports/v32_34_final_release_qa_report.md
+?? research/reports/v32_34_frontend_feature_visibility_matrix.md
+?? research/reports/v32_34_frontend_ux_baseline_and_final_scorecard.md
+?? research/reports/v32_34_independent_browser_qa_report.md
+?? research/reports/v32_35_final_qa_report.md
+?? research/reports/v32_35_forecast_feature_visibility_matrix.md
+?? research/reports/v32_35_forecast_visibility_defect_ledger.md
+?? research/reports/v32_35_independent_browser_qa_report.md
+?? research/reports/v32_36_forecasting_integrity_and_reconciliation_report.md
+?? research/reports/v32_36_l2_market_data_qualification_and_preregistration.md
+?? research/reports/v32_36_master_economic_decision_report.md
+?? research/reports/v32_36_multi_horizon_strategy_reconciliation_matrix.md
+?? research/reports/v32_37_chronos2_benchmark_summary.json
+?? research/reports/v32_37_chronos2_comparative_benchmark_report.md
+?? research/reports/v32_38_adaptive_market_intelligence_report.md
+?? research/reports/v32_38_adaptive_market_intelligence_summary.json
+?? research/reports/v32_39_preflight_data_quality_summary.json
+?? research/reports/v32_39_prospective_l2_qualification_report.md
+?? research/reports/v32_40a_burnin_capture_summary.json
+?? research/reports/v32_40b_browser_qa_report.md
+?? research/reports/v32_40b_browser_qa_summary.json
+?? research/reports/v32_40b_burnin_integrity_audit_report.md
+?? research/reports/v32_40b_burnin_integrity_audit_summary.json
+?? research/reports/v32_41_paper_trading_design_and_validation_report.md
+?? research/reports/v32_41_paper_trading_summary.json
+?? research/reports/v32_42_manual_journal_browser_qa_summary.json
+?? research/reports/v32_42_manual_trade_journal_report.md
+?? research/reports/v32_42_manual_trade_journal_summary.json
+?? research/reports/v32_42_user_position_tracker_and_risk_copilot_report.md
+?? research/reports/v32_42_user_position_tracker_and_risk_copilot_summary.json
+?? research/reports/v32_43_smart_entry_browser_qa_summary.json
+?? research/reports/v32_43_strategy_tournament_and_smart_entry_report.md
+?? research/reports/v32_43_strategy_tournament_and_smart_entry_summary.json
+?? research/reports/v32_44_smart_entry_browser_qa_summary.json
+?? research/reports/v32_44_smart_entry_independent_audit.md
+?? research/reports/v32_44_tournament_and_lifecycle_audit_summary.json
+?? research/reports/v32_45_analyse_tournament_entry_validation_report.md
+?? research/reports/v32_45_workflow_acceptance_browser_qa_summary.json
+?? research/reports/v32_45_workflow_acceptance_summary.json
+?? research/reports/v32_46_navigation_simplification_summary.json
+?? research/reports/v32_46_terminal_consolidation_and_navigation_simplification_report.md
+?? research/reports/v32_46_vigorous_qa_report.md
+?? research/reports/v32_46_vigorous_qa_summary.json
+?? research/reports/v32_47_analyse_selection_and_anomaly_monitor_report.md
+?? research/reports/v32_47_vigorous_qa_summary.json
+?? research/reports/v32_48_integrated_analyse_and_tournament_report.md
+?? research/reports/v32_48_vigorous_qa_summary.json
+?? research/reports/v32_49_scenario_qa_and_ui_report.md
+?? research/reports/v32_49_scenario_qa_summary.json
+?? research/reports/v32_50_runtime_forecast_ui_qa_report.md
+?? research/reports/v32_50_runtime_forecast_ui_qa_summary.json
+?? research/rigorous_replay_results_v2.json
+?? research/runs/v32_27/phase2_strategy_baseline_summary.json
+?? research/runs/v32_27/phase2_strategy_trade_ledger.json
+?? research/runs/v32_27/phase3_forecast_evaluation_summary.json
+?? research/runs/v32_27/phase4_meta_model_summary.json
+?? research/runs/v32_27/phase5_policy_ablation_summary.json
+?? research/runs/v32_28/master_pipeline_execution_summary.json
+?? research/runs/v32_28/phase2_strategy_baseline_summary.json
+?? research/runs/v32_28/phase2_strategy_trade_ledger.json
+?? research/runs/v32_28/phase3_forecast_evaluation_summary.json
+?? research/runs/v32_28/phase4_meta_model_summary.json
+?? research/runs/v32_28/phase5_policy_ablation_summary.json
+?? research/runs/v32_30/TSMOM_DONCHIAN_168H_336H_trades.jsonl
+?? research/runs/v32_30/TSMOM_DONCHIAN_24H_168H_trades.jsonl
+?? research/runs/v32_30/TSMOM_DONCHIAN_72H_168H_trades.jsonl
+?? research/runs/v32_30/horizon_study_summary.json
+?? research/runs/v32_37/chronos2_benchmark_summary.json
+?? research/runs/v32_37/chronos2_raw_inference_cache.npz
+?? research/v30_3_prospective_shadow_report.md
+?? research/v30_4_shadow_feed_report.md
+?? research/v30_5_shadow_operations_report.md
+?? research/v30_6_operational_proof_report.md
+?? research/v30_7_shadow_burnin_report.md
+?? research/v30_8_collection_integrity_report.md
+?? research/v30_9_statistical_gate_audit.md
+?? research/v31_0_research_closure_report.md
+?? research/v31_1_data_provenance_audit.md
+?? research/v31_1_foundation_repair_report.md
+?? research/v31_2_blocker_resolution.md
+?? research/v31_2_dataset_options_assessment.md
+?? research/v31_2_evidence_verification_report.md
+?? research/v31_2_single_dataset_acceptance_gates.md
+?? research/v31_3_coinbase15_contract.md
+?? research/v31_3_coinbase15_validation_report.md
+?? research/v31_4_coinbase15_data_use_decision.md
+?? research/v31_4_coinbase_terms_compatibility_report.md
+?? research/v31_5_coinbase_terms_primary_source_verification.md
+?? research/v31_6_alternative_data_source_qualification.md
+?? research/v31_7_binance_btcusdt_1m_contract.md
+?? research/v31_8_binance_data_license_clarification_request.md
+?? research/v31_8_binance_data_use_gate.md
+?? research/v31_9_btcusd_source_decision.md
+?? research/v32_0_btcusd_license_provenance_decision.md
+?? research/v32_11_smart_entry_api_ui_report.md
+?? research/v32_12_smart_entry_e2e_verification.md
+?? research/v32_13_smart_entry_dashboard_visibility_report.md
+?? research/v32_14_live_terminal_smart_entry_report.md
+?? research/v32_15_modern_research_and_cons_remedies_report.md
+?? research/v32_17_empirical_remediation_and_first_passage_report.md
+?? research/v32_18_persistence_containment_report.md
+?? research/v32_19_persistence_boundary_report.md
+?? research/v32_1_application_health_audit.md
+?? research/v32_20_execution_cost_contract_report.md
+?? research/v32_21_training_and_feature_audit.md
+?? research/v32_22_prediction_chart_accuracy_report.md
+?? research/v32_23_forecast_smart_entry_qa_report.md
+?? research/v32_24_repeated_forecast_smart_entry_qa_report.md
+?? research/v32_25_ai_forecast_smart_entry_completion_report.md
+?? research/v32_2_btcusd_dataset_resolution.md
+?? research/v32_4_strategy_backtest_entry_engine_report.md
+?? research/v32_5_provisional_college_project_path.md
+?? research/v5_directional_and_drift_evaluation.json
+?? tests/test_coinbase_l2_collector_and_gating.py
+?? tests/test_isolated_real_http_server.py
+?? tests/test_prospective_shadow_collector.py
+?? tests/test_shadow_feed_runner.py
+?? tests/test_strategy_to_alert_pipeline.py
+?? tests/test_v30_6_operational_proof.py
+?? tests/test_v30_7_shadow_burnin.py
+?? tests/test_v30_8_collection_integrity.py
+?? tests/test_v30_9_statistical_gate_audit.py
+?? tests/test_v32_18_persistence_containment.py
+?? tests/test_v32_22_chart_and_forecast_integrity.py
+?? tests/test_v32_23_forecast_smart_entry_recovery.py
+?? tests/test_v32_25_directional_integration.py
+?? tests/test_v32_37_chronos2_benchmark.py
+?? tests/test_v32_38_adaptive_market_intelligence.py
+?? tests/test_v32_39_prospective_l2_qualification.py
+?? tests/test_v32_40b_burnin_and_feature_warmup.py
+?? tests/test_v32_41_paper_trading_engine.py
+?? tests/test_v32_42_manual_trade_journal_and_eval.py
+?? tests/test_v32_42_user_position_tracker_and_risk_copilot.py
+?? tests/test_v32_43_strategy_tournament_and_smart_entry.py
+?? tests/test_v32_44_smart_entry_independent_audit.py
+?? tests/test_v32_45_workflow_acceptance.py
+?? tests/test_v32_46_navigation_and_terminal_consolidation.py
+?? tests/test_v32_47_analyse_selection_and_anomaly_monitor.py
+?? tests/test_v32_48_integrated_analyse_and_tournament.py
+?? tests/test_v32_49_scenario_qa.py
+?? tests/test_v32_50_chart_forecast_runtime.py
+?? web_src/manual_trade_journal_view.js
+?? web_src/smart_entry_simulator_view.js
+=== DIFF_STAT ===
+warning: in the working copy of 'CHANGES.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'api/routes_research.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'api/routes_tournament.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backtest/market_memory.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'engine/__init__.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'engine/counterfactual_contract_engine.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'engine/evidence_router.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'engine/execution_cost_model.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'engine/forecast_engine_15m.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'engine/probabilistic_entry_engine.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'engine/strategy_selection.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'experiments/results/stage10_shadow_validation/shadow_prediction_ledger.jsonl', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'experiments/results/stage11_forward_validation/forward_prediction_ledger.jsonl', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests_frontend.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'web_src/api_client.js', LF will be replaced by CRLF the next time Git touches it
+ CHANGES.md                                         |   42 +-
+ README.md                                          |  718 +-
+ api/notifications.py                               |   21 +-
+ api/routes_research.py                             |  250 +-
+ api/routes_tournament.py                           |  554 +-
+ api/server.py                                      |    4 +
+ backtest/market_memory.py                          |    4 +
+ data/prospective_forecast_ledger.jsonl             |   20 +-
+ data/research_alert_state.json                     |   10 +-
+ engine/__init__.py                                 |    3 +-
+ engine/counterfactual_contract_engine.py           |    8 +-
+ engine/evidence_router.py                          |   62 +-
+ engine/execution_cost_model.py                     |  191 +-
+ engine/forecast_engine_15m.py                      |   98 +-
+ engine/probabilistic_entry_engine.py               |   13 +-
+ engine/smart_entry_engine.py                       |   64 +-
+ engine/strategy_selection.py                       |   86 +-
+ .../results/multi_regime_validation_report.json    |    2 +-
+ .../results/post_repair_milestone_5_lock.json      |    2 +-
+ .../shadow_prediction_ledger.jsonl                 |  428 +
+ .../forward_prediction_ledger.jsonl                |  415 +
+ research/baseline_challenge_report.md              |   16 +-
+ research/challenger_bakeoff_report.md              |   12 +-
+ research/hawkes_latency_report.md                  |    8 +-
+ research/hawkes_shadow_report.md                   |   20 +-
+ research/independent_block_report.md               |    8 +-
+ research/information_inventory_report.md           |   30 +-
+ research/interval_sharpness_report.md              |    8 +-
+ research/live_baseline_comparison.md               |    8 +-
+ research/live_long_validation_report.md            |   38 +-
+ research/live_metric_reconciliation_report.md      |   10 +-
+ research/production_review_block_10.md             |    2 +-
+ research/range_stability_report.md                 |    4 +-
+ research/reports/post_repair_5_block_observed.md   |    6 +-
+ research/reports/post_repair_baseline.md           |   14 +-
+ research/reports/post_repair_restart_review.md     |    2 +-
+ research/reports/pre_post_repair_comparison.md     |    2 +-
+ results/challenger_bakeoff_manifest.json           |    8 +-
+ results/live_validation_manifest.json              |    6 +-
+ results/mamba_trial_manifest.json                  |   72 +-
+ results/model_change_request.json                  |    4 +-
+ tests_frontend.js                                  |  232 +
+ web/app.js                                         | 8451 ++++++++++++++++++--
+ web/index.html                                     |    4 +-
+ web/styles.css                                     |  345 +-
+ web_src/api_client.js                              |  192 +
+ 46 files changed, 11324 insertions(+), 1173 deletions(-)
+=== DIFF_NUMSTAT ===
+warning: in the working copy of 'CHANGES.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'api/routes_research.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'api/routes_tournament.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backtest/market_memory.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'engine/__init__.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'engine/counterfactual_contract_engine.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'engine/evidence_router.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'engine/execution_cost_model.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'engine/forecast_engine_15m.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'engine/probabilistic_entry_engine.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'engine/strategy_selection.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'experiments/results/stage10_shadow_validation/shadow_prediction_ledger.jsonl', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'experiments/results/stage11_forward_validation/forward_prediction_ledger.jsonl', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests_frontend.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'web_src/api_client.js', LF will be replaced by CRLF the next time Git touches it
+39	3	CHANGES.md
+510	208	README.md
+20	1	api/notifications.py
+246	4	api/routes_research.py
+553	1	api/routes_tournament.py
+4	0	api/server.py
+4	0	backtest/market_memory.py
+15	5	data/prospective_forecast_ledger.jsonl
+5	5	data/research_alert_state.json
+2	1	engine/__init__.py
+7	1	engine/counterfactual_contract_engine.py
+38	24	engine/evidence_router.py
+184	7	engine/execution_cost_model.py
+90	8	engine/forecast_engine_15m.py
+10	3	engine/probabilistic_entry_engine.py
+57	7	engine/smart_entry_engine.py
+54	32	engine/strategy_selection.py
+1	1	experiments/results/multi_regime_validation_report.json
+1	1	experiments/results/post_repair_milestone_5_lock.json
+428	0	experiments/results/stage10_shadow_validation/shadow_prediction_ledger.jsonl
+415	0	experiments/results/stage11_forward_validation/forward_prediction_ledger.jsonl
+8	8	research/baseline_challenge_report.md
+6	6	research/challenger_bakeoff_report.md
+4	4	research/hawkes_latency_report.md
+10	10	research/hawkes_shadow_report.md
+4	4	research/independent_block_report.md
+15	15	research/information_inventory_report.md
+4	4	research/interval_sharpness_report.md
+4	4	research/live_baseline_comparison.md
+19	19	research/live_long_validation_report.md
+5	5	research/live_metric_reconciliation_report.md
+1	1	research/production_review_block_10.md
+2	2	research/range_stability_report.md
+3	3	research/reports/post_repair_5_block_observed.md
+7	7	research/reports/post_repair_baseline.md
+1	1	research/reports/post_repair_restart_review.md
+1	1	research/reports/pre_post_repair_comparison.md
+4	4	results/challenger_bakeoff_manifest.json
+3	3	results/live_validation_manifest.json
+36	36	results/mamba_trial_manifest.json
+2	2	results/model_change_request.json
+232	0	tests_frontend.js
+7732	719	web/app.js
+2	2	web/index.html
+344	1	web/styles.css
+192	0	web_src/api_client.js
+=== UNTRACKED_PATHS ===
+api/routes_manual_journal.py
+api/routes_user_positions.py
+data/.prospective_shadow_runner.lock
+data/manual_trades/manual_trades_ledger.jsonl
+data/prospective_entry_ledger_v1_quarantined.jsonl
+data/prospective_entry_ledger_v2.jsonl
+data/prospective_shadow_status.json
+data/prospective_shadow_v1.jsonl
+data/research/coinbase_btc_usd_hourly_v1/acquisition_log.jsonl
+data/research/coinbase_btc_usd_hourly_v1/coinbase_hourly_manifest.json
+data/research/l2_stream/l2_burnin_events_20261025_135844.jsonl
+data/research/l2_stream/l2_burnin_events_20261025_140347.jsonl
+data/research/l2_stream/l2_burnin_events_20261025_140437.jsonl
+data/research/prospective_l2_gated_ledger_v1.jsonl
+data/research/user_positions/user_position_events.jsonl
+data/research/user_positions/user_positions_state.json
+data/smart_entry/smart_entry_attempts.jsonl
+engine/adaptive_risk_copilot.py
+engine/check_browser_state.py
+engine/coinbase_l2_collector.py
+engine/data_verification.py
+engine/directional_forecast_service.py
+engine/drift_evaluator.py
+engine/l2_event_recorder.py
+engine/l2_microstructure_features.py
+engine/manual_trade_journal.py
+engine/model_evaluation_interface.py
+engine/paper_trading_engine.py
+engine/prospective_l2_evaluation_protocol.py
+engine/prospective_l2_qualification.py
+engine/prospective_l2_shadow_gating.py
+engine/prospective_shadow_collector.py
+engine/regime_strategy_tournament.py
+engine/run_browser_qa.py
+engine/run_l2_prospective_burnin.py
+engine/run_real_cdp_browser_qa.py
+engine/run_v32_42_cdp_browser_qa.py
+engine/run_v32_42_journal_browser_qa.py
+engine/run_v32_43_smart_entry_browser_qa.py
+engine/run_v32_44_smart_entry_browser_qa.py
+engine/run_v32_45_workflow_acceptance_browser_qa.py
+engine/run_v32_46_vigorous_browser_qa.py
+engine/run_v32_47_real_backend_qa.py
+engine/run_v32_48_real_backend_qa.py
+engine/shadow_feed_runner.py
+engine/smart_entry_pipeline.py
+engine/smart_entry_simulator.py
+engine/strategy_signal_engine.py
+engine/trade_outcome_evaluator.py
+engine/user_position_tracker.py
+engine/v32_46_test_mock_server.py
+engine/v32_48_test_backend_server.py
+requirements-research.txt
+research/data_acquisition/acquire_coinbase_hourly.py
+research/data_audit_summary.json
+research/drift_model_walkforward_results.json
+research/execution_cost_eligibility_contract.md
+research/experiments/run_phase2_strategy_baseline.py
+research/experiments/run_phase3_forecast_evaluation.py
+research/experiments/run_phase4_meta_model.py
+research/experiments/run_phase5_ablation.py
+research/experiments/run_v32_28_master_pipeline.py
+research/experiments/run_v32_30_horizon_study.py
+research/experiments/run_v32_37_chronos2_benchmark.py
+research/experiments/verify_isolated_api_server.py
+research/har_calibration_results.json
+research/historical_replay_results.json
+research/protocol_v1_1.md
+research/protocol_v1_2_decision_matrix_v31_1.md
+research/protocol_v1_2_proposal.md
+research/reports/artifacts/browser_qa/how_it_works_desktop.png
+research/reports/artifacts/browser_qa/how_it_works_desktop_dom.html
+research/reports/artifacts/browser_qa/how_it_works_mobile.png
+research/reports/artifacts/browser_qa/how_it_works_mobile_dom.html
+research/reports/artifacts/browser_qa/how_it_works_tablet.png
+research/reports/artifacts/browser_qa/how_it_works_tablet_dom.html
+research/reports/artifacts/browser_qa/landing_desktop.png
+research/reports/artifacts/browser_qa/landing_desktop_dom.html
+research/reports/artifacts/browser_qa/landing_mobile.png
+research/reports/artifacts/browser_qa/landing_mobile_dom.html
+research/reports/artifacts/browser_qa/landing_tablet.png
+research/reports/artifacts/browser_qa/landing_tablet_dom.html
+research/reports/artifacts/browser_qa/mobile_viewport_1792992879740.png
+research/reports/artifacts/browser_qa/paper_trading_tab_1792992860827.png
+research/reports/artifacts/browser_qa/real_how_it_works_desktop.png
+research/reports/artifacts/browser_qa/real_how_it_works_mobile.png
+research/reports/artifacts/browser_qa/real_how_it_works_tablet.png
+research/reports/artifacts/browser_qa/real_landing_desktop.png
+research/reports/artifacts/browser_qa/real_landing_mobile.png
+research/reports/artifacts/browser_qa/real_landing_tablet.png
+research/reports/artifacts/browser_qa/research_page_1792992832118.png
+research/reports/artifacts/browser_qa/research_subtabs_1792992841483.png
+research/reports/artifacts/browser_qa/tablet_viewport_1792992870482.png
+research/reports/artifacts/browser_qa/terminal_desktop_1792992760727.png
+research/reports/artifacts/browser_qa/terminal_lower_1792992775557.png
+research/reports/artifacts/browser_qa/terminal_scrolled_1792992769197.png
+research/reports/artifacts/browser_qa/terminal_smart_entry_1792992781923.png
+research/reports/artifacts/browser_qa/terminal_top_1792992789558.png
+research/reports/artifacts/browser_qa/v32_42_manual_journal_desktop.png
+research/reports/artifacts/browser_qa/v32_42_manual_journal_mobile.png
+research/reports/artifacts/browser_qa/v32_42_manual_journal_tablet.png
+research/reports/artifacts/browser_qa/v32_42_position_copilot_desktop.png
+research/reports/artifacts/browser_qa/v32_42_position_copilot_mobile.png
+research/reports/artifacts/browser_qa/v32_42_position_copilot_tablet.png
+research/reports/artifacts/browser_qa/v32_43_smart_entry_desktop.png
+research/reports/artifacts/browser_qa/v32_43_smart_entry_mobile.png
+research/reports/artifacts/browser_qa/v32_43_smart_entry_tablet.png
+research/reports/artifacts/browser_qa/v32_44_smart_entry_desktop.png
+research/reports/artifacts/browser_qa/v32_44_smart_entry_mobile.png
+research/reports/artifacts/browser_qa/v32_44_smart_entry_tablet.png
+research/reports/artifacts/browser_qa/v32_45_smart_entry_desktop.png
+research/reports/artifacts/browser_qa/v32_45_smart_entry_mobile.png
+research/reports/artifacts/browser_qa/v32_45_smart_entry_tablet.png
+research/reports/artifacts/browser_qa/v32_46_vigorous/v32_46_vigorous_browser_qa_results.json
+research/reports/artifacts/browser_qa/v32_46_vigorous/v32_46_vigorous_manual_journal.png
+research/reports/artifacts/browser_qa/v32_46_vigorous/v32_46_vigorous_research_paper_trading.png
+research/reports/artifacts/browser_qa/v32_46_vigorous/v32_46_vigorous_terminal_desktop.png
+research/reports/artifacts/browser_qa/v32_46_vigorous/v32_46_vigorous_terminal_mobile.png
+research/reports/artifacts/browser_qa/v32_46_vigorous/v32_46_vigorous_terminal_stale_abstain.png
+research/reports/artifacts/browser_qa/v32_46_vigorous/v32_46_vigorous_terminal_tablet.png
+research/reports/artifacts/browser_qa/v32_47_real_backend/v32_47_desktop_smart_entry_monitor.png
+research/reports/artifacts/browser_qa/v32_47_real_backend/v32_47_mobile_smart_entry_monitor.png
+research/reports/artifacts/browser_qa/v32_47_real_backend/v32_47_tablet_smart_entry_monitor.png
+research/reports/artifacts/browser_qa/v32_48_real_backend/v32_48_test_a_one_click_integrated_workflow.png
+research/reports/artifacts/browser_qa/v32_48_real_backend/v32_48_test_b_chart_data_integrity.png
+research/reports/artifacts/browser_qa/v32_48_real_backend/v32_48_test_c_d_tournament_provenance.png
+research/reports/artifacts/browser_qa/v32_48_real_backend/v32_48_test_e_entry_and_ai_monitoring.png
+research/reports/artifacts/browser_qa/v32_48_real_backend/v32_48_test_f_desktop_1280.png
+research/reports/artifacts/browser_qa/v32_48_real_backend/v32_48_test_f_mobile_375.png
+research/reports/artifacts/browser_qa/v32_48_real_backend/v32_48_test_f_tablet_768.png
+research/reports/artifacts/browser_qa/v32_49/normal_app_analyse_network_trace.json
+research/reports/artifacts/browser_qa/v32_49/terminal_desktop_1280x800.png
+research/reports/artifacts/browser_qa/v32_49/terminal_mobile_375x667.png
+research/reports/artifacts/browser_qa/v32_49/terminal_tablet_768x1024.png
+research/reports/artifacts/v32_34/after_smart_entry_click_1792915336250.png
+research/reports/artifacts/v32_34/after_terminal_click_1792915398530.png
+research/reports/artifacts/v32_34/arena_tab_view_1792911798632.png
+research/reports/artifacts/v32_34/base_page_1792915381975.png
+research/reports/artifacts/v32_34/desktop_terminal_initial_1792911705548.png
+research/reports/artifacts/v32_34/final_terminal_verification_1792827185171.png
+research/reports/artifacts/v32_34/l2_gating_panel_1792913667670.png
+research/reports/artifacts/v32_34/l2_gating_panel_scrolled_1792913673748.png
+research/reports/artifacts/v32_34/l2_gating_status_api_1792913732626.png
+research/reports/artifacts/v32_34/l2_shadow_evaluation_api_1792913738541.png
+research/reports/artifacts/v32_34/landing_desktop_1792921198647.png
+research/reports/artifacts/v32_34/landing_desktop_new_1792921256462.png
+research/reports/artifacts/v32_34/landing_desktop_scrolled_1792921205061.png
+research/reports/artifacts/v32_34/landing_reload_1792921244677.png
+research/reports/artifacts/v32_34/live_terminal_loaded_1792826811624.png
+research/reports/artifacts/v32_34/live_terminal_scrolled_1792826825854.png
+research/reports/artifacts/v32_34/live_terminal_top_1792826841429.png
+research/reports/artifacts/v32_34/market_tab_view_1792911719450.png
+research/reports/artifacts/v32_34/maximized_terminal_1792826873504.png
+research/reports/artifacts/v32_34/maximized_top_1792826890573.png
+research/reports/artifacts/v32_34/notification_modal_1792921235005.png
+research/reports/artifacts/v32_34/replay_tab_view_1792911784505.png
+research/reports/artifacts/v32_34/research_page_1792913691121.png
+research/reports/artifacts/v32_34/research_page_1792921333469.png
+research/reports/artifacts/v32_34/research_page_evaluate_1792921368609.png
+research/reports/artifacts/v32_34/research_page_scrolled_1792921354864.png
+research/reports/artifacts/v32_34/research_results_view_1792916160876.png
+research/reports/artifacts/v32_34/research_tab_view_1792911754134.png
+research/reports/artifacts/v32_34/research_tab_view_2_1792911772323.png
+research/reports/artifacts/v32_34/responsive_1024x768_1792911809107.png
+research/reports/artifacts/v32_34/responsive_800x600_1792911823085.png
+research/reports/artifacts/v32_34/root_home_1792915316311.png
+research/reports/artifacts/v32_34/root_page_1792915270085.png
+research/reports/artifacts/v32_34/root_view_1792915236613.png
+research/reports/artifacts/v32_34/smart_entry_desktop_1792921285602.png
+research/reports/artifacts/v32_34/smart_entry_direct_1792915886546.png
+research/reports/artifacts/v32_34/smart_entry_evaluated_1792913761112.png
+research/reports/artifacts/v32_34/smart_entry_full_page_1792913726026.png
+research/reports/artifacts/v32_34/smart_entry_initial_1792915717291.png
+research/reports/artifacts/v32_34/smart_entry_loaded_1792915285315.png
+research/reports/artifacts/v32_34/smart_entry_loaded_1792915736595.png
+research/reports/artifacts/v32_34/smart_entry_maximized_1792913771003.png
+research/reports/artifacts/v32_34/smart_entry_page_1792913661611.png
+research/reports/artifacts/v32_34/smart_entry_page_1792915295929.png
+research/reports/artifacts/v32_34/smart_entry_page_1792921320756.png
+research/reports/artifacts/v32_34/smart_entry_reloaded_1792913777389.png
+research/reports/artifacts/v32_34/smart_entry_result_1792862556855.png
+research/reports/artifacts/v32_34/smart_entry_route_1792915354864.png
+research/reports/artifacts/v32_34/smart_entry_view_1792915255887.png
+research/reports/artifacts/v32_34/smart_entry_wait_1792921296578.png
+research/reports/artifacts/v32_34/strategies_tab_view_1792911731506.png
+research/reports/artifacts/v32_34/terminal_bottom_1792827110239.png
+research/reports/artifacts/v32_34/terminal_controls_1792854814930.png
+research/reports/artifacts/v32_34/terminal_controls_2_1792854847629.png
+research/reports/artifacts/v32_34/terminal_desktop_1792921262604.png
+research/reports/artifacts/v32_34/terminal_final_1792913784059.png
+research/reports/artifacts/v32_34/terminal_forecast_view_1792862500683.png
+research/reports/artifacts/v32_34/terminal_fresh_1792827145416.png
+research/reports/artifacts/v32_34/terminal_header_1792854094527.png
+research/reports/artifacts/v32_34/terminal_horizon_bar_1792854964243.png
+research/reports/artifacts/v32_34/terminal_horizon_bar_2_1792854985465.png
+research/reports/artifacts/v32_34/terminal_horizon_bar_3_1792855006437.png
+research/reports/artifacts/v32_34/terminal_initial_1792854757796.png
+research/reports/artifacts/v32_34/terminal_initial_1792915651401.png
+research/reports/artifacts/v32_34/terminal_page_1792913654515.png
+research/reports/artifacts/v32_34/terminal_page_view_1792855091267.png
+research/reports/artifacts/v32_34/terminal_reloaded_1792827073922.png
+research/reports/artifacts/v32_34/terminal_route_1792915367328.png
+research/reports/artifacts/v32_34/terminal_scrolled_1792854873429.png
+research/reports/artifacts/v32_34/terminal_tabs_view_1792826905013.png
+research/reports/artifacts/v32_34/terminal_timeframes_1792854935199.png
+research/reports/artifacts/v32_34/terminal_top_1792854072401.png
+research/reports/artifacts/v32_34/terminal_top_chart_1792854781990.png
+research/reports/artifacts/v32_34/terminal_top_scrolled_1792827089966.png
+research/reports/artifacts/v32_34/terminal_top_view_1792854906754.png
+research/reports/artifacts/v32_34/terminal_top_view_1792855123101.png
+research/reports/artifacts/v32_34/terminal_topbar_1792854082741.png
+research/reports/artifacts/v32_34/terminal_view_1792854067502.png
+research/reports/artifacts/v32_34/terminal_view_1792915246604.png
+research/reports/artifacts/v32_34/terminal_view_initial_1792915198811.png
+research/reports/artifacts/v32_34/terminal_view_loaded_1792915225564.png
+research/reports/artifacts/v32_34/terminal_view_success_1792915423958.png
+research/reports/artifacts/v32_34/terminal_viewport_1792855100336.png
+research/reports/artifacts/v32_34/top_navbar_visible_1792826956600.png
+research/reports/artifacts/v32_34/top_of_page_1792827041173.png
+research/reports/artifacts/v32_34/top_scrolled_fully_1792827163762.png
+research/reports/artifacts/v32_34/trades_tab_view_1792911742520.png
+research/reports/artifacts/v32_35/baseline_forecast_route_1792923309789.png
+research/reports/artifacts/v32_35/baseline_landing_1792923226655.png
+research/reports/artifacts/v32_35/baseline_landing_1792923231924.png
+research/reports/artifacts/v32_35/baseline_landing_1792923277842.png
+research/reports/artifacts/v32_35/baseline_terminal_market_1792923286277.png
+research/reports/artifacts/v32_35/baseline_terminal_market_scrolled_1792923293522.png
+research/reports/artifacts/v32_35/desktop_viewport_1792924473378.png
+research/reports/artifacts/v32_35/landing_page_1792924258392.png
+research/reports/artifacts/v32_35/mobile_viewport_1792924462199.png
+research/reports/artifacts/v32_35/tablet_viewport_1792924455412.png
+research/reports/artifacts/v32_35/terminal_viewport_1792855100336.png
+research/reports/artifacts/v32_35/v32_35_browser_qa_1792924241806.webp
+research/reports/artifacts/v32_50/normal_browser_network_trace.json
+research/reports/artifacts/v32_50/terminal_desktop_1280x800.png
+research/reports/artifacts/v32_50/terminal_mobile_375x667.png
+research/reports/artifacts/v32_50/terminal_tablet_768x1024.png
+research/reports/v32_26_evidence_first_pipeline_and_provenance_audit.md
+research/reports/v32_27_bounded_self_loop_execution_report.md
+research/reports/v32_28_feature_inventory_and_disposition_matrix.md
+research/reports/v32_28_feature_qa_matrix.md
+research/reports/v32_28_master_refactor_qa_report.md
+research/reports/v32_29_evidence_based_repair_report.md
+research/reports/v32_29_feature_qa_matrix.md
+research/reports/v32_29_repair_evidence_ledger.md
+research/reports/v32_30_current_state_and_discrepancy_ledger.md
+research/reports/v32_30_final_qa_and_red_team_report.md
+research/reports/v32_30_frontend_browser_qa_matrix.md
+research/reports/v32_30_horizon_research_preregistration.md
+research/reports/v32_30_horizon_research_results.md
+research/reports/v32_30_l2_data_and_feature_design.md
+research/reports/v32_31_feature_qa_matrix.md
+research/reports/v32_31_l2_entry_gating_report.md
+research/reports/v32_31_l2_preregistration_protocol.md
+research/reports/v32_32_feature_qa_matrix.md
+research/reports/v32_32_master_analysis_and_repair_report.md
+research/reports/v32_33_feature_verification_matrix.md
+research/reports/v32_33_independent_qa_report.md
+research/reports/v32_33_market_data_integrity_report.md
+research/reports/v32_33_master_improvement_report.md
+research/reports/v32_33_priority_defect_register.md
+research/reports/v32_33_quantitative_research_audit.md
+research/reports/v32_33_rating_scorecard.md
+research/reports/v32_34_defect_repair_ledger.md
+research/reports/v32_34_final_release_qa_report.md
+research/reports/v32_34_frontend_feature_visibility_matrix.md
+research/reports/v32_34_frontend_ux_baseline_and_final_scorecard.md
+research/reports/v32_34_independent_browser_qa_report.md
+research/reports/v32_35_final_qa_report.md
+research/reports/v32_35_forecast_feature_visibility_matrix.md
+research/reports/v32_35_forecast_visibility_defect_ledger.md
+research/reports/v32_35_independent_browser_qa_report.md
+research/reports/v32_36_forecasting_integrity_and_reconciliation_report.md
+research/reports/v32_36_l2_market_data_qualification_and_preregistration.md
+research/reports/v32_36_master_economic_decision_report.md
+research/reports/v32_36_multi_horizon_strategy_reconciliation_matrix.md
+research/reports/v32_37_chronos2_benchmark_summary.json
+research/reports/v32_37_chronos2_comparative_benchmark_report.md
+research/reports/v32_38_adaptive_market_intelligence_report.md
+research/reports/v32_38_adaptive_market_intelligence_summary.json
+research/reports/v32_39_preflight_data_quality_summary.json
+research/reports/v32_39_prospective_l2_qualification_report.md
+research/reports/v32_40a_burnin_capture_summary.json
+research/reports/v32_40b_browser_qa_report.md
+research/reports/v32_40b_browser_qa_summary.json
+research/reports/v32_40b_burnin_integrity_audit_report.md
+research/reports/v32_40b_burnin_integrity_audit_summary.json
+research/reports/v32_41_paper_trading_design_and_validation_report.md
+research/reports/v32_41_paper_trading_summary.json
+research/reports/v32_42_manual_journal_browser_qa_summary.json
+research/reports/v32_42_manual_trade_journal_report.md
+research/reports/v32_42_manual_trade_journal_summary.json
+research/reports/v32_42_user_position_tracker_and_risk_copilot_report.md
+research/reports/v32_42_user_position_tracker_and_risk_copilot_summary.json
+research/reports/v32_43_smart_entry_browser_qa_summary.json
+research/reports/v32_43_strategy_tournament_and_smart_entry_report.md
+research/reports/v32_43_strategy_tournament_and_smart_entry_summary.json
+research/reports/v32_44_smart_entry_browser_qa_summary.json
+research/reports/v32_44_smart_entry_independent_audit.md
+research/reports/v32_44_tournament_and_lifecycle_audit_summary.json
+research/reports/v32_45_analyse_tournament_entry_validation_report.md
+research/reports/v32_45_workflow_acceptance_browser_qa_summary.json
+research/reports/v32_45_workflow_acceptance_summary.json
+research/reports/v32_46_navigation_simplification_summary.json
+research/reports/v32_46_terminal_consolidation_and_navigation_simplification_report.md
+research/reports/v32_46_vigorous_qa_report.md
+research/reports/v32_46_vigorous_qa_summary.json
+research/reports/v32_47_analyse_selection_and_anomaly_monitor_report.md
+research/reports/v32_47_vigorous_qa_summary.json
+research/reports/v32_48_integrated_analyse_and_tournament_report.md
+research/reports/v32_48_vigorous_qa_summary.json
+research/reports/v32_49_scenario_qa_and_ui_report.md
+research/reports/v32_49_scenario_qa_summary.json
+research/reports/v32_50_runtime_forecast_ui_qa_report.md
+research/reports/v32_50_runtime_forecast_ui_qa_summary.json
+research/rigorous_replay_results_v2.json
+research/runs/v32_27/phase2_strategy_baseline_summary.json
+research/runs/v32_27/phase2_strategy_trade_ledger.json
+research/runs/v32_27/phase3_forecast_evaluation_summary.json
+research/runs/v32_27/phase4_meta_model_summary.json
+research/runs/v32_27/phase5_policy_ablation_summary.json
+research/runs/v32_28/master_pipeline_execution_summary.json
+research/runs/v32_28/phase2_strategy_baseline_summary.json
+research/runs/v32_28/phase2_strategy_trade_ledger.json
+research/runs/v32_28/phase3_forecast_evaluation_summary.json
+research/runs/v32_28/phase4_meta_model_summary.json
+research/runs/v32_28/phase5_policy_ablation_summary.json
+research/runs/v32_30/TSMOM_DONCHIAN_168H_336H_trades.jsonl
+research/runs/v32_30/TSMOM_DONCHIAN_24H_168H_trades.jsonl
+research/runs/v32_30/TSMOM_DONCHIAN_72H_168H_trades.jsonl
+research/runs/v32_30/horizon_study_summary.json
+research/runs/v32_37/chronos2_benchmark_summary.json
+research/runs/v32_37/chronos2_raw_inference_cache.npz
+research/v30_3_prospective_shadow_report.md
+research/v30_4_shadow_feed_report.md
+research/v30_5_shadow_operations_report.md
+research/v30_6_operational_proof_report.md
+research/v30_7_shadow_burnin_report.md
+research/v30_8_collection_integrity_report.md
+research/v30_9_statistical_gate_audit.md
+research/v31_0_research_closure_report.md
+research/v31_1_data_provenance_audit.md
+research/v31_1_foundation_repair_report.md
+research/v31_2_blocker_resolution.md
+research/v31_2_dataset_options_assessment.md
+research/v31_2_evidence_verification_report.md
+research/v31_2_single_dataset_acceptance_gates.md
+research/v31_3_coinbase15_contract.md
+research/v31_3_coinbase15_validation_report.md
+research/v31_4_coinbase15_data_use_decision.md
+research/v31_4_coinbase_terms_compatibility_report.md
+research/v31_5_coinbase_terms_primary_source_verification.md
+research/v31_6_alternative_data_source_qualification.md
+research/v31_7_binance_btcusdt_1m_contract.md
+research/v31_8_binance_data_license_clarification_request.md
+research/v31_8_binance_data_use_gate.md
+research/v31_9_btcusd_source_decision.md
+research/v32_0_btcusd_license_provenance_decision.md
+research/v32_11_smart_entry_api_ui_report.md
+research/v32_12_smart_entry_e2e_verification.md
+research/v32_13_smart_entry_dashboard_visibility_report.md
+research/v32_14_live_terminal_smart_entry_report.md
+research/v32_15_modern_research_and_cons_remedies_report.md
+research/v32_17_empirical_remediation_and_first_passage_report.md
+research/v32_18_persistence_containment_report.md
+research/v32_19_persistence_boundary_report.md
+research/v32_1_application_health_audit.md
+research/v32_20_execution_cost_contract_report.md
+research/v32_21_training_and_feature_audit.md
+research/v32_22_prediction_chart_accuracy_report.md
+research/v32_23_forecast_smart_entry_qa_report.md
+research/v32_24_repeated_forecast_smart_entry_qa_report.md
+research/v32_25_ai_forecast_smart_entry_completion_report.md
+research/v32_2_btcusd_dataset_resolution.md
+research/v32_4_strategy_backtest_entry_engine_report.md
+research/v32_5_provisional_college_project_path.md
+research/v5_directional_and_drift_evaluation.json
+tests/test_coinbase_l2_collector_and_gating.py
+tests/test_isolated_real_http_server.py
+tests/test_prospective_shadow_collector.py
+tests/test_shadow_feed_runner.py
+tests/test_strategy_to_alert_pipeline.py
+tests/test_v30_6_operational_proof.py
+tests/test_v30_7_shadow_burnin.py
+tests/test_v30_8_collection_integrity.py
+tests/test_v30_9_statistical_gate_audit.py
+tests/test_v32_18_persistence_containment.py
+tests/test_v32_22_chart_and_forecast_integrity.py
+tests/test_v32_23_forecast_smart_entry_recovery.py
+tests/test_v32_25_directional_integration.py
+tests/test_v32_37_chronos2_benchmark.py
+tests/test_v32_38_adaptive_market_intelligence.py
+tests/test_v32_39_prospective_l2_qualification.py
+tests/test_v32_40b_burnin_and_feature_warmup.py
+tests/test_v32_41_paper_trading_engine.py
+tests/test_v32_42_manual_trade_journal_and_eval.py
+tests/test_v32_42_user_position_tracker_and_risk_copilot.py
+tests/test_v32_43_strategy_tournament_and_smart_entry.py
+tests/test_v32_44_smart_entry_independent_audit.py
+tests/test_v32_45_workflow_acceptance.py
+tests/test_v32_46_navigation_and_terminal_consolidation.py
+tests/test_v32_47_analyse_selection_and_anomaly_monitor.py
+tests/test_v32_48_integrated_analyse_and_tournament.py
+tests/test_v32_49_scenario_qa.py
+tests/test_v32_50_chart_forecast_runtime.py
+web_src/manual_trade_journal_view.js
+web_src/smart_entry_simulator_view.js
+=== PROTECTED_FILE_METADATA ===
+{"Path":"data/prospective_entry_ledger.jsonl","Length":3385,"LastWriteTime":"2026-10-20T00:37:38.1969448+05:30","LastWriteTimeUtc":"2026-10-19T19:07:38.1969448Z","SHA256":"91c3aed984002f611a59c78a2eb4c342c0970baebbd2e3d6df7973be7acf1dd7"}
+{"Path":"data/prospective_shadow_v1.jsonl","Length":0,"LastWriteTime":"2026-10-23T15:54:07.8060474+05:30","LastWriteTimeUtc":"2026-10-23T10:24:07.8060474Z","SHA256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}
+{"Path":"data/prospective_entry_ledger_v2.jsonl","Length":12744,"LastWriteTime":"2026-10-24T15:34:04.1691418+05:30","LastWriteTimeUtc":"2026-10-24T10:04:04.1691418Z","SHA256":"e6e33e3c7beb4c255467e967fc819b85481b0afb1052c3ea7bd248c53f87b604"}
+{"Path":"data/raw/ohlcv.parquet","Length":2329745,"LastWriteTime":"2026-10-26T23:12:20.3982917+05:30","LastWriteTimeUtc":"2026-10-26T17:42:20.3982917Z","SHA256":"c007cd613bec3012fa427d047b466d5e250bd4451b5062d311f387e8afd0ce3f"}
+{"Path":"data/raw/ohlcv_pre_backfill_backup.parquet","Length":2284681,"LastWriteTime":"2026-10-24T15:25:12.7979666+05:30","LastWriteTimeUtc":"2026-10-24T09:55:12.7979666Z","SHA256":"c4949e5b5695ffa172677681b15af2ea6167e73317c3496546f2286a6730b1c8"}
+=== LISTENERS ===
+{"Address":"0.0.0.0","Port":135,"PID":1932,"Process":"svchost.exe","CommandLine":null}
+{"Address":"::","Port":135,"PID":1932,"Process":"svchost.exe","CommandLine":null}
+{"Address":"192.168.0.2","Port":139,"PID":4,"Process":"System","CommandLine":null}
+{"Address":"::","Port":445,"PID":4,"Process":"System","CommandLine":null}
+{"Address":"::","Port":2869,"PID":4,"Process":"System","CommandLine":null}
+{"Address":"::","Port":3306,"PID":6536,"Process":"mysqld.exe","CommandLine":null}
+{"Address":"0.0.0.0","Port":5040,"PID":12400,"Process":"svchost.exe","CommandLine":null}
+{"Address":"127.0.0.1","Port":5354,"PID":4716,"Process":"mDNSResponder.exe","CommandLine":null}
+{"Address":"0.0.0.0","Port":8090,"PID":516,"Process":"WsToastNotification.exe","CommandLine":"\"C:\\Users\\Ashish\\AppData\\Local\\Wondershare\\Wondershare NativePush\\WsToastNotification.exe\""}
+{"Address":"127.0.0.1","Port":9222,"PID":23872,"Process":"chrome.exe","CommandLine":"\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" --headless=new --remote-debugging-port=9222 --user-data-dir=C:\\Users\\Ashish\\AppData\\Local\\Temp\\chrome_test_profile_9222 --disable-gpu --no-sandbox --disable-dev-shm-usage --remote-allow-origins=*"}
+{"Address":"127.0.0.1","Port":11434,"PID":30300,"Process":"ollama.exe","CommandLine":"C:\\Users\\Ashish\\AppData\\Local\\Programs\\Ollama\\ollama.exe serve"}
+{"Address":"127.0.0.1","Port":27015,"PID":4708,"Process":"AppleMobileDeviceService.exe","CommandLine":null}
+{"Address":"::","Port":33060,"PID":6536,"Process":"mysqld.exe","CommandLine":null}
+{"Address":"::1","Port":42050,"PID":31984,"Process":"OneDrive.Sync.Service.exe","CommandLine":"\"C:\\Program Files\\Microsoft OneDrive\\26.183.0920.0005\\OneDrive.Sync.Service.exe\" "}
+{"Address":"::","Port":49664,"PID":1632,"Process":"lsass.exe","CommandLine":null}
+{"Address":"0.0.0.0","Port":49664,"PID":1632,"Process":"lsass.exe","CommandLine":null}
+{"Address":"::","Port":49665,"PID":1456,"Process":"wininit.exe","CommandLine":null}
+{"Address":"0.0.0.0","Port":49665,"PID":1456,"Process":"wininit.exe","CommandLine":null}
+{"Address":"::","Port":49666,"PID":2456,"Process":"svchost.exe","CommandLine":null}
+{"Address":"0.0.0.0","Port":49666,"PID":2456,"Process":"svchost.exe","CommandLine":null}
+{"Address":"::","Port":49667,"PID":3540,"Process":"svchost.exe","CommandLine":null}
+{"Address":"0.0.0.0","Port":49667,"PID":3540,"Process":"svchost.exe","CommandLine":null}
+{"Address":"::","Port":49668,"PID":4368,"Process":"spoolsv.exe","CommandLine":null}
+{"Address":"0.0.0.0","Port":49668,"PID":4368,"Process":"spoolsv.exe","CommandLine":null}
+{"Address":"::1","Port":49669,"PID":4968,"Process":"jhi_service.exe","CommandLine":null}
+{"Address":"::","Port":49676,"PID":1604,"Process":"services.exe","CommandLine":null}
+{"Address":"0.0.0.0","Port":49676,"PID":1604,"Process":"services.exe","CommandLine":null}
+{"Address":"::","Port":50131,"PID":4,"Process":"System","CommandLine":null}
+{"Address":"127.0.0.1","Port":51541,"PID":24320,"Process":"Code.exe","CommandLine":"\"C:\\Users\\Ashish\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe\" --type=utility --utility-sub-type=node.mojom.NodeService --lang=en-US --service-sandbox-type=none --dns-result-order=ipv4first --experimental-network-inspection --inspect-port=0 --video-capture-use-gpu-memory-buffer --user-data-dir=\"C:\\Users\\Ashish\\AppData\\Roaming\\Code\" --standard-schemes=vscode-webview,vscode-file --enable-sandbox --secure-schemes=vscode-webview,vscode-file,vscode-remote-resource,vscode-managed-remote-resource --cors-schemes=vscode-webview,vscode-file,vscode-remote-resource,vscode-managed-remote-resource --fetch-schemes=vscode-webview,vscode-file,vscode-remote-resource,vscode-managed-remote-resource --service-worker-schemes=vscode-webview --code-cache-schemes=vscode-webview,vscode-file --field-trial-handle=1932,i,781109630714762829,14522556753071083999,262144 --enable-features=DocumentPolicyIncludeJSCallStacksInCrashReports,EarlyEstablishGpuChannel,EstablishGpuChannelAsync,PdfUseShowSaveFilePicker --disable-features=CalculateNativeWinOcclusion,DropInputEventsWhilePaintHolding,HideCursorWhileTyping,LocalNetworkAccessChecks,NetworkServiceSandbox,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceGetProcessCreation --variations-seed-version --pseudonymization-salt-handle=1960,i,9569445595640521101,12878182298999551329,4 --trace-process-track-uuid=3190708995682289984 --mojo-platform-channel-handle=5040 /prefetch:14"}
+{"Address":"127.0.0.1","Port":51963,"PID":27996,"Process":"Code.exe","CommandLine":"\"C:\\Users\\Ashish\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe\" --type=utility --utility-sub-type=node.mojom.NodeService --lang=en-US --service-sandbox-type=none --video-capture-use-gpu-memory-buffer --user-data-dir=\"C:\\Users\\Ashish\\AppData\\Roaming\\Code\" --standard-schemes=vscode-webview,vscode-file --enable-sandbox --secure-schemes=vscode-webview,vscode-file,vscode-remote-resource,vscode-managed-remote-resource --cors-schemes=vscode-webview,vscode-file,vscode-remote-resource,vscode-managed-remote-resource --fetch-schemes=vscode-webview,vscode-file,vscode-remote-resource,vscode-managed-remote-resource --service-worker-schemes=vscode-webview --code-cache-schemes=vscode-webview,vscode-file --field-trial-handle=1932,i,781109630714762829,14522556753071083999,262144 --enable-features=DocumentPolicyIncludeJSCallStacksInCrashReports,EarlyEstablishGpuChannel,EstablishGpuChannelAsync,PdfUseShowSaveFilePicker --disable-features=CalculateNativeWinOcclusion,DropInputEventsWhilePaintHolding,HideCursorWhileTyping,LocalNetworkAccessChecks,NetworkServiceSandbox,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceGetProcessCreation --variations-seed-version --pseudonymization-salt-handle=1960,i,9569445595640521101,12878182298999551329,4 --trace-process-track-uuid=3190708990997080739 --mojo-platform-channel-handle=3856 /prefetch:14"}
+{"Address":"127.0.0.1","Port":53736,"PID":16292,"Process":"ollama app.exe","CommandLine":"\"C:\\Users\\Ashish\\AppData\\Local\\Programs\\Ollama\\ollama app.exe\""}
+{"Address":"127.0.0.1","Port":64541,"PID":24320,"Process":"Code.exe","CommandLine":"\"C:\\Users\\Ashish\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe\" --type=utility --utility-sub-type=node.mojom.NodeService --lang=en-US --service-sandbox-type=none --dns-result-order=ipv4first --experimental-network-inspection --inspect-port=0 --video-capture-use-gpu-memory-buffer --user-data-dir=\"C:\\Users\\Ashish\\AppData\\Roaming\\Code\" --standard-schemes=vscode-webview,vscode-file --enable-sandbox --secure-schemes=vscode-webview,vscode-file,vscode-remote-resource,vscode-managed-remote-resource --cors-schemes=vscode-webview,vscode-file,vscode-remote-resource,vscode-managed-remote-resource --fetch-schemes=vscode-webview,vscode-file,vscode-remote-resource,vscode-managed-remote-resource --service-worker-schemes=vscode-webview --code-cache-schemes=vscode-webview,vscode-file --field-trial-handle=1932,i,781109630714762829,14522556753071083999,262144 --enable-features=DocumentPolicyIncludeJSCallStacksInCrashReports,EarlyEstablishGpuChannel,EstablishGpuChannelAsync,PdfUseShowSaveFilePicker --disable-features=CalculateNativeWinOcclusion,DropInputEventsWhilePaintHolding,HideCursorWhileTyping,LocalNetworkAccessChecks,NetworkServiceSandbox,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceGetProcessCreation --variations-seed-version --pseudonymization-salt-handle=1960,i,9569445595640521101,12878182298999551329,4 --trace-process-track-uuid=3190708995682289984 --mojo-platform-channel-handle=5040 /prefetch:14"}
+{"Address":"127.0.0.1","Port":65423,"PID":16656,"Process":"Code.exe","CommandLine":"\"C:\\Users\\Ashish\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe\" c:\\Users\\Ashish\\.vscode\\extensions\\ms-python.vscode-pylance-2026.4.1\\dist\\server.bundle.js --cancellationReceive=file:814c4209c816c308833f9741976502217c55b9b48f --node-ipc --clientProcessId=24320"}
+=== RELEVANT_PROCESSES ===
+{"PID":29504,"Name":"pwsh.exe","ParentPID":14916,"CommandLine":"\"pwsh.exe\" -NoProfile -NoLogo -NonInteractive -Command \"try { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false) } catch {}; try { if (Get-Variable -Name PSStyle -ErrorAction Ignore) { $PSStyle.OutputRendering = 'PlainText' } } catch {}; $global:LASTEXITCODE = 0; $__copilotCommandFinished = $false; $__copilotSuccess = $false; try { $global:LASTEXITCODE = 0\n$ErrorActionPreference = 'Continue'; $root = 'C:\\Projects\\BTCognitive\\BTCognitive'; Set-Location -LiteralPath $root; '=== CAPTURE_TIME ==='; Get-Date -Format 'yyyy-MM-ddTHH:mm:ss.fffffffK'; '=== REPO_ROOT ==='; git rev-parse --show-toplevel; '=== BRANCH ==='; git branch --show-current; '=== HEAD ==='; git rev-parse HEAD; '=== GIT_STATUS ==='; git status --short --untracked-files=all; '=== DIFF_STAT ==='; git diff --stat; '=== DIFF_NUMSTAT ==='; git diff --numstat; '=== UNTRACKED_PATHS ==='; git ls-files --others --exclude-standard; '=== PROTECTED_FILE_METADATA ==='; $protected = @('data/prospective_entry_ledger.jsonl','data/prospective_shadow_v1.jsonl','data/prospective_entry_ledger_v2.jsonl','data/raw/ohlcv.parquet','data/raw/ohlcv_pre_backfill_backup.parquet'); foreach ($rel in $protected) { $p = Join-Path $root $rel; if (Test-Path -LiteralPath $p) { $item = Get-Item -LiteralPath $p; $hash = Get-FileHash -LiteralPath $p -Algorithm SHA256; [pscustomobject]@{Path=$rel; Length=$item.Length; LastWriteTime=$item.LastWriteTime.ToString('o'); LastWriteTimeUtc=$item.LastWriteTimeUtc.ToString('o'); SHA256=$hash.Hash.ToLowerInvariant()} | ConvertTo-Json -Compress } else { \\\"MISSING $rel\\\" } }; '=== LISTENERS ==='; Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Sort-Object LocalPort | ForEach-Object { $owner = Get-CimInstance Win32_Process -Filter \\\"ProcessId = $($_.OwningProcess)\\\" -ErrorAction SilentlyContinue; [pscustomobject]@{Address=$_.LocalAddress; Port=$_.LocalPort; PID=$_.OwningProcess; Process=$owner.Name; CommandLine=$owner.CommandLine} | ConvertTo-Json -Compress }; '=== RELEVANT_PROCESSES ==='; Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -match 'BTCognitive|uvicorn|prospective_worker|shadow_feed_runner|ingest_real_historical|backfill_coinbase|pytest|playwright|8096|8102' } | ForEach-Object { [pscustomobject]@{PID=$_.ProcessId; Name=$_.Name; ParentPID=$_.ParentProcessId; CommandLine=$_.CommandLine} | ConvertTo-Json -Compress }; '=== SCHEDULED_TASKS ==='; Get-ScheduledTask -ErrorAction SilentlyContinue | Where-Object { $_.TaskName -match 'BTCognitive|Prospective|Shadow' -or $_.TaskPath -match 'BTCognitive' } | ForEach-Object { [pscustomobject]@{TaskName=$_.TaskName; TaskPath=$_.TaskPath; State=$_.State; Actions=($_.Actions | Out-String).Trim()} | ConvertTo-Json -Compress }; '=== API_ENVIRONMENT_INDICATORS ==='; Get-ChildItem Env: | Where-Object { $_.Name -match 'BTC|DATA|LEDGER|API|PORT|TRADING' } | Sort-Object Name | ForEach-Object { if ($_.Name -match 'KEY|TOKEN|SECRET|PASSWORD') { \\\"{0}=<redacted-present>\\\" -f $_.Name } else { \\\"{0}={1}\\\" -f $_.Name,$_.Value } }\n$__copilotSuccess = $?\n$__copilotCommandFinished = $true\n } finally { if ($__copilotCommandFinished) { if (-not $__copilotSuccess -and $LASTEXITCODE -is [int] -and $LASTEXITCODE -ne 0) { $host.SetShouldExit($LASTEXITCODE) } elseif (-not $__copilotSuccess) { $host.SetShouldExit(1) } else { $host.SetShouldExit(0) } } }\""}
+=== SCHEDULED_TASKS ===
+=== API_ENVIRONMENT_INDICATORS ===
+APPDATA=C:\Users\Ashish\AppData\Roaming
+DRIVERDATA=C:\Windows\System32\Drivers\DriverData
+LOCALAPPDATA=C:\Users\Ashish\AppData\Local
+PROGRAMDATA=C:\ProgramData

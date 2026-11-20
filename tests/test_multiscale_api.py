@@ -19,16 +19,7 @@ from api.server import app
 client = TestClient(app)
 
 
-def test_get_multiscale_prediction_endpoint():
+def test_get_multiscale_prediction_endpoint_fails_closed():
     response = client.get("/prediction/multiscale")
-    assert response.status_code == 200
-
-    data = response.json()
-    assert data["symbol"] == "BTCUSD"
-    assert "short_horizon" in data
-    assert "long_horizon" in data
-    assert data["short_horizon"]["horizon"] == "5m"
-    assert data["long_horizon"]["horizon"] == "24h"
-    assert data["production_model_version"] == "v3.0.0-excursion-ridge-conformal"
-    assert data["shadow_model_version"] == "v1.0.0-challenger-hawkes-microstructure"
-    assert "shadow_health" in data
+    assert response.status_code == 503
+    assert response.json()["detail"]["status"] == "UNAVAILABLE"

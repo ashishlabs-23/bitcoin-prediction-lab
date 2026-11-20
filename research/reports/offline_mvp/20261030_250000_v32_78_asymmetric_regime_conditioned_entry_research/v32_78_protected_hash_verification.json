@@ -1,0 +1,42 @@
+{
+  "data/raw/ohlcv.parquet": {
+    "sha256": "ba06fb533c0b53387136b001c142efc90b5e2ccfb37937dc509879a76c2a4057",
+    "bytes": 2334866,
+    "status": "MATCH"
+  },
+  "data/raw/ohlcv_version_42326_bars.parquet": {
+    "sha256": "ba06fb533c0b53387136b001c142efc90b5e2ccfb37937dc509879a76c2a4057",
+    "bytes": 2334866,
+    "status": "MATCH"
+  },
+  "data/raw/ohlcv_checkpoint_42233_bars.parquet": {
+    "sha256": "f5c15cb11b9d51cf0077c8f8052086382deb1d8577749cbab8d0134842c7a94f",
+    "bytes": 2329800,
+    "status": "MATCH"
+  },
+  "data/raw/ohlcv_pre_backfill_backup.parquet": {
+    "sha256": "c4949e5b5695ffa172677681b15af2ea6167e73317c3496546f2286a6730b1c8",
+    "bytes": 2284681,
+    "status": "MATCH"
+  },
+  "data/raw/ohlcv_backfilled.parquet": {
+    "sha256": "1e722f33734a89e74764c02fde0552752cc1ea2eff62ca9046c9d6edf2347d5c",
+    "bytes": 2326699,
+    "status": "MATCH"
+  },
+  "data/prospective_entry_ledger.jsonl": {
+    "sha256": "91c3aed984002f611a59c78a2eb4c342c0970baebbd2e3d6df7973be7acf1dd7",
+    "bytes": 3385,
+    "status": "MATCH"
+  },
+  "data/prospective_shadow_v1.jsonl": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "status": "MATCH"
+  },
+  "data/prospective_entry_ledger_v2.jsonl": {
+    "sha256": "e6e33e3c7beb4c255467e967fc819b85481b0afb1052c3ea7bd248c53f87b604",
+    "bytes": 12744,
+    "status": "MATCH"
+  }
+}

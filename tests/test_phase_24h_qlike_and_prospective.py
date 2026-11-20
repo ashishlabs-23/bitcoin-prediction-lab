@@ -278,7 +278,7 @@ def test_model_registry_24h_authorization():
     assert verify_production_model_alignment("/api/terminal/live", "HAR-RS-DOW-24H") is False
     
     active_prod = get_active_production_model()
-    assert verify_production_model_alignment("/api/terminal/live", active_prod.canonical_id) is True
+    assert verify_production_model_alignment("/api/terminal/live", active_prod.canonical_id) is False
 
 
 # ---------------------------------------------------------------------------

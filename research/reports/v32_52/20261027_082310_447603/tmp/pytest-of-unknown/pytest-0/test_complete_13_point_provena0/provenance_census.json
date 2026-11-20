@@ -1,0 +1,20 @@
+[
+  {
+    "trial_id": 1,
+    "trial_hash": "53053cb2dc388a77",
+    "strategy_name": "MEIE-IGNITION-EPOCH01",
+    "timestamp": "2026-10-27T03:00:22.379712+00:00",
+    "epoch": 1,
+    "scientific_eligible": true,
+    "dataset_class": "REAL_MARKET",
+    "params": {
+      "entry_price": 65000.0,
+      "tp_price": 66300.0,
+      "sl_price": 64350.0,
+      "max_hold_seconds": 1200,
+      "direction": "LONG"
+    },
+    "observed_sharpe": 1.92,
+    "observed_return_bps": 189.53
+  }
+]

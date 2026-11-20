@@ -1,0 +1,179 @@
+{
+  "version": "V32.50",
+  "assessment_date": "2026-10-26",
+  "release_verdict": "FAIL",
+  "decisions": {
+    "research_experiment": "INCONCLUSIVE",
+    "prospective_evidence": "NOT_STARTED",
+    "model_authorization": "OFFLINE_RESEARCH_ONLY",
+    "live_trading": "DISABLED"
+  },
+  "headline": "Release blocked after the protected data/raw/ohlcv.parquet SHA-256 changed during QA. The writer is unknown; the QA-owned API was stopped, the file was not restored, and further QA should wait for owner direction.",
+  "normal_app_browser": {
+    "api_process": "api.server:app",
+    "isolated_port": 8102,
+    "isolated_attempt_ledger": "v32_50_attempts.jsonl in session storage",
+    "analyse_http_status": 200,
+    "request_id": "5986c0a3-59d5-407a-b12b-9619fe5055b8",
+    "closed_hourly_candles": 349,
+    "market_data_source": "COINBASE_EXCHANGE_REST",
+    "timeframe": "1h",
+    "analyse_client_elapsed_ms": 187,
+    "server_total_ms": 130.5,
+    "preliminary_candidates": 2,
+    "tournament_state": "NOT_RUN_UNVERIFIED_EVIDENCE",
+    "simulated_attempts_created": 0,
+    "result": "BACKTEST EVIDENCE UNAVAILABLE; no winner asserted"
+  },
+  "forecast": {
+    "actual_direction": "UP",
+    "horizon": "1h",
+    "model_id": "directional-gbm-1h-v1",
+    "probabilities": {
+      "up": 0.5585,
+      "down": 0.4415
+    },
+    "source_granularity_seconds": 900,
+    "forecast_origin_utc": "2026-10-26T17:15:00Z",
+    "latest_closed_hourly_bar_utc": "2026-10-26T16:00:00Z",
+    "marker": "pending; source forecast time does not match a closed displayed bar",
+    "numeric_directional_price_path_supplied": false,
+    "delayed_state_regression": "Passed using browser-only freshness transformation of a real API response; UI retained values and marked them historical-only.",
+    "timeout_recovery": "Passed for a deliberately stalled browser interception; REQUEST_TIMEOUT was visible, retry recovered, and the real endpoint returned HTTP 200. This was not a deterministic 5xx test."
+  },
+  "responsive_screenshots": [
+    {
+      "file": "research/reports/artifacts/v32_50/terminal_desktop_1280x800.png",
+      "png_pixels": "1600x1000",
+      "status": "captured; exact effective CSS viewport not established"
+    },
+    {
+      "file": "research/reports/artifacts/v32_50/terminal_tablet_768x1024.png",
+      "png_pixels": "960x1280",
+      "status": "captured; exact effective CSS viewport not established"
+    },
+    {
+      "file": "research/reports/artifacts/v32_50/terminal_mobile_375x667.png",
+      "png_pixels": "469x834",
+      "status": "responsive grid and bounded overlay verified at effective width; exact requested CSS viewport not established"
+    }
+  ],
+  "performance": {
+    "comparable_before_after_measurement": false,
+    "what_if_pre_fix_observation": {
+      "duration_seconds": 5,
+      "requests": 31,
+      "unique_payloads": 20,
+      "repeated_identical_payloads": 11,
+      "p50_ms_nearest_rank": 2402,
+      "p95_ms_nearest_rank": 8966,
+      "max_ms": 9555,
+      "caveat": "Captured under concurrent full-suite CPU load; no post-fix browser sample."
+    },
+    "forecast_endpoint_samples": {
+      "mixed_cold_warm": {
+        "count": 20,
+        "p50_ms": 420,
+        "p95_ms": 34300,
+        "max_ms": 69100,
+        "caveat": "Not a clean representative baseline."
+      },
+      "warm": {
+        "count": 20,
+        "p50_ms": 21,
+        "p95_ms": 35,
+        "max_ms": 36,
+        "caveat": "Not comparable to the mixed cold/warm sample."
+      }
+    },
+    "csv": "research/reports/v32_50_runtime_performance.csv"
+  },
+  "scenario_ledger": "research/reports/artifacts/v32_50/scenario_ledger.csv",
+  "browser_network_trace": "research/reports/artifacts/v32_50/normal_browser_network_trace.json",
+  "tests": {
+    "focused_python": {
+      "passed": 118,
+      "failed": 0,
+      "duration_seconds": 26.19,
+      "timing": "before the final JavaScript-only What-If deduplication change"
+    },
+    "node_check": "passed after final JavaScript edit",
+    "frontend_tests": "passed after final JavaScript edit",
+    "broad_suite": {
+      "passed": 1604,
+      "failed": 51,
+      "deselected": 1,
+      "warnings": 9,
+      "duration_seconds": 1204.74,
+      "caveat": "Overlapped normal-app QA/resource contention and source edits; includes protected-file hash failures and is not a clean baseline."
+    }
+  },
+  "protected_file_integrity": [
+    {
+      "path": "data/prospective_entry_ledger.jsonl",
+      "before_sha256": "91c3aed984002f611a59c78a2eb4c342c0970baebbd2e3d6df7973be7acf1dd7",
+      "after_sha256": "91c3aed984002f611a59c78a2eb4c342c0970baebbd2e3d6df7973be7acf1dd7",
+      "status": "unchanged"
+    },
+    {
+      "path": "data/prospective_shadow_v1.jsonl",
+      "before_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "unchanged"
+    },
+    {
+      "path": "data/prospective_entry_ledger_v2.jsonl",
+      "before_sha256": "e6e33e3c7beb4c255467e967fc819b85481b0afb1052c3ea7bd248c53f87b604",
+      "after_sha256": "e6e33e3c7beb4c255467e967fc819b85481b0afb1052c3ea7bd248c53f87b604",
+      "status": "unchanged"
+    },
+    {
+      "path": "data/raw/ohlcv.parquet",
+      "before_sha256": "1e722f33734a89e74764c02fde0552752cc1ea2eff62ca9046c9d6edf2347d5c",
+      "after_sha256": "c007cd613bec3012fa427d047b466d5e250bd4451b5062d311f387e8afd0ce3f",
+      "status": "MISMATCH; do not restore from the different-hash pre-backfill backup",
+      "last_write_local": "2026-10-26T23:12:20.3982917+05:30",
+      "post_qa_rows": 42233,
+      "post_qa_latest_timestamp_utc": "2026-10-26T16:00:00Z",
+      "writer_attribution": "unknown"
+    },
+    {
+      "path": "data/raw/ohlcv_pre_backfill_backup.parquet",
+      "before_sha256": "c4949e5b5695ffa172677681b15af2ea6167e73317c3496546f2286a6730b1c8",
+      "after_sha256": "c4949e5b5695ffa172677681b15af2ea6167e73317c3496546f2286a6730b1c8",
+      "status": "unchanged; not a byte-identical recovery source"
+    }
+  ],
+  "qa_shutdown": {
+    "qa_owned_process_pid": 16004,
+    "api_port": 8102,
+    "process_stopped": true,
+    "port_closed": true,
+    "protected_file_restored_or_rewritten": false
+  },
+  "read_only_writer_investigation": {
+    "api_lifespan": "FeatureCache reads data/raw/ohlcv.parquet and computes in memory; periodic API worker evaluates research alerts.",
+    "terminal_15m_adapter": "Writes the separate data/raw/coinbase_15m.parquet cache, not the protected hourly parquet.",
+    "source_level_protected_file_writers": [
+      "engine.prospective_worker.ProspectiveEvidenceWorker defaults to data/raw/ohlcv.parquet and atomically replaces it during candle sync.",
+      "engine.shadow_feed_runner.ShadowFeedRunner defaults to data/raw/ohlcv.parquet and atomically replaces it during candle sync.",
+      "Explicit ingestion/backfill scripts include data/ingest.py, data/ingest_real_historical.py, and scripts/backfill_coinbase_data_gaps.py."
+    ],
+    "system_check": "No matching scheduled tasks or dedicated worker/ingestion process were visible. The process search matched its own PowerShell inspection command.",
+    "test_path_observations": "Some inspected tests use temporary parquet paths or inject HTTP 503 before a worker writes.",
+    "attribution": "Still unknown; code-path inspection does not establish which process wrote the file. An exited or unobserved process remains possible.",
+    "post_investigation_sha256": "c007cd613bec3012fa427d047b466d5e250bd4451b5062d311f387e8afd0ce3f",
+    "port_8102": "closed"
+  },
+  "critical_unresolved_scenarios": [
+    "Protected parquet integrity mismatch and unknown writer",
+    "Forecast marker cannot align to the latest closed hourly candle",
+    "Verified tournament-arm evidence unavailable",
+    "Eligible Enter and active-monitoring browser path not exercised",
+    "Proposal price-deviation limit undeclared",
+    "No valid comparable before/after runtime profile",
+    "Exact requested CSS viewport dimensions not established",
+    "Post-deduplication browser duplicate-request count not measured",
+    "Forecast 5xx, malformed and missing-output browser states not exercised"
+  ]
+}

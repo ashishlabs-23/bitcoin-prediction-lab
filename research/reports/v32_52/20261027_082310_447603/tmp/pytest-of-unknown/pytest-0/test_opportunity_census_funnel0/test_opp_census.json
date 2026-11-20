@@ -1,0 +1,15 @@
+{
+  "funnel_counts": {
+    "stage1_raw_observations": 100,
+    "stage2_mechanism_events": 50,
+    "stage3_qualified_opportunities": 25,
+    "stage4_executable_opportunities": 5,
+    "stage5_executed_trades": 5,
+    "stage6_resolved_trades": 0
+  },
+  "outcome_partition": {
+    "profitable_trades": 0,
+    "non_profitable_trades": 0
+  },
+  "abstention_records": []
+}

@@ -20,6 +20,11 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from engine.range_forecast_service import RangeForecastService, BTCUSDRangeForecast
 
 
+@pytest.fixture(autouse=True)
+def prevent_persistent_forecast_writes(monkeypatch):
+    monkeypatch.setattr(RangeForecastService, "_persist_forecast", lambda *_: None)
+
+
 @pytest.fixture
 def range_service():
     return RangeForecastService(model_version="test-v3-range-engine")
@@ -49,6 +54,10 @@ def test_range_forecast_generation_and_monotonicity(range_service):
     # Price boundary ordering
     assert fc.lower_p90 <= fc.lower_p50 <= fc.lower_p10 <= price
     assert price <= fc.upper_p10 <= fc.upper_p50 <= fc.upper_p90
+    assert fc.calibration_status == "UNAVAILABLE"
+    assert fc.coverage_confidence is None
+    assert fc.conformal_trade_setup is None
+    assert fc.volatility_harvest_signal == "UNAVAILABLE_UNCALIBRATED"
 
 
 def test_data_quality_gating(range_service):
@@ -69,5 +78,6 @@ def test_data_quality_gating(range_service):
 def test_natural_language_explanation(range_service):
     fc = range_service.generate_forecast(current_price=100000.0, vol_24h=0.02)
     assert "BTCUSD current price is $100,000.00" in fc.natural_language_explanation
-    assert "90% empirical forecast envelope" in fc.natural_language_explanation
+    assert "Unvalidated fixed-multiplier heuristic range" in fc.natural_language_explanation
+    assert "not a calibrated quantile forecast" in fc.natural_language_explanation
     assert "Directional evidence is" in fc.natural_language_explanation

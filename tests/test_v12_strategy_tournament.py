@@ -19,6 +19,8 @@ import os
 import sys
 import json
 import pytest
+import numpy as np
+import pandas as pd
 from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 
@@ -27,18 +29,48 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 from api.server import app
-from research.v12_strategy_tournament_engine import V12StrategyTournamentEngine
+import api.routes_tournament as tournament_routes
+from research.v12_strategy_tournament_engine import (
+    V12StrategyTournamentEngine,
+    get_regime_tournament_engine,
+)
 
 
 @pytest.fixture(scope="module")
-def client():
-    with TestClient(app) as test_client:
-        yield test_client
+def client(engine):
+    original_get_engine = tournament_routes.get_tournament_engine
+    tournament_routes.get_tournament_engine = lambda: engine
+    try:
+        with TestClient(app) as test_client:
+            yield test_client
+    finally:
+        tournament_routes.get_tournament_engine = original_get_engine
 
 
 @pytest.fixture(scope="module")
-def engine():
-    return V12StrategyTournamentEngine()
+def engine(tmp_path_factory):
+    fixture_path = tmp_path_factory.mktemp("v12_tournament_fixture") / "deterministic_ohlcv.parquet"
+    rng = np.random.default_rng(12012)
+    count = 2000
+    timestamps = pd.date_range(
+        end=pd.Timestamp.now(tz="UTC").floor("h") - pd.Timedelta(hours=1),
+        periods=count,
+        freq="h",
+    )
+    returns = rng.normal(0.0, 0.005, count)
+    close = 80_000.0 * np.exp(np.cumsum(returns))
+    open_price = np.concatenate(([close[0]], close[:-1]))
+    high = np.maximum(open_price, close) * (1.0 + rng.uniform(0.00005, 0.0002, count))
+    low = np.minimum(open_price, close) * (1.0 - rng.uniform(0.00005, 0.0002, count))
+    pd.DataFrame({
+        "timestamp": timestamps,
+        "open": open_price,
+        "high": high,
+        "low": low,
+        "close": close,
+        "volume": rng.uniform(100.0, 1000.0, count),
+    }).to_parquet(fixture_path, index=False)
+    return get_regime_tournament_engine(data_path=str(fixture_path))
 
 
 def test_v12_tournament_manifest_and_frozen_contracts(engine):

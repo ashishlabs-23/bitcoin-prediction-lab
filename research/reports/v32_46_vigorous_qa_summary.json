@@ -1,0 +1,106 @@
+{
+  "audit_version": "V32.46",
+  "audit_date": "2026-10-26",
+  "executive_verdict": "QA_VERIFIED",
+  "governance_decisions": {
+    "research_experiment": "PASS",
+    "prospective_evidence": "NOT_STARTED",
+    "model_authorization": "OFFLINE_RESEARCH_ONLY",
+    "live_trading": "DISABLED"
+  },
+  "protected_file_integrity": {
+    "status": "BIT_IDENTICAL_PRESERVED",
+    "verified_files": [
+      {
+        "path": "data/prospective_entry_ledger.jsonl",
+        "sha256": "91c3aed984002f611a59c78a2eb4c342c0970baebbd2e3d6df7973be7acf1dd7",
+        "matches_baseline": true
+      },
+      {
+        "path": "data/prospective_shadow_v1.jsonl",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "matches_baseline": true
+      },
+      {
+        "path": "data/prospective_entry_ledger_v2.jsonl",
+        "sha256": "e6e33e3c7beb4c255467e967fc819b85481b0afb1052c3ea7bd248c53f87b604",
+        "matches_baseline": true
+      },
+      {
+        "path": "data/raw/ohlcv.parquet",
+        "sha256": "1e722f33734a89e74764c02fde0552752cc1ea2eff62ca9046c9d6edf2347d5c",
+        "matches_baseline": true
+      },
+      {
+        "path": "data/raw/ohlcv_pre_backfill_backup.parquet",
+        "sha256": "c4949e5b5695ffa172677681b15af2ea6167e73317c3496546f2286a6730b1c8",
+        "matches_baseline": true
+      }
+    ]
+  },
+  "test_execution_evidence": {
+    "syntax_check": {
+      "command": "node --check web/app.js",
+      "exit_code": 0,
+      "status": "PASSED"
+    },
+    "frontend_unit_suite": {
+      "command": "node tests_frontend.js",
+      "exit_code": 0,
+      "steady_state_polling_budget_req_per_min": 29.5,
+      "polling_limit_req_per_min": 60,
+      "status": "PASSED"
+    },
+    "pytest_regression_suite": {
+      "command": ".\\.venv_win\\Scripts\\pytest.exe -v tests/test_v32_43_strategy_tournament_and_smart_entry.py tests/test_v32_44_smart_entry_independent_audit.py tests/test_v32_45_workflow_acceptance.py tests/test_v32_46_navigation_and_terminal_consolidation.py",
+      "exit_code": 0,
+      "total_tests": 42,
+      "passed": 42,
+      "failed": 0,
+      "duration_seconds": 27.31,
+      "status": "PASSED"
+    },
+    "real_browser_cdp_suite": {
+      "runner": "engine/run_v32_46_vigorous_browser_qa.py",
+      "exit_code": 0,
+      "cdp_port": 9222,
+      "mock_server_port": 8090,
+      "tests_passed": [
+        "desktop_primary_navigation",
+        "terminal_1_to_7_workflow_interactions",
+        "research_hub_paper_trading_isolation",
+        "manual_journal_isolation",
+        "route_history_and_legacy_deep_links",
+        "tablet_viewport_responsive",
+        "mobile_viewport_responsive",
+        "stale_market_data_fail_closed"
+      ],
+      "console_errors": 0,
+      "network_errors": 0,
+      "status": "PASSED"
+    }
+  },
+  "screenshot_artifacts": [
+    "research/reports/artifacts/browser_qa/v32_46_vigorous/v32_46_vigorous_terminal_desktop.png",
+    "research/reports/artifacts/browser_qa/v32_46_vigorous/v32_46_vigorous_research_paper_trading.png",
+    "research/reports/artifacts/browser_qa/v32_46_vigorous/v32_46_vigorous_manual_journal.png",
+    "research/reports/artifacts/browser_qa/v32_46_vigorous/v32_46_vigorous_terminal_tablet.png",
+    "research/reports/artifacts/browser_qa/v32_46_vigorous/v32_46_vigorous_terminal_mobile.png",
+    "research/reports/artifacts/browser_qa/v32_46_vigorous/v32_46_vigorous_terminal_stale_abstain.png"
+  ],
+  "storage_isolation_verified": {
+    "paper_trading_ledger": "data/paper_trading_positions.json",
+    "smart_entry_attempts_ledger": "data/smart_entry_simulated_attempts.json",
+    "manual_journal_store": "localStorage.btcognitive_manual_trades_v32_42",
+    "cross_contamination_detected": false
+  },
+  "safety_invariants_certified": {
+    "read_only_analyse_setup": true,
+    "tournament_without_attempt_creation": true,
+    "stale_data_fail_closed_abstain": true,
+    "idempotent_enter_simulated_trade": true,
+    "immutable_tp_sl_levels": true,
+    "zero_monetary_pnl": true,
+    "live_trading_permanently_disabled": true
+  }
+}

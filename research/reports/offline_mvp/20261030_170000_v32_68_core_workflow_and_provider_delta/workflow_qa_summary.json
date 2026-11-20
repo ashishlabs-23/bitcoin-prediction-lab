@@ -1,0 +1,30 @@
+{
+  "timestamp_utc": "2026-10-30T10:19:47Z",
+  "base_url": "http://127.0.0.1:8098",
+  "data_mode": "fixture",
+  "analyse_scenarios": {
+    "initial_ready": "PASSED",
+    "execution_complete": "PASSED",
+    "rapid_click_debounced": "PASSED",
+    "stale_rejected_truthfully": "PASSED"
+  },
+  "entry_scenarios": {
+    "invalid_setup_rejected": "PASSED",
+    "simulated_entry_persisted_and_idempotent": "PASSED",
+    "zero_fabricated_quote": "PASSED",
+    "zero_broker_order_calls": "PASSED"
+  },
+  "benchmark_30_warm_runs": {
+    "sample_size": 30,
+    "total_ms_p50": 82.36,
+    "total_ms_p90": 110.86,
+    "total_ms_p95": 131.66,
+    "total_ms_max": 171.77,
+    "backend_total_p50": 4.33,
+    "backend_screening_p50": 4.19,
+    "backend_tournament_p50": 0.08,
+    "backend_decision_p50": 0.03,
+    "error_count": 0
+  },
+  "overall_status": "PASSED"
+}

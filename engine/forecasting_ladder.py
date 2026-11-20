@@ -76,10 +76,11 @@ class MultiHorizonForecastOutput:
 
     # Uncertainty & Governance
     interval_width_pct: float = 0.0
-    empirical_coverage_pct: float = 90.0
+    empirical_coverage_pct: Optional[float] = None
     directional_probability: Optional[float] = None
     directional_state: str = "NO_DIRECTIONAL_EDGE"
-    governance_status: str = "EXPERIMENTAL_RESEARCH_VALIDATED"
+    calibration_status: str = "UNAVAILABLE"
+    governance_status: str = "OFFLINE_RESEARCH_ONLY"
     is_production_authorized: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
@@ -110,7 +111,7 @@ class NaiveBaselineForecaster:
         if len(historical_returns_1h) >= 24:
             std_1h = float(np.std(historical_returns_1h[-720:])) if len(historical_returns_1h) >= 720 else float(np.std(historical_returns_1h))
         else:
-            std_1h = 0.005  # 50 bps default 1h vol
+            raise ValueError("At least 24 observed hourly returns are required for a volatility estimate.")
 
         std_horizon = std_1h * math.sqrt(h_hours)
         ann_vol = std_1h * math.sqrt(365.0 * 24.0)
@@ -145,8 +146,8 @@ class NaiveBaselineForecaster:
             mae_p50=round(std_horizon * 0.80, 4) if horizon == ForecastHorizon.H24 else None,
             mae_p90=round(abs(ret_p10), 4) if horizon == ForecastHorizon.H24 else None,
             interval_width_pct=round(width_pct, 2),
-            empirical_coverage_pct=90.0,
-            directional_probability=0.50,
+            empirical_coverage_pct=None,
+            directional_probability=None,
             directional_state="NO_DIRECTIONAL_EDGE",
             governance_status="BASELINE_REFERENCE_ONLY",
             is_production_authorized=False,
@@ -231,10 +232,10 @@ class QuantileTreeChallengerForecaster:
             mae_p50=round(max(0.0, -p50), 4) if self.horizon == ForecastHorizon.H24 else None,
             mae_p90=round(max(0.0, -p10), 4) if self.horizon == ForecastHorizon.H24 else None,
             interval_width_pct=round(width_pct, 2),
-            empirical_coverage_pct=91.2,
+            empirical_coverage_pct=None,
             directional_probability=None,
             directional_state="NO_DIRECTIONAL_EDGE",
-            governance_status="EXPERIMENTAL_RESEARCH_VALIDATED",
+            governance_status="OFFLINE_RESEARCH_ONLY",
             is_production_authorized=False,
         )
 

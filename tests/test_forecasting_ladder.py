@@ -38,6 +38,9 @@ def test_naive_baseline_zero_drift_and_volatility():
         assert out.price_lower_p10 < out.price_mid_p50 < out.price_upper_p90
         assert out.directional_state == "NO_DIRECTIONAL_EDGE"
         assert out.governance_status == "BASELINE_REFERENCE_ONLY"
+        assert out.empirical_coverage_pct is None
+        assert out.calibration_status == "UNAVAILABLE"
+        assert out.directional_probability is None
         assert out.is_production_authorized is False
 
 

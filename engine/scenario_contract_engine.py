@@ -133,7 +133,7 @@ class ScenarioContractEngine:
     Authoritative calculation engine for research-only scenario levels.
     """
 
-    def __init__(self, exchange: str = "Coinbase", instrument: str = "BTC-USD"):
+    def __init__(self, exchange: str = "UNAVAILABLE", instrument: str = "BTC-USD"):
         self.exchange = exchange
         self.instrument = instrument
 
@@ -206,7 +206,7 @@ class ScenarioContractEngine:
         direction: str,
         horizon: str = "1h",
         market_regime: str = "VOL_EXPANDING",
-        c2_health: str = "CALIBRATED",
+        c2_health: str = "UNAVAILABLE",
         is_model_gated: bool = True,
         raw_probability: Optional[float] = None,
         cost_bps: Optional[float] = None,
@@ -344,7 +344,7 @@ class ScenarioContractEngine:
             event_probability=raw_probability,
             probability_target="TRIPLE_BARRIER_TP_FIRST",
             probability_horizon=horizon,
-            calibration_status=CalibrationStatus.UNAVAILABLE if raw_probability is None else CalibrationStatus.CALIBRATED_CONFORMAL,
+            calibration_status=CalibrationStatus.UNAVAILABLE,
             entry_type=EntryType.CURRENT_MARKET_REFERENCE,
             entry_price=geom["entry_price"],
             take_profit=geom["take_profit"],
@@ -419,10 +419,10 @@ class HypotheticalScenarioPlanner:
                 "is_valid": False,
                 "error_code": "MARKET_DATA_UNAVAILABLE",
                 "narrative": f"Parquet dataset not found at {self.ohlcv_path}",
-                "source": "Coinbase Spot",
+                "source": "LOCAL_PARQUET_UNVERIFIED",
                 "instrument": "BTC/USD",
                 "source_timeframe": "1h",
-                "market_source": "Coinbase Spot (Closed Hourly Candle)"
+                "market_source": "Local parquet; exchange provenance unavailable"
             }
 
         try:
@@ -432,10 +432,10 @@ class HypotheticalScenarioPlanner:
                     "is_valid": False,
                     "error_code": "MARKET_DATA_EMPTY",
                     "narrative": "Parquet dataset contains 0 records.",
-                    "source": "Coinbase Spot",
+                    "source": "LOCAL_PARQUET_UNVERIFIED",
                     "instrument": "BTC/USD",
                     "source_timeframe": "1h",
-                    "market_source": "Coinbase Spot (Closed Hourly Candle)"
+                    "market_source": "Local parquet; exchange provenance unavailable"
                 }
 
             df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
@@ -459,12 +459,12 @@ class HypotheticalScenarioPlanner:
                     "is_valid": False,
                     "error_code": "INSUFFICIENT_CONTINUOUS_HISTORY",
                     "narrative": f"Continuous segment has {n_seg} bars; minimum {self.lookback_bars + 1} required for {self.lookback_bars}-bar lookback.",
-                    "source": "Coinbase Spot",
+                    "source": "LOCAL_PARQUET_UNVERIFIED",
                     "instrument": "BTC/USD",
                     "source_timeframe": "1h",
                     "continuity_segment_id": segment_id,
                     "segment_bars_available": n_seg,
-                    "market_source": "Coinbase Spot (Closed Hourly Candle)"
+                    "market_source": "Local parquet; exchange provenance unavailable"
                 }
 
             # Preceding valid closed hourly bars within segment
@@ -479,12 +479,12 @@ class HypotheticalScenarioPlanner:
                     "is_valid": False,
                     "error_code": "INSUFFICIENT_LOG_RETURNS",
                     "narrative": f"Calculated {len(log_returns)} log returns; expected {self.lookback_bars}.",
-                    "source": "Coinbase Spot",
+                    "source": "LOCAL_PARQUET_UNVERIFIED",
                     "instrument": "BTC/USD",
                     "source_timeframe": "1h",
                     "continuity_segment_id": segment_id,
                     "segment_bars_available": n_seg,
-                    "market_source": "Coinbase Spot (Closed Hourly Candle)"
+                    "market_source": "Local parquet; exchange provenance unavailable"
                 }
 
             sigma_1h = float(np.std(log_returns, ddof=1))
@@ -493,12 +493,12 @@ class HypotheticalScenarioPlanner:
                     "is_valid": False,
                     "error_code": "INVALID_VOLATILITY_ESTIMATE",
                     "narrative": f"Calculated non-finite or non-positive sigma_1h: {sigma_1h}",
-                    "source": "Coinbase Spot",
+                    "source": "LOCAL_PARQUET_UNVERIFIED",
                     "instrument": "BTC/USD",
                     "source_timeframe": "1h",
                     "continuity_segment_id": segment_id,
                     "segment_bars_available": n_seg,
-                    "market_source": "Coinbase Spot (Closed Hourly Candle)"
+                    "market_source": "Local parquet; exchange provenance unavailable"
                 }
 
             latest_row = seg_df.iloc[-1]
@@ -520,7 +520,7 @@ class HypotheticalScenarioPlanner:
                         f"exceeding conservative maximum allowable staleness threshold "
                         f"of {self.max_staleness_seconds:.1f}s (3.0 hours)."
                     ),
-                    "source": "Coinbase Spot",
+                    "source": "LOCAL_PARQUET_UNVERIFIED",
                     "instrument": "BTC/USD",
                     "source_timeframe": "1h",
                     "reference_price": ref_price,
@@ -538,12 +538,12 @@ class HypotheticalScenarioPlanner:
                     "sigma_1h": sigma_1h,
                     "lookback_bars": self.lookback_bars,
                     "staleness_threshold_seconds": self.max_staleness_seconds,
-                    "market_source": "Coinbase Spot (Closed Hourly Candle)"
+                    "market_source": "Local parquet; exchange provenance unavailable"
                 }
 
             return {
                 "is_valid": True,
-                "source": "Coinbase Spot",
+                "source": "LOCAL_PARQUET_UNVERIFIED",
                 "instrument": "BTC/USD",
                 "source_timeframe": "1h",
                 "reference_price": ref_price,
@@ -561,17 +561,17 @@ class HypotheticalScenarioPlanner:
                 "sigma_1h": sigma_1h,
                 "lookback_bars": self.lookback_bars,
                 "staleness_threshold_seconds": self.max_staleness_seconds,
-                "market_source": "Coinbase Spot (Closed Hourly Candle)"
+                "market_source": "Local parquet; exchange provenance unavailable"
             }
         except Exception as e:
             return {
                 "is_valid": False,
                 "error_code": "MARKET_DATA_EXCEPTION",
                 "narrative": f"Failed reading market dataset: {str(e)}",
-                "source": "Coinbase Spot",
+                "source": "LOCAL_PARQUET_UNVERIFIED",
                 "instrument": "BTC/USD",
                 "source_timeframe": "1h",
-                "market_source": "Coinbase Spot (Closed Hourly Candle)"
+                "market_source": "Local parquet; exchange provenance unavailable"
             }
 
     def compute_scenario_preview(
@@ -614,12 +614,18 @@ class HypotheticalScenarioPlanner:
                 "rejection_code": "DATA_FREQUENCY_UNSUPPORTED",
                 "rejection_narrative": f"Hourly data only: Horizon '{horizon}' is unsupported; only Hourly data (1h, 4h, 24h) is verified.",
                 "scenario_type": "HYPOTHETICAL_VOLATILITY_BARRIER",
+                "scenario_estimate_status": "UNVALIDATED_HEURISTIC",
+                "calibration_status": "UNAVAILABLE",
+                "calibration_notice": (
+                    "Fixed volatility multipliers and square-root-of-time scaling are unvalidated scenario heuristics, "
+                    "not calibrated quantile forecasts."
+                ),
                 "is_actionable": False,
                 "execution_authorization": "DISABLED",
-                "source": mkt_state.get("source", "Coinbase Spot"),
+                "source": mkt_state.get("source", "UNAVAILABLE"),
                 "instrument": mkt_state.get("instrument", "BTC/USD"),
                 "source_timeframe": "1h",
-                "market_source": mkt_state.get("market_source", "Coinbase Spot (Closed Hourly Candle)"),
+                "market_source": mkt_state.get("market_source", "Source provenance unavailable"),
                 "reference_price": mkt_state.get("reference_price"),
                 "price_timestamp": mkt_state.get("price_timestamp"),
                 "reference_price_timestamp_utc": mkt_state.get("reference_price_timestamp_utc"),
@@ -649,10 +655,10 @@ class HypotheticalScenarioPlanner:
                 "scenario_type": "HYPOTHETICAL_VOLATILITY_BARRIER",
                 "is_actionable": False,
                 "execution_authorization": "DISABLED",
-                "source": "Coinbase Spot",
+                "source": "LOCAL_PARQUET_UNVERIFIED",
                 "instrument": "BTC/USD",
                 "source_timeframe": "1h",
-                "market_source": "Coinbase Spot (Closed Hourly Candle)",
+                "market_source": "Local parquet; exchange provenance unavailable",
                 "selected_horizon": horizon,
                 "contract_version": SCENARIO_PLANNER_VERSION,
                 "disclaimer": "Hypothetical volatility barrier calculation only. Does NOT constitute a directional prediction, trade signal, or investment advice. Execution authorization is DISABLED.",
@@ -671,10 +677,10 @@ class HypotheticalScenarioPlanner:
                 "scenario_type": "HYPOTHETICAL_VOLATILITY_BARRIER",
                 "is_actionable": False,
                 "execution_authorization": "DISABLED",
-                "source": mkt_state.get("source", "Coinbase Spot"),
+                "source": mkt_state.get("source", "UNAVAILABLE"),
                 "instrument": mkt_state.get("instrument", "BTC/USD"),
                 "source_timeframe": mkt_state.get("source_timeframe", "1h"),
-                "market_source": mkt_state.get("market_source", "Coinbase Spot (Closed Hourly Candle)"),
+                "market_source": mkt_state.get("market_source", "Source provenance unavailable"),
                 "reference_price": mkt_state.get("reference_price"),
                 "price_timestamp": mkt_state.get("price_timestamp"),
                 "reference_price_timestamp_utc": mkt_state.get("reference_price_timestamp_utc"),
@@ -705,10 +711,10 @@ class HypotheticalScenarioPlanner:
                         "scenario_type": "HYPOTHETICAL_VOLATILITY_BARRIER",
                         "is_actionable": False,
                         "execution_authorization": "DISABLED",
-                        "source": "Coinbase Spot",
+                        "source": "LOCAL_PARQUET_UNVERIFIED",
                         "instrument": "BTC/USD",
                         "source_timeframe": "1h",
-                        "market_source": "Coinbase Spot (Closed Hourly Candle)",
+                        "market_source": "Local parquet; exchange provenance unavailable",
                         "selected_horizon": horizon,
                         "contract_version": SCENARIO_PLANNER_VERSION,
                         "disclaimer": "Hypothetical volatility barrier calculation only. Does NOT constitute a directional prediction, trade signal, or investment advice. Execution authorization is DISABLED.",
@@ -724,10 +730,10 @@ class HypotheticalScenarioPlanner:
                     "scenario_type": "HYPOTHETICAL_VOLATILITY_BARRIER",
                     "is_actionable": False,
                     "execution_authorization": "DISABLED",
-                    "source": "Coinbase Spot",
+                    "source": "LOCAL_PARQUET_UNVERIFIED",
                     "instrument": "BTC/USD",
                     "source_timeframe": "1h",
-                    "market_source": "Coinbase Spot (Closed Hourly Candle)",
+                    "market_source": "Local parquet; exchange provenance unavailable",
                     "selected_horizon": horizon,
                     "contract_version": SCENARIO_PLANNER_VERSION,
                     "disclaimer": "Hypothetical volatility barrier calculation only. Does NOT constitute a directional prediction, trade signal, or investment advice. Execution authorization is DISABLED.",
@@ -811,6 +817,12 @@ class HypotheticalScenarioPlanner:
         return {
             "status": "SUCCESS",
             "scenario_type": "HYPOTHETICAL_VOLATILITY_BARRIER",
+            "scenario_estimate_status": "UNVALIDATED_HEURISTIC",
+            "calibration_status": "UNAVAILABLE",
+            "calibration_notice": (
+                "Fixed volatility multipliers and square-root-of-time scaling are unvalidated scenario heuristics, "
+                "not calibrated quantile forecasts."
+            ),
             "is_actionable": False,
             "execution_authorization": "DISABLED",
             "source": mkt_state["source"],
@@ -881,4 +893,3 @@ class HypotheticalScenarioPlanner:
 
 # Global Singleton Planner Instance
 scenario_planner = HypotheticalScenarioPlanner()
-

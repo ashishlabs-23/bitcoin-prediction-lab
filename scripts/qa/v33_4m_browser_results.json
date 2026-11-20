@@ -1,0 +1,475 @@
+{
+  "analysis_id_dom": "ana_ee29321e5f42",
+  "backend_response": {
+    "analysis_id": "ana_ee29321e5f42",
+    "timestamp_utc": "2026-11-02T14:37:55.663979+00:00",
+    "is_read_only": true,
+    "attempts_created": 0,
+    "candle_watermark": {
+      "last_closed_timestamp": "2026-10-30T13:00:00+00:00",
+      "last_closed_close": 76985.4,
+      "candle_watermark_hash": "0caf188f890c45e8",
+      "candle_window_sha256": "3fa27c80c80c2207846e817111231fda6dc9aad99f950e8ba597694702b491a0",
+      "total_closed_candles": 168
+    },
+    "candle_watermark_hash": "0caf188f890c45e8",
+    "freshness_status": "MARKET_DATA_STALE",
+    "data_freshness": {
+      "is_fresh": false,
+      "freshness_status": "MARKET_DATA_STALE",
+      "observed_age_seconds": 265075.8,
+      "freshness_threshold_seconds": 7200,
+      "latest_candle_time_utc": "2026-10-30T13:00:00+00:00",
+      "has_candle_gaps": false,
+      "candle_gap_count": 0,
+      "dataset_fingerprint": "3fa27c80c80c2207846e817111231fda6dc9aad99f950e8ba597694702b491a0"
+    },
+    "data_integrity": {
+      "is_valid": true,
+      "reason": "VALID"
+    },
+    "market_regime": {
+      "regime": "TRENDING_BEARISH",
+      "is_valid": true,
+      "rationale": "Close < EMA50 < EMA200 with ADX=40.7 >= 22.0",
+      "close": 76985.4,
+      "ema20": 78155.69,
+      "ema50": 79116.58,
+      "ema200": 80250.85,
+      "adx": 40.73,
+      "atr": 650.83,
+      "bbw": 0.0551,
+      "bb_upper": 80267.65,
+      "bb_mid": 78116.46,
+      "bb_lower": 75965.27
+    },
+    "shortlisted_candidates": [],
+    "candidate_rejections": [
+      {
+        "strategy_id": "TSMOM_DONCHIAN_24H_168H",
+        "strategy_name": "Donchian Trend Breakout (168h Trend / 24h Channel)",
+        "version": "1.0.0",
+        "rejection_reason": "Regime mismatch: requires ['TRENDING_BULLISH', 'VOLATILITY_EXPANSION'] but observed regime is TRENDING_BEARISH"
+      },
+      {
+        "strategy_id": "ATR_VOLATILITY_BREAKOUT_12H",
+        "strategy_name": "ATR Volatility Expansion Breakout (12h)",
+        "version": "1.0.0",
+        "rejection_reason": "Regime mismatch: requires ['VOLATILITY_EXPANSION', 'TRENDING_BULLISH'] but observed regime is TRENDING_BEARISH"
+      },
+      {
+        "strategy_id": "RANGE_BOLLINGER_REVERSION_20H",
+        "strategy_name": "Bollinger & RSI Mean Reversion (20h)",
+        "version": "1.0.0",
+        "rejection_reason": "Regime mismatch: requires ['RANGE_BOUND'] but observed regime is TRENDING_BEARISH"
+      },
+      {
+        "strategy_id": "HTF_RANGE_EXPANSION_BREAKOUT",
+        "strategy_name": "High-Timeframe Range Expansion (4h / 20-bar)",
+        "version": "1.0.0",
+        "rejection_reason": "Regime mismatch: requires ['VOLATILITY_EXPANSION', 'TRENDING_BULLISH'] but observed regime is TRENDING_BEARISH"
+      },
+      {
+        "strategy_id": "CHRONOS2_FOUNDATION",
+        "strategy_name": "Amazon Chronos-2 Foundation Model",
+        "version": "2.0.0",
+        "rejection_reason": "Strategy quarantined (QUARANTINED)"
+      }
+    ],
+    "top_qualifying_candidate": null,
+    "action": "ABSTAIN",
+    "reason": "Regime TRENDING_BEARISH identified. 0 compatible candidate(s) shortlisted.",
+    "market_intelligence": {
+      "status": "SUCCESS",
+      "calculation_status": "SUCCESS",
+      "data_freshness_status": "MARKET_DATA_STALE",
+      "setup_evaluation_eligibility": "INELIGIBLE_DATA_STALE",
+      "data_age_hours": 73.63,
+      "last_observed_timestamp_utc": "2026-10-30T13:00:00+00:00",
+      "timestamp_utc": "2026-11-02T14:37:55.860114+00:00",
+      "current_market_assessment": "UNAVAILABLE",
+      "current_price": null,
+      "last_observed_candle_price": 76985.4,
+      "last_observed_candle_time": "2026-10-30T13:00:00+00:00",
+      "historical_volatility_analysis": "AVAILABLE",
+      "historical_risk_envelope": "AVAILABLE_WITH_TIMESTAMP",
+      "data_freshness": {
+        "is_fresh": false,
+        "is_stale": true,
+        "observed_age_hours": 73.63,
+        "max_allowable_age_hours": 2,
+        "has_gaps": false,
+        "gap_count": 0,
+        "total_closed_candles": 168,
+        "freshness_warning": "STALE_DATA_WARNING: Closed candles are 73.6h old (exceeds 2.0h operational limit). Market intelligence represents historical/cached context, NOT live market conditions. Current-market assessment is UNAVAILABLE. Trade authorization is locked to ABSTAIN."
+      },
+      "volatility_term_structure": {
+        "rv_1h_pct": 40.47,
+        "rv_4h_pct": 35.69,
+        "rv_24h_pct": 73.48,
+        "rv_7d_pct": 38.05,
+        "rv_30d_pct": 38.05,
+        "vol_ratio_1h_24h": 0.551,
+        "curve_shape": "CONTANGO_COMPRESSION",
+        "measurement_horizon_hours": 720,
+        "annualization_convention": "Hourly log-returns scaled by sqrt(8760)"
+      },
+      "volatility_regime": {
+        "regime": "TRENDING_BEARISH",
+        "is_expansion": true,
+        "bollinger_band_width_pct": 5.51,
+        "wilder_adx_14": 40.73,
+        "trend_strength": "STRONG_TREND",
+        "atr_14_usd": 650.83,
+        "trend_direction": "NEUTRAL",
+        "bb_mid": 78116.46,
+        "bb_upper": 80267.65,
+        "bb_lower": 75965.27,
+        "evaluation_note": "Regime indicates volatility dynamics; does NOT imply directional trade probability."
+      },
+      "conformal_risk_envelope_7d": {
+        "point_forecast_variance": 0.14478,
+        "point_forecast_volatility_pct": 38.05,
+        "conformal_lower_variance": 0.08397,
+        "conformal_upper_variance": 0.20559,
+        "conformal_lower_volatility_pct": 28.98,
+        "conformal_upper_volatility_pct": 45.34,
+        "nominal_target_coverage_pct": 90,
+        "nominal_coverage_pct": 90,
+        "causal_point_in_time_coverage_pct": 84.89,
+        "multi_regime_pooled_coverage_pct": 90.43,
+        "measured_historical_coverage_pct": 84.89,
+        "coverage_confidence_interval_95pct": [
+          73.14,
+          93.14
+        ],
+        "confidence_interval_method": "Stationary block bootstrap (block_len=168h, B=1000)",
+        "legacy_naive_iid_ci_deprecated": [
+          88.92,
+          91.94
+        ],
+        "extreme_volatility_coverage_pct": 82.14,
+        "calibration_status": "PROVISIONALLY_VALIDATED_FOR_RISK_CONTAINMENT",
+        "forecast_timestamp_utc": "2026-10-30T13:00:00+00:00",
+        "forecast_horizon": "7d (168h)",
+        "uncertainty_engine": "C2 Dependence-Aware Conformal Prediction",
+        "cohort_reconciliation": {
+          "development_cohort_2020_2025": {
+            "cohort_identity": "DEVELOPMENT_CALIBRATION_2020_2025",
+            "calibration_window": "2020-01-01 to 2025-12-31",
+            "observation_count_bars": 42233,
+            "measured_coverage_pct": 92.84,
+            "coverage_confidence_interval_95pct": [
+              88.25,
+              96.46
+            ],
+            "extreme_volatility_subgroup_coverage_pct": 89.47,
+            "cohort_role": "Historical model parameter estimation & baseline calibration"
+          },
+          "chronological_holdout_cohort_2026": {
+            "cohort_identity": "2026_CHRONOLOGICAL_HOLDOUT",
+            "evaluation_window": "2026-01-01 to 2026-10-17",
+            "observation_count_bars": 5671,
+            "causal_point_in_time_coverage_pct": 84.89,
+            "causal_block_bootstrap_95pct_ci": [
+              73.14,
+              93.14
+            ],
+            "multi_regime_pooled_coverage_pct": 90.43,
+            "extreme_volatility_subgroup_coverage_pct": 82.14,
+            "cohort_role": "Chronological historical holdout replay (NOT prospective evidence)",
+            "prospective_evidence_distinction": "Prospective ledger remains strictly FROZEN at 7/100 blocks"
+          }
+        },
+        "anti_conflation_notice": "Risk containment and directional prediction are different statistical problems. Causal holdout coverage is 84.89% (undercovering 90% target due to expansion lag). Zero directional trade success probability is implied."
+      },
+      "excursion_estimates_24h": {
+        "horizon": "24h",
+        "favourable_excursion_upper": {
+          "p10_price": 77866.28,
+          "p50_price": 79124.69,
+          "p90_price": 81389.81,
+          "p50_pct": 2.78,
+          "p90_pct": 5.72
+        },
+        "adverse_excursion_lower": {
+          "p10_price": 75978.68,
+          "p50_price": 74216.91,
+          "p90_price": 71448.42,
+          "p50_pct": 3.6,
+          "p90_pct": 7.19
+        },
+        "expected_favourable_excursion_upper_p50": 79124.69,
+        "expected_adverse_excursion_lower_p50": 74216.91,
+        "mondrian_scaling_factor": 0.85,
+        "anti_conflation_notice": "Excursion bounds quantify empirical dispersion quantiles, not a forecast of future trade profit."
+      },
+      "calibration_health_state": "WATCH_STALE",
+      "data_quality_warnings": [
+        "STALE_DATA_WARNING: Closed candles are 73.6h old (exceeds 2.0h operational limit). Market intelligence represents historical/cached context, NOT live market conditions. Current-market assessment is UNAVAILABLE. Trade authorization is locked to ABSTAIN."
+      ]
+    },
+    "trade_authorization": {
+      "decision_timestamp_utc": "2026-11-02T14:37:56.043785+00:00",
+      "final_decision": "ABSTAIN",
+      "actionable_recommendation": "NO_TRADE",
+      "live_trading": "DISABLED \u2014 ANALYSIS ONLY",
+      "decision_summary": "Trading blocked due to stale market data (73.6h old > 2.0h limit). Market intelligence remains available as historical context.",
+      "user_bias_rejected": false,
+      "execution_friction_assumed_bps": 87,
+      "cost_venue": "COINBASE_ADVANCED_87BPS",
+      "research_authorization_status": "OFFLINE_RESEARCH_ONLY",
+      "directional_eligibility_lock": "CURRENTLY_UNAUTHORIZED_PENDING_NEW_VALIDATED_EVIDENCE",
+      "five_question_evaluation": {
+        "question_1_market_regime": {
+          "question": "Is BTC trending, ranging, compressing, or expanding?",
+          "state": "FAIL",
+          "status": "BLOCKED_STALE",
+          "passed": false,
+          "explanation": "Market data is stale (73.6h old > 2.0h limit). Live regime cannot be validated."
+        },
+        "question_2_directional_evidence": {
+          "question": "Is there reliable evidence favouring LONG or SHORT?",
+          "state": "FAIL",
+          "status": "BLOCKED_STALE",
+          "passed": false,
+          "explanation": "Directional evidence cannot be evaluated on stale market data.",
+          "research_authorization_state": "CURRENTLY_UNAUTHORIZED_PENDING_NEW_VALIDATED_EVIDENCE"
+        },
+        "question_3_entry_location": {
+          "question": "Is the proposed entry price favourable relative to current market structure?",
+          "state": "FAIL",
+          "status": "BLOCKED_STALE",
+          "passed": false,
+          "structural_location_quality": "UNAVAILABLE_STALE",
+          "structural_location_score": 0,
+          "support_price": 75965.27,
+          "resistance_price": 80267.65,
+          "atr_14_distance_usd": 650.83,
+          "anti_conflation_notice": "Never equate location quality with probability of profit. A trade near support is not automatically a good LONG.",
+          "explanation": "Entry location cannot be confirmed on stale price history."
+        },
+        "question_4_execution_economics": {
+          "question": "Is the potential return sufficient relative to adverse excursion and total costs?",
+          "state": "FAIL",
+          "status": "BLOCKED_STALE",
+          "passed": false,
+          "gross_expected_return_bps": 0,
+          "net_expected_value_bps": 0,
+          "friction_breakdown": {
+            "venue": "COINBASE_ADVANCED_87BPS",
+            "commission_round_trip_bps": 83,
+            "spread_bps": 4,
+            "spread_status": "ESTIMATED_4BPS_UNAVAILABLE_WITHOUT_L2_DEPTH",
+            "slippage_bps": 0,
+            "slippage_status": "ESTIMATED_0BPS_MAKER_ASSUMED",
+            "total_round_trip_friction_bps": 87,
+            "disclosure": "Figures are illustrative historical evaluation outputs; not predictive guarantees of actual future returns."
+          },
+          "explanation": "Execution economics cannot be approved on stale candles."
+        },
+        "question_5_confidence_calibration": {
+          "question": "How reliable is the underlying evidence in this particular market condition?",
+          "state": "FAIL",
+          "status": "BLOCKED_STALE",
+          "passed": false,
+          "diagnostic_sample_floor_n": 30,
+          "sample_size_classification": "DIAGNOSTIC_MINIMUM_ONLY \u2014 NOT_A_VALIDATION_THRESHOLD",
+          "sample_size_governance_notice": "N >= 30 is a descriptive engineering diagnostic floor, not proof of statistical evidence. Effective sample size estimate N_eff is an AR(1)-style approximation, not a substitute for dependence-aware block validation. Confirmatory research claims require pre-registered protocol validation with N >= 100 clean prospective blocks.",
+          "effective_sample_size_estimate_n_eff": 70.6,
+          "calibration_status": "PROVISIONALLY_VALIDATED_FOR_RISK_CONTAINMENT",
+          "explanation": "Calibration state requires fresh candles for verification."
+        }
+      }
+    },
+    "htf_setup": {
+      "strategy_id": "HTF_RANGE_EXPANSION_BREAKOUT",
+      "strategy_name": "High-Timeframe Range Expansion Breakout (4h / 20-bar)",
+      "setup_status": "BLOCKED",
+      "regime": "TRENDING_BEARISH",
+      "observed_regime_raw": "TRENDING_BEARISH",
+      "regime_confirmed": false,
+      "trigger_status": "STALE_DATA_BLOCKED",
+      "completed_4h_bar": {
+        "timestamp_utc": "2026-10-30T08:00:00+00:00",
+        "open": 78017.76,
+        "high": 78091.63,
+        "low": 77087.53,
+        "close": 77241.91,
+        "range_high_20_4h": 81890,
+        "range_low_20_4h": 76301.02,
+        "donchian_channel_high_20_4h": 81890,
+        "donchian_channel_low_20_4h": 76301.02,
+        "atr_14_4h": 1234.68,
+        "distance_to_breakout_bps": -567.6,
+        "incomplete_candle_notice": {
+          "latest_bucket_utc": "2026-10-30T12:00:00+00:00",
+          "bars_present": 2,
+          "bars_required": 4,
+          "message": "Latest 4-hour candle is incomplete (2/4 closed 1h bars). Evaluated strictly on the latest fully closed 4h candle."
+        },
+        "data_freshness_status": "MARKET_DATA_STALE",
+        "observed_age_hours": 73.6
+      },
+      "entry_reference": null,
+      "stop_reference": null,
+      "target_reference": null,
+      "risk_reward_ratio": null,
+      "holding_horizon_bars": 18,
+      "holding_horizon_hours": 72,
+      "historical_evidence_status": "RETROSPECTIVE_REPRODUCIBLE_NON_CONFIRMATORY",
+      "prospective_validation_status": "NOT_VALIDATED",
+      "authorization_status": "OFFLINE_RESEARCH_ONLY",
+      "data_freshness_status": "MARKET_DATA_STALE",
+      "data_age_hours": 73.6,
+      "last_observed_timestamp_utc": "2026-10-30T08:00:00+00:00",
+      "reason_codes": [
+        "STALE_MARKET_DATA_BLOCKED",
+        "REGIME_MISMATCH_BEARISH",
+        "BLOCKED_BY_REGIME_TRENDING_BEARISH"
+      ],
+      "explanation": "Market data is stale (73.6h old > 2.0h operational limit; latest completed 4h bar 2026-10-30T08:00:00+00:00). Historical snapshot preserved; current live setup cannot be evaluated on stale market data. Incompatible regime: Coinbase spot is Long-only. Downward trending regime does not support long breakout expansion."
+    },
+    "strategy_id": "HTF_RANGE_EXPANSION_BREAKOUT",
+    "setup_status": "BLOCKED",
+    "regime": "TRENDING_BEARISH",
+    "trigger_status": "STALE_DATA_BLOCKED",
+    "entry_reference": null,
+    "stop_reference": null,
+    "target_reference": null,
+    "historical_evidence_status": "RETROSPECTIVE_REPRODUCIBLE_NON_CONFIRMATORY",
+    "prospective_validation_status": "NOT_VALIDATED",
+    "authorization_status": "OFFLINE_RESEARCH_ONLY",
+    "reason_codes": [
+      "STALE_MARKET_DATA_BLOCKED",
+      "REGIME_MISMATCH_BEARISH",
+      "BLOCKED_BY_REGIME_TRENDING_BEARISH"
+    ],
+    "strategy_assessment_status": "BLOCKED",
+    "strategy_assessment": {
+      "status": "BLOCKED",
+      "walk_forward_evidence": "RETROSPECTIVE_REPRODUCIBLE",
+      "strategy_validation": "NOT_VALIDATED",
+      "evaluated_candidates": [],
+      "reason": "Market data is stale (73.6h old > 2.0h operational limit; latest completed 4h bar 2026-10-30T08:00:00+00:00). Historical snapshot preserved; current live setup cannot be evaluated on stale market data. Incompatible regime: Coinbase spot is Long-only. Downward trending regime does not support long breakout expansion.",
+      "governance_notice": "Interactive analysis is decoupled from historical backtesting. Evidence must be generated via offline research."
+    },
+    "tournament": {
+      "tournament_id": "trn_04ef3a5e0f5b",
+      "executed_at_utc": "2026-11-02T14:37:56.301582+00:00",
+      "evaluation_regime": "TRENDING_BEARISH",
+      "evaluation_protocol": "WALK_FORWARD_CAUSAL_SPLIT_v1",
+      "protocol_hash": "4e8021437f984349",
+      "dataset_hash": null,
+      "date_window": null,
+      "strategy_versions": {},
+      "execution_source": "NOT_RUN_NO_ELIGIBLE_CANDIDATES",
+      "strategy_assessment_status": "NO_SETUP",
+      "walk_forward_evidence": "NOT_APPLICABLE",
+      "strategy_validation": "NOT_APPLICABLE",
+      "cache_validation": {
+        "validation_status": "NOT_APPLICABLE",
+        "hashes_matched": false,
+        "source_label": "Tournament skipped because no candidates were eligible.",
+        "newly_executed": false
+      },
+      "is_read_only": true,
+      "attempts_created": 0,
+      "candidate_results": [],
+      "baseline_comparator": null,
+      "sequential_evaluation_log": [],
+      "tournament_winner": null,
+      "final_verdict": "ABSTAIN",
+      "verdict_explanation": "No shortlisted candidates provided for tournament evaluation."
+    },
+    "smart_entry_decision": {
+      "decision_id": "dec_c374508d5597",
+      "decision_timestamp_utc": "2026-11-02T14:37:55.663979+00:00",
+      "status": "NO_SMART_ENTRY",
+      "action": "ABSTAIN",
+      "strategy_assessment_status": "BLOCKED",
+      "walk_forward_evidence": "RETROSPECTIVE_REPRODUCIBLE",
+      "strategy_validation": "NOT_VALIDATED",
+      "market_regime": "TRENDING_BEARISH",
+      "reason": "Market data is stale (73.6h old > 2.0h operational limit; latest completed 4h bar 2026-10-30T08:00:00+00:00). Historical snapshot preserved; current live setup cannot be evaluated on stale market data. Incompatible regime: Coinbase spot is Long-only. Downward trending regime does not support long breakout expansion.",
+      "candidate_setup": null,
+      "data_provenance": {
+        "instrument": "BTC-USD",
+        "timeframe": "1h",
+        "source": "LOCAL_HISTORICAL_SNAPSHOT",
+        "submitted_candle_count": 168,
+        "analyzed_closed_candle_count": 168,
+        "request_payload_sha256": "86ea8d72db45690d4fdbc4bbae7bd5db715a8f56027642376d38557f7de1907e",
+        "analyzed_window_sha256": "3fa27c80c80c2207846e817111231fda6dc9aad99f950e8ba597694702b491a0",
+        "latest_closed_timestamp": "2026-10-30T13:00:00+00:00",
+        "authorization": "OFFLINE_RESEARCH_ONLY"
+      }
+    },
+    "decision": {
+      "decision_id": "dec_c374508d5597",
+      "decision_timestamp_utc": "2026-11-02T14:37:55.663979+00:00",
+      "status": "NO_SMART_ENTRY",
+      "action": "ABSTAIN",
+      "strategy_assessment_status": "BLOCKED",
+      "walk_forward_evidence": "RETROSPECTIVE_REPRODUCIBLE",
+      "strategy_validation": "NOT_VALIDATED",
+      "market_regime": "TRENDING_BEARISH",
+      "reason": "Market data is stale (73.6h old > 2.0h operational limit; latest completed 4h bar 2026-10-30T08:00:00+00:00). Historical snapshot preserved; current live setup cannot be evaluated on stale market data. Incompatible regime: Coinbase spot is Long-only. Downward trending regime does not support long breakout expansion.",
+      "candidate_setup": null,
+      "data_provenance": {
+        "instrument": "BTC-USD",
+        "timeframe": "1h",
+        "source": "LOCAL_HISTORICAL_SNAPSHOT",
+        "submitted_candle_count": 168,
+        "analyzed_closed_candle_count": 168,
+        "request_payload_sha256": "86ea8d72db45690d4fdbc4bbae7bd5db715a8f56027642376d38557f7de1907e",
+        "analyzed_window_sha256": "3fa27c80c80c2207846e817111231fda6dc9aad99f950e8ba597694702b491a0",
+        "latest_closed_timestamp": "2026-10-30T13:00:00+00:00",
+        "authorization": "OFFLINE_RESEARCH_ONLY"
+      }
+    },
+    "integrated_workflow": true,
+    "runtime_timings_ms": {
+      "analysis_screening": 637.545,
+      "tournament_or_evidence_check": 0.104,
+      "final_decision": 0.087,
+      "total": 637.758,
+      "tournament_arm_1": null,
+      "tournament_arm_2": null,
+      "tournament_arm_3": null
+    },
+    "tournament_arm_timing_status": "NOT_RUN_NO_ELIGIBLE_CANDIDATES",
+    "data_provenance": {
+      "instrument": "BTC-USD",
+      "timeframe": "1h",
+      "source": "LOCAL_HISTORICAL_SNAPSHOT",
+      "submitted_candle_count": 168,
+      "analyzed_closed_candle_count": 168,
+      "request_payload_sha256": "86ea8d72db45690d4fdbc4bbae7bd5db715a8f56027642376d38557f7de1907e",
+      "analyzed_window_sha256": "3fa27c80c80c2207846e817111231fda6dc9aad99f950e8ba597694702b491a0",
+      "latest_closed_timestamp": "2026-10-30T13:00:00+00:00",
+      "authorization": "OFFLINE_RESEARCH_ONLY"
+    },
+    "request_id": "8e918f97-33bb-44c4-8f1a-ea08c2ae41df"
+  },
+  "outcome_heading": "HTF SETUP BLOCKED",
+  "outcome_sub": "Market data is stale (73.6h old > 2.0h operational limit; latest completed 4h bar 2026-10-30T08:00:00+00:00). Historical snapshot preserved; current live setup cannot be evaluated on stale market data. Incompatible regime: Coinbase spot is Long-only. Downward trending regime does not support long breakout expansion.",
+  "setup_status_badge": "SETUP STATUS: BLOCKED",
+  "freshness_badge": "Data Freshness: MARKET_DATA_STALE (73.6h old)",
+  "regime_text": "TRENDING_BEARISH",
+  "trigger_text": "STALE_DATA_BLOCKED",
+  "entry_text": "Unavailable",
+  "stop_text": "Unavailable",
+  "target_text": "Unavailable",
+  "candle_details": "Latest Completed 4h Close: $77,241.91 \u00b7 20-bar Donchian Range: [$76,301.02 \u2013 $81,890] \u00b7 \u26a0\ufe0f Latest 4-hour candle is incomplete (2/4 closed 1h bars). Evaluated strictly on the latest fully closed 4h candle.",
+  "explanation": "Market data is stale (73.6h old > 2.0h operational limit; latest completed 4h bar 2026-10-30T08:00:00+00:00). Historical snapshot preserved; current live setup cannot be evaluated on stale market data. Incompatible regime: Coinbase spot is Long-only. Downward trending regime does not support long breakout expansion.",
+  "badge_retrospective": "Historical Evidence: RETROSPECTIVE_REPRODUCIBLE_NON_CONFIRMATORY",
+  "badge_prospective": "Prospective Validation: NOT_VALIDATED",
+  "badge_authorization": "Authorization: OFFLINE_RESEARCH_ONLY (Trading DISABLED)",
+  "historical_evidence": {
+    "trades": "194\nHistorical Trades\nJan 2022 \u2013 Sep 2026",
+    "winrate": "43.81%\nOverall Win Rate\n85 wins / 194 total",
+    "expectancy": "+9.57 bps\nAll-Trade Net Expectancy\nBinance VIP0 (26 bps friction)",
+    "retained_subgroup": "110 / 84\nRetained / Excluded\n+59.25 bps on 110 retained"
+  }
+}

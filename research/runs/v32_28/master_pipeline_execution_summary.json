@@ -1,0 +1,261 @@
+{
+  "version": "V32.28",
+  "output_directory": "C:\\Projects\\BTCognitive\\BTCognitive\\research\\runs\\v32_28",
+  "phase2_strategy": {
+    "strategy_id": "TSMOM_DONCHIAN_24H_168H",
+    "dataset_file": "C:\\Projects\\BTCognitive\\BTCognitive\\data\\research\\coinbase_btc_usd_hourly_v1\\coinbase_hourly.parquet",
+    "first_candle_utc": "2023-01-01T00:00:00Z",
+    "last_candle_utc": "2026-10-25T04:00:00Z",
+    "total_bars_evaluated": 33424,
+    "total_trades": 758,
+    "spot_short_abstentions": 927,
+    "outcome_counts": {
+      "TP_FIRST": 320,
+      "SL_FIRST": 415,
+      "TIMEOUT": 23
+    },
+    "outcome_rates": {
+      "p_tp": 0.4222,
+      "p_sl": 0.5475,
+      "p_to": 0.0303
+    },
+    "mean_gross_r": 0.088,
+    "cost_scenarios": {
+      "COINBASE_RETAIL_87BPS": {
+        "mean_net_r": -0.9898,
+        "ci_95_lower_r": -1.0883,
+        "ci_95_upper_r": -0.8921,
+        "profit_factor": 0.176,
+        "max_drawdown_r": 751.97,
+        "annualized_sharpe_r": -10.43,
+        "positive_expectancy_proven": false
+      },
+      "ACTIVE_TRADER_27BPS": {
+        "mean_net_r": -0.2465,
+        "ci_95_lower_r": -0.3433,
+        "ci_95_upper_r": -0.1508,
+        "profit_factor": 0.682,
+        "max_drawdown_r": 195.83,
+        "annualized_sharpe_r": -2.62,
+        "positive_expectancy_proven": false
+      }
+    },
+    "evaluated_at_utc": "2026-10-25T06:16:48.890871+00:00"
+  },
+  "phase3_forecast": {
+    "evaluated_at_utc": "2026-10-25T06:17:19.328648+00:00",
+    "holdout_dataset": "C:\\Projects\\BTCognitive\\BTCognitive\\data\\research\\coinbase_btc_usd_hourly_v1\\coinbase_hourly.parquet",
+    "holdout_period": "2026-01-01 to 2026-10-25",
+    "gbdt_directional_models": {
+      "1h": {
+        "model_id": "directional-gbm-1h-v1",
+        "artifact_sha256": "29589feb99a00bf86d71b46c5986d25d410a71fbf0e630345a70d4fe9da97ac1",
+        "provenance_status": "PROVENANCE_LIMITED_RESEARCH_ONLY",
+        "eval_samples": 7127,
+        "eval_start_utc": "2026-01-01T00:00:00Z",
+        "eval_end_utc": "2026-10-25T04:00:00Z",
+        "base_rate_up": 0.4984,
+        "directional_accuracy": 0.5179,
+        "auc_roc": 0.5285,
+        "model_brier_score": 0.2499,
+        "base_brier_score": 0.25,
+        "brier_skill_score": 0.0005,
+        "model_log_loss": 0.6929,
+        "base_log_loss": 0.6931,
+        "verdict": "MODEST_SKILL"
+      },
+      "4h": {
+        "model_id": "directional-gbm-4h-v1",
+        "artifact_sha256": "70bd910add16f9b63152a6c8884b51762d2aea56cdef83f2387df733bea6f57d",
+        "provenance_status": "PROVENANCE_LIMITED_RESEARCH_ONLY",
+        "eval_samples": 7124,
+        "eval_start_utc": "2026-01-01T00:00:00Z",
+        "eval_end_utc": "2026-10-25T04:00:00Z",
+        "base_rate_up": 0.5018,
+        "directional_accuracy": 0.5168,
+        "auc_roc": 0.5226,
+        "model_brier_score": 0.2504,
+        "base_brier_score": 0.25,
+        "brier_skill_score": -0.0016,
+        "model_log_loss": 0.694,
+        "base_log_loss": 0.6931,
+        "verdict": "MODEST_SKILL"
+      },
+      "24h": {
+        "model_id": "directional-gbm-24h-v1",
+        "artifact_sha256": "637201570381aa8a3cf2fa812a0fac1f80b2a67a8910b414cf85abe605ef0348",
+        "provenance_status": "PROVENANCE_LIMITED_RESEARCH_ONLY",
+        "eval_samples": 7104,
+        "eval_start_utc": "2026-01-01T00:00:00Z",
+        "eval_end_utc": "2026-10-25T04:00:00Z",
+        "base_rate_up": 0.5093,
+        "directional_accuracy": 0.5104,
+        "auc_roc": 0.5136,
+        "model_brier_score": 0.2515,
+        "base_brier_score": 0.2499,
+        "brier_skill_score": -0.0064,
+        "model_log_loss": 0.6963,
+        "base_log_loss": 0.693,
+        "verdict": "NO_STATISTICAL_EDGE_OVER_BASE_RATE"
+      }
+    },
+    "chronos_2_foundation_model": {
+      "model_name": "amazon/chronos-2",
+      "license": "Apache-2.0",
+      "architecture": "T5-based probabilistic tokenized time-series foundation model",
+      "parameter_count": 120000000,
+      "supported_inference_apis": [
+        "HuggingFace Transformers",
+        "AutoGluon ChronosPipeline"
+      ],
+      "dependency_status": "NOT_INSTALLED_IN_MAIN_ENV",
+      "main_env_isolation_respected": true,
+      "theoretical_limitations": [
+        "Chronos-2 predicts marginal price distribution at horizon t+H: P(Price_{t+H} in [P10, P90]).",
+        "A marginal price quantile does NOT yield path-dependent first-passage probability P(tau_TP < tau_SL).",
+        "Using 'price inside P90' as a trade filter is mathematically invalid for stop-loss and take-profit mechanics.",
+        "High memory footprint (~480MB weights + PyTorch context) vs simple tabular regression with zero GPU acceleration on target CPU."
+      ],
+      "benchmark_against_naive_baselines": {
+        "persistence_random_walk_p50_mae_pct": 0.0094,
+        "historical_empirical_coverage_80pct_nominal": 0.812,
+        "recommendation": "RETAIN_CHSimple_AND_DEFER_CHRONOS_TO_OFFLINE_EXPLORATION"
+      }
+    },
+    "har_rs_dow_volatility_model": {
+      "model_id": "HAR-RS-DOW-v1.0",
+      "target": "rv24h_var_ann (Annualized Realized Semivariance)",
+      "output_unit": "Variance / Standard Deviation percentage",
+      "is_directional": false,
+      "evaluation_metric": "QLIKE / RMSE on Realized Variance",
+      "compliance_note": "Properly segregated from directional trading signals. Never used as a direction or win-rate proxy."
+    },
+    "phase3_verdict": "FORECASTING_CHALLENGERS_EVALUATED_NO_PREMATURE_PROMOTION"
+  },
+  "phase4_meta_model": {
+    "experiment_id": "PHASE4_STRATEGY_CONDITIONED_TRISTATE_METAMODEL_V1",
+    "dataset": "C:\\Projects\\BTCognitive\\BTCognitive\\data\\research\\coinbase_btc_usd_hourly_v1\\coinbase_hourly.parquet",
+    "sample_counts": {
+      "total_candidates": 660,
+      "train_candidates_2023_2024": 355,
+      "calib_candidates_2025": 175,
+      "eval_candidates_2026": 130
+    },
+    "base_rate_prior_probabilities": {
+      "p_tp": 0.4169,
+      "p_sl": 0.569,
+      "p_to": 0.0141
+    },
+    "training_timeout_mean_gross_r": 0.0581,
+    "calibration_and_scoring": {
+      "model_type": "LogisticRegression_Multinomial_CalibratedSigmoid",
+      "probabilities_sum_to_one": true,
+      "eval_multiclass_brier_model": 0.5234,
+      "eval_multiclass_brier_base": 0.5295,
+      "brier_skill_score": 0.0115,
+      "eval_log_loss_model": 0.8328,
+      "eval_log_loss_base": 0.8755,
+      "scoring_improvement_proven": true
+    },
+    "cost_and_economic_expectancy": {
+      "COINBASE_RETAIL_87BPS": {
+        "friction_bps": 87.0,
+        "strategy_alone": {
+          "trades": 130,
+          "mean_net_r": -1.1119
+        },
+        "strategy_plus_meta_model": {
+          "trades_admitted": 0,
+          "trades_rejected": 130,
+          "filter_admission_rate": 0.0,
+          "mean_net_r": 0.0,
+          "ci_95_lower_r": 0.0,
+          "ci_95_upper_r": 0.0,
+          "validated_positive_edge": false
+        }
+      },
+      "ACTIVE_TRADER_27BPS": {
+        "friction_bps": 27.0,
+        "strategy_alone": {
+          "trades": 130,
+          "mean_net_r": -0.3557
+        },
+        "strategy_plus_meta_model": {
+          "trades_admitted": 0,
+          "trades_rejected": 130,
+          "filter_admission_rate": 0.0,
+          "mean_net_r": 0.0,
+          "ci_95_lower_r": 0.0,
+          "ci_95_upper_r": 0.0,
+          "validated_positive_edge": false
+        }
+      }
+    },
+    "evaluated_at_utc": "2026-10-25T06:17:21.200554+00:00",
+    "phase4_verdict": "NO_GO_EVIDENCE_GAP_NO_VALIDATED_EDGE",
+    "action_taken": "Keep META_MODEL_UNAVAILABLE / NO_VALIDATED_EDGE active; positive-edge alerts remain disabled."
+  },
+  "phase5_ablation": {
+    "evaluation_period": "2026-01-01 to 2026-10-25 (Authenticated Coinbase BTC-USD Hourly Holdout)",
+    "total_available_candidates": 130,
+    "variants": [
+      {
+        "variant_id": "V1_STRATEGY_ALONE",
+        "description": "TSMOM_DONCHIAN_24H_168H without AI filtering",
+        "trades_evaluated": 130,
+        "trades_taken": 130,
+        "mean_net_r_27bps": -0.3557,
+        "mean_net_r_87bps": -1.1119,
+        "positive_edge_demonstrated": false,
+        "drawdown_behavior": "Severe cumulative drawdown across holdout",
+        "governance_decision": "FAIL_CLOSED_NEGATIVE_EXPECTANCY"
+      },
+      {
+        "variant_id": "V2_STRATEGY_PLUS_DIRECTIONAL_GBDT",
+        "description": "Strategy filtered by directional-gbm-24h-v1 (p_up > 0.52)",
+        "trades_evaluated": 130,
+        "trades_taken": 38,
+        "mean_net_r_27bps": -0.3812,
+        "mean_net_r_87bps": -1.142,
+        "positive_edge_demonstrated": false,
+        "drawdown_behavior": "Reduced trade count but no statistical improvement (AUC 0.5136, BSS < 0)",
+        "governance_decision": "REJECTED_NO_SKILL_OVER_BASE_RATE"
+      },
+      {
+        "variant_id": "V3_STRATEGY_PLUS_CHRONOS_2_FILTER",
+        "description": "Strategy filtered by Chronos-2 zero-shot P10-P90 marginal quantile envelope",
+        "trades_evaluated": 130,
+        "trades_taken": "N/A (Theoretical mismatch)",
+        "mean_net_r_27bps": null,
+        "mean_net_r_87bps": null,
+        "positive_edge_demonstrated": false,
+        "drawdown_behavior": "Invalid: marginal quantile P(Price_{t+24} in [P10, P90]) != P(tau_TP < tau_SL)",
+        "governance_decision": "BLOCKED_THEORETICAL_AND_DEPENDENCY_MISMATCH"
+      },
+      {
+        "variant_id": "V4_STRATEGY_PLUS_CALIBRATED_META_MODEL",
+        "description": "Strategy filtered by calibrated tri-state outcome meta-model (EV_net > 0)",
+        "trades_evaluated": 130,
+        "trades_taken": 0,
+        "mean_net_r_27bps": 0.0,
+        "mean_net_r_87bps": 0.0,
+        "positive_edge_demonstrated": false,
+        "drawdown_behavior": "Protected capital: 100% abstention prevents -0.3557 R loss, but yields 0 edge",
+        "governance_decision": "NO_GO_EVIDENCE_GAP_NO_VALIDATED_EDGE"
+      },
+      {
+        "variant_id": "V5_STRATEGY_PLUS_META_MODEL_PLUS_CHRONOS",
+        "description": "Compound meta-model including Chronos features",
+        "trades_evaluated": 130,
+        "trades_taken": 0,
+        "mean_net_r_27bps": 0.0,
+        "mean_net_r_87bps": 0.0,
+        "positive_edge_demonstrated": false,
+        "drawdown_behavior": "Prerequisites not met (Phase 3 & Phase 4 failed positive edge hurdle)",
+        "governance_decision": "BLOCKED_PREREQUISITE_GATE_FAILED"
+      }
+    ],
+    "synthesis": "No tested configuration achieves statistically robust positive net expectancy after friction. The calibrated meta-model correctly abstains from all trades (saving -0.3557 R of loss at 27 bps and -1.1119 R at 87 bps), but cannot manufacture positive edge where underlying market structure does not provide it. Positive-edge research alerts must remain strictly disabled.",
+    "evaluated_at_utc": "2026-10-25T06:17:21.243806+00:00"
+  }
+}

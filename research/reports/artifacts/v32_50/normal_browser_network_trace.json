@@ -1,0 +1,106 @@
+{
+  "capture": {
+    "type": "Normal-app browser network observations",
+    "frontend": "Terminal frontend",
+    "backend": "normal api.server:app",
+    "api_port": 8102,
+    "market_data_source": "Coinbase REST",
+    "simulated_entry_ledger": "isolated session file",
+    "payload_policy": "No candle arrays, credentials, or secrets included.",
+    "limitations": [
+      "Trace is a curated summary of page-level browser request observations, not a raw HAR export.",
+      "Some timings were collected while the full test suite was consuming resources.",
+      "No post-deduplication What-If browser trace was captured."
+    ]
+  },
+  "requests": [
+    {
+      "operation": "Integrated Analyse",
+      "method": "POST",
+      "path": "/api/tournament/analyse",
+      "http_status": 200,
+      "request_id": "5986c0a3-59d5-407a-b12b-9619fe5055b8",
+      "client_elapsed_ms": 187,
+      "server_total_ms": 130.5,
+      "request_summary": {
+        "closed_candle_count": 349,
+        "symbol": "BTC-USD",
+        "timeframe": "1h",
+        "source": "COINBASE_EXCHANGE_REST",
+        "auto_tournament": true
+      },
+      "response_summary": {
+        "preliminary_candidate_count": 2,
+        "tournament_state": "NOT_RUN_UNVERIFIED_EVIDENCE",
+        "verified_arm_evidence": false,
+        "simulated_attempt_count": 0
+      },
+      "visible_result": "BACKTEST EVIDENCE UNAVAILABLE; no winner asserted; Analyse button re-enabled"
+    },
+    {
+      "operation": "Forecast fetch, warm sample",
+      "method": "GET",
+      "path": "/api/forecast/latest",
+      "http_status": 200,
+      "sample_count": 20,
+      "request_count": 20,
+      "p50_ms": 21,
+      "p95_ms": 35,
+      "max_ms": 36,
+      "notes": "Separate warm sequence; not comparable to mixed cold/warm timings."
+    },
+    {
+      "operation": "Forecast fetch, mixed cold/warm sample",
+      "method": "GET",
+      "path": "/api/forecast/latest",
+      "http_status": 200,
+      "sample_count": 20,
+      "request_count": 20,
+      "p50_ms": 420,
+      "p95_ms": 34300,
+      "max_ms": 69100,
+      "notes": "Mixed sample; not a clean representative baseline."
+    },
+    {
+      "operation": "Forecast timeout and recovery",
+      "method": "GET",
+      "path": "/api/forecast/latest",
+      "timeout_injection": "Browser route interception deliberately stalled beyond the client timeout.",
+      "injected_http_status": null,
+      "client_outcome": "REQUEST_TIMEOUT shown; chart remained usable; last-success timestamp retained; Retry remained usable.",
+      "recovery_http_status": 200,
+      "recovery_elapsed_ms": 495,
+      "notes": "The interception did not produce a deterministic HTTP 5xx response."
+    },
+    {
+      "operation": "What-If request burst before deduplication",
+      "method": "POST",
+      "path": "/api/arena/what-if-scenario",
+      "capture_duration_seconds": 5,
+      "request_count": 31,
+      "unique_payload_count": 20,
+      "repeated_identical_payload_count": 11,
+      "all_observed_statuses": [
+        200
+      ],
+      "p50_ms_nearest_rank": 2402,
+      "p95_ms_nearest_rank": 8966,
+      "max_ms": 9555,
+      "notes": "Captured under concurrent full-suite CPU load before the in-flight dedupe edit; no after trace."
+    }
+  ],
+  "actual_forecast_response_summary": {
+    "direction": "UP",
+    "horizon": "1h",
+    "model_id": "directional-gbm-1h-v1",
+    "probabilities": {
+      "up": 0.5585,
+      "down": 0.4415
+    },
+    "source_granularity_seconds": 900,
+    "forecast_origin_utc": "2026-10-26T17:15:00Z",
+    "latest_closed_hourly_bar_utc": "2026-10-26T16:00:00Z",
+    "marker_outcome": "Not anchored: no matching closed hourly bar; UI explicitly showed marker pending.",
+    "numeric_directional_price_path_present": false
+  }
+}

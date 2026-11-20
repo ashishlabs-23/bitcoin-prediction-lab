@@ -1,0 +1,453 @@
+ M CHANGES.md
+ M README.md
+ M api/notifications.py
+ M api/routes_research.py
+ M api/routes_tournament.py
+ M api/server.py
+ M backtest/market_memory.py
+ M data/prospective_forecast_ledger.jsonl
+ M data/research_alert_state.json
+ M engine/__init__.py
+ M engine/counterfactual_contract_engine.py
+ M engine/evidence_router.py
+ M engine/execution_cost_model.py
+ M engine/forecast_engine_15m.py
+ M engine/probabilistic_entry_engine.py
+ M engine/smart_entry_engine.py
+ M engine/strategy_selection.py
+ M experiments/results/multi_regime_validation_report.json
+ M experiments/results/post_repair_milestone_5_lock.json
+ M experiments/results/stage10_shadow_validation/shadow_prediction_ledger.jsonl
+ M experiments/results/stage11_forward_validation/forward_prediction_ledger.jsonl
+ M research/baseline_challenge_report.md
+ M research/challenger_bakeoff_report.md
+ M research/hawkes_latency_report.md
+ M research/hawkes_shadow_report.md
+ M research/independent_block_report.md
+ M research/information_inventory_report.md
+ M research/interval_sharpness_report.md
+ M research/live_baseline_comparison.md
+ M research/live_long_validation_report.md
+ M research/live_metric_reconciliation_report.md
+ M research/production_review_block_10.md
+ M research/range_stability_report.md
+ M research/reports/post_repair_5_block_observed.md
+ M research/reports/post_repair_baseline.md
+ M research/reports/post_repair_restart_review.md
+ M research/reports/pre_post_repair_comparison.md
+ M results/challenger_bakeoff_manifest.json
+ M results/live_validation_manifest.json
+ M results/mamba_trial_manifest.json
+ M results/model_change_request.json
+ M tests_frontend.js
+ M web/app.js
+ M web/index.html
+ M web/styles.css
+ M web_src/api_client.js
+?? api/routes_manual_journal.py
+?? api/routes_user_positions.py
+?? data/.prospective_shadow_runner.lock
+?? data/manual_trades/manual_trades_ledger.jsonl
+?? data/prospective_entry_ledger_v1_quarantined.jsonl
+?? data/prospective_entry_ledger_v2.jsonl
+?? data/prospective_shadow_status.json
+?? data/prospective_shadow_v1.jsonl
+?? data/research/coinbase_btc_usd_hourly_v1/acquisition_log.jsonl
+?? data/research/coinbase_btc_usd_hourly_v1/coinbase_hourly_manifest.json
+?? data/research/l2_stream/l2_burnin_events_20261025_135844.jsonl
+?? data/research/l2_stream/l2_burnin_events_20261025_140347.jsonl
+?? data/research/l2_stream/l2_burnin_events_20261025_140437.jsonl
+?? data/research/prospective_l2_gated_ledger_v1.jsonl
+?? data/research/user_positions/user_position_events.jsonl
+?? data/research/user_positions/user_positions_state.json
+?? data/smart_entry/smart_entry_attempts.jsonl
+?? engine/adaptive_risk_copilot.py
+?? engine/check_browser_state.py
+?? engine/coinbase_l2_collector.py
+?? engine/data_verification.py
+?? engine/directional_forecast_service.py
+?? engine/drift_evaluator.py
+?? engine/l2_event_recorder.py
+?? engine/l2_microstructure_features.py
+?? engine/manual_trade_journal.py
+?? engine/model_evaluation_interface.py
+?? engine/paper_trading_engine.py
+?? engine/prospective_l2_evaluation_protocol.py
+?? engine/prospective_l2_qualification.py
+?? engine/prospective_l2_shadow_gating.py
+?? engine/prospective_shadow_collector.py
+?? engine/regime_strategy_tournament.py
+?? engine/run_browser_qa.py
+?? engine/run_l2_prospective_burnin.py
+?? engine/run_real_cdp_browser_qa.py
+?? engine/run_v32_42_cdp_browser_qa.py
+?? engine/run_v32_42_journal_browser_qa.py
+?? engine/run_v32_43_smart_entry_browser_qa.py
+?? engine/run_v32_44_smart_entry_browser_qa.py
+?? engine/run_v32_45_workflow_acceptance_browser_qa.py
+?? engine/run_v32_46_vigorous_browser_qa.py
+?? engine/run_v32_47_real_backend_qa.py
+?? engine/run_v32_48_real_backend_qa.py
+?? engine/shadow_feed_runner.py
+?? engine/smart_entry_pipeline.py
+?? engine/smart_entry_simulator.py
+?? engine/strategy_signal_engine.py
+?? engine/trade_outcome_evaluator.py
+?? engine/user_position_tracker.py
+?? engine/v32_46_test_mock_server.py
+?? engine/v32_48_test_backend_server.py
+?? requirements-research.txt
+?? research/data_acquisition/acquire_coinbase_hourly.py
+?? research/data_audit_summary.json
+?? research/drift_model_walkforward_results.json
+?? research/execution_cost_eligibility_contract.md
+?? research/experiments/run_phase2_strategy_baseline.py
+?? research/experiments/run_phase3_forecast_evaluation.py
+?? research/experiments/run_phase4_meta_model.py
+?? research/experiments/run_phase5_ablation.py
+?? research/experiments/run_v32_28_master_pipeline.py
+?? research/experiments/run_v32_30_horizon_study.py
+?? research/experiments/run_v32_37_chronos2_benchmark.py
+?? research/experiments/verify_isolated_api_server.py
+?? research/har_calibration_results.json
+?? research/historical_replay_results.json
+?? research/protocol_v1_1.md
+?? research/protocol_v1_2_decision_matrix_v31_1.md
+?? research/protocol_v1_2_proposal.md
+?? research/reports/artifacts/browser_qa/how_it_works_desktop.png
+?? research/reports/artifacts/browser_qa/how_it_works_desktop_dom.html
+?? research/reports/artifacts/browser_qa/how_it_works_mobile.png
+?? research/reports/artifacts/browser_qa/how_it_works_mobile_dom.html
+?? research/reports/artifacts/browser_qa/how_it_works_tablet.png
+?? research/reports/artifacts/browser_qa/how_it_works_tablet_dom.html
+?? research/reports/artifacts/browser_qa/landing_desktop.png
+?? research/reports/artifacts/browser_qa/landing_desktop_dom.html
+?? research/reports/artifacts/browser_qa/landing_mobile.png
+?? research/reports/artifacts/browser_qa/landing_mobile_dom.html
+?? research/reports/artifacts/browser_qa/landing_tablet.png
+?? research/reports/artifacts/browser_qa/landing_tablet_dom.html
+?? research/reports/artifacts/browser_qa/mobile_viewport_1792992879740.png
+?? research/reports/artifacts/browser_qa/paper_trading_tab_1792992860827.png
+?? research/reports/artifacts/browser_qa/real_how_it_works_desktop.png
+?? research/reports/artifacts/browser_qa/real_how_it_works_mobile.png
+?? research/reports/artifacts/browser_qa/real_how_it_works_tablet.png
+?? research/reports/artifacts/browser_qa/real_landing_desktop.png
+?? research/reports/artifacts/browser_qa/real_landing_mobile.png
+?? research/reports/artifacts/browser_qa/real_landing_tablet.png
+?? research/reports/artifacts/browser_qa/research_page_1792992832118.png
+?? research/reports/artifacts/browser_qa/research_subtabs_1792992841483.png
+?? research/reports/artifacts/browser_qa/tablet_viewport_1792992870482.png
+?? research/reports/artifacts/browser_qa/terminal_desktop_1792992760727.png
+?? research/reports/artifacts/browser_qa/terminal_lower_1792992775557.png
+?? research/reports/artifacts/browser_qa/terminal_scrolled_1792992769197.png
+?? research/reports/artifacts/browser_qa/terminal_smart_entry_1792992781923.png
+?? research/reports/artifacts/browser_qa/terminal_top_1792992789558.png
+?? research/reports/artifacts/browser_qa/v32_42_manual_journal_desktop.png
+?? research/reports/artifacts/browser_qa/v32_42_manual_journal_mobile.png
+?? research/reports/artifacts/browser_qa/v32_42_manual_journal_tablet.png
+?? research/reports/artifacts/browser_qa/v32_42_position_copilot_desktop.png
+?? research/reports/artifacts/browser_qa/v32_42_position_copilot_mobile.png
+?? research/reports/artifacts/browser_qa/v32_42_position_copilot_tablet.png
+?? research/reports/artifacts/browser_qa/v32_43_smart_entry_desktop.png
+?? research/reports/artifacts/browser_qa/v32_43_smart_entry_mobile.png
+?? research/reports/artifacts/browser_qa/v32_43_smart_entry_tablet.png
+?? research/reports/artifacts/browser_qa/v32_44_smart_entry_desktop.png
+?? research/reports/artifacts/browser_qa/v32_44_smart_entry_mobile.png
+?? research/reports/artifacts/browser_qa/v32_44_smart_entry_tablet.png
+?? research/reports/artifacts/browser_qa/v32_45_smart_entry_desktop.png
+?? research/reports/artifacts/browser_qa/v32_45_smart_entry_mobile.png
+?? research/reports/artifacts/browser_qa/v32_45_smart_entry_tablet.png
+?? research/reports/artifacts/browser_qa/v32_46_vigorous/v32_46_vigorous_browser_qa_results.json
+?? research/reports/artifacts/browser_qa/v32_46_vigorous/v32_46_vigorous_manual_journal.png
+?? research/reports/artifacts/browser_qa/v32_46_vigorous/v32_46_vigorous_research_paper_trading.png
+?? research/reports/artifacts/browser_qa/v32_46_vigorous/v32_46_vigorous_terminal_desktop.png
+?? research/reports/artifacts/browser_qa/v32_46_vigorous/v32_46_vigorous_terminal_mobile.png
+?? research/reports/artifacts/browser_qa/v32_46_vigorous/v32_46_vigorous_terminal_stale_abstain.png
+?? research/reports/artifacts/browser_qa/v32_46_vigorous/v32_46_vigorous_terminal_tablet.png
+?? research/reports/artifacts/browser_qa/v32_47_real_backend/v32_47_desktop_smart_entry_monitor.png
+?? research/reports/artifacts/browser_qa/v32_47_real_backend/v32_47_mobile_smart_entry_monitor.png
+?? research/reports/artifacts/browser_qa/v32_47_real_backend/v32_47_tablet_smart_entry_monitor.png
+?? research/reports/artifacts/browser_qa/v32_48_real_backend/v32_48_test_a_one_click_integrated_workflow.png
+?? research/reports/artifacts/browser_qa/v32_48_real_backend/v32_48_test_b_chart_data_integrity.png
+?? research/reports/artifacts/browser_qa/v32_48_real_backend/v32_48_test_c_d_tournament_provenance.png
+?? research/reports/artifacts/browser_qa/v32_48_real_backend/v32_48_test_e_entry_and_ai_monitoring.png
+?? research/reports/artifacts/browser_qa/v32_48_real_backend/v32_48_test_f_desktop_1280.png
+?? research/reports/artifacts/browser_qa/v32_48_real_backend/v32_48_test_f_mobile_375.png
+?? research/reports/artifacts/browser_qa/v32_48_real_backend/v32_48_test_f_tablet_768.png
+?? research/reports/artifacts/browser_qa/v32_49/normal_app_analyse_network_trace.json
+?? research/reports/artifacts/browser_qa/v32_49/terminal_desktop_1280x800.png
+?? research/reports/artifacts/browser_qa/v32_49/terminal_mobile_375x667.png
+?? research/reports/artifacts/browser_qa/v32_49/terminal_tablet_768x1024.png
+?? research/reports/artifacts/v32_34/after_smart_entry_click_1792915336250.png
+?? research/reports/artifacts/v32_34/after_terminal_click_1792915398530.png
+?? research/reports/artifacts/v32_34/arena_tab_view_1792911798632.png
+?? research/reports/artifacts/v32_34/base_page_1792915381975.png
+?? research/reports/artifacts/v32_34/desktop_terminal_initial_1792911705548.png
+?? research/reports/artifacts/v32_34/final_terminal_verification_1792827185171.png
+?? research/reports/artifacts/v32_34/l2_gating_panel_1792913667670.png
+?? research/reports/artifacts/v32_34/l2_gating_panel_scrolled_1792913673748.png
+?? research/reports/artifacts/v32_34/l2_gating_status_api_1792913732626.png
+?? research/reports/artifacts/v32_34/l2_shadow_evaluation_api_1792913738541.png
+?? research/reports/artifacts/v32_34/landing_desktop_1792921198647.png
+?? research/reports/artifacts/v32_34/landing_desktop_new_1792921256462.png
+?? research/reports/artifacts/v32_34/landing_desktop_scrolled_1792921205061.png
+?? research/reports/artifacts/v32_34/landing_reload_1792921244677.png
+?? research/reports/artifacts/v32_34/live_terminal_loaded_1792826811624.png
+?? research/reports/artifacts/v32_34/live_terminal_scrolled_1792826825854.png
+?? research/reports/artifacts/v32_34/live_terminal_top_1792826841429.png
+?? research/reports/artifacts/v32_34/market_tab_view_1792911719450.png
+?? research/reports/artifacts/v32_34/maximized_terminal_1792826873504.png
+?? research/reports/artifacts/v32_34/maximized_top_1792826890573.png
+?? research/reports/artifacts/v32_34/notification_modal_1792921235005.png
+?? research/reports/artifacts/v32_34/replay_tab_view_1792911784505.png
+?? research/reports/artifacts/v32_34/research_page_1792913691121.png
+?? research/reports/artifacts/v32_34/research_page_1792921333469.png
+?? research/reports/artifacts/v32_34/research_page_evaluate_1792921368609.png
+?? research/reports/artifacts/v32_34/research_page_scrolled_1792921354864.png
+?? research/reports/artifacts/v32_34/research_results_view_1792916160876.png
+?? research/reports/artifacts/v32_34/research_tab_view_1792911754134.png
+?? research/reports/artifacts/v32_34/research_tab_view_2_1792911772323.png
+?? research/reports/artifacts/v32_34/responsive_1024x768_1792911809107.png
+?? research/reports/artifacts/v32_34/responsive_800x600_1792911823085.png
+?? research/reports/artifacts/v32_34/root_home_1792915316311.png
+?? research/reports/artifacts/v32_34/root_page_1792915270085.png
+?? research/reports/artifacts/v32_34/root_view_1792915236613.png
+?? research/reports/artifacts/v32_34/smart_entry_desktop_1792921285602.png
+?? research/reports/artifacts/v32_34/smart_entry_direct_1792915886546.png
+?? research/reports/artifacts/v32_34/smart_entry_evaluated_1792913761112.png
+?? research/reports/artifacts/v32_34/smart_entry_full_page_1792913726026.png
+?? research/reports/artifacts/v32_34/smart_entry_initial_1792915717291.png
+?? research/reports/artifacts/v32_34/smart_entry_loaded_1792915285315.png
+?? research/reports/artifacts/v32_34/smart_entry_loaded_1792915736595.png
+?? research/reports/artifacts/v32_34/smart_entry_maximized_1792913771003.png
+?? research/reports/artifacts/v32_34/smart_entry_page_1792913661611.png
+?? research/reports/artifacts/v32_34/smart_entry_page_1792915295929.png
+?? research/reports/artifacts/v32_34/smart_entry_page_1792921320756.png
+?? research/reports/artifacts/v32_34/smart_entry_reloaded_1792913777389.png
+?? research/reports/artifacts/v32_34/smart_entry_result_1792862556855.png
+?? research/reports/artifacts/v32_34/smart_entry_route_1792915354864.png
+?? research/reports/artifacts/v32_34/smart_entry_view_1792915255887.png
+?? research/reports/artifacts/v32_34/smart_entry_wait_1792921296578.png
+?? research/reports/artifacts/v32_34/strategies_tab_view_1792911731506.png
+?? research/reports/artifacts/v32_34/terminal_bottom_1792827110239.png
+?? research/reports/artifacts/v32_34/terminal_controls_1792854814930.png
+?? research/reports/artifacts/v32_34/terminal_controls_2_1792854847629.png
+?? research/reports/artifacts/v32_34/terminal_desktop_1792921262604.png
+?? research/reports/artifacts/v32_34/terminal_final_1792913784059.png
+?? research/reports/artifacts/v32_34/terminal_forecast_view_1792862500683.png
+?? research/reports/artifacts/v32_34/terminal_fresh_1792827145416.png
+?? research/reports/artifacts/v32_34/terminal_header_1792854094527.png
+?? research/reports/artifacts/v32_34/terminal_horizon_bar_1792854964243.png
+?? research/reports/artifacts/v32_34/terminal_horizon_bar_2_1792854985465.png
+?? research/reports/artifacts/v32_34/terminal_horizon_bar_3_1792855006437.png
+?? research/reports/artifacts/v32_34/terminal_initial_1792854757796.png
+?? research/reports/artifacts/v32_34/terminal_initial_1792915651401.png
+?? research/reports/artifacts/v32_34/terminal_page_1792913654515.png
+?? research/reports/artifacts/v32_34/terminal_page_view_1792855091267.png
+?? research/reports/artifacts/v32_34/terminal_reloaded_1792827073922.png
+?? research/reports/artifacts/v32_34/terminal_route_1792915367328.png
+?? research/reports/artifacts/v32_34/terminal_scrolled_1792854873429.png
+?? research/reports/artifacts/v32_34/terminal_tabs_view_1792826905013.png
+?? research/reports/artifacts/v32_34/terminal_timeframes_1792854935199.png
+?? research/reports/artifacts/v32_34/terminal_top_1792854072401.png
+?? research/reports/artifacts/v32_34/terminal_top_chart_1792854781990.png
+?? research/reports/artifacts/v32_34/terminal_top_scrolled_1792827089966.png
+?? research/reports/artifacts/v32_34/terminal_top_view_1792854906754.png
+?? research/reports/artifacts/v32_34/terminal_top_view_1792855123101.png
+?? research/reports/artifacts/v32_34/terminal_topbar_1792854082741.png
+?? research/reports/artifacts/v32_34/terminal_view_1792854067502.png
+?? research/reports/artifacts/v32_34/terminal_view_1792915246604.png
+?? research/reports/artifacts/v32_34/terminal_view_initial_1792915198811.png
+?? research/reports/artifacts/v32_34/terminal_view_loaded_1792915225564.png
+?? research/reports/artifacts/v32_34/terminal_view_success_1792915423958.png
+?? research/reports/artifacts/v32_34/terminal_viewport_1792855100336.png
+?? research/reports/artifacts/v32_34/top_navbar_visible_1792826956600.png
+?? research/reports/artifacts/v32_34/top_of_page_1792827041173.png
+?? research/reports/artifacts/v32_34/top_scrolled_fully_1792827163762.png
+?? research/reports/artifacts/v32_34/trades_tab_view_1792911742520.png
+?? research/reports/artifacts/v32_35/baseline_forecast_route_1792923309789.png
+?? research/reports/artifacts/v32_35/baseline_landing_1792923226655.png
+?? research/reports/artifacts/v32_35/baseline_landing_1792923231924.png
+?? research/reports/artifacts/v32_35/baseline_landing_1792923277842.png
+?? research/reports/artifacts/v32_35/baseline_terminal_market_1792923286277.png
+?? research/reports/artifacts/v32_35/baseline_terminal_market_scrolled_1792923293522.png
+?? research/reports/artifacts/v32_35/desktop_viewport_1792924473378.png
+?? research/reports/artifacts/v32_35/landing_page_1792924258392.png
+?? research/reports/artifacts/v32_35/mobile_viewport_1792924462199.png
+?? research/reports/artifacts/v32_35/tablet_viewport_1792924455412.png
+?? research/reports/artifacts/v32_35/terminal_viewport_1792855100336.png
+?? research/reports/artifacts/v32_35/v32_35_browser_qa_1792924241806.webp
+?? research/reports/artifacts/v32_50/normal_browser_network_trace.json
+?? research/reports/artifacts/v32_50/terminal_desktop_1280x800.png
+?? research/reports/artifacts/v32_50/terminal_mobile_375x667.png
+?? research/reports/artifacts/v32_50/terminal_tablet_768x1024.png
+?? research/reports/v32_26_evidence_first_pipeline_and_provenance_audit.md
+?? research/reports/v32_27_bounded_self_loop_execution_report.md
+?? research/reports/v32_28_feature_inventory_and_disposition_matrix.md
+?? research/reports/v32_28_feature_qa_matrix.md
+?? research/reports/v32_28_master_refactor_qa_report.md
+?? research/reports/v32_29_evidence_based_repair_report.md
+?? research/reports/v32_29_feature_qa_matrix.md
+?? research/reports/v32_29_repair_evidence_ledger.md
+?? research/reports/v32_30_current_state_and_discrepancy_ledger.md
+?? research/reports/v32_30_final_qa_and_red_team_report.md
+?? research/reports/v32_30_frontend_browser_qa_matrix.md
+?? research/reports/v32_30_horizon_research_preregistration.md
+?? research/reports/v32_30_horizon_research_results.md
+?? research/reports/v32_30_l2_data_and_feature_design.md
+?? research/reports/v32_31_feature_qa_matrix.md
+?? research/reports/v32_31_l2_entry_gating_report.md
+?? research/reports/v32_31_l2_preregistration_protocol.md
+?? research/reports/v32_32_feature_qa_matrix.md
+?? research/reports/v32_32_master_analysis_and_repair_report.md
+?? research/reports/v32_33_feature_verification_matrix.md
+?? research/reports/v32_33_independent_qa_report.md
+?? research/reports/v32_33_market_data_integrity_report.md
+?? research/reports/v32_33_master_improvement_report.md
+?? research/reports/v32_33_priority_defect_register.md
+?? research/reports/v32_33_quantitative_research_audit.md
+?? research/reports/v32_33_rating_scorecard.md
+?? research/reports/v32_34_defect_repair_ledger.md
+?? research/reports/v32_34_final_release_qa_report.md
+?? research/reports/v32_34_frontend_feature_visibility_matrix.md
+?? research/reports/v32_34_frontend_ux_baseline_and_final_scorecard.md
+?? research/reports/v32_34_independent_browser_qa_report.md
+?? research/reports/v32_35_final_qa_report.md
+?? research/reports/v32_35_forecast_feature_visibility_matrix.md
+?? research/reports/v32_35_forecast_visibility_defect_ledger.md
+?? research/reports/v32_35_independent_browser_qa_report.md
+?? research/reports/v32_36_forecasting_integrity_and_reconciliation_report.md
+?? research/reports/v32_36_l2_market_data_qualification_and_preregistration.md
+?? research/reports/v32_36_master_economic_decision_report.md
+?? research/reports/v32_36_multi_horizon_strategy_reconciliation_matrix.md
+?? research/reports/v32_37_chronos2_benchmark_summary.json
+?? research/reports/v32_37_chronos2_comparative_benchmark_report.md
+?? research/reports/v32_38_adaptive_market_intelligence_report.md
+?? research/reports/v32_38_adaptive_market_intelligence_summary.json
+?? research/reports/v32_39_preflight_data_quality_summary.json
+?? research/reports/v32_39_prospective_l2_qualification_report.md
+?? research/reports/v32_40a_burnin_capture_summary.json
+?? research/reports/v32_40b_browser_qa_report.md
+?? research/reports/v32_40b_browser_qa_summary.json
+?? research/reports/v32_40b_burnin_integrity_audit_report.md
+?? research/reports/v32_40b_burnin_integrity_audit_summary.json
+?? research/reports/v32_41_paper_trading_design_and_validation_report.md
+?? research/reports/v32_41_paper_trading_summary.json
+?? research/reports/v32_42_manual_journal_browser_qa_summary.json
+?? research/reports/v32_42_manual_trade_journal_report.md
+?? research/reports/v32_42_manual_trade_journal_summary.json
+?? research/reports/v32_42_user_position_tracker_and_risk_copilot_report.md
+?? research/reports/v32_42_user_position_tracker_and_risk_copilot_summary.json
+?? research/reports/v32_43_smart_entry_browser_qa_summary.json
+?? research/reports/v32_43_strategy_tournament_and_smart_entry_report.md
+?? research/reports/v32_43_strategy_tournament_and_smart_entry_summary.json
+?? research/reports/v32_44_smart_entry_browser_qa_summary.json
+?? research/reports/v32_44_smart_entry_independent_audit.md
+?? research/reports/v32_44_tournament_and_lifecycle_audit_summary.json
+?? research/reports/v32_45_analyse_tournament_entry_validation_report.md
+?? research/reports/v32_45_workflow_acceptance_browser_qa_summary.json
+?? research/reports/v32_45_workflow_acceptance_summary.json
+?? research/reports/v32_46_navigation_simplification_summary.json
+?? research/reports/v32_46_terminal_consolidation_and_navigation_simplification_report.md
+?? research/reports/v32_46_vigorous_qa_report.md
+?? research/reports/v32_46_vigorous_qa_summary.json
+?? research/reports/v32_47_analyse_selection_and_anomaly_monitor_report.md
+?? research/reports/v32_47_vigorous_qa_summary.json
+?? research/reports/v32_48_integrated_analyse_and_tournament_report.md
+?? research/reports/v32_48_vigorous_qa_summary.json
+?? research/reports/v32_49_scenario_qa_and_ui_report.md
+?? research/reports/v32_49_scenario_qa_summary.json
+?? research/reports/v32_50_runtime_forecast_ui_qa_report.md
+?? research/reports/v32_50_runtime_forecast_ui_qa_summary.json
+?? research/rigorous_replay_results_v2.json
+?? research/runs/v32_27/phase2_strategy_baseline_summary.json
+?? research/runs/v32_27/phase2_strategy_trade_ledger.json
+?? research/runs/v32_27/phase3_forecast_evaluation_summary.json
+?? research/runs/v32_27/phase4_meta_model_summary.json
+?? research/runs/v32_27/phase5_policy_ablation_summary.json
+?? research/runs/v32_28/master_pipeline_execution_summary.json
+?? research/runs/v32_28/phase2_strategy_baseline_summary.json
+?? research/runs/v32_28/phase2_strategy_trade_ledger.json
+?? research/runs/v32_28/phase3_forecast_evaluation_summary.json
+?? research/runs/v32_28/phase4_meta_model_summary.json
+?? research/runs/v32_28/phase5_policy_ablation_summary.json
+?? research/runs/v32_30/TSMOM_DONCHIAN_168H_336H_trades.jsonl
+?? research/runs/v32_30/TSMOM_DONCHIAN_24H_168H_trades.jsonl
+?? research/runs/v32_30/TSMOM_DONCHIAN_72H_168H_trades.jsonl
+?? research/runs/v32_30/horizon_study_summary.json
+?? research/runs/v32_37/chronos2_benchmark_summary.json
+?? research/runs/v32_37/chronos2_raw_inference_cache.npz
+?? research/v30_3_prospective_shadow_report.md
+?? research/v30_4_shadow_feed_report.md
+?? research/v30_5_shadow_operations_report.md
+?? research/v30_6_operational_proof_report.md
+?? research/v30_7_shadow_burnin_report.md
+?? research/v30_8_collection_integrity_report.md
+?? research/v30_9_statistical_gate_audit.md
+?? research/v31_0_research_closure_report.md
+?? research/v31_1_data_provenance_audit.md
+?? research/v31_1_foundation_repair_report.md
+?? research/v31_2_blocker_resolution.md
+?? research/v31_2_dataset_options_assessment.md
+?? research/v31_2_evidence_verification_report.md
+?? research/v31_2_single_dataset_acceptance_gates.md
+?? research/v31_3_coinbase15_contract.md
+?? research/v31_3_coinbase15_validation_report.md
+?? research/v31_4_coinbase15_data_use_decision.md
+?? research/v31_4_coinbase_terms_compatibility_report.md
+?? research/v31_5_coinbase_terms_primary_source_verification.md
+?? research/v31_6_alternative_data_source_qualification.md
+?? research/v31_7_binance_btcusdt_1m_contract.md
+?? research/v31_8_binance_data_license_clarification_request.md
+?? research/v31_8_binance_data_use_gate.md
+?? research/v31_9_btcusd_source_decision.md
+?? research/v32_0_btcusd_license_provenance_decision.md
+?? research/v32_11_smart_entry_api_ui_report.md
+?? research/v32_12_smart_entry_e2e_verification.md
+?? research/v32_13_smart_entry_dashboard_visibility_report.md
+?? research/v32_14_live_terminal_smart_entry_report.md
+?? research/v32_15_modern_research_and_cons_remedies_report.md
+?? research/v32_17_empirical_remediation_and_first_passage_report.md
+?? research/v32_18_persistence_containment_report.md
+?? research/v32_19_persistence_boundary_report.md
+?? research/v32_1_application_health_audit.md
+?? research/v32_20_execution_cost_contract_report.md
+?? research/v32_21_training_and_feature_audit.md
+?? research/v32_22_prediction_chart_accuracy_report.md
+?? research/v32_23_forecast_smart_entry_qa_report.md
+?? research/v32_24_repeated_forecast_smart_entry_qa_report.md
+?? research/v32_25_ai_forecast_smart_entry_completion_report.md
+?? research/v32_2_btcusd_dataset_resolution.md
+?? research/v32_4_strategy_backtest_entry_engine_report.md
+?? research/v32_5_provisional_college_project_path.md
+?? research/v5_directional_and_drift_evaluation.json
+?? tests/test_coinbase_l2_collector_and_gating.py
+?? tests/test_isolated_real_http_server.py
+?? tests/test_prospective_shadow_collector.py
+?? tests/test_shadow_feed_runner.py
+?? tests/test_strategy_to_alert_pipeline.py
+?? tests/test_v30_6_operational_proof.py
+?? tests/test_v30_7_shadow_burnin.py
+?? tests/test_v30_8_collection_integrity.py
+?? tests/test_v30_9_statistical_gate_audit.py
+?? tests/test_v32_18_persistence_containment.py
+?? tests/test_v32_22_chart_and_forecast_integrity.py
+?? tests/test_v32_23_forecast_smart_entry_recovery.py
+?? tests/test_v32_25_directional_integration.py
+?? tests/test_v32_37_chronos2_benchmark.py
+?? tests/test_v32_38_adaptive_market_intelligence.py
+?? tests/test_v32_39_prospective_l2_qualification.py
+?? tests/test_v32_40b_burnin_and_feature_warmup.py
+?? tests/test_v32_41_paper_trading_engine.py
+?? tests/test_v32_42_manual_trade_journal_and_eval.py
+?? tests/test_v32_42_user_position_tracker_and_risk_copilot.py
+?? tests/test_v32_43_strategy_tournament_and_smart_entry.py
+?? tests/test_v32_44_smart_entry_independent_audit.py
+?? tests/test_v32_45_workflow_acceptance.py
+?? tests/test_v32_46_navigation_and_terminal_consolidation.py
+?? tests/test_v32_47_analyse_selection_and_anomaly_monitor.py
+?? tests/test_v32_48_integrated_analyse_and_tournament.py
+?? tests/test_v32_49_scenario_qa.py
+?? tests/test_v32_50_chart_forecast_runtime.py
+?? web_src/manual_trade_journal_view.js
+?? web_src/smart_entry_simulator_view.js

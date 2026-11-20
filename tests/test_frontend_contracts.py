@@ -23,16 +23,17 @@ client = TestClient(app)
 
 def test_research_entry_tp_sl_endpoint_contract():
     """
-    Frozen research output stays blocked without authenticated evidence.
-    Even when AUTHORIZED_FOR_PRODUCTION (volatility risk intelligence),
-    directional signals, trade entry, TP/SL, and live capital execution remain strictly prohibited.
+    Frozen research output stays blocked and production authorization remains withheld.
     """
     response = client.get("/api/research/entry-tp-sl")
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "BLOCKED"
-    # Authorization state can only be AUTHORIZED_FOR_PRODUCTION (volatility only) or BLOCKED_*
-    assert data["research_status"] in {"BLOCKED_PROVENANCE_UNVERIFIED", "BLOCKED_AUDIT_FAILURE", "AUTHORIZED_FOR_PRODUCTION"}
+    assert data["research_status"] in {
+        "BLOCKED_PROVENANCE_UNVERIFIED",
+        "BLOCKED_AUDIT_FAILURE",
+        "OFFLINE_RESEARCH_ONLY",
+    }
     assert data["claim_level"] == "UNVALIDATED"
     # Strict non-execution guarantees
     assert data["live_capital_authorized"] is False
@@ -44,19 +45,18 @@ def test_research_entry_tp_sl_endpoint_contract():
     assert data["sl_price"] is None
 
 
-def test_prediction_latest_when_gate_is_authorized(monkeypatch):
+def test_prediction_latest_never_promotes_offline_gate(monkeypatch):
     """
-    When research gate is AUTHORIZED (e.g. for canonical volatility model HAR-RS-DOW-v1.0),
-    prediction/latest reflects authorized volatility intelligence while strictly denying live capital.
+    Baseline output remains non-production while the model is offline-only.
     """
     import api.market_monitor_routes as monitor_routes
     app.state.research_gate = {
-        "status": "READY",
-        "authorized": True,
-        "authorization_status": "AUTHORIZED_FOR_PRODUCTION",
+        "status": "OFFLINE_RESEARCH_ONLY",
+        "authorized": False,
+        "authorization_status": "OFFLINE_RESEARCH_ONLY",
         "canonical_model_id": "HAR-RS-DOW-v1.0",
-        "reason_code": "NONE",
-        "reason": "Production volatility model verified."
+        "reason_code": "MODEL_UNAUTHORIZED",
+        "reason": "Production authorization withheld by governance."
     }
 
     async def fake_market_data(client=None, horizon="24h"):
@@ -73,7 +73,7 @@ def test_prediction_latest_when_gate_is_authorized(monkeypatch):
                 "live_capital_authorized": False, "research_classification": "EXPERIMENTAL_BASELINE",
                 "governance_disclaimer": "Historical distribution baseline only.",
             },
-            "research": {"status": "AUTHORIZED_FOR_PRODUCTION", "trading_enabled": False},
+            "research": {"status": "OFFLINE_RESEARCH_ONLY", "trading_enabled": False},
         }
 
     monkeypatch.setattr(monitor_routes, "get_market_dashboard", fake_market_data)
@@ -83,8 +83,9 @@ def test_prediction_latest_when_gate_is_authorized(monkeypatch):
     assert data["status"] == "EXPERIMENTAL_BASELINE"
     assert data["direction"] == "NOT_ESTIMATED"
     assert data["live_capital_authorized"] is False
-    assert data["research"]["authorized"] is True
-    assert data["research"]["production_forecast_available"] is True
+    assert data["research"]["authorized"] is False
+    assert data["research"]["authorization_status"] == "OFFLINE_RESEARCH_ONLY"
+    assert data["research"]["production_forecast_available"] is False
     assert data["research"]["trading_enabled"] is False
 
 
@@ -189,6 +190,8 @@ def test_active_frontend_is_the_research_terminal_and_discloses_forecast_gate():
     assert "const clockNow = exchangeClock" in app_js
     assert "wsStatus: coinbaseWsStatus" in app_js
     assert "Forecast unavailable · frozen inputs unverified" in app_js
+    assert "Forecast unavailable · offline research only" in app_js
+    assert "runtime integrity checks do not authorize production serving" in app_js.lower()
     assert "Coverage: ${liveCov}%" not in app_js
     assert "updateExcursionEnvelope" not in app_js
     assert "RESEARCH RESULTS UNAVAILABLE" in app_js
@@ -197,7 +200,7 @@ def test_active_frontend_is_the_research_terminal_and_discloses_forecast_gate():
     assert "Math.random() > 0.3" not in app_js
     assert "64654.60" not in app_js
     assert "Test request completed; check the configured delivery status." in app_js
-    assert "No validated market observations or notification tests have been recorded." in app_js
+    assert "they do not represent validated market observations or notification-test history" in app_js
     assert "🧪 NOTIFICATION TEST · NOT A MARKET SIGNAL" in app_js
     assert "Send Test Notification" in app_js
     with open(os.path.join(root, "styles.css"), "r", encoding="utf-8") as f:

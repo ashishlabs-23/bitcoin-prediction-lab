@@ -1,0 +1,56 @@
+{
+  "protocol": "BTCognitive V32.42 — Manual Trade Journal and AI Forecast Evaluation",
+  "timestamp_utc": "2026-10-25T17:15:00Z",
+  "governance_status": "OFFLINE_RESEARCH_ONLY",
+  "economic_posture": "NO_GO_NO_VALIDATED_EDGE",
+  "live_trading_authorization": "DISABLED",
+  "broker_integrations": "STRICTLY_NONE",
+  "components_implemented": {
+    "engine": "engine/manual_trade_journal.py",
+    "routes": "api/routes_manual_journal.py",
+    "frontend_client": "web_src/api_client.js",
+    "frontend_view": "ManualTradeJournalView in web/app.js",
+    "test_suite": "tests/test_v32_42_manual_trade_journal_and_eval.py",
+    "browser_qa_runner": "engine/run_v32_42_journal_browser_qa.py"
+  },
+  "calculations_verified": {
+    "spot_long_pnl": "PASSED",
+    "spot_short_pnl": "PASSED",
+    "gross_pnl_only_when_fees_omitted": "PASSED",
+    "net_pnl_complete_when_fees_explicit": "PASSED",
+    "derivative_contract_multiplier": "PASSED",
+    "missing_contract_specs_rejection": "PASSED",
+    "partial_and_full_exits": "PASSED",
+    "durable_persistence_and_recovery": "PASSED",
+    "immutable_forecast_snapshot_sha256": "PASSED",
+    "user_trade_against_ai_forecast_preserved": "PASSED"
+  },
+  "pytest_results": {
+    "test_file": "tests/test_v32_42_manual_trade_journal_and_eval.py",
+    "passed": 10,
+    "failed": 0,
+    "duration_seconds": 50.07
+  },
+  "frontend_results": {
+    "test_file": "tests_frontend.js",
+    "status": "ALL_PASSED",
+    "steady_state_polling_budget": "29.5 req/min (under 60 req/min limit)"
+  },
+  "browser_qa_results": {
+    "desktop_1280x800": "PASSED",
+    "tablet_768x1024": "PASSED",
+    "mobile_375x667": "PASSED",
+    "screenshots_captured": [
+      "research/reports/artifacts/browser_qa/v32_42_manual_journal_desktop.png",
+      "research/reports/artifacts/browser_qa/v32_42_manual_journal_tablet.png",
+      "research/reports/artifacts/browser_qa/v32_42_manual_journal_mobile.png"
+    ]
+  },
+  "protected_files_verified": {
+    "data/prospective_entry_ledger.jsonl": "91c3aed984002f611a59c78a2eb4c342c0970baebbd2e3d6df7973be7acf1dd7",
+    "data/prospective_shadow_v1.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "data/prospective_entry_ledger_v2.jsonl": "e6e33e3c7beb4c255467e967fc819b85481b0afb1052c3ea7bd248c53f87b604",
+    "data/raw/ohlcv.parquet": "1e722f33734a89e74764c02fde0552752cc1ea2eff62ca9046c9d6edf2347d5c",
+    "data/raw/ohlcv_pre_backfill_backup.parquet": "c4949e5b5695ffa172677681b15af2ea6167e73317c3496546f2286a6730b1c8"
+  }
+}

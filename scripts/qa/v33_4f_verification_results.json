@@ -1,0 +1,125 @@
+{
+  "time_window_sec": 24.05000901222229,
+  "smart_entry_requests_sent": 6,
+  "requests_per_minute": 14.96880935957433,
+  "pre_repair_rate": 207.4,
+  "reduction_pct": 92.78263772440968,
+  "completed_requests_count": 57,
+  "status_codes": {
+    "200": 57
+  },
+  "analysis_post_result": {
+    "status": 200,
+    "duration_ms": 52.75
+  },
+  "polling_timeline": [
+    {
+      "event": "POLL_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "time": 1793549788.1344028
+    },
+    {
+      "event": "POLL_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "time": 1793549788.1344545
+    },
+    {
+      "event": "POLL_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "time": 1793549788.1345
+    },
+    {
+      "event": "POLL_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "status": 200,
+      "duration_ms": 132.95,
+      "time": 1793549788.2674067
+    },
+    {
+      "event": "POLL_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "status": 200,
+      "duration_ms": 133.01,
+      "time": 1793549788.2675164
+    },
+    {
+      "event": "POLL_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "status": 200,
+      "duration_ms": 133.32,
+      "time": 1793549788.2677186
+    },
+    {
+      "event": "POLL_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "time": 1793549796.2755885
+    },
+    {
+      "event": "POLL_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "time": 1793549796.2756925
+    },
+    {
+      "event": "POLL_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "time": 1793549796.27571
+    },
+    {
+      "event": "POLL_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "status": 200,
+      "duration_ms": 8745.16,
+      "time": 1793549805.0207534
+    },
+    {
+      "event": "POLL_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "status": 200,
+      "duration_ms": 8750.62,
+      "time": 1793549805.0263216
+    },
+    {
+      "event": "POLL_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "status": 200,
+      "duration_ms": 8755.82,
+      "time": 1793549805.0315313
+    },
+    {
+      "event": "POLL_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "time": 1793549813.0403607
+    },
+    {
+      "event": "POLL_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "time": 1793549813.0403905
+    },
+    {
+      "event": "POLL_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "time": 1793549813.0404112
+    },
+    {
+      "event": "POLL_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "status": 200,
+      "duration_ms": 8.38,
+      "time": 1793549813.048754
+    },
+    {
+      "event": "POLL_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "status": 200,
+      "duration_ms": 8.6,
+      "time": 1793549813.0490148
+    },
+    {
+      "event": "POLL_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "status": 200,
+      "duration_ms": 8.73,
+      "time": 1793549813.049124
+    }
+  ]
+}

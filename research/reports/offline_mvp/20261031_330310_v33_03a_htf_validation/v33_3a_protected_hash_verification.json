@@ -1,0 +1,108 @@
+{
+  "manifest_version": "1.6.0",
+  "milestone": "BTCognitive V33.3A - HTF Range Expansion Breakout Validation",
+  "verification_timestamp_utc": "2026-10-31T15:35:00Z",
+  "lead_orchestrator": "Antigravity",
+  "operating_contract": "OFFLINE_RESEARCH_ONLY",
+  "governed_determination": "REGIME_FILTER_IMPROVEMENT_CANDIDATE",
+  "evaluated_strategy": "HTF_RANGE_EXPANSION_BREAKOUT",
+  "evaluated_filter": "MarketRegimeClassifier (Excluding RANGE_BOUND and TRANSITION_UNSUPPORTED)",
+  "git_environment": {
+    "branch": "main",
+    "head_commit_sha": "25d483f4c3646661b57311de9d0b53d2be881adb",
+    "working_tree_policy": "PRESERVED_NO_DESTRUCTIVE_OPERATIONS"
+  },
+  "protected_dataset_registry": [
+    {
+      "relative_path": "data/raw/ohlcv_checkpoint_42233_bars.parquet",
+      "expected_sha256": "f5c15cb11b9d51cf0077c8f8052086382deb1d8577749cbab8d0134842c7a94f",
+      "actual_sha256": "f5c15cb11b9d51cf0077c8f8052086382deb1d8577749cbab8d0134842c7a94f",
+      "file_size_bytes": 2329800,
+      "row_count": 42233,
+      "hash_matched": true,
+      "source_lineage_status": "SOURCE_LINEAGE_VERIFIED",
+      "governance_classification": "EMPIRICALLY_APPROVED"
+    },
+    {
+      "relative_path": "data/raw/ohlcv_version_42326_bars.parquet",
+      "expected_sha256": "ba06fb533c0b53387136b001c142efc90b5e2ccfb37937dc509879a76c2a4057",
+      "actual_sha256": "ba06fb533c0b53387136b001c142efc90b5e2ccfb37937dc509879a76c2a4057",
+      "file_size_bytes": 2334866,
+      "row_count": 42326,
+      "hash_matched": true,
+      "source_lineage_status": "SOURCE_LINEAGE_VERIFIED",
+      "governance_classification": "EMPIRICALLY_APPROVED"
+    },
+    {
+      "relative_path": "data/processed/multi_regime_features.parquet",
+      "expected_sha256": "e37fcc1a896e5a8a60db337f8e49253eaf1d8d011c430e32a23a43d7de04205f",
+      "actual_sha256": "e37fcc1a896e5a8a60db337f8e49253eaf1d8d011c430e32a23a43d7de04205f",
+      "file_size_bytes": 3095866,
+      "row_count": 42233,
+      "hash_matched": true,
+      "source_lineage_status": "SYNTHETIC_DATA_CONFIRMED",
+      "governance_classification": "QUARANTINED_SYNTHETIC"
+    },
+    {
+      "relative_path": "data/raw/binance_funding_2022_2026.parquet",
+      "expected_sha256": "e90282de4f78ebde4b0e253cd71e50233d965062defa9f1b81be5b87da094436",
+      "actual_sha256": "e90282de4f78ebde4b0e253cd71e50233d965062defa9f1b81be5b87da094436",
+      "file_size_bytes": 145791,
+      "row_count": 5113,
+      "hash_matched": true,
+      "source_lineage_status": "SOURCE_LINEAGE_UNRESOLVED",
+      "governance_classification": "QUARANTINED_UNRESOLVED"
+    },
+    {
+      "relative_path": "data/raw/funding.parquet",
+      "expected_sha256": "f176186ec28c78feac7091fa8dcf1f202145ff3a2ea373426ca3a29ca27dfa66",
+      "actual_sha256": "f176186ec28c78feac7091fa8dcf1f202145ff3a2ea373426ca3a29ca27dfa66",
+      "file_size_bytes": 12625,
+      "row_count": 375,
+      "hash_matched": true,
+      "source_lineage_status": "SOURCE_LINEAGE_UNRESOLVED",
+      "governance_classification": "QUARANTINED_UNRESOLVED"
+    },
+    {
+      "relative_path": "data/prospective_forecast_ledger.jsonl",
+      "expected_sha256": "ee58b37c71c5c3ff322af3084d27b306eb0a445a8bd6e01a74b76d8168ccd491",
+      "actual_sha256": "ee58b37c71c5c3ff322af3084d27b306eb0a445a8bd6e01a74b76d8168ccd491",
+      "hash_matched": true,
+      "clean_blocks_resolved": 7,
+      "required_hurdle_blocks": 100,
+      "governed_status_string": "FROZEN — 7/100 — COLLECTOR_INACTIVE"
+    }
+  ],
+  "acceptance_test_suite_summary": {
+    "suite_path": "tests/test_v33_3a_htf_validation.py",
+    "total_tests": 8,
+    "passed": 8,
+    "failed": 0,
+    "warnings_count": 0,
+    "execution_time_seconds": 0.38,
+    "status": "PASS"
+  },
+  "empirical_validation_summary": {
+    "baseline_trades": 194,
+    "baseline_win_rate": 0.4485,
+    "baseline_net_ev_inst_bps": 14.97,
+    "baseline_net_ev_binance_vip0_bps": 9.57,
+    "baseline_compounded_mdd_pct": 45.18,
+    "filtered_trades": 110,
+    "filtered_win_rate": 0.4909,
+    "filtered_net_ev_inst_bps": 64.66,
+    "filtered_net_ev_binance_vip0_bps": 59.26,
+    "filtered_compounded_mdd_pct": 27.67,
+    "walk_forward_out_of_sample_baseline_net_ev_bps": -43.65,
+    "walk_forward_out_of_sample_filtered_net_ev_bps": 1.27,
+    "governed_decision": "REGIME_FILTER_IMPROVEMENT_CANDIDATE"
+  },
+  "governance_invariants": {
+    "live_trading": "DISABLED — ANALYSIS ONLY",
+    "model_authorization": "OFFLINE_RESEARCH_ONLY",
+    "vpin_gate_status": "RESTRICTED_OMITTED_PER_MANAGER_RULING",
+    "algorithmic_routing_status": "RESTRICTED_OMITTED_PER_MANAGER_RULING",
+    "entry_analysis_architecture": "FROZEN (Q2=INSUFFICIENT_EVIDENCE, ANALYSIS=ABSTAIN)"
+  }
+}
+

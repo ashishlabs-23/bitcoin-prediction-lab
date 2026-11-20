@@ -90,8 +90,10 @@ def test_research_api_experiments_endpoint():
         assert res.status_code == 200
         data = res.json()
         assert data["status"] == "AVAILABLE"
-        assert data["active_baseline"]["model_id"] == "HAR-RS-DOW-v1.0"
-        assert data["active_baseline"]["causal_holdout_coverage_pct"] == 84.89
+        assert data["active_baseline"]["model_id"] == "Standard-HAR-v1.0"
+        assert data["active_baseline"]["forecast_accuracy_status"] == "NOT_ESTABLISHED"
+        assert data["active_baseline"]["causal_holdout_coverage_pct"] is None
+        assert data["active_baseline"]["holdout_qlike"] is None
         assert data["total_experiments"] >= 3
 
         exp_ids = [e["experiment_id"] for e in data["experiments"]]
@@ -103,7 +105,7 @@ def test_research_api_experiments_endpoint():
 def test_authoritative_registry_includes_challenger():
     models = list_authoritative_models()
     canonical_ids = [m["canonical_id"] for m in models]
-    assert "HAR-RS-DOW-v1.0" in canonical_ids
+    assert "Standard-HAR-v1.0" in canonical_ids
     assert "HAR-QLIKE-v1.0" in canonical_ids
 
     chal = get_model_identity("HAR-QLIKE-v1.0")

@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "verification_milestone": "V33.4L",
+  "classification_badge": "RETROSPECTIVE RESEARCH ONLY \u2014 NON-CONFIRMATORY",
+  "provenance_badge": "Provenance: PARTIALLY_RESOLVED",
+  "trades_count": "194\nHistorical Trades\nJan 2022 \u2013 Sep 2026",
+  "win_rate": "43.81%\nOverall Win Rate\n85 wins / 194 total",
+  "net_expectancy": "+9.57 bps\nAll-Trade Net Expectancy\nBinance VIP0 (26 bps friction)",
+  "retained_metric": "110 / 84\nRetained / Excluded\n+59.25 bps on 110 retained",
+  "setup_assessment_banner": "Separate Current Setup Assessment: Must be calculated from a fresh, correctly timestamped market snapshot and the applicable strategy contract. Historical performance does not determine whether a setup exists now.",
+  "prospective_validation_banner": "Prospective Validation: NOT VALIDATED. HTF shadow ledger: 0 events accumulated post-freeze. Collector inactive. Historical statistics do not satisfy prospective authorization.",
+  "disclaimer_text": "The figures above are historical research statistics from offline backtest replay, not a prediction of future performance. Real trading remains strictly DISABLED.",
+  "screenshot_path": "C:\\Projects\\BTCognitive\\BTCognitive\\artifacts\\v33_4l_historical_evidence_dashboard.png",
+  "brain_screenshot": "C:\\Users\\Ashish\\.gemini\\antigravity\\brain\\1ae7aeff-968f-4a42-b599-198389cab42b\\v33_4l_historical_evidence_dashboard.png"
+}

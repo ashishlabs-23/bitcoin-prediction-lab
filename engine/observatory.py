@@ -23,6 +23,7 @@ import sqlite3
 import hashlib
 import json
 import logging
+import threading
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone, timedelta
 from enum import Enum
@@ -159,11 +160,11 @@ class ObservatoryHealthSummary:
 
 @dataclass(frozen=True)
 class MarketState:
-    regime: str = "COMPRESSION"
-    macro_epoch: str = "SPOT_ETF_ERA"
-    vol_ratio_1h_24h: float = 1.00
-    jump_state: str = "LOW"
-    compression_duration_hours: int = 0
+    regime: str = "UNAVAILABLE"
+    macro_epoch: str = "UNAVAILABLE"
+    vol_ratio_1h_24h: Optional[float] = None
+    jump_state: str = "UNAVAILABLE"
+    compression_duration_hours: Optional[int] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -171,12 +172,12 @@ class MarketState:
 
 @dataclass(frozen=True)
 class RiskState:
-    expected_7d_variance: float = 0.12000
-    expected_7d_volatility: float = 0.34641
-    lower_bound: float = 0.04000
-    upper_bound: float = 0.22000
-    interval_width: float = 0.18000
-    nominal_target_coverage: float = 0.90
+    expected_7d_variance: Optional[float] = None
+    expected_7d_volatility: Optional[float] = None
+    lower_bound: Optional[float] = None
+    upper_bound: Optional[float] = None
+    interval_width: Optional[float] = None
+    nominal_target_coverage: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -184,14 +185,14 @@ class RiskState:
 
 @dataclass(frozen=True)
 class ModelState:
-    health: str = "STABLE"
-    coverage_30d: float = 0.914
-    coverage_90d: float = 0.908
-    upper_breach_30d: float = 0.042
-    lower_breach_30d: float = 0.044
-    tail_asymmetry: float = 0.002
-    winkler_30d: float = 0.204
-    risk_defense_active: bool = False
+    health: str = "UNAVAILABLE"
+    coverage_30d: Optional[float] = None
+    coverage_90d: Optional[float] = None
+    upper_breach_30d: Optional[float] = None
+    lower_breach_30d: Optional[float] = None
+    tail_asymmetry: Optional[float] = None
+    winkler_30d: Optional[float] = None
+    risk_defense_active: Optional[bool] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -199,12 +200,12 @@ class ModelState:
 
 @dataclass(frozen=True)
 class DataState:
-    feed_completeness: float = 1.0
-    ingestion_latency_ms: int = 42
-    timestamp_drift_sec: float = 0.0
-    exchange_failover: str = "NONE"
-    iv_freshness: str = "HEALTHY"
-    data_invalid_count: int = 0
+    feed_completeness: Optional[float] = None
+    ingestion_latency_ms: Optional[int] = None
+    timestamp_drift_sec: Optional[float] = None
+    exchange_failover: str = "UNAVAILABLE"
+    iv_freshness: str = "UNAVAILABLE"
+    data_invalid_count: Optional[int] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -227,6 +228,9 @@ class ObservatorySnapshot:
             "risk": self.risk.to_dict(),
             "model": self.model.to_dict(),
             "data": self.data.to_dict(),
+            "status": "UNAVAILABLE",
+            "calibration_status": "UNAVAILABLE",
+            "c2_status": "DISABLED",
             "scientific_contract_hash": self.scientific_contract_hash,
             "prospective_experiment_id": self.prospective_experiment_id
         }
@@ -817,84 +821,49 @@ class ForecastAccuracyObservatory:
         )
 
     def get_canonical_snapshot(self, features_dict: Optional[Dict[str, Any]] = None) -> ObservatorySnapshot:
-        """
-        Builds a canonical point-in-time snapshot of the 4 independent epistemic states:
-        Market State + Risk State + Model State + Data State at t0.
-        Read-only context layer for decision support and audit integrity.
-        """
+        """Return no current metrics unless verified data and calibration are available."""
         now_ts = datetime.now(timezone.utc).isoformat()
-        health = self.evaluate_calibration_health()
-
-        # 1. Market State
-        last_rec = self.records[-1] if self.records else None
-        point_v = last_rec.point_forecast_har_rs_dow if last_rec else 0.1200
-        lower_v = last_rec.risk_envelope_lower if last_rec else 0.0400
-        upper_v = last_rec.risk_envelope_upper if last_rec else 0.2200
-        regime_desc = last_rec.macro_regime if last_rec else "SPOT_ETF_ERA"
-        
-        vol_state = "NORMAL"
-        if point_v > 0.30:
-            vol_state = "EXTREME_EXPANSION"
-        elif point_v > 0.18:
-            vol_state = "ELEVATED"
-        elif point_v < 0.08:
-            vol_state = "COMPRESSION"
-
-        vol_ratio = 1.0
-        if features_dict:
-            vol_ratio = float(features_dict.get("vol_ratio_1h_24h", 1.0))
-
-        market = MarketState(
-            regime=vol_state,
-            macro_epoch=regime_desc,
-            vol_ratio_1h_24h=round(vol_ratio, 3),
-            jump_state="LOW" if point_v < 0.25 else "ELEVATED",
-            compression_duration_hours=0
-        )
-
-        # 2. Risk State
-        risk = RiskState(
-            expected_7d_variance=round(point_v, 5),
-            expected_7d_volatility=round(float(np.sqrt(max(1e-6, point_v))), 5),
-            lower_bound=round(lower_v, 5),
-            upper_bound=round(upper_v, 5),
-            interval_width=round(upper_v - lower_v, 5),
-            nominal_target_coverage=round(self.nominal_target, 2)
-        )
-
-        # 3. Model State
-        model = ModelState(
-            health=health.status.value,
-            coverage_30d=round(health.coverage_30d_pct / 100.0, 3),
-            coverage_90d=round(health.coverage_90d_pct / 100.0, 3),
-            upper_breach_30d=round(health.upper_breach_30d_pct / 100.0, 3),
-            lower_breach_30d=round(health.lower_breach_30d_pct / 100.0, 3),
-            tail_asymmetry=round(health.tail_asymmetry_30d_pct / 100.0, 3),
-            winkler_30d=round(health.mean_winkler_30d, 4),
-            risk_defense_active=health.status in [CalibrationHealthStatus.DEGRADED, CalibrationHealthStatus.FAIL]
-        )
-
-        # 4. Data State
-        data = DataState(
-            feed_completeness=1.0,
-            ingestion_latency_ms=42,
-            timestamp_drift_sec=0.0,
-            exchange_failover="NONE",
-            iv_freshness="HEALTHY",
-            data_invalid_count=health.data_invalid_N
-        )
-
         return ObservatorySnapshot(
             snapshot_ts=now_ts,
-            market=market,
-            risk=risk,
-            model=model,
-            data=data,
+            market=MarketState(),
+            risk=RiskState(),
+            model=ModelState(),
+            data=DataState(),
             scientific_contract_hash=CANONICAL_SCIENTIFIC_CONTRACT_HASH,
             prospective_experiment_id=PROSPECTIVE_EXPERIMENT_ID
         )
 
 
-observatory = ForecastAccuracyObservatory()
+class LazyForecastAccuracyObservatory:
+    """Thread-safe forwarding proxy for a lazily constructed observatory."""
+
+    def __init__(self, *args, **kwargs):
+        object.__setattr__(self, "_factory_args", args)
+        object.__setattr__(self, "_factory_kwargs", kwargs)
+        object.__setattr__(self, "_instance", None)
+        object.__setattr__(self, "_lock", threading.Lock())
+
+    def _get_instance(self) -> ForecastAccuracyObservatory:
+        instance = object.__getattribute__(self, "_instance")
+        if instance is None:
+            with object.__getattribute__(self, "_lock"):
+                instance = object.__getattribute__(self, "_instance")
+                if instance is None:
+                    instance = ForecastAccuracyObservatory(
+                        *object.__getattribute__(self, "_factory_args"),
+                        **object.__getattribute__(self, "_factory_kwargs"),
+                    )
+                    object.__setattr__(self, "_instance", instance)
+        return instance
+
+    def __getattr__(self, name: str):
+        return getattr(self._get_instance(), name)
+
+    def __setattr__(self, name: str, value):
+        if name in {"_factory_args", "_factory_kwargs", "_instance", "_lock"}:
+            object.__setattr__(self, name, value)
+            return
+        setattr(self._get_instance(), name, value)
 
 
+observatory = LazyForecastAccuracyObservatory()

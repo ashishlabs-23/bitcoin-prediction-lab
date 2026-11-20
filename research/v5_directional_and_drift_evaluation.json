@@ -1,0 +1,232 @@
+{
+  "pde_break_even_drift": [
+    {
+      "geometry": "Legacy 24h (1.5 : 1.0)",
+      "k_tp": 1.5,
+      "k_sl": 1.0,
+      "H": 24,
+      "India (27 bps)_mu_star": 0.4245,
+      "India (27 bps)_friction_r": 0.1575,
+      "India (27 bps)_null_share": 29.6,
+      "India (27 bps)_req_share": 54.5,
+      "India (27 bps)_edge_pts": 24.9,
+      "EU/UK (13 bps)_mu_star": 0.3024,
+      "EU/UK (13 bps)_friction_r": 0.0758,
+      "EU/UK (13 bps)_null_share": 29.6,
+      "EU/UK (13 bps)_req_share": 47.0,
+      "EU/UK (13 bps)_edge_pts": 17.4,
+      "US (9.3 bps)_mu_star": 0.2685,
+      "US (9.3 bps)_friction_r": 0.0542,
+      "US (9.3 bps)_null_share": 29.6,
+      "US (9.3 bps)_req_share": 45.0,
+      "US (9.3 bps)_edge_pts": 15.4
+    },
+    {
+      "geometry": "Balanced 48h (0.9 : 0.6)",
+      "k_tp": 0.9,
+      "k_sl": 0.6,
+      "H": 48,
+      "India (27 bps)_mu_star": 0.2795,
+      "India (27 bps)_friction_r": 0.1856,
+      "India (27 bps)_null_share": 38.4,
+      "India (27 bps)_req_share": 48.6,
+      "India (27 bps)_edge_pts": 10.1,
+      "EU/UK (13 bps)_mu_star": 0.1585,
+      "EU/UK (13 bps)_friction_r": 0.0894,
+      "EU/UK (13 bps)_null_share": 38.4,
+      "EU/UK (13 bps)_req_share": 44.1,
+      "EU/UK (13 bps)_edge_pts": 5.7,
+      "US (9.3 bps)_mu_star": 0.1255,
+      "US (9.3 bps)_friction_r": 0.0639,
+      "US (9.3 bps)_null_share": 38.4,
+      "US (9.3 bps)_req_share": 43.0,
+      "US (9.3 bps)_edge_pts": 4.5
+    },
+    {
+      "geometry": "Symmetric 48h (0.7 : 0.7)",
+      "k_tp": 0.7,
+      "k_sl": 0.7,
+      "H": 48,
+      "India (27 bps)_mu_star": 0.2554,
+      "India (27 bps)_friction_r": 0.1591,
+      "India (27 bps)_null_share": 50.0,
+      "India (27 bps)_req_share": 58.8,
+      "India (27 bps)_edge_pts": 8.8,
+      "EU/UK (13 bps)_mu_star": 0.1215,
+      "EU/UK (13 bps)_friction_r": 0.0766,
+      "EU/UK (13 bps)_null_share": 50.0,
+      "EU/UK (13 bps)_req_share": 54.3,
+      "EU/UK (13 bps)_edge_pts": 4.3,
+      "US (9.3 bps)_mu_star": 0.0874,
+      "US (9.3 bps)_friction_r": 0.0548,
+      "US (9.3 bps)_null_share": 50.0,
+      "US (9.3 bps)_req_share": 53.0,
+      "US (9.3 bps)_edge_pts": 3.0
+    },
+    {
+      "geometry": "Symmetric 72h (0.7 : 0.7)",
+      "k_tp": 0.7,
+      "k_sl": 0.7,
+      "H": 72,
+      "India (27 bps)_mu_star": 0.2085,
+      "India (27 bps)_friction_r": 0.1299,
+      "India (27 bps)_null_share": 50.0,
+      "India (27 bps)_req_share": 57.2,
+      "India (27 bps)_edge_pts": 7.2,
+      "EU/UK (13 bps)_mu_star": 0.0995,
+      "EU/UK (13 bps)_friction_r": 0.0625,
+      "EU/UK (13 bps)_null_share": 50.0,
+      "EU/UK (13 bps)_req_share": 53.5,
+      "EU/UK (13 bps)_edge_pts": 3.5,
+      "US (9.3 bps)_mu_star": 0.0706,
+      "US (9.3 bps)_friction_r": 0.0447,
+      "US (9.3 bps)_null_share": 50.0,
+      "US (9.3 bps)_req_share": 52.5,
+      "US (9.3 bps)_edge_pts": 2.5
+    }
+  ],
+  "directional_retest_resolved_trades": {
+    "V1_1h_momentum": {
+      "features": [
+        "f_r1"
+      ],
+      "coefficients": {
+        "f_r1": 0.0471,
+        "intercept": -0.5663
+      },
+      "test_sample_size": 7938,
+      "directional_auc_resolved_only": 0.5079,
+      "top_quintile_n": 1588,
+      "top_quintile_tp_rate": 35.39,
+      "top_quintile_gross_r": -0.1152,
+      "top_quintile_net_r": {
+        "India (27 bps)": -0.274,
+        "EU/UK (13 bps)": -0.1917,
+        "US (9.3 bps)": -0.1699
+      }
+    },
+    "V2_4h_momentum": {
+      "features": [
+        "f_r4"
+      ],
+      "coefficients": {
+        "f_r4": 0.0943,
+        "intercept": -0.5681
+      },
+      "test_sample_size": 7938,
+      "directional_auc_resolved_only": 0.517,
+      "top_quintile_n": 1588,
+      "top_quintile_tp_rate": 36.08,
+      "top_quintile_gross_r": -0.0979,
+      "top_quintile_net_r": {
+        "India (27 bps)": -0.2567,
+        "EU/UK (13 bps)": -0.1744,
+        "US (9.3 bps)": -0.1526
+      }
+    },
+    "V3_24h_momentum": {
+      "features": [
+        "f_r24"
+      ],
+      "coefficients": {
+        "f_r24": 0.0661,
+        "intercept": -0.5676
+      },
+      "test_sample_size": 7938,
+      "directional_auc_resolved_only": 0.5407,
+      "top_quintile_n": 1588,
+      "top_quintile_tp_rate": 38.79,
+      "top_quintile_gross_r": -0.0302,
+      "top_quintile_net_r": {
+        "India (27 bps)": -0.189,
+        "EU/UK (13 bps)": -0.1067,
+        "US (9.3 bps)": -0.0849
+      }
+    },
+    "V4_multi_horizon": {
+      "features": [
+        "f_r1",
+        "f_r4",
+        "f_r24"
+      ],
+      "coefficients": {
+        "f_r1": 0.0009,
+        "f_r4": 0.0851,
+        "f_r24": 0.0201,
+        "intercept": -0.5686
+      },
+      "test_sample_size": 7938,
+      "directional_auc_resolved_only": 0.5249,
+      "top_quintile_n": 1588,
+      "top_quintile_tp_rate": 37.09,
+      "top_quintile_gross_r": -0.0727,
+      "top_quintile_net_r": {
+        "India (27 bps)": -0.2315,
+        "EU/UK (13 bps)": -0.1492,
+        "US (9.3 bps)": -0.1274
+      }
+    },
+    "V5_momentum_vol_interaction": {
+      "features": [
+        "f_r1",
+        "f_r4",
+        "f_r24",
+        "f_vol_ratio"
+      ],
+      "coefficients": {
+        "f_r1": 0.001,
+        "f_r4": 0.0864,
+        "f_r24": 0.0179,
+        "f_vol_ratio": -0.1197,
+        "intercept": -0.6064
+      },
+      "test_sample_size": 7938,
+      "directional_auc_resolved_only": 0.5482,
+      "top_quintile_n": 1588,
+      "top_quintile_tp_rate": 39.74,
+      "top_quintile_gross_r": -0.0066,
+      "top_quintile_net_r": {
+        "India (27 bps)": -0.1654,
+        "EU/UK (13 bps)": -0.0831,
+        "US (9.3 bps)": -0.0613
+      }
+    },
+    "V5_vol_ratio_ONLY": {
+      "features": [
+        "f_vol_ratio"
+      ],
+      "coefficients": {
+        "f_vol_ratio": -0.1203,
+        "intercept": -0.6029
+      },
+      "test_sample_size": 7938,
+      "directional_auc_resolved_only": 0.5654,
+      "top_quintile_n": 1588,
+      "top_quintile_tp_rate": 43.2,
+      "top_quintile_gross_r": 0.08,
+      "top_quintile_net_r": {
+        "India (27 bps)": -0.0788,
+        "EU/UK (13 bps)": 0.0035,
+        "US (9.3 bps)": 0.0253
+      }
+    }
+  },
+  "fat_tailed_null_calibration": {
+    "empirical_all_trades_n": 41985,
+    "empirical_tp_rate": 17.6,
+    "empirical_sl_rate": 32.26,
+    "empirical_timeout_rate": 50.14,
+    "uncalibrated_brownian_null": {
+      "scale_factor": 1.0,
+      "p_tp": 13.32,
+      "p_sl": 31.72,
+      "p_timeout": 54.96
+    },
+    "recalibrated_fat_tailed_null": {
+      "optimal_scale_factor_c_sigma": 1.0518,
+      "p_tp": 15.3,
+      "p_sl": 34.16,
+      "p_timeout": 50.54
+    }
+  }
+}

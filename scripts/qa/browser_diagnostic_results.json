@@ -1,0 +1,2776 @@
+{
+  "dom_initial": {
+    "url": "http://127.0.0.1:8000/",
+    "has_btn_analyse": true,
+    "btn_id": "btn-analyse-setup",
+    "btn_analyse_text": "\ud83d\udd2c\nAnalyse Setup",
+    "btn_analyse_disabled": false,
+    "has_tab_smart_entry": true,
+    "tab_smart_entry_active": true,
+    "has_hero_analyse": false
+  },
+  "dom_smart_entry": {
+    "has_btn": true,
+    "btn_id": "btn-analyse-setup",
+    "btn_text": "\ud83d\udd2c\nAnalyse Setup",
+    "btn_disabled": false,
+    "market_state_text": "BTC-USD \u00b7 1h \u00b7 Feed: Degraded source (LOCAL_HISTORICAL_SNAPSHOT) \u00b7 Latest chart bar: 2026-10-30T13:00:00.000Z \u00b7 Live price: $76,985.4",
+    "progress_text": "Ready to analyze the closed candles currently shown on the chart.\nValidate closed candles: Waiting\nCompute features/regime and rank candidates: Waiting\nVerify or run eligible tournament: Waiting\nForm final decision: Waiting"
+  },
+  "post_dom": {
+    "btn_text": "\ud83d\udd2c\nAnalyse Setup",
+    "btn_disabled": false,
+    "progress_text": "Analysis completed, but verified tournament-arm evidence is unavailable. No winner or simulated entry is shown.\nValidate closed candles: Complete\nCompute features/regime and rank candidates: Complete \u00b7 68.6 ms\nVerify or run eligible tournament: Not run \u2014 verified arm evidence unavailable \u00b7 0.0 ms\nForm final decision: Complete \u00b7 0.0 ms\nRequest e9463b8b-53e6-45a8-b5c3-0f6004ea2324 \u00b7 Total 68.7 ms \u00b7 Tournament arms: NOT_RUN_UNVERIFIED_EVIDENCE (per-arm values are null when no verified arm ran).",
+    "timings_text": "Request e9463b8b-53e6-45a8-b5c3-0f6004ea2324 \u00b7 Total 68.7 ms \u00b7 Tournament arms: NOT_RUN_UNVERIFIED_EVIDENCE (per-arm values are null when no verified arm ran).",
+    "outcome_heading": "BACKTEST EVIDENCE UNAVAILABLE",
+    "outcome_text": "BACKTEST EVIDENCE UNAVAILABLE\n\nNo verified walk-forward manifest matches the registered candidate strategies and frozen protocol. A fresh three-arm evaluation is also unavailable because aligned point-in-time AI forecasts and a matched baseline series are not supplied. No arm metrics were computed or reused.\n\nBTC-USD \u00b7 1h \u00b7 LOCAL_HISTORICAL_SNAPSHOT \u00b7 closed through 2026-10-30T13:00:00+00:00\nTournament evidence: Not run \u2014 verified evidence unavailable \u00b7 Historical evidence is not a profitability claim.\nEvaluation window: not reported \u2013 not reported \u00b7 Dataset unavailable \u00b7 Protocol 4e8021437f984349\nWhy candidates were rejected (3)",
+    "error_text": null,
+    "market_state_text": "BTC-USD \u00b7 1h \u00b7 Feed: Degraded source (LOCAL_HISTORICAL_SNAPSHOT) \u00b7 Latest chart bar: 2026-10-30T13:00:00.000Z \u00b7 Live price: $76,985.4"
+  },
+  "first_analysis_request": {
+    "request_id": "7456.137",
+    "url": "http://127.0.0.1:8000/api/tournament/analyse",
+    "method": "POST",
+    "post_data": "{\"instrument\":\"BTC-USD\",\"timeframe\":\"1h\",\"data_source\":\"LOCAL_HISTORICAL_SNAPSHOT\",\"request_id\":\"e9463b8b-53e6-45a8-b5c3-0f6004ea2324\",\"live_price\":76985.4,\"enforce_freshness\":false,\"max_age_hours\":2,\"candles\":[{\"timestamp_utc\":\"2026-10-23T14:00:00.000Z\",\"open\":81890.82,\"high\":81962,\"low\":80943.49,\"close\":81678.55,\"volume\":452.69018609,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-23T15:00:00.000Z\",\"open\":81681.79,\"high\":81706.92,\"low\":81277.26,\"close\":81582.35,\"volume\":363.20473062,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-23T16:00:00.000Z\",\"open\":81582.35,\"high\":81750,\"low\":81376.58,\"close\":81610.51,\"volume\":181.69425981,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-23T17:00:00.000Z\",\"open\":81610.52,\"high\":81748.87,\"low\":81463.68,\"close\":81556.64,\"volume\":198.40214747,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-23T18:00:00.000Z\",\"open\":81541.16,\"high\":81560.98,\"low\":81306.44,\"close\":81337.6,\"volume\":233.62459714,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-23T19:00:00.000Z\",\"open\":81337.61,\"high\":81364.49,\"low\":81129.99,\"close\":81184.34,\"volume\":388.25026785,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-23T20:00:00.000Z\",\"open\":81184.35,\"high\":81400,\"low\":81151.11,\"close\":81311.1,\"volume\":228.67784876,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-23T21:00:00.000Z\",\"open\":81311.1,\"high\":81400,\"low\":81224.05,\"close\":81280.39,\"volume\":136.78755538,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-23T22:00:00.000Z\",\"open\":81280.39,\"high\":81343.13,\"low\":80452.42,\"close\":80718.91,\"volume\":350.14120665,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-23T23:00:00.000Z\",\"open\":80758.43,\"high\":81095.27,\"low\":80401.34,\"close\":81078.04,\"volume\":328.67903864,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T00:00:00.000Z\",\"open\":81079.63,\"high\":81106.03,\"low\":80478.56,\"close\":80508.25,\"volume\":352.95133593,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T01:00:00.000Z\",\"open\":80508.25,\"high\":80859.56,\"low\":80502.01,\"close\":80823.4,\"volume\":137.49058808,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T02:00:00.000Z\",\"open\":80823.4,\"high\":80894.58,\"low\":80719.01,\"close\":80888.89,\"volume\":60.74210976,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T03:00:00.000Z\",\"open\":80888.88,\"high\":80988.38,\"low\":80735.9,\"close\":80866.21,\"volume\":94.22720114,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T04:00:00.000Z\",\"open\":80866.21,\"high\":80988.39,\"low\":80720.9,\"close\":80782.04,\"volume\":93.0854743,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T05:00:00.000Z\",\"open\":80782.04,\"high\":80787.39,\"low\":80608.1,\"close\":80654.94,\"volume\":90.78797609,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T06:00:00.000Z\",\"open\":80654.95,\"high\":80725.06,\"low\":80577.77,\"close\":80680.23,\"volume\":53.27066815,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T07:00:00.000Z\",\"open\":80680.23,\"high\":80816.75,\"low\":80581.83,\"close\":80635.79,\"volume\":76.74148235,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T08:00:00.000Z\",\"open\":80635.79,\"high\":80722.17,\"low\":80516.39,\"close\":80603.99,\"volume\":74.62815002,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T09:00:00.000Z\",\"open\":80604,\"high\":80604,\"low\":80346.61,\"close\":80516.01,\"volume\":75.31222095,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T10:00:00.000Z\",\"open\":80516.03,\"high\":80635.79,\"low\":80402.53,\"close\":80557.92,\"volume\":63.64012691,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T11:00:00.000Z\",\"open\":80562.58,\"high\":80599.9,\"low\":80469.07,\"close\":80487.22,\"volume\":47.40168539,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T12:00:00.000Z\",\"open\":80487.23,\"high\":80744.92,\"low\":80414.75,\"close\":80676.58,\"volume\":58.30330463,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T13:00:00.000Z\",\"open\":80667.52,\"high\":80748.5,\"low\":80536.12,\"close\":80592.58,\"volume\":88.99038631,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T14:00:00.000Z\",\"open\":80592.58,\"high\":80660.91,\"low\":79707,\"close\":80100.26,\"volume\":697.77083605,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T15:00:00.000Z\",\"open\":80100.26,\"high\":80133.15,\"low\":79107,\"close\":79691.25,\"volume\":511.3825798,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T16:00:00.000Z\",\"open\":79691.06,\"high\":80189.13,\"low\":79475,\"close\":80110.54,\"volume\":315.90856818,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T17:00:00.000Z\",\"open\":80110.53,\"high\":80195.27,\"low\":80000,\"close\":80166.81,\"volume\":163.7699247,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T18:00:00.000Z\",\"open\":80166.82,\"high\":80539.3,\"low\":80126.57,\"close\":80430.62,\"volume\":133.36488116,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T19:00:00.000Z\",\"open\":80430.62,\"high\":80511.21,\"low\":80376.68,\"close\":80379.96,\"volume\":91.06935058,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T20:00:00.000Z\",\"open\":80379.97,\"high\":80523.08,\"low\":80379.97,\"close\":80409.14,\"volume\":76.66856333,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T21:00:00.000Z\",\"open\":80409.14,\"high\":80416.52,\"low\":80186.71,\"close\":80309.81,\"volume\":81.93567061,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T22:00:00.000Z\",\"open\":80309.81,\"high\":80533.09,\"low\":80309.81,\"close\":80490.11,\"volume\":110.74098897,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T23:00:00.000Z\",\"open\":80520.39,\"high\":80819.6,\"low\":80421.11,\"close\":80769.67,\"volume\":155.02074068,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T00:00:00.000Z\",\"open\":80769.67,\"high\":80805.26,\"low\":80614.11,\"close\":80759.42,\"volume\":116.41618777,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T01:00:00.000Z\",\"open\":80759.43,\"high\":80810.87,\"low\":80661.41,\"close\":80791.18,\"volume\":72.86629041,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T02:00:00.000Z\",\"open\":80791.19,\"high\":80900.79,\"low\":80683.74,\"close\":80802.67,\"volume\":102.7560483,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T03:00:00.000Z\",\"open\":80802.68,\"high\":80925,\"low\":80721.03,\"close\":80734.03,\"volume\":90.58425349,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T04:00:00.000Z\",\"open\":80738.64,\"high\":80858.4,\"low\":80712.45,\"close\":80822.13,\"volume\":57.2245448,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T05:00:00.000Z\",\"open\":80822.14,\"high\":80833.35,\"low\":80382.78,\"close\":80500.48,\"volume\":86.2364469,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T06:00:00.000Z\",\"open\":80500.47,\"high\":80577.31,\"low\":80310.01,\"close\":80390.84,\"volume\":51.88660126,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T07:00:00.000Z\",\"open\":80387.44,\"high\":80614.4,\"low\":80387.15,\"close\":80568.44,\"volume\":32.17846752,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T08:00:00.000Z\",\"open\":80568.44,\"high\":80588.19,\"low\":80258,\"close\":80300,\"volume\":36.0030613,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T09:00:00.000Z\",\"open\":80299.99,\"high\":80344.13,\"low\":79973.01,\"close\":80224.13,\"volume\":100.63874764,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T10:00:00.000Z\",\"open\":80224.13,\"high\":80324.39,\"low\":80105.12,\"close\":80175.9,\"volume\":37.65410698,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T11:00:00.000Z\",\"open\":80175.89,\"high\":80548.86,\"low\":80175.89,\"close\":80476.81,\"volume\":141.31361752,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T12:00:00.000Z\",\"open\":80476.81,\"high\":80476.82,\"low\":80219.16,\"close\":80347.9,\"volume\":61.24605915,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T13:00:00.000Z\",\"open\":80347.89,\"high\":80366.45,\"low\":80133.54,\"close\":80266.06,\"volume\":56.74466901,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T14:00:00.000Z\",\"open\":80266.06,\"high\":80549.99,\"low\":80179.66,\"close\":80547.36,\"volume\":96.90264937,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T15:00:00.000Z\",\"open\":80547.37,\"high\":80695.69,\"low\":80418.78,\"close\":80527.74,\"volume\":78.84300246,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T16:00:00.000Z\",\"open\":80527.74,\"high\":80743.93,\"low\":80421.18,\"close\":80692.06,\"volume\":69.43642286,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T17:00:00.000Z\",\"open\":80692.06,\"high\":80859.26,\"low\":80616.24,\"close\":80681,\"volume\":95.98184849,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T18:00:00.000Z\",\"open\":80681.01,\"high\":80712.44,\"low\":80534.49,\"close\":80552.7,\"volume\":66.82465546,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T19:00:00.000Z\",\"open\":80552.7,\"high\":80576.9,\"low\":80429.72,\"close\":80455.57,\"volume\":50.63639931,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T20:00:00.000Z\",\"open\":80455.56,\"high\":80524.97,\"low\":80302.77,\"close\":80385.96,\"volume\":118.79827459,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T21:00:00.000Z\",\"open\":80385.96,\"high\":80421.17,\"low\":80095.45,\"close\":80155.4,\"volume\":85.19142978,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T22:00:00.000Z\",\"open\":80155.41,\"high\":80625.84,\"low\":80136.17,\"close\":80368.46,\"volume\":113.3739639,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T23:00:00.000Z\",\"open\":80368.46,\"high\":80375.06,\"low\":79732.29,\"close\":80053.16,\"volume\":260.80454647,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T00:00:00.000Z\",\"open\":80053.16,\"high\":80276.92,\"low\":79793.24,\"close\":80059.5,\"volume\":193.87269814,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T01:00:00.000Z\",\"open\":80059.51,\"high\":80173.33,\"low\":79278.5,\"close\":79637.18,\"volume\":278.34607801,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T02:00:00.000Z\",\"open\":79637.18,\"high\":79861.54,\"low\":79350.86,\"close\":79459.45,\"volume\":226.82060347,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T03:00:00.000Z\",\"open\":79459.45,\"high\":79716,\"low\":79255,\"close\":79478.39,\"volume\":241.21400166,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T04:00:00.000Z\",\"open\":79478.38,\"high\":80037.2,\"low\":79456.7,\"close\":80004.95,\"volume\":120.88682103,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T05:00:00.000Z\",\"open\":80004.95,\"high\":80173.09,\"low\":79940.27,\"close\":80145.23,\"volume\":55.64090839,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T06:00:00.000Z\",\"open\":80145.23,\"high\":80175,\"low\":79832.67,\"close\":80001,\"volume\":34.0373482,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T07:00:00.000Z\",\"open\":80000.94,\"high\":80114.58,\"low\":79831,\"close\":79914.17,\"volume\":50.62167144,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T08:00:00.000Z\",\"open\":79914.18,\"high\":80295,\"low\":79541.14,\"close\":80114.58,\"volume\":179.25754749,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T09:00:00.000Z\",\"open\":80114.59,\"high\":80462.78,\"low\":80062.4,\"close\":80422.23,\"volume\":83.28349417,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T10:00:00.000Z\",\"open\":80422.23,\"high\":80422.23,\"low\":80237.22,\"close\":80239.82,\"volume\":45.17234954,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T11:00:00.000Z\",\"open\":80239.83,\"high\":80410,\"low\":80128.02,\"close\":80284.1,\"volume\":144.00142045,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T12:00:00.000Z\",\"open\":80284.09,\"high\":80435.65,\"low\":80136.92,\"close\":80204.75,\"volume\":256.98893618,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T13:00:00.000Z\",\"open\":80202.75,\"high\":80204.43,\"low\":79300,\"close\":79566.11,\"volume\":1588.71205788,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T14:00:00.000Z\",\"open\":79566.1,\"high\":80290.56,\"low\":79444.77,\"close\":80272.86,\"volume\":714.37407635,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T15:00:00.000Z\",\"open\":80272.87,\"high\":80710.04,\"low\":80217.74,\"close\":80298.98,\"volume\":595.48699428,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T16:00:00.000Z\",\"open\":80298.98,\"high\":80328.51,\"low\":79643.11,\"close\":80097.95,\"volume\":325.59492002,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T17:00:00.000Z\",\"open\":80099.58,\"high\":80436.18,\"low\":79998.17,\"close\":80196.98,\"volume\":349.49665773,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T18:00:00.000Z\",\"open\":80196.18,\"high\":80293.68,\"low\":79834.42,\"close\":79857.18,\"volume\":314.00117969,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T19:00:00.000Z\",\"open\":79858.7,\"high\":79990.77,\"low\":79762.86,\"close\":79874.53,\"volume\":332.37447708,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T20:00:00.000Z\",\"open\":79878.12,\"high\":79900,\"low\":79671.52,\"close\":79719.94,\"volume\":264.08166032,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T21:00:00.000Z\",\"open\":79718.5,\"high\":80079.74,\"low\":79718.49,\"close\":79964.94,\"volume\":131.6690293,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T22:00:00.000Z\",\"open\":79964.95,\"high\":79997.91,\"low\":79783.4,\"close\":79864.87,\"volume\":98.9616727,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T23:00:00.000Z\",\"open\":79864.88,\"high\":80048.32,\"low\":79544.76,\"close\":80008.79,\"volume\":121.42192459,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T00:00:00.000Z\",\"open\":80008.79,\"high\":80248.34,\"low\":79978.25,\"close\":80080.77,\"volume\":130.56423239,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T01:00:00.000Z\",\"open\":80080.77,\"high\":80240.01,\"low\":79885,\"close\":79926.77,\"volume\":89.79418407,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T02:00:00.000Z\",\"open\":79926.77,\"high\":79983.42,\"low\":79600.03,\"close\":79674.58,\"volume\":202.02656028,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T03:00:00.000Z\",\"open\":79674.59,\"high\":79798.89,\"low\":79490.24,\"close\":79685.8,\"volume\":161.72776035,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T04:00:00.000Z\",\"open\":79685.8,\"high\":79721.69,\"low\":79482.73,\"close\":79607.24,\"volume\":174.60154297,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T05:00:00.000Z\",\"open\":79607.24,\"high\":79913.98,\"low\":79577,\"close\":79828.72,\"volume\":79.40274183,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T06:00:00.000Z\",\"open\":79828.72,\"high\":79865.3,\"low\":79426.01,\"close\":79515.93,\"volume\":70.65034109,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T07:00:00.000Z\",\"open\":79515.93,\"high\":79891.58,\"low\":79437.42,\"close\":79661.73,\"volume\":200.51412306,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T08:00:00.000Z\",\"open\":79662.78,\"high\":79810.77,\"low\":79571.01,\"close\":79726.53,\"volume\":70.3109731,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T09:00:00.000Z\",\"open\":79726.54,\"high\":79753.01,\"low\":79509.38,\"close\":79634.3,\"volume\":71.44820283,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T10:00:00.000Z\",\"open\":79634.31,\"high\":80008.79,\"low\":79365.93,\"close\":79817.25,\"volume\":156.52333145,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T11:00:00.000Z\",\"open\":79817.25,\"high\":80006.5,\"low\":79703.1,\"close\":79760.4,\"volume\":78.80214225,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T12:00:00.000Z\",\"open\":79760.39,\"high\":80363.72,\"low\":79692.27,\"close\":80228.8,\"volume\":295.35889476,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T13:00:00.000Z\",\"open\":80228.81,\"high\":80266.39,\"low\":79798.33,\"close\":79901.43,\"volume\":235.46886629,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T14:00:00.000Z\",\"open\":79906.93,\"high\":80275,\"low\":79743.82,\"close\":80222.97,\"volume\":326.63317913,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T15:00:00.000Z\",\"open\":80223.9,\"high\":80571.63,\"low\":80097.04,\"close\":80434.19,\"volume\":457.80157368,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T16:00:00.000Z\",\"open\":80434.18,\"high\":80556.61,\"low\":80321.96,\"close\":80540.79,\"volume\":208.85373738,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T17:00:00.000Z\",\"open\":80540.8,\"high\":80723.25,\"low\":80383.43,\"close\":80393.82,\"volume\":162.70004221,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T18:00:00.000Z\",\"open\":80393.82,\"high\":80616.97,\"low\":80335.08,\"close\":80509.27,\"volume\":100.91070683,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T19:00:00.000Z\",\"open\":80509.27,\"high\":80723.94,\"low\":80495,\"close\":80706.77,\"volume\":223.91010534,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T20:00:00.000Z\",\"open\":80706.76,\"high\":80725,\"low\":80476.36,\"close\":80670.98,\"volume\":223.75526257,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T21:00:00.000Z\",\"open\":80670.98,\"high\":81182,\"low\":80530.32,\"close\":80782.53,\"volume\":317.37217009,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T22:00:00.000Z\",\"open\":80782.53,\"high\":80923.91,\"low\":80698.38,\"close\":80792.37,\"volume\":143.75562813,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T23:00:00.000Z\",\"open\":80792.37,\"high\":80925.7,\"low\":80673.13,\"close\":80799.51,\"volume\":173.29616388,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T00:00:00.000Z\",\"open\":80799.5,\"high\":80799.5,\"low\":80580.34,\"close\":80633.87,\"volume\":201.34822417,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T01:00:00.000Z\",\"open\":80633.88,\"high\":80873.5,\"low\":80493.55,\"close\":80826.38,\"volume\":159.37951113,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T02:00:00.000Z\",\"open\":80826.39,\"high\":81030.69,\"low\":80737.03,\"close\":80817.5,\"volume\":123.58582072,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T03:00:00.000Z\",\"open\":80817.5,\"high\":81110.26,\"low\":80778.66,\"close\":81038.15,\"volume\":131.81205378,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T04:00:00.000Z\",\"open\":81023.78,\"high\":81032.11,\"low\":80795.18,\"close\":80873.63,\"volume\":60.0711512,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T05:00:00.000Z\",\"open\":80873.62,\"high\":80878.2,\"low\":80777.27,\"close\":80781.1,\"volume\":52.75338477,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T06:00:00.000Z\",\"open\":80781.1,\"high\":80895.17,\"low\":80734.83,\"close\":80754.52,\"volume\":46.18580325,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T07:00:00.000Z\",\"open\":80754.52,\"high\":80975.89,\"low\":80738.65,\"close\":80969.36,\"volume\":168.45933501,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T08:00:00.000Z\",\"open\":80969.36,\"high\":81694.39,\"low\":80962.99,\"close\":81360.75,\"volume\":344.70581677,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T09:00:00.000Z\",\"open\":81362.25,\"high\":81443.73,\"low\":81230.11,\"close\":81435.58,\"volume\":74.06393068,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T10:00:00.000Z\",\"open\":81435.58,\"high\":81487.17,\"low\":81332.71,\"close\":81372.39,\"volume\":74.00848353,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T11:00:00.000Z\",\"open\":81372.38,\"high\":81372.39,\"low\":81189.49,\"close\":81215.3,\"volume\":85.57705578,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T12:00:00.000Z\",\"open\":81215.3,\"high\":81225.03,\"low\":80577.4,\"close\":80608.49,\"volume\":261.06984831,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T13:00:00.000Z\",\"open\":80608.49,\"high\":80795.1,\"low\":80270.68,\"close\":80603.34,\"volume\":413.51060231,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T14:00:00.000Z\",\"open\":80603.34,\"high\":80752.99,\"low\":80327.5,\"close\":80479.33,\"volume\":286.24891944,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T15:00:00.000Z\",\"open\":80479.32,\"high\":80640.96,\"low\":80370.3,\"close\":80434.8,\"volume\":176.86274164,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T16:00:00.000Z\",\"open\":80434.8,\"high\":80642,\"low\":80277.19,\"close\":80494.11,\"volume\":278.880824,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T17:00:00.000Z\",\"open\":80494.11,\"high\":80881.56,\"low\":80355,\"close\":80763.35,\"volume\":289.75097623,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T18:00:00.000Z\",\"open\":80748.03,\"high\":81234,\"low\":80600,\"close\":80931.79,\"volume\":575.01121148,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T19:00:00.000Z\",\"open\":80931.79,\"high\":81539.42,\"low\":80897.5,\"close\":81502.09,\"volume\":447.6284889,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T20:00:00.000Z\",\"open\":81502.09,\"high\":81715.01,\"low\":80898.98,\"close\":81261.34,\"volume\":370.74979721,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T21:00:00.000Z\",\"open\":81259.82,\"high\":81380.16,\"low\":81056.52,\"close\":81266.56,\"volume\":267.92544105,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T22:00:00.000Z\",\"open\":81266.56,\"high\":81339.68,\"low\":81041.57,\"close\":81183.48,\"volume\":129.34094071,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T23:00:00.000Z\",\"open\":81183.47,\"high\":81270.96,\"low\":81065.66,\"close\":81249.31,\"volume\":128.05612741,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T00:00:00.000Z\",\"open\":81249.32,\"high\":81289.72,\"low\":81000,\"close\":81000,\"volume\":142.62685884,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T01:00:00.000Z\",\"open\":81000,\"high\":81005.42,\"low\":79874,\"close\":79904.99,\"volume\":424.17175074,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T02:00:00.000Z\",\"open\":79903.99,\"high\":80075.01,\"low\":79586.17,\"close\":79852.9,\"volume\":235.54764315,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T03:00:00.000Z\",\"open\":79856.27,\"high\":79916.64,\"low\":79649.78,\"close\":79739.07,\"volume\":95.08825648,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T04:00:00.000Z\",\"open\":79736.42,\"high\":80211.82,\"low\":79662,\"close\":80138.67,\"volume\":179.37114817,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T05:00:00.000Z\",\"open\":80138.67,\"high\":80411.68,\"low\":80098.03,\"close\":80115.75,\"volume\":87.67695081,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T06:00:00.000Z\",\"open\":80115.75,\"high\":80170.37,\"low\":79780,\"close\":79849.42,\"volume\":58.15306705,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T07:00:00.000Z\",\"open\":79849.42,\"high\":79879.61,\"low\":79710.14,\"close\":79737.31,\"volume\":96.08282455,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T08:00:00.000Z\",\"open\":79737.3,\"high\":80024.77,\"low\":79728.18,\"close\":79954.35,\"volume\":151.28668204,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T09:00:00.000Z\",\"open\":79960.03,\"high\":80232.84,\"low\":79936.17,\"close\":80092.01,\"volume\":118.72983982,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T10:00:00.000Z\",\"open\":80092,\"high\":80272.19,\"low\":80000,\"close\":80185.6,\"volume\":63.0161527,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T11:00:00.000Z\",\"open\":80185.6,\"high\":80206.76,\"low\":80005,\"close\":80057.41,\"volume\":97.0592979,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T12:00:00.000Z\",\"open\":80057.41,\"high\":80158.79,\"low\":79895.58,\"close\":79947.6,\"volume\":143.25993512,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T13:00:00.000Z\",\"open\":79947.6,\"high\":80315.5,\"low\":79772.04,\"close\":80188.5,\"volume\":446.69138924,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T14:00:00.000Z\",\"open\":80188.5,\"high\":81423.9,\"low\":80145.4,\"close\":81090.06,\"volume\":651.37752667,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T15:00:00.000Z\",\"open\":81090.06,\"high\":81824.09,\"low\":81088.71,\"close\":81698.54,\"volume\":630.62334677,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T16:00:00.000Z\",\"open\":81698.55,\"high\":81890,\"low\":81092.26,\"close\":81173.03,\"volume\":466.32450108,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T17:00:00.000Z\",\"open\":81173.03,\"high\":81173.34,\"low\":80561.69,\"close\":80798.49,\"volume\":375.96184317,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T18:00:00.000Z\",\"open\":80798.49,\"high\":80854.28,\"low\":80491.77,\"close\":80762.26,\"volume\":212.44631928,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T19:00:00.000Z\",\"open\":80762.25,\"high\":80851,\"low\":80661.31,\"close\":80743.29,\"volume\":500.15452364,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T20:00:00.000Z\",\"open\":80743.29,\"high\":80757.74,\"low\":78177.37,\"close\":78744.03,\"volume\":1455.5863126,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T21:00:00.000Z\",\"open\":78738.4,\"high\":79700,\"low\":78463.06,\"close\":78890.57,\"volume\":1080.59567845,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T22:00:00.000Z\",\"open\":78887.52,\"high\":79137.98,\"low\":78448.49,\"close\":78862.27,\"volume\":1211.07681905,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T23:00:00.000Z\",\"open\":78860.64,\"high\":78880.81,\"low\":77699,\"close\":77780.33,\"volume\":1010.70639421,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-30T00:00:00.000Z\",\"open\":77782.75,\"high\":78083.81,\"low\":76600,\"close\":77058.45,\"volume\":1551.12409682,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-30T01:00:00.000Z\",\"open\":77058.44,\"high\":77204.98,\"low\":76459.28,\"close\":76634.81,\"volume\":1348.13899777,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-30T02:00:00.000Z\",\"open\":76643.44,\"high\":77366.97,\"low\":76301.02,\"close\":77218.43,\"volume\":813.87381698,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-30T03:00:00.000Z\",\"open\":77218.43,\"high\":78048.24,\"low\":77101,\"close\":78016.94,\"volume\":558.89867894,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-30T04:00:00.000Z\",\"open\":78016.95,\"high\":78247.81,\"low\":77709.75,\"close\":78069.07,\"volume\":362.88975038,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-30T05:00:00.000Z\",\"open\":78069.08,\"high\":78588.99,\"low\":78039.38,\"close\":78381.81,\"volume\":387.12800129,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-30T06:00:00.000Z\",\"open\":78381.81,\"high\":78634.8,\"low\":78201.48,\"close\":78477.74,\"volume\":399.24195329,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-30T07:00:00.000Z\",\"open\":78477.74,\"high\":78490.11,\"low\":77859.11,\"close\":78017.76,\"volume\":324.54436907,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-30T08:00:00.000Z\",\"open\":78017.76,\"high\":78091.63,\"low\":77755,\"close\":77873.26,\"volume\":326.31064754,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-30T09:00:00.000Z\",\"open\":77873.27,\"high\":77899.01,\"low\":77407.01,\"close\":77552.34,\"volume\":303.9437663,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-30T10:00:00.000Z\",\"open\":77552.34,\"high\":77699.7,\"low\":77185.89,\"close\":77699.49,\"volume\":330.91060437,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-30T11:00:00.000Z\",\"open\":77695.92,\"high\":77728.44,\"low\":77087.53,\"close\":77241.91,\"volume\":306.44847394,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-30T12:00:00.000Z\",\"open\":77241.91,\"high\":77467.16,\"low\":77144.12,\"close\":77318.98,\"volume\":377.61804757,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-30T13:00:00.000Z\",\"open\":77317.91,\"high\":77317.91,\"low\":76409,\"close\":76985.4,\"volume\":1088.64656097,\"is_closed\":true}],\"auto_tournament\":true}",
+    "headers": {
+      "sec-ch-ua-platform": "\"Windows\"",
+      "Referer": "http://127.0.0.1:8000/",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"Google Chrome\";v=\"156\"",
+      "Content-Type": "application/json",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "started_at": 1793547281.200976,
+    "response": null,
+    "status": 200,
+    "response_headers": {
+      "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' ws: wss: https:; img-src 'self' data: https:; frame-ancestors 'none';",
+      "cache-control": "no-store, no-cache, must-revalidate",
+      "pragma": "no-cache",
+      "access-control-allow-credentials": "true",
+      "referrer-policy": "strict-origin-when-cross-origin",
+      "x-content-type-options": "nosniff",
+      "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=()",
+      "expires": "0",
+      "access-control-allow-origin": "http://127.0.0.1:8000",
+      "content-length": "20217",
+      "date": "Sun, 01 Nov 2026 15:34:40 GMT",
+      "content-type": "application/json",
+      "vary": "Origin",
+      "server": "uvicorn",
+      "x-frame-options": "DENY"
+    },
+    "finished_at": 1793547281.281461,
+    "duration_ms": 80.49,
+    "body_parsed": {
+      "analysis_id": "ana_cc642339a05f",
+      "timestamp_utc": "2026-11-01T15:34:41.199888+00:00",
+      "is_read_only": true,
+      "attempts_created": 0,
+      "candle_watermark": {
+        "last_closed_timestamp": "2026-10-30T13:00:00+00:00",
+        "last_closed_close": 76985.4,
+        "candle_watermark_hash": "0caf188f890c45e8",
+        "candle_window_sha256": "3fa27c80c80c2207846e817111231fda6dc9aad99f950e8ba597694702b491a0",
+        "total_closed_candles": 168
+      },
+      "candle_watermark_hash": "0caf188f890c45e8",
+      "freshness_status": "MARKET_DATA_STALE",
+      "data_freshness": {
+        "is_fresh": false,
+        "freshness_status": "MARKET_DATA_STALE",
+        "observed_age_seconds": 182081.2,
+        "freshness_threshold_seconds": 7200.0,
+        "latest_candle_time_utc": "2026-10-30T13:00:00+00:00",
+        "has_candle_gaps": false,
+        "candle_gap_count": 0,
+        "dataset_fingerprint": "3fa27c80c80c2207846e817111231fda6dc9aad99f950e8ba597694702b491a0"
+      },
+      "data_integrity": {
+        "is_valid": true,
+        "reason": "VALID"
+      },
+      "market_regime": {
+        "regime": "VOLATILITY_EXPANSION",
+        "is_valid": true,
+        "rationale": "High directional index ADX=40.7 with moving average divergence",
+        "close": 76985.4,
+        "ema20": 78155.69,
+        "ema50": 79116.58,
+        "ema200": 76985.4,
+        "adx": 40.73,
+        "atr": 650.83,
+        "bbw": 0.0551,
+        "bb_upper": 80267.65,
+        "bb_mid": 78116.46,
+        "bb_lower": 75965.27
+      },
+      "shortlisted_candidates": [
+        {
+          "rank": 1,
+          "candidate_id": "ATR_VOLATILITY_BREAKOUT_12H",
+          "strategy_id": "ATR_VOLATILITY_BREAKOUT_12H",
+          "strategy_name": "ATR Volatility Expansion Breakout (12h)",
+          "version": "1.0.0",
+          "family": "Volatility Breakout",
+          "intended_regime": [
+            "VOLATILITY_EXPANSION",
+            "TRENDING_BULLISH"
+          ],
+          "direction": "LONG",
+          "holding_horizon_hours": 12.0,
+          "proposed_geometry": {
+            "reference_entry_price": 76985.4,
+            "proposed_tp_price": 78287.06,
+            "proposed_sl_price": 76334.57,
+            "reward_usd": 1301.66,
+            "risk_usd": 650.83,
+            "reward_risk_ratio": 2.0,
+            "anomaly_policy": "Hourly down bar with volume > 3.5x 50-bar baseline"
+          },
+          "screen_7_of_10": {
+            "passed": true,
+            "status": "SCREEN_PASSED",
+            "evidence_source": "HISTORICAL_WALKFORWARD_SCREENING",
+            "strategy_id": "ATR_VOLATILITY_BREAKOUT_12H",
+            "strategy_version": "1.0.0",
+            "tp_hits": 8,
+            "total_attempts": 10,
+            "numerator_tp_hits": 8,
+            "denominator_eligible_attempts": 10,
+            "tp_hit_rate": 0.8,
+            "wilson_ci_95": [
+              0.4902,
+              0.9433
+            ],
+            "evaluation_dates": [
+              "2026-09-09",
+              "2026-10-21"
+            ],
+            "breakdown": {
+              "tp_hits": 8,
+              "sl_hits": 2,
+              "anomaly_exits": 0,
+              "timeouts": 0
+            },
+            "separately_reported": {
+              "pending_attempts": 0,
+              "user_exited_early": 0,
+              "unresolved_intrabar": 0,
+              "partial_exits": 0
+            },
+            "uncertainty_caveat": "Passing 7/10 preliminary screen (8/10 = 80.0%) is an initial gating hurdle, NOT proof of a future 70% success probability. Under binomial assumptions, Wilson 95% CI is [49.0%, 94.3%]. Financial time-series serial dependence expands true uncertainty further.",
+            "explanation": "Passed preliminary screen (8/10 = 80.0% TP hits >= 7/10 required; source: HISTORICAL_WALKFORWARD_SCREENING). Wilson 95% CI is [49.0%, 94.3%]."
+          },
+          "latest_10_eligible_outcomes": {
+            "tp_hits": 8,
+            "sl_hits": 2,
+            "anomaly_exits": 0,
+            "timeouts": 0
+          },
+          "success_count": 8,
+          "evaluation_period": [
+            "2026-09-09",
+            "2026-10-21"
+          ],
+          "confidence_interval": [
+            0.4902,
+            0.9433
+          ],
+          "sample_provenance": "HISTORICAL_WALKFORWARD_SCREENING",
+          "qualification_state": "SCREEN_PASSED",
+          "historical_evidence": {
+            "historical_tp_hit_rate": 0.612,
+            "sample_size": 215,
+            "status": "QUALIFICATION_CANDIDATE"
+          }
+        },
+        {
+          "rank": 2,
+          "candidate_id": "TSMOM_DONCHIAN_24H_168H",
+          "strategy_id": "TSMOM_DONCHIAN_24H_168H",
+          "strategy_name": "Donchian Trend Breakout (168h Trend / 24h Channel)",
+          "version": "1.0.0",
+          "family": "Trend-Following",
+          "intended_regime": [
+            "TRENDING_BULLISH",
+            "VOLATILITY_EXPANSION"
+          ],
+          "direction": "LONG",
+          "holding_horizon_hours": 24.0,
+          "proposed_geometry": {
+            "reference_entry_price": 76985.4,
+            "proposed_tp_price": 78449.77,
+            "proposed_sl_price": 76009.15,
+            "reward_usd": 1464.37,
+            "risk_usd": 976.25,
+            "reward_risk_ratio": 1.5,
+            "anomaly_policy": "3 consecutive hourly closes below 50h EMA, or adverse volume spike > 3.0x"
+          },
+          "screen_7_of_10": {
+            "passed": true,
+            "status": "SCREEN_PASSED",
+            "evidence_source": "HISTORICAL_WALKFORWARD_SCREENING",
+            "strategy_id": "TSMOM_DONCHIAN_24H_168H",
+            "strategy_version": "1.0.0",
+            "tp_hits": 7,
+            "total_attempts": 10,
+            "numerator_tp_hits": 7,
+            "denominator_eligible_attempts": 10,
+            "tp_hit_rate": 0.7,
+            "wilson_ci_95": [
+              0.3968,
+              0.8922
+            ],
+            "evaluation_dates": [
+              "2026-09-10",
+              "2026-10-22"
+            ],
+            "breakdown": {
+              "tp_hits": 7,
+              "sl_hits": 2,
+              "anomaly_exits": 1,
+              "timeouts": 0
+            },
+            "separately_reported": {
+              "pending_attempts": 0,
+              "user_exited_early": 0,
+              "unresolved_intrabar": 0,
+              "partial_exits": 0
+            },
+            "uncertainty_caveat": "Passing 7/10 preliminary screen (7/10 = 70.0%) is an initial gating hurdle, NOT proof of a future 70% success probability. Under binomial assumptions, Wilson 95% CI is [39.7%, 89.2%]. Financial time-series serial dependence expands true uncertainty further.",
+            "explanation": "Passed preliminary screen (7/10 = 70.0% TP hits >= 7/10 required; source: HISTORICAL_WALKFORWARD_SCREENING). Wilson 95% CI is [39.7%, 89.2%]."
+          },
+          "latest_10_eligible_outcomes": {
+            "tp_hits": 7,
+            "sl_hits": 2,
+            "anomaly_exits": 1,
+            "timeouts": 0
+          },
+          "success_count": 7,
+          "evaluation_period": [
+            "2026-09-10",
+            "2026-10-22"
+          ],
+          "confidence_interval": [
+            0.3968,
+            0.8922
+          ],
+          "sample_provenance": "HISTORICAL_WALKFORWARD_SCREENING",
+          "qualification_state": "SCREEN_PASSED",
+          "historical_evidence": {
+            "historical_tp_hit_rate": 0.584,
+            "sample_size": 342,
+            "status": "QUALIFICATION_CANDIDATE"
+          }
+        }
+      ],
+      "candidate_rejections": [
+        {
+          "strategy_id": "RANGE_BOLLINGER_REVERSION_20H",
+          "strategy_name": "Bollinger & RSI Mean Reversion (20h)",
+          "version": "1.0.0",
+          "rejection_reason": "Regime mismatch: requires ['RANGE_BOUND'] but observed regime is VOLATILITY_EXPANSION"
+        },
+        {
+          "strategy_id": "CHRONOS2_FOUNDATION",
+          "strategy_name": "Amazon Chronos-2 Foundation Model",
+          "version": "2.0.0",
+          "rejection_reason": "Strategy quarantined (QUARANTINED)"
+        },
+        {
+          "strategy_id": "HTF_RANGE_EXPANSION_BREAKOUT",
+          "strategy_name": "High-Timeframe Range Expansion (4h / 20-bar)",
+          "version": "1.0.0",
+          "rejection_reason": "Failed preliminary 7/10 screen: 3/10 TP hits < 7 required"
+        }
+      ],
+      "top_qualifying_candidate": {
+        "rank": 1,
+        "candidate_id": "ATR_VOLATILITY_BREAKOUT_12H",
+        "strategy_id": "ATR_VOLATILITY_BREAKOUT_12H",
+        "strategy_name": "ATR Volatility Expansion Breakout (12h)",
+        "version": "1.0.0",
+        "family": "Volatility Breakout",
+        "intended_regime": [
+          "VOLATILITY_EXPANSION",
+          "TRENDING_BULLISH"
+        ],
+        "direction": "LONG",
+        "holding_horizon_hours": 12.0,
+        "proposed_geometry": {
+          "reference_entry_price": 76985.4,
+          "proposed_tp_price": 78287.06,
+          "proposed_sl_price": 76334.57,
+          "reward_usd": 1301.66,
+          "risk_usd": 650.83,
+          "reward_risk_ratio": 2.0,
+          "anomaly_policy": "Hourly down bar with volume > 3.5x 50-bar baseline"
+        },
+        "screen_7_of_10": {
+          "passed": true,
+          "status": "SCREEN_PASSED",
+          "evidence_source": "HISTORICAL_WALKFORWARD_SCREENING",
+          "strategy_id": "ATR_VOLATILITY_BREAKOUT_12H",
+          "strategy_version": "1.0.0",
+          "tp_hits": 8,
+          "total_attempts": 10,
+          "numerator_tp_hits": 8,
+          "denominator_eligible_attempts": 10,
+          "tp_hit_rate": 0.8,
+          "wilson_ci_95": [
+            0.4902,
+            0.9433
+          ],
+          "evaluation_dates": [
+            "2026-09-09",
+            "2026-10-21"
+          ],
+          "breakdown": {
+            "tp_hits": 8,
+            "sl_hits": 2,
+            "anomaly_exits": 0,
+            "timeouts": 0
+          },
+          "separately_reported": {
+            "pending_attempts": 0,
+            "user_exited_early": 0,
+            "unresolved_intrabar": 0,
+            "partial_exits": 0
+          },
+          "uncertainty_caveat": "Passing 7/10 preliminary screen (8/10 = 80.0%) is an initial gating hurdle, NOT proof of a future 70% success probability. Under binomial assumptions, Wilson 95% CI is [49.0%, 94.3%]. Financial time-series serial dependence expands true uncertainty further.",
+          "explanation": "Passed preliminary screen (8/10 = 80.0% TP hits >= 7/10 required; source: HISTORICAL_WALKFORWARD_SCREENING). Wilson 95% CI is [49.0%, 94.3%]."
+        },
+        "latest_10_eligible_outcomes": {
+          "tp_hits": 8,
+          "sl_hits": 2,
+          "anomaly_exits": 0,
+          "timeouts": 0
+        },
+        "success_count": 8,
+        "evaluation_period": [
+          "2026-09-09",
+          "2026-10-21"
+        ],
+        "confidence_interval": [
+          0.4902,
+          0.9433
+        ],
+        "sample_provenance": "HISTORICAL_WALKFORWARD_SCREENING",
+        "qualification_state": "SCREEN_PASSED",
+        "historical_evidence": {
+          "historical_tp_hit_rate": 0.612,
+          "sample_size": 215,
+          "status": "QUALIFICATION_CANDIDATE"
+        }
+      },
+      "action": "RUN_TOURNAMENT_AVAILABLE",
+      "reason": "Regime VOLATILITY_EXPANSION identified. 2 compatible candidate(s) shortlisted.",
+      "market_intelligence": {
+        "status": "SUCCESS",
+        "timestamp_utc": "2026-11-01T15:34:41.235459+00:00",
+        "current_market_assessment": "UNAVAILABLE",
+        "current_price": null,
+        "last_observed_candle_price": 76985.4,
+        "last_observed_candle_time": "2026-10-30T13:00:00+00:00",
+        "historical_volatility_analysis": "AVAILABLE",
+        "historical_risk_envelope": "AVAILABLE_WITH_TIMESTAMP",
+        "data_freshness": {
+          "is_fresh": false,
+          "is_stale": true,
+          "observed_age_hours": 50.58,
+          "max_allowable_age_hours": 2.0,
+          "has_gaps": false,
+          "gap_count": 0,
+          "total_closed_candles": 168,
+          "freshness_warning": "STALE_DATA_WARNING: Closed candles are 50.6h old (exceeds 2.0h operational limit). Market intelligence represents historical/cached context, NOT live market conditions. Current-market assessment is UNAVAILABLE. Trade authorization is locked to ABSTAIN."
+        },
+        "volatility_term_structure": {
+          "rv_1h_pct": 40.47,
+          "rv_4h_pct": 35.69,
+          "rv_24h_pct": 73.48,
+          "rv_7d_pct": 38.05,
+          "rv_30d_pct": 38.05,
+          "vol_ratio_1h_24h": 0.551,
+          "curve_shape": "CONTANGO_COMPRESSION",
+          "measurement_horizon_hours": 720,
+          "annualization_convention": "Hourly log-returns scaled by sqrt(8760)"
+        },
+        "volatility_regime": {
+          "regime": "VOLATILITY_EXPANSION",
+          "is_expansion": true,
+          "bollinger_band_width_pct": 5.51,
+          "wilder_adx_14": 40.73,
+          "trend_strength": "STRONG_TREND",
+          "atr_14_usd": 650.83,
+          "trend_direction": "NEUTRAL",
+          "bb_mid": 78116.46,
+          "bb_upper": 80267.65,
+          "bb_lower": 75965.27,
+          "evaluation_note": "Regime indicates volatility dynamics; does NOT imply directional trade probability."
+        },
+        "conformal_risk_envelope_7d": {
+          "point_forecast_variance": 0.14478,
+          "point_forecast_volatility_pct": 38.05,
+          "conformal_lower_variance": 0.08397,
+          "conformal_upper_variance": 0.20559,
+          "conformal_lower_volatility_pct": 28.98,
+          "conformal_upper_volatility_pct": 45.34,
+          "nominal_target_coverage_pct": 90.0,
+          "nominal_coverage_pct": 90.0,
+          "causal_point_in_time_coverage_pct": 84.89,
+          "multi_regime_pooled_coverage_pct": 90.43,
+          "measured_historical_coverage_pct": 84.89,
+          "coverage_confidence_interval_95pct": [
+            73.14,
+            93.14
+          ],
+          "confidence_interval_method": "Stationary block bootstrap (block_len=168h, B=1000)",
+          "legacy_naive_iid_ci_deprecated": [
+            88.92,
+            91.94
+          ],
+          "extreme_volatility_coverage_pct": 82.14,
+          "calibration_status": "PROVISIONALLY_VALIDATED_FOR_RISK_CONTAINMENT",
+          "forecast_timestamp_utc": "2026-10-30T13:00:00+00:00",
+          "forecast_horizon": "7d (168h)",
+          "uncertainty_engine": "C2 Dependence-Aware Conformal Prediction",
+          "cohort_reconciliation": {
+            "development_cohort_2020_2025": {
+              "cohort_identity": "DEVELOPMENT_CALIBRATION_2020_2025",
+              "calibration_window": "2020-01-01 to 2025-12-31",
+              "observation_count_bars": 42233,
+              "measured_coverage_pct": 92.84,
+              "coverage_confidence_interval_95pct": [
+                88.25,
+                96.46
+              ],
+              "extreme_volatility_subgroup_coverage_pct": 89.47,
+              "cohort_role": "Historical model parameter estimation & baseline calibration"
+            },
+            "chronological_holdout_cohort_2026": {
+              "cohort_identity": "2026_CHRONOLOGICAL_HOLDOUT",
+              "evaluation_window": "2026-01-01 to 2026-10-17",
+              "observation_count_bars": 5671,
+              "causal_point_in_time_coverage_pct": 84.89,
+              "causal_block_bootstrap_95pct_ci": [
+                73.14,
+                93.14
+              ],
+              "multi_regime_pooled_coverage_pct": 90.43,
+              "extreme_volatility_subgroup_coverage_pct": 82.14,
+              "cohort_role": "Chronological historical holdout replay (NOT prospective evidence)",
+              "prospective_evidence_distinction": "Prospective ledger remains strictly FROZEN at 7/100 blocks"
+            }
+          },
+          "anti_conflation_notice": "Risk containment and directional prediction are different statistical problems. Causal holdout coverage is 84.89% (undercovering 90% target due to expansion lag). Zero directional trade success probability is implied."
+        },
+        "excursion_estimates_24h": {
+          "horizon": "24h",
+          "favourable_excursion_upper": {
+            "p10_price": 77866.28,
+            "p50_price": 79124.69,
+            "p90_price": 81389.81,
+            "p50_pct": 2.78,
+            "p90_pct": 5.72
+          },
+          "adverse_excursion_lower": {
+            "p10_price": 75978.68,
+            "p50_price": 74216.91,
+            "p90_price": 71448.42,
+            "p50_pct": 3.6,
+            "p90_pct": 7.19
+          },
+          "expected_favourable_excursion_upper_p50": 79124.69,
+          "expected_adverse_excursion_lower_p50": 74216.91,
+          "mondrian_scaling_factor": 0.85,
+          "anti_conflation_notice": "Excursion bounds quantify empirical dispersion quantiles, not a forecast of future trade profit."
+        },
+        "calibration_health_state": "WATCH_STALE",
+        "data_quality_warnings": [
+          "STALE_DATA_WARNING: Closed candles are 50.6h old (exceeds 2.0h operational limit). Market intelligence represents historical/cached context, NOT live market conditions. Current-market assessment is UNAVAILABLE. Trade authorization is locked to ABSTAIN."
+        ]
+      },
+      "trade_authorization": {
+        "decision_timestamp_utc": "2026-11-01T15:34:41.268278+00:00",
+        "final_decision": "ABSTAIN",
+        "actionable_recommendation": "NO_TRADE",
+        "live_trading": "DISABLED \u2014 ANALYSIS ONLY",
+        "decision_summary": "Trading blocked due to stale market data (50.6h old > 2.0h limit). Market intelligence remains available as historical context.",
+        "user_bias_rejected": false,
+        "execution_friction_assumed_bps": 87.0,
+        "cost_venue": "COINBASE_ADVANCED_87BPS",
+        "research_authorization_status": "OFFLINE_RESEARCH_ONLY",
+        "directional_eligibility_lock": "CURRENTLY_UNAUTHORIZED_PENDING_NEW_VALIDATED_EVIDENCE",
+        "five_question_evaluation": {
+          "question_1_market_regime": {
+            "question": "Is BTC trending, ranging, compressing, or expanding?",
+            "state": "FAIL",
+            "status": "BLOCKED_STALE",
+            "passed": false,
+            "explanation": "Market data is stale (50.6h old > 2.0h limit). Live regime cannot be validated."
+          },
+          "question_2_directional_evidence": {
+            "question": "Is there reliable evidence favouring LONG or SHORT?",
+            "state": "FAIL",
+            "status": "BLOCKED_STALE",
+            "passed": false,
+            "explanation": "Directional evidence cannot be evaluated on stale market data.",
+            "research_authorization_state": "CURRENTLY_UNAUTHORIZED_PENDING_NEW_VALIDATED_EVIDENCE"
+          },
+          "question_3_entry_location": {
+            "question": "Is the proposed entry price favourable relative to current market structure?",
+            "state": "FAIL",
+            "status": "BLOCKED_STALE",
+            "passed": false,
+            "structural_location_quality": "UNAVAILABLE_STALE",
+            "structural_location_score": 0.0,
+            "support_price": 75965.27,
+            "resistance_price": 80267.65,
+            "atr_14_distance_usd": 650.83,
+            "anti_conflation_notice": "Never equate location quality with probability of profit. A trade near support is not automatically a good LONG.",
+            "explanation": "Entry location cannot be confirmed on stale price history."
+          },
+          "question_4_execution_economics": {
+            "question": "Is the potential return sufficient relative to adverse excursion and total costs?",
+            "state": "FAIL",
+            "status": "BLOCKED_STALE",
+            "passed": false,
+            "gross_expected_return_bps": 0.0,
+            "net_expected_value_bps": 0.0,
+            "friction_breakdown": {
+              "venue": "COINBASE_ADVANCED_87BPS",
+              "commission_round_trip_bps": 83.0,
+              "spread_bps": 4.0,
+              "spread_status": "ESTIMATED_4BPS_UNAVAILABLE_WITHOUT_L2_DEPTH",
+              "slippage_bps": 0.0,
+              "slippage_status": "ESTIMATED_0BPS_MAKER_ASSUMED",
+              "total_round_trip_friction_bps": 87.0,
+              "disclosure": "Figures are illustrative historical evaluation outputs; not predictive guarantees of actual future returns."
+            },
+            "explanation": "Execution economics cannot be approved on stale candles."
+          },
+          "question_5_confidence_calibration": {
+            "question": "How reliable is the underlying evidence in this particular market condition?",
+            "state": "FAIL",
+            "status": "BLOCKED_STALE",
+            "passed": false,
+            "diagnostic_sample_floor_n": 30,
+            "sample_size_classification": "DIAGNOSTIC_MINIMUM_ONLY \u2014 NOT_A_VALIDATION_THRESHOLD",
+            "sample_size_governance_notice": "N >= 30 is a descriptive engineering diagnostic floor, not proof of statistical evidence. Effective sample size estimate N_eff is an AR(1)-style approximation, not a substitute for dependence-aware block validation. Confirmatory research claims require pre-registered protocol validation with N >= 100 clean prospective blocks.",
+            "effective_sample_size_estimate_n_eff": 70.6,
+            "calibration_status": "PROVISIONALLY_VALIDATED_FOR_RISK_CONTAINMENT",
+            "explanation": "Calibration state requires fresh candles for verification."
+          }
+        }
+      },
+      "tournament": {
+        "tournament_id": "trn_fc55dc91814e",
+        "executed_at_utc": "2026-11-01T15:34:41.268504+00:00",
+        "evaluation_regime": "VOLATILITY_EXPANSION",
+        "evaluation_protocol": "WALK_FORWARD_CAUSAL_SPLIT_v1",
+        "protocol_hash": "4e8021437f984349",
+        "dataset_hash": null,
+        "date_window": null,
+        "strategy_versions": {
+          "ATR_VOLATILITY_BREAKOUT_12H": "1.0.0",
+          "TSMOM_DONCHIAN_24H_168H": "1.0.0"
+        },
+        "execution_source": "CACHED_WALK_FORWARD_UNAVAILABLE",
+        "cache_validation": {
+          "validation_status": "UNAVAILABLE",
+          "hashes_matched": false,
+          "source_label": "No verified walk-forward manifest matches the registered candidate strategies and frozen protocol. A fresh three-arm evaluation is also unavailable because aligned point-in-time AI forecasts and a matched baseline series are not supplied. No arm metrics were computed or reused.",
+          "newly_executed": false
+        },
+        "is_read_only": true,
+        "attempts_created": 0,
+        "candidate_results": [],
+        "baseline_comparator": null,
+        "sequential_evaluation_log": [
+          {
+            "step": 1,
+            "candidate_rank": 1,
+            "strategy_id": "ATR_VOLATILITY_BREAKOUT_12H",
+            "status": "BLOCKED_UNVERIFIED_EVIDENCE",
+            "reason": "No verified walk-forward manifest matches the registered candidate strategies and frozen protocol. A fresh three-arm evaluation is also unavailable because aligned point-in-time AI forecasts and a matched baseline series are not supplied. No arm metrics were computed or reused."
+          },
+          {
+            "step": 2,
+            "candidate_rank": 2,
+            "strategy_id": "TSMOM_DONCHIAN_24H_168H",
+            "status": "BLOCKED_UNVERIFIED_EVIDENCE",
+            "reason": "No verified walk-forward manifest matches the registered candidate strategies and frozen protocol. A fresh three-arm evaluation is also unavailable because aligned point-in-time AI forecasts and a matched baseline series are not supplied. No arm metrics were computed or reused."
+          }
+        ],
+        "tournament_winner": null,
+        "final_verdict": "ABSTAIN",
+        "verdict_explanation": "No verified walk-forward manifest matches the registered candidate strategies and frozen protocol. A fresh three-arm evaluation is also unavailable because aligned point-in-time AI forecasts and a matched baseline series are not supplied. No arm metrics were computed or reused."
+      },
+      "smart_entry_decision": {
+        "decision_id": "dec_05d63ea2c9f8",
+        "decision_timestamp_utc": "2026-11-01T15:34:41.268534+00:00",
+        "status": "NO_SMART_ENTRY",
+        "action": "ABSTAIN",
+        "market_regime": "VOLATILITY_EXPANSION",
+        "reason": "No verified walk-forward manifest matches the registered candidate strategies and frozen protocol. A fresh three-arm evaluation is also unavailable because aligned point-in-time AI forecasts and a matched baseline series are not supplied. No arm metrics were computed or reused.",
+        "candidate_setup": null,
+        "data_provenance": {
+          "instrument": "BTC-USD",
+          "timeframe": "1h",
+          "source": "LOCAL_HISTORICAL_SNAPSHOT",
+          "submitted_candle_count": 168,
+          "analyzed_closed_candle_count": 168,
+          "request_payload_sha256": "86ea8d72db45690d4fdbc4bbae7bd5db715a8f56027642376d38557f7de1907e",
+          "analyzed_window_sha256": "3fa27c80c80c2207846e817111231fda6dc9aad99f950e8ba597694702b491a0",
+          "latest_closed_timestamp": "2026-10-30T13:00:00+00:00",
+          "authorization": "OFFLINE_RESEARCH_ONLY"
+        }
+      },
+      "decision": {
+        "decision_id": "dec_05d63ea2c9f8",
+        "decision_timestamp_utc": "2026-11-01T15:34:41.268534+00:00",
+        "status": "NO_SMART_ENTRY",
+        "action": "ABSTAIN",
+        "market_regime": "VOLATILITY_EXPANSION",
+        "reason": "No verified walk-forward manifest matches the registered candidate strategies and frozen protocol. A fresh three-arm evaluation is also unavailable because aligned point-in-time AI forecasts and a matched baseline series are not supplied. No arm metrics were computed or reused.",
+        "candidate_setup": null,
+        "data_provenance": {
+          "instrument": "BTC-USD",
+          "timeframe": "1h",
+          "source": "LOCAL_HISTORICAL_SNAPSHOT",
+          "submitted_candle_count": 168,
+          "analyzed_closed_candle_count": 168,
+          "request_payload_sha256": "86ea8d72db45690d4fdbc4bbae7bd5db715a8f56027642376d38557f7de1907e",
+          "analyzed_window_sha256": "3fa27c80c80c2207846e817111231fda6dc9aad99f950e8ba597694702b491a0",
+          "latest_closed_timestamp": "2026-10-30T13:00:00+00:00",
+          "authorization": "OFFLINE_RESEARCH_ONLY"
+        }
+      },
+      "integrated_workflow": true,
+      "runtime_timings_ms": {
+        "analysis_screening": 68.608,
+        "tournament_or_evidence_check": 0.043,
+        "final_decision": 0.014,
+        "total": 68.673,
+        "tournament_arm_1": null,
+        "tournament_arm_2": null,
+        "tournament_arm_3": null
+      },
+      "tournament_arm_timing_status": "NOT_RUN_UNVERIFIED_EVIDENCE",
+      "data_provenance": {
+        "instrument": "BTC-USD",
+        "timeframe": "1h",
+        "source": "LOCAL_HISTORICAL_SNAPSHOT",
+        "submitted_candle_count": 168,
+        "analyzed_closed_candle_count": 168,
+        "request_payload_sha256": "86ea8d72db45690d4fdbc4bbae7bd5db715a8f56027642376d38557f7de1907e",
+        "analyzed_window_sha256": "3fa27c80c80c2207846e817111231fda6dc9aad99f950e8ba597694702b491a0",
+        "latest_closed_timestamp": "2026-10-30T13:00:00+00:00",
+        "authorization": "OFFLINE_RESEARCH_ONLY"
+      },
+      "request_id": "e9463b8b-53e6-45a8-b5c3-0f6004ea2324"
+    }
+  },
+  "repeat_analysis_request": {
+    "request_id": "7456.145",
+    "url": "http://127.0.0.1:8000/api/tournament/analyse",
+    "method": "POST",
+    "post_data": "{\"instrument\":\"BTC-USD\",\"timeframe\":\"1h\",\"data_source\":\"LOCAL_HISTORICAL_SNAPSHOT\",\"request_id\":\"a08b7add-75e4-4e54-bbe0-568d4e5ab415\",\"live_price\":76985.4,\"enforce_freshness\":false,\"max_age_hours\":2,\"candles\":[{\"timestamp_utc\":\"2026-10-23T14:00:00.000Z\",\"open\":81890.82,\"high\":81962,\"low\":80943.49,\"close\":81678.55,\"volume\":452.69018609,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-23T15:00:00.000Z\",\"open\":81681.79,\"high\":81706.92,\"low\":81277.26,\"close\":81582.35,\"volume\":363.20473062,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-23T16:00:00.000Z\",\"open\":81582.35,\"high\":81750,\"low\":81376.58,\"close\":81610.51,\"volume\":181.69425981,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-23T17:00:00.000Z\",\"open\":81610.52,\"high\":81748.87,\"low\":81463.68,\"close\":81556.64,\"volume\":198.40214747,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-23T18:00:00.000Z\",\"open\":81541.16,\"high\":81560.98,\"low\":81306.44,\"close\":81337.6,\"volume\":233.62459714,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-23T19:00:00.000Z\",\"open\":81337.61,\"high\":81364.49,\"low\":81129.99,\"close\":81184.34,\"volume\":388.25026785,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-23T20:00:00.000Z\",\"open\":81184.35,\"high\":81400,\"low\":81151.11,\"close\":81311.1,\"volume\":228.67784876,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-23T21:00:00.000Z\",\"open\":81311.1,\"high\":81400,\"low\":81224.05,\"close\":81280.39,\"volume\":136.78755538,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-23T22:00:00.000Z\",\"open\":81280.39,\"high\":81343.13,\"low\":80452.42,\"close\":80718.91,\"volume\":350.14120665,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-23T23:00:00.000Z\",\"open\":80758.43,\"high\":81095.27,\"low\":80401.34,\"close\":81078.04,\"volume\":328.67903864,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T00:00:00.000Z\",\"open\":81079.63,\"high\":81106.03,\"low\":80478.56,\"close\":80508.25,\"volume\":352.95133593,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T01:00:00.000Z\",\"open\":80508.25,\"high\":80859.56,\"low\":80502.01,\"close\":80823.4,\"volume\":137.49058808,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T02:00:00.000Z\",\"open\":80823.4,\"high\":80894.58,\"low\":80719.01,\"close\":80888.89,\"volume\":60.74210976,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T03:00:00.000Z\",\"open\":80888.88,\"high\":80988.38,\"low\":80735.9,\"close\":80866.21,\"volume\":94.22720114,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T04:00:00.000Z\",\"open\":80866.21,\"high\":80988.39,\"low\":80720.9,\"close\":80782.04,\"volume\":93.0854743,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T05:00:00.000Z\",\"open\":80782.04,\"high\":80787.39,\"low\":80608.1,\"close\":80654.94,\"volume\":90.78797609,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T06:00:00.000Z\",\"open\":80654.95,\"high\":80725.06,\"low\":80577.77,\"close\":80680.23,\"volume\":53.27066815,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T07:00:00.000Z\",\"open\":80680.23,\"high\":80816.75,\"low\":80581.83,\"close\":80635.79,\"volume\":76.74148235,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T08:00:00.000Z\",\"open\":80635.79,\"high\":80722.17,\"low\":80516.39,\"close\":80603.99,\"volume\":74.62815002,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T09:00:00.000Z\",\"open\":80604,\"high\":80604,\"low\":80346.61,\"close\":80516.01,\"volume\":75.31222095,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T10:00:00.000Z\",\"open\":80516.03,\"high\":80635.79,\"low\":80402.53,\"close\":80557.92,\"volume\":63.64012691,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T11:00:00.000Z\",\"open\":80562.58,\"high\":80599.9,\"low\":80469.07,\"close\":80487.22,\"volume\":47.40168539,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T12:00:00.000Z\",\"open\":80487.23,\"high\":80744.92,\"low\":80414.75,\"close\":80676.58,\"volume\":58.30330463,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T13:00:00.000Z\",\"open\":80667.52,\"high\":80748.5,\"low\":80536.12,\"close\":80592.58,\"volume\":88.99038631,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T14:00:00.000Z\",\"open\":80592.58,\"high\":80660.91,\"low\":79707,\"close\":80100.26,\"volume\":697.77083605,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T15:00:00.000Z\",\"open\":80100.26,\"high\":80133.15,\"low\":79107,\"close\":79691.25,\"volume\":511.3825798,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T16:00:00.000Z\",\"open\":79691.06,\"high\":80189.13,\"low\":79475,\"close\":80110.54,\"volume\":315.90856818,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T17:00:00.000Z\",\"open\":80110.53,\"high\":80195.27,\"low\":80000,\"close\":80166.81,\"volume\":163.7699247,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T18:00:00.000Z\",\"open\":80166.82,\"high\":80539.3,\"low\":80126.57,\"close\":80430.62,\"volume\":133.36488116,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T19:00:00.000Z\",\"open\":80430.62,\"high\":80511.21,\"low\":80376.68,\"close\":80379.96,\"volume\":91.06935058,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T20:00:00.000Z\",\"open\":80379.97,\"high\":80523.08,\"low\":80379.97,\"close\":80409.14,\"volume\":76.66856333,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T21:00:00.000Z\",\"open\":80409.14,\"high\":80416.52,\"low\":80186.71,\"close\":80309.81,\"volume\":81.93567061,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T22:00:00.000Z\",\"open\":80309.81,\"high\":80533.09,\"low\":80309.81,\"close\":80490.11,\"volume\":110.74098897,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-24T23:00:00.000Z\",\"open\":80520.39,\"high\":80819.6,\"low\":80421.11,\"close\":80769.67,\"volume\":155.02074068,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T00:00:00.000Z\",\"open\":80769.67,\"high\":80805.26,\"low\":80614.11,\"close\":80759.42,\"volume\":116.41618777,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T01:00:00.000Z\",\"open\":80759.43,\"high\":80810.87,\"low\":80661.41,\"close\":80791.18,\"volume\":72.86629041,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T02:00:00.000Z\",\"open\":80791.19,\"high\":80900.79,\"low\":80683.74,\"close\":80802.67,\"volume\":102.7560483,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T03:00:00.000Z\",\"open\":80802.68,\"high\":80925,\"low\":80721.03,\"close\":80734.03,\"volume\":90.58425349,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T04:00:00.000Z\",\"open\":80738.64,\"high\":80858.4,\"low\":80712.45,\"close\":80822.13,\"volume\":57.2245448,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T05:00:00.000Z\",\"open\":80822.14,\"high\":80833.35,\"low\":80382.78,\"close\":80500.48,\"volume\":86.2364469,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T06:00:00.000Z\",\"open\":80500.47,\"high\":80577.31,\"low\":80310.01,\"close\":80390.84,\"volume\":51.88660126,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T07:00:00.000Z\",\"open\":80387.44,\"high\":80614.4,\"low\":80387.15,\"close\":80568.44,\"volume\":32.17846752,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T08:00:00.000Z\",\"open\":80568.44,\"high\":80588.19,\"low\":80258,\"close\":80300,\"volume\":36.0030613,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T09:00:00.000Z\",\"open\":80299.99,\"high\":80344.13,\"low\":79973.01,\"close\":80224.13,\"volume\":100.63874764,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T10:00:00.000Z\",\"open\":80224.13,\"high\":80324.39,\"low\":80105.12,\"close\":80175.9,\"volume\":37.65410698,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T11:00:00.000Z\",\"open\":80175.89,\"high\":80548.86,\"low\":80175.89,\"close\":80476.81,\"volume\":141.31361752,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T12:00:00.000Z\",\"open\":80476.81,\"high\":80476.82,\"low\":80219.16,\"close\":80347.9,\"volume\":61.24605915,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T13:00:00.000Z\",\"open\":80347.89,\"high\":80366.45,\"low\":80133.54,\"close\":80266.06,\"volume\":56.74466901,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T14:00:00.000Z\",\"open\":80266.06,\"high\":80549.99,\"low\":80179.66,\"close\":80547.36,\"volume\":96.90264937,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T15:00:00.000Z\",\"open\":80547.37,\"high\":80695.69,\"low\":80418.78,\"close\":80527.74,\"volume\":78.84300246,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T16:00:00.000Z\",\"open\":80527.74,\"high\":80743.93,\"low\":80421.18,\"close\":80692.06,\"volume\":69.43642286,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T17:00:00.000Z\",\"open\":80692.06,\"high\":80859.26,\"low\":80616.24,\"close\":80681,\"volume\":95.98184849,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T18:00:00.000Z\",\"open\":80681.01,\"high\":80712.44,\"low\":80534.49,\"close\":80552.7,\"volume\":66.82465546,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T19:00:00.000Z\",\"open\":80552.7,\"high\":80576.9,\"low\":80429.72,\"close\":80455.57,\"volume\":50.63639931,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T20:00:00.000Z\",\"open\":80455.56,\"high\":80524.97,\"low\":80302.77,\"close\":80385.96,\"volume\":118.79827459,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T21:00:00.000Z\",\"open\":80385.96,\"high\":80421.17,\"low\":80095.45,\"close\":80155.4,\"volume\":85.19142978,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T22:00:00.000Z\",\"open\":80155.41,\"high\":80625.84,\"low\":80136.17,\"close\":80368.46,\"volume\":113.3739639,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-25T23:00:00.000Z\",\"open\":80368.46,\"high\":80375.06,\"low\":79732.29,\"close\":80053.16,\"volume\":260.80454647,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T00:00:00.000Z\",\"open\":80053.16,\"high\":80276.92,\"low\":79793.24,\"close\":80059.5,\"volume\":193.87269814,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T01:00:00.000Z\",\"open\":80059.51,\"high\":80173.33,\"low\":79278.5,\"close\":79637.18,\"volume\":278.34607801,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T02:00:00.000Z\",\"open\":79637.18,\"high\":79861.54,\"low\":79350.86,\"close\":79459.45,\"volume\":226.82060347,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T03:00:00.000Z\",\"open\":79459.45,\"high\":79716,\"low\":79255,\"close\":79478.39,\"volume\":241.21400166,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T04:00:00.000Z\",\"open\":79478.38,\"high\":80037.2,\"low\":79456.7,\"close\":80004.95,\"volume\":120.88682103,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T05:00:00.000Z\",\"open\":80004.95,\"high\":80173.09,\"low\":79940.27,\"close\":80145.23,\"volume\":55.64090839,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T06:00:00.000Z\",\"open\":80145.23,\"high\":80175,\"low\":79832.67,\"close\":80001,\"volume\":34.0373482,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T07:00:00.000Z\",\"open\":80000.94,\"high\":80114.58,\"low\":79831,\"close\":79914.17,\"volume\":50.62167144,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T08:00:00.000Z\",\"open\":79914.18,\"high\":80295,\"low\":79541.14,\"close\":80114.58,\"volume\":179.25754749,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T09:00:00.000Z\",\"open\":80114.59,\"high\":80462.78,\"low\":80062.4,\"close\":80422.23,\"volume\":83.28349417,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T10:00:00.000Z\",\"open\":80422.23,\"high\":80422.23,\"low\":80237.22,\"close\":80239.82,\"volume\":45.17234954,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T11:00:00.000Z\",\"open\":80239.83,\"high\":80410,\"low\":80128.02,\"close\":80284.1,\"volume\":144.00142045,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T12:00:00.000Z\",\"open\":80284.09,\"high\":80435.65,\"low\":80136.92,\"close\":80204.75,\"volume\":256.98893618,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T13:00:00.000Z\",\"open\":80202.75,\"high\":80204.43,\"low\":79300,\"close\":79566.11,\"volume\":1588.71205788,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T14:00:00.000Z\",\"open\":79566.1,\"high\":80290.56,\"low\":79444.77,\"close\":80272.86,\"volume\":714.37407635,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T15:00:00.000Z\",\"open\":80272.87,\"high\":80710.04,\"low\":80217.74,\"close\":80298.98,\"volume\":595.48699428,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T16:00:00.000Z\",\"open\":80298.98,\"high\":80328.51,\"low\":79643.11,\"close\":80097.95,\"volume\":325.59492002,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T17:00:00.000Z\",\"open\":80099.58,\"high\":80436.18,\"low\":79998.17,\"close\":80196.98,\"volume\":349.49665773,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T18:00:00.000Z\",\"open\":80196.18,\"high\":80293.68,\"low\":79834.42,\"close\":79857.18,\"volume\":314.00117969,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T19:00:00.000Z\",\"open\":79858.7,\"high\":79990.77,\"low\":79762.86,\"close\":79874.53,\"volume\":332.37447708,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T20:00:00.000Z\",\"open\":79878.12,\"high\":79900,\"low\":79671.52,\"close\":79719.94,\"volume\":264.08166032,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T21:00:00.000Z\",\"open\":79718.5,\"high\":80079.74,\"low\":79718.49,\"close\":79964.94,\"volume\":131.6690293,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T22:00:00.000Z\",\"open\":79964.95,\"high\":79997.91,\"low\":79783.4,\"close\":79864.87,\"volume\":98.9616727,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-26T23:00:00.000Z\",\"open\":79864.88,\"high\":80048.32,\"low\":79544.76,\"close\":80008.79,\"volume\":121.42192459,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T00:00:00.000Z\",\"open\":80008.79,\"high\":80248.34,\"low\":79978.25,\"close\":80080.77,\"volume\":130.56423239,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T01:00:00.000Z\",\"open\":80080.77,\"high\":80240.01,\"low\":79885,\"close\":79926.77,\"volume\":89.79418407,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T02:00:00.000Z\",\"open\":79926.77,\"high\":79983.42,\"low\":79600.03,\"close\":79674.58,\"volume\":202.02656028,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T03:00:00.000Z\",\"open\":79674.59,\"high\":79798.89,\"low\":79490.24,\"close\":79685.8,\"volume\":161.72776035,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T04:00:00.000Z\",\"open\":79685.8,\"high\":79721.69,\"low\":79482.73,\"close\":79607.24,\"volume\":174.60154297,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T05:00:00.000Z\",\"open\":79607.24,\"high\":79913.98,\"low\":79577,\"close\":79828.72,\"volume\":79.40274183,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T06:00:00.000Z\",\"open\":79828.72,\"high\":79865.3,\"low\":79426.01,\"close\":79515.93,\"volume\":70.65034109,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T07:00:00.000Z\",\"open\":79515.93,\"high\":79891.58,\"low\":79437.42,\"close\":79661.73,\"volume\":200.51412306,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T08:00:00.000Z\",\"open\":79662.78,\"high\":79810.77,\"low\":79571.01,\"close\":79726.53,\"volume\":70.3109731,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T09:00:00.000Z\",\"open\":79726.54,\"high\":79753.01,\"low\":79509.38,\"close\":79634.3,\"volume\":71.44820283,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T10:00:00.000Z\",\"open\":79634.31,\"high\":80008.79,\"low\":79365.93,\"close\":79817.25,\"volume\":156.52333145,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T11:00:00.000Z\",\"open\":79817.25,\"high\":80006.5,\"low\":79703.1,\"close\":79760.4,\"volume\":78.80214225,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T12:00:00.000Z\",\"open\":79760.39,\"high\":80363.72,\"low\":79692.27,\"close\":80228.8,\"volume\":295.35889476,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T13:00:00.000Z\",\"open\":80228.81,\"high\":80266.39,\"low\":79798.33,\"close\":79901.43,\"volume\":235.46886629,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T14:00:00.000Z\",\"open\":79906.93,\"high\":80275,\"low\":79743.82,\"close\":80222.97,\"volume\":326.63317913,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T15:00:00.000Z\",\"open\":80223.9,\"high\":80571.63,\"low\":80097.04,\"close\":80434.19,\"volume\":457.80157368,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T16:00:00.000Z\",\"open\":80434.18,\"high\":80556.61,\"low\":80321.96,\"close\":80540.79,\"volume\":208.85373738,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T17:00:00.000Z\",\"open\":80540.8,\"high\":80723.25,\"low\":80383.43,\"close\":80393.82,\"volume\":162.70004221,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T18:00:00.000Z\",\"open\":80393.82,\"high\":80616.97,\"low\":80335.08,\"close\":80509.27,\"volume\":100.91070683,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T19:00:00.000Z\",\"open\":80509.27,\"high\":80723.94,\"low\":80495,\"close\":80706.77,\"volume\":223.91010534,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T20:00:00.000Z\",\"open\":80706.76,\"high\":80725,\"low\":80476.36,\"close\":80670.98,\"volume\":223.75526257,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T21:00:00.000Z\",\"open\":80670.98,\"high\":81182,\"low\":80530.32,\"close\":80782.53,\"volume\":317.37217009,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T22:00:00.000Z\",\"open\":80782.53,\"high\":80923.91,\"low\":80698.38,\"close\":80792.37,\"volume\":143.75562813,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-27T23:00:00.000Z\",\"open\":80792.37,\"high\":80925.7,\"low\":80673.13,\"close\":80799.51,\"volume\":173.29616388,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T00:00:00.000Z\",\"open\":80799.5,\"high\":80799.5,\"low\":80580.34,\"close\":80633.87,\"volume\":201.34822417,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T01:00:00.000Z\",\"open\":80633.88,\"high\":80873.5,\"low\":80493.55,\"close\":80826.38,\"volume\":159.37951113,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T02:00:00.000Z\",\"open\":80826.39,\"high\":81030.69,\"low\":80737.03,\"close\":80817.5,\"volume\":123.58582072,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T03:00:00.000Z\",\"open\":80817.5,\"high\":81110.26,\"low\":80778.66,\"close\":81038.15,\"volume\":131.81205378,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T04:00:00.000Z\",\"open\":81023.78,\"high\":81032.11,\"low\":80795.18,\"close\":80873.63,\"volume\":60.0711512,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T05:00:00.000Z\",\"open\":80873.62,\"high\":80878.2,\"low\":80777.27,\"close\":80781.1,\"volume\":52.75338477,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T06:00:00.000Z\",\"open\":80781.1,\"high\":80895.17,\"low\":80734.83,\"close\":80754.52,\"volume\":46.18580325,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T07:00:00.000Z\",\"open\":80754.52,\"high\":80975.89,\"low\":80738.65,\"close\":80969.36,\"volume\":168.45933501,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T08:00:00.000Z\",\"open\":80969.36,\"high\":81694.39,\"low\":80962.99,\"close\":81360.75,\"volume\":344.70581677,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T09:00:00.000Z\",\"open\":81362.25,\"high\":81443.73,\"low\":81230.11,\"close\":81435.58,\"volume\":74.06393068,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T10:00:00.000Z\",\"open\":81435.58,\"high\":81487.17,\"low\":81332.71,\"close\":81372.39,\"volume\":74.00848353,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T11:00:00.000Z\",\"open\":81372.38,\"high\":81372.39,\"low\":81189.49,\"close\":81215.3,\"volume\":85.57705578,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T12:00:00.000Z\",\"open\":81215.3,\"high\":81225.03,\"low\":80577.4,\"close\":80608.49,\"volume\":261.06984831,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T13:00:00.000Z\",\"open\":80608.49,\"high\":80795.1,\"low\":80270.68,\"close\":80603.34,\"volume\":413.51060231,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T14:00:00.000Z\",\"open\":80603.34,\"high\":80752.99,\"low\":80327.5,\"close\":80479.33,\"volume\":286.24891944,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T15:00:00.000Z\",\"open\":80479.32,\"high\":80640.96,\"low\":80370.3,\"close\":80434.8,\"volume\":176.86274164,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T16:00:00.000Z\",\"open\":80434.8,\"high\":80642,\"low\":80277.19,\"close\":80494.11,\"volume\":278.880824,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T17:00:00.000Z\",\"open\":80494.11,\"high\":80881.56,\"low\":80355,\"close\":80763.35,\"volume\":289.75097623,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T18:00:00.000Z\",\"open\":80748.03,\"high\":81234,\"low\":80600,\"close\":80931.79,\"volume\":575.01121148,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T19:00:00.000Z\",\"open\":80931.79,\"high\":81539.42,\"low\":80897.5,\"close\":81502.09,\"volume\":447.6284889,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T20:00:00.000Z\",\"open\":81502.09,\"high\":81715.01,\"low\":80898.98,\"close\":81261.34,\"volume\":370.74979721,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T21:00:00.000Z\",\"open\":81259.82,\"high\":81380.16,\"low\":81056.52,\"close\":81266.56,\"volume\":267.92544105,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T22:00:00.000Z\",\"open\":81266.56,\"high\":81339.68,\"low\":81041.57,\"close\":81183.48,\"volume\":129.34094071,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-28T23:00:00.000Z\",\"open\":81183.47,\"high\":81270.96,\"low\":81065.66,\"close\":81249.31,\"volume\":128.05612741,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T00:00:00.000Z\",\"open\":81249.32,\"high\":81289.72,\"low\":81000,\"close\":81000,\"volume\":142.62685884,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T01:00:00.000Z\",\"open\":81000,\"high\":81005.42,\"low\":79874,\"close\":79904.99,\"volume\":424.17175074,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T02:00:00.000Z\",\"open\":79903.99,\"high\":80075.01,\"low\":79586.17,\"close\":79852.9,\"volume\":235.54764315,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T03:00:00.000Z\",\"open\":79856.27,\"high\":79916.64,\"low\":79649.78,\"close\":79739.07,\"volume\":95.08825648,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T04:00:00.000Z\",\"open\":79736.42,\"high\":80211.82,\"low\":79662,\"close\":80138.67,\"volume\":179.37114817,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T05:00:00.000Z\",\"open\":80138.67,\"high\":80411.68,\"low\":80098.03,\"close\":80115.75,\"volume\":87.67695081,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T06:00:00.000Z\",\"open\":80115.75,\"high\":80170.37,\"low\":79780,\"close\":79849.42,\"volume\":58.15306705,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T07:00:00.000Z\",\"open\":79849.42,\"high\":79879.61,\"low\":79710.14,\"close\":79737.31,\"volume\":96.08282455,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T08:00:00.000Z\",\"open\":79737.3,\"high\":80024.77,\"low\":79728.18,\"close\":79954.35,\"volume\":151.28668204,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T09:00:00.000Z\",\"open\":79960.03,\"high\":80232.84,\"low\":79936.17,\"close\":80092.01,\"volume\":118.72983982,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T10:00:00.000Z\",\"open\":80092,\"high\":80272.19,\"low\":80000,\"close\":80185.6,\"volume\":63.0161527,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T11:00:00.000Z\",\"open\":80185.6,\"high\":80206.76,\"low\":80005,\"close\":80057.41,\"volume\":97.0592979,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T12:00:00.000Z\",\"open\":80057.41,\"high\":80158.79,\"low\":79895.58,\"close\":79947.6,\"volume\":143.25993512,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T13:00:00.000Z\",\"open\":79947.6,\"high\":80315.5,\"low\":79772.04,\"close\":80188.5,\"volume\":446.69138924,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T14:00:00.000Z\",\"open\":80188.5,\"high\":81423.9,\"low\":80145.4,\"close\":81090.06,\"volume\":651.37752667,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T15:00:00.000Z\",\"open\":81090.06,\"high\":81824.09,\"low\":81088.71,\"close\":81698.54,\"volume\":630.62334677,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T16:00:00.000Z\",\"open\":81698.55,\"high\":81890,\"low\":81092.26,\"close\":81173.03,\"volume\":466.32450108,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T17:00:00.000Z\",\"open\":81173.03,\"high\":81173.34,\"low\":80561.69,\"close\":80798.49,\"volume\":375.96184317,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T18:00:00.000Z\",\"open\":80798.49,\"high\":80854.28,\"low\":80491.77,\"close\":80762.26,\"volume\":212.44631928,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T19:00:00.000Z\",\"open\":80762.25,\"high\":80851,\"low\":80661.31,\"close\":80743.29,\"volume\":500.15452364,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T20:00:00.000Z\",\"open\":80743.29,\"high\":80757.74,\"low\":78177.37,\"close\":78744.03,\"volume\":1455.5863126,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T21:00:00.000Z\",\"open\":78738.4,\"high\":79700,\"low\":78463.06,\"close\":78890.57,\"volume\":1080.59567845,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T22:00:00.000Z\",\"open\":78887.52,\"high\":79137.98,\"low\":78448.49,\"close\":78862.27,\"volume\":1211.07681905,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-29T23:00:00.000Z\",\"open\":78860.64,\"high\":78880.81,\"low\":77699,\"close\":77780.33,\"volume\":1010.70639421,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-30T00:00:00.000Z\",\"open\":77782.75,\"high\":78083.81,\"low\":76600,\"close\":77058.45,\"volume\":1551.12409682,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-30T01:00:00.000Z\",\"open\":77058.44,\"high\":77204.98,\"low\":76459.28,\"close\":76634.81,\"volume\":1348.13899777,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-30T02:00:00.000Z\",\"open\":76643.44,\"high\":77366.97,\"low\":76301.02,\"close\":77218.43,\"volume\":813.87381698,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-30T03:00:00.000Z\",\"open\":77218.43,\"high\":78048.24,\"low\":77101,\"close\":78016.94,\"volume\":558.89867894,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-30T04:00:00.000Z\",\"open\":78016.95,\"high\":78247.81,\"low\":77709.75,\"close\":78069.07,\"volume\":362.88975038,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-30T05:00:00.000Z\",\"open\":78069.08,\"high\":78588.99,\"low\":78039.38,\"close\":78381.81,\"volume\":387.12800129,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-30T06:00:00.000Z\",\"open\":78381.81,\"high\":78634.8,\"low\":78201.48,\"close\":78477.74,\"volume\":399.24195329,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-30T07:00:00.000Z\",\"open\":78477.74,\"high\":78490.11,\"low\":77859.11,\"close\":78017.76,\"volume\":324.54436907,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-30T08:00:00.000Z\",\"open\":78017.76,\"high\":78091.63,\"low\":77755,\"close\":77873.26,\"volume\":326.31064754,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-30T09:00:00.000Z\",\"open\":77873.27,\"high\":77899.01,\"low\":77407.01,\"close\":77552.34,\"volume\":303.9437663,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-30T10:00:00.000Z\",\"open\":77552.34,\"high\":77699.7,\"low\":77185.89,\"close\":77699.49,\"volume\":330.91060437,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-30T11:00:00.000Z\",\"open\":77695.92,\"high\":77728.44,\"low\":77087.53,\"close\":77241.91,\"volume\":306.44847394,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-30T12:00:00.000Z\",\"open\":77241.91,\"high\":77467.16,\"low\":77144.12,\"close\":77318.98,\"volume\":377.61804757,\"is_closed\":true},{\"timestamp_utc\":\"2026-10-30T13:00:00.000Z\",\"open\":77317.91,\"high\":77317.91,\"low\":76409,\"close\":76985.4,\"volume\":1088.64656097,\"is_closed\":true}],\"auto_tournament\":true}",
+    "headers": {
+      "sec-ch-ua-platform": "\"Windows\"",
+      "Referer": "http://127.0.0.1:8000/",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"Google Chrome\";v=\"156\"",
+      "Content-Type": "application/json",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "started_at": 1793547283.750568,
+    "response": null,
+    "status": 200,
+    "response_headers": {
+      "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' ws: wss: https:; img-src 'self' data: https:; frame-ancestors 'none';",
+      "cache-control": "no-store, no-cache, must-revalidate",
+      "pragma": "no-cache",
+      "access-control-allow-credentials": "true",
+      "referrer-policy": "strict-origin-when-cross-origin",
+      "x-content-type-options": "nosniff",
+      "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=()",
+      "expires": "0",
+      "access-control-allow-origin": "http://127.0.0.1:8000",
+      "content-length": "20217",
+      "date": "Sun, 01 Nov 2026 15:34:42 GMT",
+      "content-type": "application/json",
+      "vary": "Origin",
+      "server": "uvicorn",
+      "x-frame-options": "DENY"
+    },
+    "finished_at": 1793547283.8947241,
+    "duration_ms": 144.16,
+    "body_parsed": {
+      "analysis_id": "ana_f853bc5924d7",
+      "timestamp_utc": "2026-11-01T15:34:43.753109+00:00",
+      "is_read_only": true,
+      "attempts_created": 0,
+      "candle_watermark": {
+        "last_closed_timestamp": "2026-10-30T13:00:00+00:00",
+        "last_closed_close": 76985.4,
+        "candle_watermark_hash": "0caf188f890c45e8",
+        "candle_window_sha256": "3fa27c80c80c2207846e817111231fda6dc9aad99f950e8ba597694702b491a0",
+        "total_closed_candles": 168
+      },
+      "candle_watermark_hash": "0caf188f890c45e8",
+      "freshness_status": "MARKET_DATA_STALE",
+      "data_freshness": {
+        "is_fresh": false,
+        "freshness_status": "MARKET_DATA_STALE",
+        "observed_age_seconds": 182083.8,
+        "freshness_threshold_seconds": 7200.0,
+        "latest_candle_time_utc": "2026-10-30T13:00:00+00:00",
+        "has_candle_gaps": false,
+        "candle_gap_count": 0,
+        "dataset_fingerprint": "3fa27c80c80c2207846e817111231fda6dc9aad99f950e8ba597694702b491a0"
+      },
+      "data_integrity": {
+        "is_valid": true,
+        "reason": "VALID"
+      },
+      "market_regime": {
+        "regime": "VOLATILITY_EXPANSION",
+        "is_valid": true,
+        "rationale": "High directional index ADX=40.7 with moving average divergence",
+        "close": 76985.4,
+        "ema20": 78155.69,
+        "ema50": 79116.58,
+        "ema200": 76985.4,
+        "adx": 40.73,
+        "atr": 650.83,
+        "bbw": 0.0551,
+        "bb_upper": 80267.65,
+        "bb_mid": 78116.46,
+        "bb_lower": 75965.27
+      },
+      "shortlisted_candidates": [
+        {
+          "rank": 1,
+          "candidate_id": "ATR_VOLATILITY_BREAKOUT_12H",
+          "strategy_id": "ATR_VOLATILITY_BREAKOUT_12H",
+          "strategy_name": "ATR Volatility Expansion Breakout (12h)",
+          "version": "1.0.0",
+          "family": "Volatility Breakout",
+          "intended_regime": [
+            "VOLATILITY_EXPANSION",
+            "TRENDING_BULLISH"
+          ],
+          "direction": "LONG",
+          "holding_horizon_hours": 12.0,
+          "proposed_geometry": {
+            "reference_entry_price": 76985.4,
+            "proposed_tp_price": 78287.06,
+            "proposed_sl_price": 76334.57,
+            "reward_usd": 1301.66,
+            "risk_usd": 650.83,
+            "reward_risk_ratio": 2.0,
+            "anomaly_policy": "Hourly down bar with volume > 3.5x 50-bar baseline"
+          },
+          "screen_7_of_10": {
+            "passed": true,
+            "status": "SCREEN_PASSED",
+            "evidence_source": "HISTORICAL_WALKFORWARD_SCREENING",
+            "strategy_id": "ATR_VOLATILITY_BREAKOUT_12H",
+            "strategy_version": "1.0.0",
+            "tp_hits": 8,
+            "total_attempts": 10,
+            "numerator_tp_hits": 8,
+            "denominator_eligible_attempts": 10,
+            "tp_hit_rate": 0.8,
+            "wilson_ci_95": [
+              0.4902,
+              0.9433
+            ],
+            "evaluation_dates": [
+              "2026-09-09",
+              "2026-10-21"
+            ],
+            "breakdown": {
+              "tp_hits": 8,
+              "sl_hits": 2,
+              "anomaly_exits": 0,
+              "timeouts": 0
+            },
+            "separately_reported": {
+              "pending_attempts": 0,
+              "user_exited_early": 0,
+              "unresolved_intrabar": 0,
+              "partial_exits": 0
+            },
+            "uncertainty_caveat": "Passing 7/10 preliminary screen (8/10 = 80.0%) is an initial gating hurdle, NOT proof of a future 70% success probability. Under binomial assumptions, Wilson 95% CI is [49.0%, 94.3%]. Financial time-series serial dependence expands true uncertainty further.",
+            "explanation": "Passed preliminary screen (8/10 = 80.0% TP hits >= 7/10 required; source: HISTORICAL_WALKFORWARD_SCREENING). Wilson 95% CI is [49.0%, 94.3%]."
+          },
+          "latest_10_eligible_outcomes": {
+            "tp_hits": 8,
+            "sl_hits": 2,
+            "anomaly_exits": 0,
+            "timeouts": 0
+          },
+          "success_count": 8,
+          "evaluation_period": [
+            "2026-09-09",
+            "2026-10-21"
+          ],
+          "confidence_interval": [
+            0.4902,
+            0.9433
+          ],
+          "sample_provenance": "HISTORICAL_WALKFORWARD_SCREENING",
+          "qualification_state": "SCREEN_PASSED",
+          "historical_evidence": {
+            "historical_tp_hit_rate": 0.612,
+            "sample_size": 215,
+            "status": "QUALIFICATION_CANDIDATE"
+          }
+        },
+        {
+          "rank": 2,
+          "candidate_id": "TSMOM_DONCHIAN_24H_168H",
+          "strategy_id": "TSMOM_DONCHIAN_24H_168H",
+          "strategy_name": "Donchian Trend Breakout (168h Trend / 24h Channel)",
+          "version": "1.0.0",
+          "family": "Trend-Following",
+          "intended_regime": [
+            "TRENDING_BULLISH",
+            "VOLATILITY_EXPANSION"
+          ],
+          "direction": "LONG",
+          "holding_horizon_hours": 24.0,
+          "proposed_geometry": {
+            "reference_entry_price": 76985.4,
+            "proposed_tp_price": 78449.77,
+            "proposed_sl_price": 76009.15,
+            "reward_usd": 1464.37,
+            "risk_usd": 976.25,
+            "reward_risk_ratio": 1.5,
+            "anomaly_policy": "3 consecutive hourly closes below 50h EMA, or adverse volume spike > 3.0x"
+          },
+          "screen_7_of_10": {
+            "passed": true,
+            "status": "SCREEN_PASSED",
+            "evidence_source": "HISTORICAL_WALKFORWARD_SCREENING",
+            "strategy_id": "TSMOM_DONCHIAN_24H_168H",
+            "strategy_version": "1.0.0",
+            "tp_hits": 7,
+            "total_attempts": 10,
+            "numerator_tp_hits": 7,
+            "denominator_eligible_attempts": 10,
+            "tp_hit_rate": 0.7,
+            "wilson_ci_95": [
+              0.3968,
+              0.8922
+            ],
+            "evaluation_dates": [
+              "2026-09-10",
+              "2026-10-22"
+            ],
+            "breakdown": {
+              "tp_hits": 7,
+              "sl_hits": 2,
+              "anomaly_exits": 1,
+              "timeouts": 0
+            },
+            "separately_reported": {
+              "pending_attempts": 0,
+              "user_exited_early": 0,
+              "unresolved_intrabar": 0,
+              "partial_exits": 0
+            },
+            "uncertainty_caveat": "Passing 7/10 preliminary screen (7/10 = 70.0%) is an initial gating hurdle, NOT proof of a future 70% success probability. Under binomial assumptions, Wilson 95% CI is [39.7%, 89.2%]. Financial time-series serial dependence expands true uncertainty further.",
+            "explanation": "Passed preliminary screen (7/10 = 70.0% TP hits >= 7/10 required; source: HISTORICAL_WALKFORWARD_SCREENING). Wilson 95% CI is [39.7%, 89.2%]."
+          },
+          "latest_10_eligible_outcomes": {
+            "tp_hits": 7,
+            "sl_hits": 2,
+            "anomaly_exits": 1,
+            "timeouts": 0
+          },
+          "success_count": 7,
+          "evaluation_period": [
+            "2026-09-10",
+            "2026-10-22"
+          ],
+          "confidence_interval": [
+            0.3968,
+            0.8922
+          ],
+          "sample_provenance": "HISTORICAL_WALKFORWARD_SCREENING",
+          "qualification_state": "SCREEN_PASSED",
+          "historical_evidence": {
+            "historical_tp_hit_rate": 0.584,
+            "sample_size": 342,
+            "status": "QUALIFICATION_CANDIDATE"
+          }
+        }
+      ],
+      "candidate_rejections": [
+        {
+          "strategy_id": "RANGE_BOLLINGER_REVERSION_20H",
+          "strategy_name": "Bollinger & RSI Mean Reversion (20h)",
+          "version": "1.0.0",
+          "rejection_reason": "Regime mismatch: requires ['RANGE_BOUND'] but observed regime is VOLATILITY_EXPANSION"
+        },
+        {
+          "strategy_id": "CHRONOS2_FOUNDATION",
+          "strategy_name": "Amazon Chronos-2 Foundation Model",
+          "version": "2.0.0",
+          "rejection_reason": "Strategy quarantined (QUARANTINED)"
+        },
+        {
+          "strategy_id": "HTF_RANGE_EXPANSION_BREAKOUT",
+          "strategy_name": "High-Timeframe Range Expansion (4h / 20-bar)",
+          "version": "1.0.0",
+          "rejection_reason": "Failed preliminary 7/10 screen: 3/10 TP hits < 7 required"
+        }
+      ],
+      "top_qualifying_candidate": {
+        "rank": 1,
+        "candidate_id": "ATR_VOLATILITY_BREAKOUT_12H",
+        "strategy_id": "ATR_VOLATILITY_BREAKOUT_12H",
+        "strategy_name": "ATR Volatility Expansion Breakout (12h)",
+        "version": "1.0.0",
+        "family": "Volatility Breakout",
+        "intended_regime": [
+          "VOLATILITY_EXPANSION",
+          "TRENDING_BULLISH"
+        ],
+        "direction": "LONG",
+        "holding_horizon_hours": 12.0,
+        "proposed_geometry": {
+          "reference_entry_price": 76985.4,
+          "proposed_tp_price": 78287.06,
+          "proposed_sl_price": 76334.57,
+          "reward_usd": 1301.66,
+          "risk_usd": 650.83,
+          "reward_risk_ratio": 2.0,
+          "anomaly_policy": "Hourly down bar with volume > 3.5x 50-bar baseline"
+        },
+        "screen_7_of_10": {
+          "passed": true,
+          "status": "SCREEN_PASSED",
+          "evidence_source": "HISTORICAL_WALKFORWARD_SCREENING",
+          "strategy_id": "ATR_VOLATILITY_BREAKOUT_12H",
+          "strategy_version": "1.0.0",
+          "tp_hits": 8,
+          "total_attempts": 10,
+          "numerator_tp_hits": 8,
+          "denominator_eligible_attempts": 10,
+          "tp_hit_rate": 0.8,
+          "wilson_ci_95": [
+            0.4902,
+            0.9433
+          ],
+          "evaluation_dates": [
+            "2026-09-09",
+            "2026-10-21"
+          ],
+          "breakdown": {
+            "tp_hits": 8,
+            "sl_hits": 2,
+            "anomaly_exits": 0,
+            "timeouts": 0
+          },
+          "separately_reported": {
+            "pending_attempts": 0,
+            "user_exited_early": 0,
+            "unresolved_intrabar": 0,
+            "partial_exits": 0
+          },
+          "uncertainty_caveat": "Passing 7/10 preliminary screen (8/10 = 80.0%) is an initial gating hurdle, NOT proof of a future 70% success probability. Under binomial assumptions, Wilson 95% CI is [49.0%, 94.3%]. Financial time-series serial dependence expands true uncertainty further.",
+          "explanation": "Passed preliminary screen (8/10 = 80.0% TP hits >= 7/10 required; source: HISTORICAL_WALKFORWARD_SCREENING). Wilson 95% CI is [49.0%, 94.3%]."
+        },
+        "latest_10_eligible_outcomes": {
+          "tp_hits": 8,
+          "sl_hits": 2,
+          "anomaly_exits": 0,
+          "timeouts": 0
+        },
+        "success_count": 8,
+        "evaluation_period": [
+          "2026-09-09",
+          "2026-10-21"
+        ],
+        "confidence_interval": [
+          0.4902,
+          0.9433
+        ],
+        "sample_provenance": "HISTORICAL_WALKFORWARD_SCREENING",
+        "qualification_state": "SCREEN_PASSED",
+        "historical_evidence": {
+          "historical_tp_hit_rate": 0.612,
+          "sample_size": 215,
+          "status": "QUALIFICATION_CANDIDATE"
+        }
+      },
+      "action": "RUN_TOURNAMENT_AVAILABLE",
+      "reason": "Regime VOLATILITY_EXPANSION identified. 2 compatible candidate(s) shortlisted.",
+      "market_intelligence": {
+        "status": "SUCCESS",
+        "timestamp_utc": "2026-11-01T15:34:43.812560+00:00",
+        "current_market_assessment": "UNAVAILABLE",
+        "current_price": null,
+        "last_observed_candle_price": 76985.4,
+        "last_observed_candle_time": "2026-10-30T13:00:00+00:00",
+        "historical_volatility_analysis": "AVAILABLE",
+        "historical_risk_envelope": "AVAILABLE_WITH_TIMESTAMP",
+        "data_freshness": {
+          "is_fresh": false,
+          "is_stale": true,
+          "observed_age_hours": 50.58,
+          "max_allowable_age_hours": 2.0,
+          "has_gaps": false,
+          "gap_count": 0,
+          "total_closed_candles": 168,
+          "freshness_warning": "STALE_DATA_WARNING: Closed candles are 50.6h old (exceeds 2.0h operational limit). Market intelligence represents historical/cached context, NOT live market conditions. Current-market assessment is UNAVAILABLE. Trade authorization is locked to ABSTAIN."
+        },
+        "volatility_term_structure": {
+          "rv_1h_pct": 40.47,
+          "rv_4h_pct": 35.69,
+          "rv_24h_pct": 73.48,
+          "rv_7d_pct": 38.05,
+          "rv_30d_pct": 38.05,
+          "vol_ratio_1h_24h": 0.551,
+          "curve_shape": "CONTANGO_COMPRESSION",
+          "measurement_horizon_hours": 720,
+          "annualization_convention": "Hourly log-returns scaled by sqrt(8760)"
+        },
+        "volatility_regime": {
+          "regime": "VOLATILITY_EXPANSION",
+          "is_expansion": true,
+          "bollinger_band_width_pct": 5.51,
+          "wilder_adx_14": 40.73,
+          "trend_strength": "STRONG_TREND",
+          "atr_14_usd": 650.83,
+          "trend_direction": "NEUTRAL",
+          "bb_mid": 78116.46,
+          "bb_upper": 80267.65,
+          "bb_lower": 75965.27,
+          "evaluation_note": "Regime indicates volatility dynamics; does NOT imply directional trade probability."
+        },
+        "conformal_risk_envelope_7d": {
+          "point_forecast_variance": 0.14478,
+          "point_forecast_volatility_pct": 38.05,
+          "conformal_lower_variance": 0.08397,
+          "conformal_upper_variance": 0.20559,
+          "conformal_lower_volatility_pct": 28.98,
+          "conformal_upper_volatility_pct": 45.34,
+          "nominal_target_coverage_pct": 90.0,
+          "nominal_coverage_pct": 90.0,
+          "causal_point_in_time_coverage_pct": 84.89,
+          "multi_regime_pooled_coverage_pct": 90.43,
+          "measured_historical_coverage_pct": 84.89,
+          "coverage_confidence_interval_95pct": [
+            73.14,
+            93.14
+          ],
+          "confidence_interval_method": "Stationary block bootstrap (block_len=168h, B=1000)",
+          "legacy_naive_iid_ci_deprecated": [
+            88.92,
+            91.94
+          ],
+          "extreme_volatility_coverage_pct": 82.14,
+          "calibration_status": "PROVISIONALLY_VALIDATED_FOR_RISK_CONTAINMENT",
+          "forecast_timestamp_utc": "2026-10-30T13:00:00+00:00",
+          "forecast_horizon": "7d (168h)",
+          "uncertainty_engine": "C2 Dependence-Aware Conformal Prediction",
+          "cohort_reconciliation": {
+            "development_cohort_2020_2025": {
+              "cohort_identity": "DEVELOPMENT_CALIBRATION_2020_2025",
+              "calibration_window": "2020-01-01 to 2025-12-31",
+              "observation_count_bars": 42233,
+              "measured_coverage_pct": 92.84,
+              "coverage_confidence_interval_95pct": [
+                88.25,
+                96.46
+              ],
+              "extreme_volatility_subgroup_coverage_pct": 89.47,
+              "cohort_role": "Historical model parameter estimation & baseline calibration"
+            },
+            "chronological_holdout_cohort_2026": {
+              "cohort_identity": "2026_CHRONOLOGICAL_HOLDOUT",
+              "evaluation_window": "2026-01-01 to 2026-10-17",
+              "observation_count_bars": 5671,
+              "causal_point_in_time_coverage_pct": 84.89,
+              "causal_block_bootstrap_95pct_ci": [
+                73.14,
+                93.14
+              ],
+              "multi_regime_pooled_coverage_pct": 90.43,
+              "extreme_volatility_subgroup_coverage_pct": 82.14,
+              "cohort_role": "Chronological historical holdout replay (NOT prospective evidence)",
+              "prospective_evidence_distinction": "Prospective ledger remains strictly FROZEN at 7/100 blocks"
+            }
+          },
+          "anti_conflation_notice": "Risk containment and directional prediction are different statistical problems. Causal holdout coverage is 84.89% (undercovering 90% target due to expansion lag). Zero directional trade success probability is implied."
+        },
+        "excursion_estimates_24h": {
+          "horizon": "24h",
+          "favourable_excursion_upper": {
+            "p10_price": 77866.28,
+            "p50_price": 79124.69,
+            "p90_price": 81389.81,
+            "p50_pct": 2.78,
+            "p90_pct": 5.72
+          },
+          "adverse_excursion_lower": {
+            "p10_price": 75978.68,
+            "p50_price": 74216.91,
+            "p90_price": 71448.42,
+            "p50_pct": 3.6,
+            "p90_pct": 7.19
+          },
+          "expected_favourable_excursion_upper_p50": 79124.69,
+          "expected_adverse_excursion_lower_p50": 74216.91,
+          "mondrian_scaling_factor": 0.85,
+          "anti_conflation_notice": "Excursion bounds quantify empirical dispersion quantiles, not a forecast of future trade profit."
+        },
+        "calibration_health_state": "WATCH_STALE",
+        "data_quality_warnings": [
+          "STALE_DATA_WARNING: Closed candles are 50.6h old (exceeds 2.0h operational limit). Market intelligence represents historical/cached context, NOT live market conditions. Current-market assessment is UNAVAILABLE. Trade authorization is locked to ABSTAIN."
+        ]
+      },
+      "trade_authorization": {
+        "decision_timestamp_utc": "2026-11-01T15:34:43.880392+00:00",
+        "final_decision": "ABSTAIN",
+        "actionable_recommendation": "NO_TRADE",
+        "live_trading": "DISABLED \u2014 ANALYSIS ONLY",
+        "decision_summary": "Trading blocked due to stale market data (50.6h old > 2.0h limit). Market intelligence remains available as historical context.",
+        "user_bias_rejected": false,
+        "execution_friction_assumed_bps": 87.0,
+        "cost_venue": "COINBASE_ADVANCED_87BPS",
+        "research_authorization_status": "OFFLINE_RESEARCH_ONLY",
+        "directional_eligibility_lock": "CURRENTLY_UNAUTHORIZED_PENDING_NEW_VALIDATED_EVIDENCE",
+        "five_question_evaluation": {
+          "question_1_market_regime": {
+            "question": "Is BTC trending, ranging, compressing, or expanding?",
+            "state": "FAIL",
+            "status": "BLOCKED_STALE",
+            "passed": false,
+            "explanation": "Market data is stale (50.6h old > 2.0h limit). Live regime cannot be validated."
+          },
+          "question_2_directional_evidence": {
+            "question": "Is there reliable evidence favouring LONG or SHORT?",
+            "state": "FAIL",
+            "status": "BLOCKED_STALE",
+            "passed": false,
+            "explanation": "Directional evidence cannot be evaluated on stale market data.",
+            "research_authorization_state": "CURRENTLY_UNAUTHORIZED_PENDING_NEW_VALIDATED_EVIDENCE"
+          },
+          "question_3_entry_location": {
+            "question": "Is the proposed entry price favourable relative to current market structure?",
+            "state": "FAIL",
+            "status": "BLOCKED_STALE",
+            "passed": false,
+            "structural_location_quality": "UNAVAILABLE_STALE",
+            "structural_location_score": 0.0,
+            "support_price": 75965.27,
+            "resistance_price": 80267.65,
+            "atr_14_distance_usd": 650.83,
+            "anti_conflation_notice": "Never equate location quality with probability of profit. A trade near support is not automatically a good LONG.",
+            "explanation": "Entry location cannot be confirmed on stale price history."
+          },
+          "question_4_execution_economics": {
+            "question": "Is the potential return sufficient relative to adverse excursion and total costs?",
+            "state": "FAIL",
+            "status": "BLOCKED_STALE",
+            "passed": false,
+            "gross_expected_return_bps": 0.0,
+            "net_expected_value_bps": 0.0,
+            "friction_breakdown": {
+              "venue": "COINBASE_ADVANCED_87BPS",
+              "commission_round_trip_bps": 83.0,
+              "spread_bps": 4.0,
+              "spread_status": "ESTIMATED_4BPS_UNAVAILABLE_WITHOUT_L2_DEPTH",
+              "slippage_bps": 0.0,
+              "slippage_status": "ESTIMATED_0BPS_MAKER_ASSUMED",
+              "total_round_trip_friction_bps": 87.0,
+              "disclosure": "Figures are illustrative historical evaluation outputs; not predictive guarantees of actual future returns."
+            },
+            "explanation": "Execution economics cannot be approved on stale candles."
+          },
+          "question_5_confidence_calibration": {
+            "question": "How reliable is the underlying evidence in this particular market condition?",
+            "state": "FAIL",
+            "status": "BLOCKED_STALE",
+            "passed": false,
+            "diagnostic_sample_floor_n": 30,
+            "sample_size_classification": "DIAGNOSTIC_MINIMUM_ONLY \u2014 NOT_A_VALIDATION_THRESHOLD",
+            "sample_size_governance_notice": "N >= 30 is a descriptive engineering diagnostic floor, not proof of statistical evidence. Effective sample size estimate N_eff is an AR(1)-style approximation, not a substitute for dependence-aware block validation. Confirmatory research claims require pre-registered protocol validation with N >= 100 clean prospective blocks.",
+            "effective_sample_size_estimate_n_eff": 70.6,
+            "calibration_status": "PROVISIONALLY_VALIDATED_FOR_RISK_CONTAINMENT",
+            "explanation": "Calibration state requires fresh candles for verification."
+          }
+        }
+      },
+      "tournament": {
+        "tournament_id": "trn_3f221542e4e2",
+        "executed_at_utc": "2026-11-01T15:34:43.880653+00:00",
+        "evaluation_regime": "VOLATILITY_EXPANSION",
+        "evaluation_protocol": "WALK_FORWARD_CAUSAL_SPLIT_v1",
+        "protocol_hash": "4e8021437f984349",
+        "dataset_hash": null,
+        "date_window": null,
+        "strategy_versions": {
+          "ATR_VOLATILITY_BREAKOUT_12H": "1.0.0",
+          "TSMOM_DONCHIAN_24H_168H": "1.0.0"
+        },
+        "execution_source": "CACHED_WALK_FORWARD_UNAVAILABLE",
+        "cache_validation": {
+          "validation_status": "UNAVAILABLE",
+          "hashes_matched": false,
+          "source_label": "No verified walk-forward manifest matches the registered candidate strategies and frozen protocol. A fresh three-arm evaluation is also unavailable because aligned point-in-time AI forecasts and a matched baseline series are not supplied. No arm metrics were computed or reused.",
+          "newly_executed": false
+        },
+        "is_read_only": true,
+        "attempts_created": 0,
+        "candidate_results": [],
+        "baseline_comparator": null,
+        "sequential_evaluation_log": [
+          {
+            "step": 1,
+            "candidate_rank": 1,
+            "strategy_id": "ATR_VOLATILITY_BREAKOUT_12H",
+            "status": "BLOCKED_UNVERIFIED_EVIDENCE",
+            "reason": "No verified walk-forward manifest matches the registered candidate strategies and frozen protocol. A fresh three-arm evaluation is also unavailable because aligned point-in-time AI forecasts and a matched baseline series are not supplied. No arm metrics were computed or reused."
+          },
+          {
+            "step": 2,
+            "candidate_rank": 2,
+            "strategy_id": "TSMOM_DONCHIAN_24H_168H",
+            "status": "BLOCKED_UNVERIFIED_EVIDENCE",
+            "reason": "No verified walk-forward manifest matches the registered candidate strategies and frozen protocol. A fresh three-arm evaluation is also unavailable because aligned point-in-time AI forecasts and a matched baseline series are not supplied. No arm metrics were computed or reused."
+          }
+        ],
+        "tournament_winner": null,
+        "final_verdict": "ABSTAIN",
+        "verdict_explanation": "No verified walk-forward manifest matches the registered candidate strategies and frozen protocol. A fresh three-arm evaluation is also unavailable because aligned point-in-time AI forecasts and a matched baseline series are not supplied. No arm metrics were computed or reused."
+      },
+      "smart_entry_decision": {
+        "decision_id": "dec_b2ec688d0844",
+        "decision_timestamp_utc": "2026-11-01T15:34:43.880684+00:00",
+        "status": "NO_SMART_ENTRY",
+        "action": "ABSTAIN",
+        "market_regime": "VOLATILITY_EXPANSION",
+        "reason": "No verified walk-forward manifest matches the registered candidate strategies and frozen protocol. A fresh three-arm evaluation is also unavailable because aligned point-in-time AI forecasts and a matched baseline series are not supplied. No arm metrics were computed or reused.",
+        "candidate_setup": null,
+        "data_provenance": {
+          "instrument": "BTC-USD",
+          "timeframe": "1h",
+          "source": "LOCAL_HISTORICAL_SNAPSHOT",
+          "submitted_candle_count": 168,
+          "analyzed_closed_candle_count": 168,
+          "request_payload_sha256": "86ea8d72db45690d4fdbc4bbae7bd5db715a8f56027642376d38557f7de1907e",
+          "analyzed_window_sha256": "3fa27c80c80c2207846e817111231fda6dc9aad99f950e8ba597694702b491a0",
+          "latest_closed_timestamp": "2026-10-30T13:00:00+00:00",
+          "authorization": "OFFLINE_RESEARCH_ONLY"
+        }
+      },
+      "decision": {
+        "decision_id": "dec_b2ec688d0844",
+        "decision_timestamp_utc": "2026-11-01T15:34:43.880684+00:00",
+        "status": "NO_SMART_ENTRY",
+        "action": "ABSTAIN",
+        "market_regime": "VOLATILITY_EXPANSION",
+        "reason": "No verified walk-forward manifest matches the registered candidate strategies and frozen protocol. A fresh three-arm evaluation is also unavailable because aligned point-in-time AI forecasts and a matched baseline series are not supplied. No arm metrics were computed or reused.",
+        "candidate_setup": null,
+        "data_provenance": {
+          "instrument": "BTC-USD",
+          "timeframe": "1h",
+          "source": "LOCAL_HISTORICAL_SNAPSHOT",
+          "submitted_candle_count": 168,
+          "analyzed_closed_candle_count": 168,
+          "request_payload_sha256": "86ea8d72db45690d4fdbc4bbae7bd5db715a8f56027642376d38557f7de1907e",
+          "analyzed_window_sha256": "3fa27c80c80c2207846e817111231fda6dc9aad99f950e8ba597694702b491a0",
+          "latest_closed_timestamp": "2026-10-30T13:00:00+00:00",
+          "authorization": "OFFLINE_RESEARCH_ONLY"
+        }
+      },
+      "integrated_workflow": true,
+      "runtime_timings_ms": {
+        "analysis_screening": 127.533,
+        "tournament_or_evidence_check": 0.043,
+        "final_decision": 0.014,
+        "total": 127.6,
+        "tournament_arm_1": null,
+        "tournament_arm_2": null,
+        "tournament_arm_3": null
+      },
+      "tournament_arm_timing_status": "NOT_RUN_UNVERIFIED_EVIDENCE",
+      "data_provenance": {
+        "instrument": "BTC-USD",
+        "timeframe": "1h",
+        "source": "LOCAL_HISTORICAL_SNAPSHOT",
+        "submitted_candle_count": 168,
+        "analyzed_closed_candle_count": 168,
+        "request_payload_sha256": "86ea8d72db45690d4fdbc4bbae7bd5db715a8f56027642376d38557f7de1907e",
+        "analyzed_window_sha256": "3fa27c80c80c2207846e817111231fda6dc9aad99f950e8ba597694702b491a0",
+        "latest_closed_timestamp": "2026-10-30T13:00:00+00:00",
+        "authorization": "OFFLINE_RESEARCH_ONLY"
+      },
+      "request_id": "a08b7add-75e4-4e54-bbe0-568d4e5ab415"
+    }
+  },
+  "polling_timeline": [
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/market/candles?symbol=BTC-USD&interval=1h",
+      "method": "GET",
+      "time": 1793547267.8288252
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/arena/trade-markers?limit=50",
+      "method": "GET",
+      "time": 1793547267.8288765
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/forecast/latest?horizon=1h",
+      "method": "GET",
+      "time": 1793547267.8291073
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/notifications/diagnostics",
+      "method": "GET",
+      "time": 1793547267.8291373
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/latest?cost_scenario=COINBASE_RETAIL_87BPS",
+      "method": "GET",
+      "time": 1793547267.829166
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "method": "GET",
+      "time": 1793547267.829198
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "method": "GET",
+      "time": 1793547267.8292298
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "method": "GET",
+      "time": 1793547267.829482
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/lineage",
+      "method": "GET",
+      "time": 1793547267.8295138
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/arena/strategy-summary",
+      "method": "GET",
+      "time": 1793547267.829542
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/arena/meie/trades?limit=50",
+      "method": "GET",
+      "time": 1793547267.829568
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/arena/meie/accounts",
+      "method": "GET",
+      "time": 1793547267.8295937
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/arena/status",
+      "method": "GET",
+      "time": 1793547267.829621
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/arena/active-paper-position?indicators=ofi%2Chawkes%2Cvpin%2Cliquidations%2Cfunding%2Copen_interest%2Crv_5m%2Crv_1h%2Crv_4h%2Crv_24h%2Cjump_intensity&horizon=15m&signal_mode=live_ai",
+      "method": "GET",
+      "time": 1793547267.829647
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/prediction/price/forecast?horizon=all",
+      "method": "GET",
+      "time": 1793547267.8298724
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/notifications/recent?limit=15",
+      "method": "GET",
+      "time": 1793547267.8299062
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/notifications/settings",
+      "method": "GET",
+      "time": 1793547267.8299453
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/terminal/decision-anatomy",
+      "method": "GET",
+      "time": 1793547267.8305445
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/terminal/status",
+      "method": "GET",
+      "time": 1793547267.830573
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/research/entry-quality",
+      "method": "GET",
+      "time": 1793547267.8306026
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/market/candles?symbol=BTC-USD&interval=1h",
+      "status": 200,
+      "duration_ms": 82.08,
+      "time": 1793547267.9109027
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/notifications/diagnostics",
+      "status": 200,
+      "duration_ms": 88.68,
+      "time": 1793547267.9178228
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "status": 200,
+      "duration_ms": 88.65,
+      "time": 1793547267.9178495
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/latest?cost_scenario=COINBASE_RETAIL_87BPS",
+      "status": 200,
+      "duration_ms": 88.76,
+      "time": 1793547267.9179294
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "status": 200,
+      "duration_ms": 88.73,
+      "time": 1793547267.9179559
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/lineage",
+      "status": 200,
+      "duration_ms": 88.9,
+      "time": 1793547267.918421
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "status": 200,
+      "duration_ms": 89.09,
+      "time": 1793547267.918573
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/forecast/latest?horizon=1h",
+      "status": 200,
+      "duration_ms": 89.5,
+      "time": 1793547267.9186115
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/arena/strategy-summary",
+      "status": 200,
+      "duration_ms": 123.73,
+      "time": 1793547267.9532785
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/arena/meie/trades?limit=50",
+      "status": 200,
+      "duration_ms": 123.86,
+      "time": 1793547267.9534283
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/prediction/price/forecast?horizon=all",
+      "status": 200,
+      "duration_ms": 123.69,
+      "time": 1793547267.953563
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/notifications/recent?limit=15",
+      "status": 200,
+      "duration_ms": 123.7,
+      "time": 1793547267.9536052
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/notifications/settings",
+      "status": 200,
+      "duration_ms": 123.79,
+      "time": 1793547267.9537342
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/arena/active-paper-position?indicators=ofi%2Chawkes%2Cvpin%2Cliquidations%2Cfunding%2Copen_interest%2Crv_5m%2Crv_1h%2Crv_4h%2Crv_24h%2Cjump_intensity&horizon=15m&signal_mode=live_ai",
+      "status": 200,
+      "duration_ms": 204.94,
+      "time": 1793547268.0345943
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/arena/trade-markers?limit=50",
+      "status": 200,
+      "duration_ms": 206.08,
+      "time": 1793547268.0349584
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/latest?cost_scenario=COINBASE_RETAIL_87BPS",
+      "method": "GET",
+      "time": 1793547268.1066473
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/arena/status",
+      "status": 200,
+      "duration_ms": 278.99,
+      "time": 1793547268.1086204
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/arena/meie/accounts",
+      "status": 200,
+      "duration_ms": 809.12,
+      "time": 1793547268.638718
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "method": "GET",
+      "time": 1793547269.4694157
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "method": "GET",
+      "time": 1793547269.4695122
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "method": "GET",
+      "time": 1793547269.4695399
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/research/entry-quality",
+      "status": 200,
+      "duration_ms": 2259.67,
+      "time": 1793547270.0902798
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/latest?cost_scenario=COINBASE_RETAIL_87BPS",
+      "status": 200,
+      "duration_ms": 2004.31,
+      "time": 1793547270.1109679
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "status": 200,
+      "duration_ms": 653.41,
+      "time": 1793547270.122836
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "status": 200,
+      "duration_ms": 662.55,
+      "time": 1793547270.132065
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "status": 200,
+      "duration_ms": 671.7,
+      "time": 1793547270.1412532
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/terminal/status",
+      "status": 200,
+      "duration_ms": 2988.33,
+      "time": 1793547270.8189101
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/terminal/decision-anatomy",
+      "status": 200,
+      "duration_ms": 3494.15,
+      "time": 1793547271.324708
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "method": "GET",
+      "time": 1793547271.6333935
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "method": "GET",
+      "time": 1793547271.6335702
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "status": 200,
+      "duration_ms": 23.15,
+      "time": 1793547271.6565528
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "status": 200,
+      "duration_ms": 23.45,
+      "time": 1793547271.6570241
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "method": "GET",
+      "time": 1793547271.659925
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "status": 200,
+      "duration_ms": 8.9,
+      "time": 1793547271.6688292
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/arena/active-paper-position?indicators=ofi%2Chawkes%2Cvpin%2Cliquidations%2Cfunding%2Copen_interest%2Crv_5m%2Crv_1h%2Crv_4h%2Crv_24h%2Cjump_intensity&horizon=15m&signal_mode=live_ai",
+      "method": "GET",
+      "time": 1793547272.8266165
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/arena/active-paper-position?indicators=ofi%2Chawkes%2Cvpin%2Cliquidations%2Cfunding%2Copen_interest%2Crv_5m%2Crv_1h%2Crv_4h%2Crv_24h%2Cjump_intensity&horizon=15m&signal_mode=live_ai",
+      "status": 200,
+      "duration_ms": 52.58,
+      "time": 1793547272.8792057
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "method": "GET",
+      "time": 1793547273.1639462
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "method": "GET",
+      "time": 1793547273.1639872
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "status": 200,
+      "duration_ms": 6.0,
+      "time": 1793547273.1699479
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "status": 200,
+      "duration_ms": 6.05,
+      "time": 1793547273.170042
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "method": "GET",
+      "time": 1793547273.172514
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "status": 200,
+      "duration_ms": 3.72,
+      "time": 1793547273.1762378
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "method": "GET",
+      "time": 1793547274.6788
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "method": "GET",
+      "time": 1793547274.6788325
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "method": "GET",
+      "time": 1793547274.6788561
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "status": 200,
+      "duration_ms": 8.12,
+      "time": 1793547274.6869607
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "status": 200,
+      "duration_ms": 8.24,
+      "time": 1793547274.6870413
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "status": 200,
+      "duration_ms": 8.33,
+      "time": 1793547274.6871848
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/arena/trade-markers?limit=50",
+      "method": "GET",
+      "time": 1793547275.8159
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/arena/trade-markers?limit=50",
+      "status": 200,
+      "duration_ms": 43.99,
+      "time": 1793547275.85989
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "method": "GET",
+      "time": 1793547276.1895983
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "method": "GET",
+      "time": 1793547276.1897087
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "method": "GET",
+      "time": 1793547276.189732
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "status": 200,
+      "duration_ms": 6.52,
+      "time": 1793547276.196256
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "status": 200,
+      "duration_ms": 6.93,
+      "time": 1793547276.1965303
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "status": 200,
+      "duration_ms": 6.89,
+      "time": 1793547276.1966045
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "method": "GET",
+      "time": 1793547277.698567
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "method": "GET",
+      "time": 1793547277.6986017
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "method": "GET",
+      "time": 1793547277.6990662
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "status": 200,
+      "duration_ms": 8.86,
+      "time": 1793547277.7074654
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "status": 200,
+      "duration_ms": 8.53,
+      "time": 1793547277.7075937
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "status": 200,
+      "duration_ms": 9.05,
+      "time": 1793547277.7076178
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/arena/active-paper-position?indicators=ofi%2Chawkes%2Cvpin%2Cliquidations%2Cfunding%2Copen_interest%2Crv_5m%2Crv_1h%2Crv_4h%2Crv_24h%2Cjump_intensity&horizon=15m&signal_mode=live_ai",
+      "method": "GET",
+      "time": 1793547277.8265972
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/arena/active-paper-position?indicators=ofi%2Chawkes%2Cvpin%2Cliquidations%2Cfunding%2Copen_interest%2Crv_5m%2Crv_1h%2Crv_4h%2Crv_24h%2Cjump_intensity&horizon=15m&signal_mode=live_ai",
+      "status": 200,
+      "duration_ms": 60.65,
+      "time": 1793547277.887254
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "method": "GET",
+      "time": 1793547279.208635
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "method": "GET",
+      "time": 1793547279.208681
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "method": "GET",
+      "time": 1793547279.208713
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "status": 200,
+      "duration_ms": 15.38,
+      "time": 1793547279.22402
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "status": 200,
+      "duration_ms": 15.48,
+      "time": 1793547279.2242
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "status": 200,
+      "duration_ms": 15.55,
+      "time": 1793547279.2242358
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "method": "GET",
+      "time": 1793547280.7301233
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "method": "GET",
+      "time": 1793547280.7302637
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "method": "GET",
+      "time": 1793547280.7306051
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "status": 200,
+      "duration_ms": 18.57,
+      "time": 1793547280.7488496
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "status": 200,
+      "duration_ms": 19.17,
+      "time": 1793547280.7492979
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "status": 200,
+      "duration_ms": 19.22,
+      "time": 1793547280.749833
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/analyse",
+      "method": "POST",
+      "time": 1793547281.2009802
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/analyse",
+      "status": 200,
+      "duration_ms": 80.49,
+      "time": 1793547281.2814758
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "method": "GET",
+      "time": 1793547282.2509449
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "status": 200,
+      "duration_ms": 9.38,
+      "time": 1793547282.2603402
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "method": "GET",
+      "time": 1793547282.2659335
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "method": "GET",
+      "time": 1793547282.266083
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "status": 200,
+      "duration_ms": 25.04,
+      "time": 1793547282.290984
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "status": 200,
+      "duration_ms": 25.17,
+      "time": 1793547282.291264
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/arena/active-paper-position?indicators=ofi%2Chawkes%2Cvpin%2Cliquidations%2Cfunding%2Copen_interest%2Crv_5m%2Crv_1h%2Crv_4h%2Crv_24h%2Cjump_intensity&horizon=15m&signal_mode=live_ai",
+      "method": "GET",
+      "time": 1793547282.8291793
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/prediction/price/forecast?horizon=all",
+      "method": "GET",
+      "time": 1793547282.8294423
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/prediction/price/forecast?horizon=all",
+      "status": 200,
+      "duration_ms": 26.45,
+      "time": 1793547282.8559017
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/arena/active-paper-position?indicators=ofi%2Chawkes%2Cvpin%2Cliquidations%2Cfunding%2Copen_interest%2Crv_5m%2Crv_1h%2Crv_4h%2Crv_24h%2Cjump_intensity&horizon=15m&signal_mode=live_ai",
+      "status": 200,
+      "duration_ms": 191.37,
+      "time": 1793547283.0205579
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/latest?cost_scenario=COINBASE_RETAIL_87BPS",
+      "method": "GET",
+      "time": 1793547283.1093776
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/latest?cost_scenario=COINBASE_RETAIL_87BPS",
+      "status": 200,
+      "duration_ms": 20.59,
+      "time": 1793547283.129985
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/analyse",
+      "method": "POST",
+      "time": 1793547283.7505717
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "method": "GET",
+      "time": 1793547283.7657292
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "status": 200,
+      "duration_ms": 34.65,
+      "time": 1793547283.8003845
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "method": "GET",
+      "time": 1793547283.8055482
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "method": "GET",
+      "time": 1793547283.8058357
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/arena/trade-markers?limit=50",
+      "method": "GET",
+      "time": 1793547283.8258753
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "status": 200,
+      "duration_ms": 56.55,
+      "time": 1793547283.862109
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "status": 200,
+      "duration_ms": 58.21,
+      "time": 1793547283.8640528
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/analyse",
+      "status": 200,
+      "duration_ms": 144.16,
+      "time": 1793547283.8947396
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/arena/trade-markers?limit=50",
+      "status": 200,
+      "duration_ms": 208.56,
+      "time": 1793547284.0344405
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "method": "GET",
+      "time": 1793547285.3082178
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "status": 200,
+      "duration_ms": 7.59,
+      "time": 1793547285.315816
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "method": "GET",
+      "time": 1793547285.3647969
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "status": 200,
+      "duration_ms": 19.96,
+      "time": 1793547285.3847675
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "method": "GET",
+      "time": 1793547285.3889484
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "status": 200,
+      "duration_ms": 6.96,
+      "time": 1793547285.3959174
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "method": "GET",
+      "time": 1793547286.8246992
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "status": 200,
+      "duration_ms": 23.16,
+      "time": 1793547286.84787
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "method": "GET",
+      "time": 1793547286.8892732
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "status": 200,
+      "duration_ms": 28.66,
+      "time": 1793547286.9179423
+    },
+    {
+      "event": "REQUEST_SENT",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "method": "GET",
+      "time": 1793547286.926562
+    },
+    {
+      "event": "RESPONSE_RECEIVED",
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "status": 200,
+      "duration_ms": 8.07,
+      "time": 1793547286.9346454
+    }
+  ],
+  "completed_requests": [
+    {
+      "url": "https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbv2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKwBNntkaToggR7BYRbKPxDcwg.woff2",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 465.69,
+      "started_at": 1793547267.3988147
+    },
+    {
+      "url": "https://fonts.gstatic.com/s/outfit/v15/QGYvz_MVcBeNP4NJtEtq.woff2",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 511.17,
+      "started_at": 1793547267.3987374
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/market/candles?symbol=BTC-USD&interval=1h",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 82.08,
+      "started_at": 1793547267.8288195
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/notifications/diagnostics",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 88.68,
+      "started_at": 1793547267.8291364
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 88.65,
+      "started_at": 1793547267.8291967
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/latest?cost_scenario=COINBASE_RETAIL_87BPS",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 88.76,
+      "started_at": 1793547267.8291647
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 88.73,
+      "started_at": 1793547267.829229
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/lineage",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 88.9,
+      "started_at": 1793547267.8295124
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 89.09,
+      "started_at": 1793547267.8294802
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/forecast/latest?horizon=1h",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 89.5,
+      "started_at": 1793547267.8291054
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/arena/strategy-summary",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 123.73,
+      "started_at": 1793547267.8295405
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/arena/meie/trades?limit=50",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 123.86,
+      "started_at": 1793547267.829567
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/prediction/price/forecast?horizon=all",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 123.69,
+      "started_at": 1793547267.8298712
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/notifications/recent?limit=15",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 123.7,
+      "started_at": 1793547267.8299055
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/notifications/settings",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 123.79,
+      "started_at": 1793547267.8299446
+    },
+    {
+      "url": "http://127.0.0.1:8000/prediction/latest?live=false",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 125.02,
+      "started_at": 1793547267.8300276
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/arena/active-paper-position?indicators=ofi%2Chawkes%2Cvpin%2Cliquidations%2Cfunding%2Copen_interest%2Crv_5m%2Crv_1h%2Crv_4h%2Crv_24h%2Cjump_intensity&horizon=15m&signal_mode=live_ai",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 204.94,
+      "started_at": 1793547267.829646
+    },
+    {
+      "url": "http://127.0.0.1:8000/regime/latest?live=false",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 204.55,
+      "started_at": 1793547267.8300884
+    },
+    {
+      "url": "http://127.0.0.1:8000/explanation/latest?live=false",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 204.68,
+      "started_at": 1793547267.8301244
+    },
+    {
+      "url": "http://127.0.0.1:8000/quality/latest?live=false",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 204.68,
+      "started_at": 1793547267.8301616
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/arena/trade-markers?limit=50",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 206.08,
+      "started_at": 1793547267.8288739
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/arena/status",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 278.99,
+      "started_at": 1793547267.82962
+    },
+    {
+      "url": "http://127.0.0.1:8000/market/latest",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 278.82,
+      "started_at": 1793547267.8304625
+    },
+    {
+      "url": "http://127.0.0.1:8000/intelligence/latest",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 297.95,
+      "started_at": 1793547267.8304932
+    },
+    {
+      "url": "http://127.0.0.1:8000/prediction/counterfactual?top_k=5",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 359.2,
+      "started_at": 1793547267.8305175
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/arena/meie/accounts",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 809.12,
+      "started_at": 1793547267.829593
+    },
+    {
+      "url": "http://127.0.0.1:8000/health",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 2183.43,
+      "started_at": 1793547267.8299978
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/research/entry-quality",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 2259.67,
+      "started_at": 1793547267.830602
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/latest?cost_scenario=COINBASE_RETAIL_87BPS",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 2004.31,
+      "started_at": 1793547268.1066442
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 653.41,
+      "started_at": 1793547269.4694135
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 662.55,
+      "started_at": 1793547269.4695113
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 671.7,
+      "started_at": 1793547269.4695394
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/terminal/status",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 2988.33,
+      "started_at": 1793547267.8305721
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/terminal/decision-anatomy",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 3494.15,
+      "started_at": 1793547267.8305433
+    },
+    {
+      "url": "http://127.0.0.1:8000/memory",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 3791.8,
+      "started_at": 1793547267.8303945
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 23.15,
+      "started_at": 1793547271.6333902
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 23.45,
+      "started_at": 1793547271.6335688
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 8.9,
+      "started_at": 1793547271.6599226
+    },
+    {
+      "url": "http://127.0.0.1:8000/prediction/history?limit=20",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 3851.65,
+      "started_at": 1793547267.8300586
+    },
+    {
+      "url": "http://127.0.0.1:8000/portfolio",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 3886.55,
+      "started_at": 1793547267.8304305
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/arena/active-paper-position?indicators=ofi%2Chawkes%2Cvpin%2Cliquidations%2Cfunding%2Copen_interest%2Crv_5m%2Crv_1h%2Crv_4h%2Crv_24h%2Cjump_intensity&horizon=15m&signal_mode=live_ai",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 52.58,
+      "started_at": 1793547272.826613
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 6.0,
+      "started_at": 1793547273.1639438
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 6.05,
+      "started_at": 1793547273.1639845
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 3.72,
+      "started_at": 1793547273.172512
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 8.12,
+      "started_at": 1793547274.678832
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 8.24,
+      "started_at": 1793547274.6787977
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 8.33,
+      "started_at": 1793547274.6788557
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/arena/trade-markers?limit=50",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 43.99,
+      "started_at": 1793547275.8158956
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 6.52,
+      "started_at": 1793547276.1897314
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 6.93,
+      "started_at": 1793547276.1895962
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 6.89,
+      "started_at": 1793547276.1897078
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 8.86,
+      "started_at": 1793547277.698601
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 8.53,
+      "started_at": 1793547277.6990645
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 9.05,
+      "started_at": 1793547277.6985648
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/arena/active-paper-position?indicators=ofi%2Chawkes%2Cvpin%2Cliquidations%2Cfunding%2Copen_interest%2Crv_5m%2Crv_1h%2Crv_4h%2Crv_24h%2Cjump_intensity&horizon=15m&signal_mode=live_ai",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 60.65,
+      "started_at": 1793547277.8265944
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 15.38,
+      "started_at": 1793547279.2086318
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 15.48,
+      "started_at": 1793547279.2087116
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 15.55,
+      "started_at": 1793547279.20868
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 18.57,
+      "started_at": 1793547280.7302604
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 19.17,
+      "started_at": 1793547280.7301173
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 19.22,
+      "started_at": 1793547280.7306006
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/analyse",
+      "method": "POST",
+      "status": 200,
+      "duration_ms": 80.49,
+      "started_at": 1793547281.200976
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 9.38,
+      "started_at": 1793547282.25094
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 25.04,
+      "started_at": 1793547282.2659278
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 25.17,
+      "started_at": 1793547282.2660797
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/prediction/price/forecast?horizon=all",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 26.45,
+      "started_at": 1793547282.8294382
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/arena/active-paper-position?indicators=ofi%2Chawkes%2Cvpin%2Cliquidations%2Cfunding%2Copen_interest%2Crv_5m%2Crv_1h%2Crv_4h%2Crv_24h%2Cjump_intensity&horizon=15m&signal_mode=live_ai",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 191.37,
+      "started_at": 1793547282.8291733
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/latest?cost_scenario=COINBASE_RETAIL_87BPS",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 20.59,
+      "started_at": 1793547283.1093729
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 34.65,
+      "started_at": 1793547283.765723
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 56.55,
+      "started_at": 1793547283.8055425
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 58.21,
+      "started_at": 1793547283.8058321
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/analyse",
+      "method": "POST",
+      "status": 200,
+      "duration_ms": 144.16,
+      "started_at": 1793547283.750568
+    },
+    {
+      "url": "http://127.0.0.1:8000/health",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 1176.73,
+      "started_at": 1793547282.8380003
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/arena/trade-markers?limit=50",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 208.56,
+      "started_at": 1793547283.8258708
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 7.59,
+      "started_at": 1793547285.308214
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 19.96,
+      "started_at": 1793547285.3647919
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 6.96,
+      "started_at": 1793547285.3889432
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/evaluation",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 23.16,
+      "started_at": 1793547286.824694
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/attempts",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 28.66,
+      "started_at": 1793547286.8892677
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/tournament/smart-entry/latest",
+      "method": "GET",
+      "status": 200,
+      "duration_ms": 8.07,
+      "started_at": 1793547286.9265559
+    }
+  ],
+  "console_logs": [
+    {
+      "type": "info",
+      "args": [
+        "[BTCognitiveTiming]",
+        "{\"name\":\"chart.candles.compute_and_render\",\"duration_ms\":6,\"candle_count\":168,\"interval\":\"1h\"}"
+      ],
+      "timestamp": 1793547267.9685302
+    },
+    {
+      "type": "info",
+      "args": [
+        "[BTCognitiveTiming]",
+        "{\"name\":\"forecast.fetch_and_render\",\"request_id\":\"3849b4e8-fdae-4ba4-8147-64fbf79334b2\",\"duration_ms\":151,\"horizon\":\"1h\",\"status\":\"FORECAST_STALE\"}"
+      ],
+      "timestamp": 1793547267.9704502
+    },
+    {
+      "type": "info",
+      "args": [
+        "[BTCognitiveTiming]",
+        "{\"name\":\"analysis.integrated_request\",\"request_id\":\"e9463b8b-53e6-45a8-b5c3-0f6004ea2324\",\"duration_ms\":125,\"runtime_timings_ms\":{\"analysis_screening\":68.608,\"tournament_or_evidence_check\":0.043,\"final_decision\":0.014,\"total\":68.673,\"tournament_arm_1\":null,\"tournament_arm_2\":null,\"tournament_arm_3\":null},\"candidate_count\":2,\"tournament_status\":\"CACHED_WALK_FORWARD_UNAVAILABLE\"}"
+      ],
+      "timestamp": 1793547281.3093927
+    },
+    {
+      "type": "info",
+      "args": [
+        "[BTCognitiveTiming]",
+        "{\"name\":\"analysis.integrated_request\",\"request_id\":\"a08b7add-75e4-4e54-bbe0-568d4e5ab415\",\"duration_ms\":166,\"runtime_timings_ms\":{\"analysis_screening\":127.533,\"tournament_or_evidence_check\":0.043,\"final_decision\":0.014,\"total\":127.6,\"tournament_arm_1\":null,\"tournament_arm_2\":null,\"tournament_arm_3\":null},\"candidate_count\":2,\"tournament_status\":\"CACHED_WALK_FORWARD_UNAVAILABLE\"}"
+      ],
+      "timestamp": 1793547283.9020174
+    }
+  ]
+}

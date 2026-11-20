@@ -1,0 +1,142 @@
+{
+  "version": "V32.49",
+  "assessment_date": "2026-10-26",
+  "release_decision": "PARTIAL_PASS_BLOCKED",
+  "research_experiment": "INCONCLUSIVE",
+  "prospective_evidence": "NOT_STARTED",
+  "model_authorization": "OFFLINE_RESEARCH_ONLY",
+  "live_trading": "DISABLED",
+  "scenario_status_counts": {
+    "PASS": 40,
+    "FAIL": 0,
+    "BLOCKED": 11,
+    "NOT_RUN": 15,
+    "total": 66
+  },
+  "scenario_statuses": {
+    "UI-01": "PASS",
+    "UI-02": "BLOCKED",
+    "UI-03": "BLOCKED",
+    "UI-04": "PASS",
+    "UI-05": "NOT_RUN",
+    "UI-06": "NOT_RUN",
+    "UI-07": "NOT_RUN",
+    "ANA-01": "PASS",
+    "ANA-02": "BLOCKED",
+    "ANA-03": "NOT_RUN",
+    "ANA-04": "PASS",
+    "ANA-05": "PASS",
+    "ANA-06": "PASS",
+    "ANA-07": "PASS",
+    "ANA-08": "PASS",
+    "ANA-09": "PASS",
+    "ANA-10": "PASS",
+    "ANA-11": "PASS",
+    "ANA-12": "NOT_RUN",
+    "STR-01": "PASS",
+    "STR-02": "PASS",
+    "STR-03": "PASS",
+    "STR-04": "PASS",
+    "STR-05": "NOT_RUN",
+    "STR-06": "BLOCKED",
+    "STR-07": "BLOCKED",
+    "STR-08": "BLOCKED",
+    "STR-09": "PASS",
+    "STR-10": "PASS",
+    "STR-11": "NOT_RUN",
+    "STR-12": "PASS",
+    "STR-13": "BLOCKED",
+    "STR-14": "NOT_RUN",
+    "STR-15": "NOT_RUN",
+    "ENT-01": "PASS",
+    "ENT-02": "PASS",
+    "ENT-03": "PASS",
+    "ENT-04": "PASS",
+    "ENT-05": "PASS",
+    "ENT-06": "BLOCKED",
+    "ENT-07": "PASS",
+    "ENT-08": "PASS",
+    "ENT-09": "NOT_RUN",
+    "ENT-10": "PASS",
+    "MON-01": "PASS",
+    "MON-02": "PASS",
+    "MON-03": "PASS",
+    "MON-04": "PASS",
+    "MON-05": "PASS",
+    "MON-06": "PASS",
+    "MON-07": "NOT_RUN",
+    "MON-08": "PASS",
+    "MON-09": "BLOCKED",
+    "MON-10": "NOT_RUN",
+    "MON-11": "PASS",
+    "MON-12": "PASS",
+    "MON-13": "PASS",
+    "MON-14": "PASS",
+    "UX-01": "PASS",
+    "UX-02": "PASS",
+    "UX-03": "PASS",
+    "UX-04": "NOT_RUN",
+    "UX-05": "BLOCKED",
+    "UX-06": "BLOCKED",
+    "UX-07": "NOT_RUN",
+    "UX-08": "NOT_RUN"
+  },
+  "test_evidence": {
+    "python_command": ".venv_win\\Scripts\\pytest.exe tests\\test_v32_49_scenario_qa.py tests\\test_v32_43_strategy_tournament_and_smart_entry.py tests\\test_v32_44_smart_entry_independent_audit.py tests\\test_v32_45_workflow_acceptance.py tests\\test_v32_46_navigation_and_terminal_consolidation.py tests\\test_v32_47_analyse_selection_and_anomaly_monitor.py tests\\test_v32_48_integrated_analyse_and_tournament.py -q",
+    "python_result": "116 passed",
+    "frontend_commands": [
+      "node --check web\\app.js",
+      "node tests_frontend.js"
+    ],
+    "frontend_result": "passed",
+    "python_compile_result": "passed"
+  },
+  "normal_app_e2e": {
+    "entrypoint": "api.server:app",
+    "isolated_port": 8096,
+    "feed": "Coinbase Exchange REST BTC-USD 1h candles",
+    "trace_file": "artifacts/browser_qa/v32_49/normal_app_analyse_network_trace.json",
+    "analysis_http_status": 200,
+    "requests_in_recorded_trace": 1,
+    "submitted_and_analyzed_closed_candles": 349,
+    "decision": "NO_SMART_ENTRY",
+    "tournament_execution_source": "NOT_RUN_NO_ELIGIBLE_CANDIDATES",
+    "attempts_created": 0,
+    "note": "The integrated tournament was correctly skipped because the live-feed analysis had no eligible candidates. No entry or active-monitor E2E was possible."
+  },
+  "protected_file_sha256": {
+    "data/prospective_entry_ledger.jsonl": {
+      "before": "91c3aed984002f611a59c78a2eb4c342c0970baebbd2e3d6df7973be7acf1dd7",
+      "after": "91c3aed984002f611a59c78a2eb4c342c0970baebbd2e3d6df7973be7acf1dd7"
+    },
+    "data/prospective_shadow_v1.jsonl": {
+      "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "data/prospective_entry_ledger_v2.jsonl": {
+      "before": "e6e33e3c7beb4c255467e967fc819b85481b0afb1052c3ea7bd248c53f87b604",
+      "after": "e6e33e3c7beb4c255467e967fc819b85481b0afb1052c3ea7bd248c53f87b604"
+    },
+    "data/raw/ohlcv.parquet": {
+      "before": "1e722f33734a89e74764c02fde0552752cc1ea2eff62ca9046c9d6edf2347d5c",
+      "after": "1e722f33734a89e74764c02fde0552752cc1ea2eff62ca9046c9d6edf2347d5c"
+    },
+    "data/raw/ohlcv_pre_backfill_backup.parquet": {
+      "before": "c4949e5b5695ffa172677681b15af2ea6167e73317c3496546f2286a6730b1c8",
+      "after": "c4949e5b5695ffa172677681b15af2ea6167e73317c3496546f2286a6730b1c8"
+    }
+  },
+  "known_blockers": [
+    "No verified cache manifest or complete fresh three-arm inputs were available; candidate qualification, winner, fallback, both-fail, cached reuse and fresh-compute branches remain blocked.",
+    "No price-deviation threshold is specified for invalidating an otherwise fresh proposal when price changes between Analyse and Enter.",
+    "The real-feed browser run abstained, so active-entry monitor, reload/restart UI, monitor failures, anomaly actions and exit UI could not be exercised end-to-end.",
+    "The deliberately delayed rapid-repeat browser run exposed the in-flight disabled/progress state but its response waiter timed out after 60 seconds; request deduplication is unit/API tested, but that browser scenario is blocked.",
+    "Keyboard-only coverage was partial; screen-reader, contrast, focus-visibility and target-size manual audits were not run."
+  ],
+  "evidence_boundary": {
+    "browser_market_data": "Real Coinbase REST feed observed during QA; not prospective confirmatory evidence.",
+    "unit_fixtures": "Synthetic deterministic fixtures used only for regression logic, never represented as market evidence.",
+    "profitability_claim": false,
+    "prospective_blocks_collected": 0
+  }
+}

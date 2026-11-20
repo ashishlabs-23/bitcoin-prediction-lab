@@ -8,6 +8,45 @@ This ledger tracks every file created, modified, or deleted in the BTCognitive r
 
 ## Change History
 
+### [2026-10-23] — V31.0 Research Closure and V1.2 Protocol Proposal
+- **Author/Agent:** Copilot Research Assistant
+- **Target Files:**
+  - `research/v31_0_research_closure_report.md`: Added an evidence-classified V31.0 closure report with verified local dataset hashes/structural checks, capability matrix, inherited-claim conflicts, protocol audit, test results, and no-go criteria.
+  - `research/protocol_v1_2_proposal.md`: Added a human-review-only protocol proposal that leaves the trade evidence threshold unset pending a precision/power rationale; V1.1 remains unchanged.
+- **Rationale / Intent:** Complete a research milestone without changing the frozen strategy or live-feed configuration. The named entry and shadow ledgers remained unchanged. A separate forecast-ledger update appeared during concurrent test activity; its cause could not be attributed and it was preserved. The research decision is `RESEARCH BLOCKED — DATA OR METHODOLOGY DEFECT`; no profitable strategy or execution authorization is claimed.
+
+### [2026-10-23] — V31.1 Data Gate and Protocol Review
+- **Author/Agent:** Copilot Research Assistant
+- **Target Files:**
+  - `research/v31_1_data_provenance_audit.md`: Reverified the Bitstamp snapshot hash and structural properties; documented contradictory timestamp/rights records, Coinbase bucket-start/availability and terms limitations, the Binance instrument mismatch, and the Gate A stop decision. No accepted dataset manifest was created.
+  - `research/v31_1_foundation_repair_report.md`: Recorded the V31.1 blocked decision, existing replay and cost defects, unapproved protocol recommendations, skipped downstream tests, and integrity/review gates.
+  - `research/protocol_v1_2_decision_matrix_v31_1.md`: Added a human-review-only estimand, evidence-unit, uncertainty, sample-size, interim-look, and multiplicity decision matrix.
+  - `research/protocol_v1_2_proposal.md`: Appended a dated V31.1 addendum; V1.1 remains frozen and V1.2 remains unapproved.
+- **Rationale / Intent:** Stop before replay or performance work because no candidate dataset clears the full provenance, timing, rights, and granularity gate. Preserve all prior reports and user changes; do not change replay/cost code, prospective records, production state, branch, or commits.
+
+### [2026-10-23] — V31.2 Evidence Verification and Single-Source Gate Documentation
+- **Author/Agent:** Copilot Research Assistant
+- **Target Files:**
+  - `research/v31_2_evidence_verification_report.md`: Documents the source-identity conflict across Bitstamp, Coinbase, and Binance, the unresolved timestamp and availability contracts, the invalid integrity baseline claim, and the blocked final decision.
+  - `research/v31_2_single_dataset_acceptance_gates.md`: Defines the G1–G11 single-dataset acceptance gates and the pass/fail criteria required before isolated replay may proceed.
+  - `research/v31_2_dataset_options_assessment.md`: Evaluates the four dataset options (Bitstamp remediation, 15-minute Coinbase study, Binance-only path, or full stop) without promoting strategy implementation.
+  - `research/v31_2_blocker_resolution.md`: Resolves the active blocker to `NO QUALIFIED CANDIDATE` after cross-checking Bitstamp, Coinbase, and Binance evidence against the repository contract.
+- **Rationale / Intent:** Complete the evidence-verification phase and document the safest research-only decision: remain blocked until one dataset has a fully verified venue, timestamp, provenance, rights, and holdout contract. No strategy code, tournament, or live behavior was changed.
+
+### [2026-10-23] — V31.3 Coinbase 15m Contract Isolation
+- **Author/Agent:** Copilot Research Assistant
+- **Target Files:**
+  - `research/v31_3_coinbase15_contract.md`: Defines an isolated Coinbase BTC-USD 15m exploratory contract with explicit exclusions and scope limitations.
+  - `research/v31_3_coinbase15_validation_report.md`: Validates the local artifact, documents all eight gates, and sets the status to `CONTRACT DEFINED — VALIDATION BLOCKED` because the rights/provenance gate remains unresolved.
+- **Rationale / Intent:** Isolate the Coinbase artifact from the conflicting Bitstamp/Binance/V12 pipeline without changing executable logic, broadening scope, or authorizing replay or strategy work. The local artifact is valid as a bounded 15-minute contextual source, but it is not qualified for broader research until rights/provenance is independently supported.
+
+### [2026-10-23] — V31.4 Coinbase Data-Use Compatibility Review
+- **Author/Agent:** Copilot Research Assistant
+- **Target Files:**
+  - `research/v31_4_coinbase_terms_compatibility_report.md`: Reviews the Coinbase Market Data Terms restriction for AI/ML and automated research use, confirms the repo’s AI/ML research context, and documents the unresolved permission question.
+  - `research/v31_4_coinbase15_data_use_decision.md`: Records the final data-use decision as `NOT AUTHORIZED FOR BTCognitive AI/ML USE — WRITTEN AUTHORIZATION NOT VERIFIED`.
+- **Rationale / Intent:** Separate technical validity from permission. The local Coinbase artifact remains technically coherent, but it is not authorized for BTCognitive AI/ML research use without explicit written authorization and human review. No strategy, replay, collector, or protected-ledger behavior was modified.
+
 ### [2026-10-16T18:05:15+05:30] — Canonical PRD v1.0 Initialization
 - **Author/Agent:** Antigravity AI Agent
 - **Target File:** `docs/BTCognitive_Master_PRD.md` ([link](file:///c:/Projects/BTCognitive/BTCognitive/docs/BTCognitive_Master_PRD.md))
@@ -77,6 +116,3 @@ This ledger tracks every file created, modified, or deleted in the BTCognitive r
   - `docs/BTCognitive_Master_PRD_v2_Continuation.md` ([link](file:///c:/Projects/BTCognitive/BTCognitive/docs/BTCognitive_Master_PRD_v2_Continuation.md)): Added Section 10 detailing V5 statistical integrity, bootstrap uncertainty, and experiment freeze.
   - `research/reports/signal_integrity_and_barrier_research.md` ([link](file:///c:/Projects/BTCognitive/BTCognitive/research/reports/signal_integrity_and_barrier_research.md)): Added Section 13 Addendum documenting V5 findings.
 - **Rationale / Intent:** Resolve remaining statistical questions from V4: prove that `vol_spread` requires 191 bars of warm-up after segment boundaries; disambiguate Target A (gross return > 15.0 bps under hypothetical Binance perpetual) from Target B (gross return > 87.0 bps under primary Coinbase Spot); calculate 95% bootstrap confidence intervals showing that Candidate 1 is decisively negative on Coinbase Spot ([-101.18, -55.81] bps) but inconclusive on Binance hypothetical ([-28.56, +16.36] bps); prove that the logistic classifier is statistically significantly worse than empirical training prevalence prior; simulate sequential compounded portfolio equity; audit the prospective ledger (3 resolved 24h records, 2 pending 168h records); freeze the research manifest; and retain `NO_CANDIDATE_PASSED_PREREGISTERED_GATE`.
-
-
-

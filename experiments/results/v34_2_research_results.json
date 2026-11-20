@@ -1,0 +1,793 @@
+{
+  "mission_id": "V34.2-STATISTICAL-POWER-EXPANSION",
+  "timestamp_utc": "2026-11-03T03:18:39.929734+00:00",
+  "agent_2_forecast_inference": {
+    "1d_24h": {
+      "mean_loss_har": 0.4024803161642265,
+      "mean_loss_rs_dow": 1887.2606600224394,
+      "mean_loss_persist": 0.9211162087076442,
+      "mean_differential": -1886.8581797062748,
+      "bandwidth_sensitivity": [
+        {
+          "bandwidth_lags": 24,
+          "one_sided_p": 0.9685366049897547,
+          "two_sided_p": 0.06292679002049062,
+          "hln_stat": -1.8614697355209138,
+          "se": 993.4348320504608
+        },
+        {
+          "bandwidth_lags": 48,
+          "one_sided_p": 0.9671031157937318,
+          "two_sided_p": 0.06579376841253648,
+          "hln_stat": -1.8415398397864176,
+          "se": 983.3290078582994
+        },
+        {
+          "bandwidth_lags": 96,
+          "one_sided_p": 0.9689739879479213,
+          "two_sided_p": 0.06205202410415733,
+          "hln_stat": -1.8677002101131885,
+          "se": 928.4257038363412
+        }
+      ],
+      "stationary_bootstrap": {
+        "block_len": 24,
+        "boot_p_one_sided": 0.9625,
+        "boot_p_two_sided": 0.0375
+      },
+      "non_overlapping": {
+        "sample_size": 50,
+        "t_stat": -1.5402938816024605,
+        "one_sided_p": 0.9350387975032524,
+        "two_sided_p": 0.12992240499349525
+      }
+    },
+    "7d_168h": {
+      "mean_loss_har": 0.04577093324328854,
+      "mean_loss_rs_dow": 0.04610687753446551,
+      "mean_loss_persist": 1.1232468457174425,
+      "mean_differential": -0.00033594429117697014,
+      "bandwidth_sensitivity": [
+        {
+          "bandwidth_lags": 168,
+          "one_sided_p": 0.5440142980000477,
+          "two_sided_p": 0.9119714039999045,
+          "hln_stat": -0.11057601419673792,
+          "se": 0.0026065038030970516
+        },
+        {
+          "bandwidth_lags": 336,
+          "one_sided_p": 0.5400642844509138,
+          "two_sided_p": 0.9198714310981724,
+          "hln_stat": -0.10061724104661993,
+          "se": 0.0023887245126104936
+        },
+        {
+          "bandwidth_lags": 672,
+          "one_sided_p": 0.5293534693620018,
+          "two_sided_p": 0.9412930612759964,
+          "hln_stat": -0.07366046712696137,
+          "se": 0.001963156071065606
+        }
+      ],
+      "stationary_bootstrap": {
+        "block_len": 168,
+        "boot_p_one_sided": 0.556,
+        "boot_p_two_sided": 0.892
+      },
+      "non_overlapping": {
+        "sample_size": 8,
+        "t_stat": -2.6252405383865933,
+        "one_sided_p": 0.9829259886671791,
+        "two_sided_p": 0.03414802266564187
+      }
+    },
+    "22d_528h": {
+      "mean_loss_har": 0.027819840691146517,
+      "mean_loss_rs_dow": 0.027376477965832813,
+      "mean_loss_persist": 1.073404122543922,
+      "mean_differential": 0.00044336272531369836,
+      "bandwidth_sensitivity": [
+        {
+          "bandwidth_lags": 528,
+          "one_sided_p": 0.15081612834701408,
+          "two_sided_p": 0.30163225669402816,
+          "hln_stat": 1.033392713389885,
+          "se": 0.00023707964602037103
+        },
+        {
+          "bandwidth_lags": 1056,
+          "one_sided_p": 0.4106870889823748,
+          "two_sided_p": 0.8213741779647497,
+          "hln_stat": 0.22582824981514377,
+          "se": 0.0002056508469750693
+        },
+        {
+          "bandwidth_lags": 2112,
+          "one_sided_p": 0.008393130546079819,
+          "two_sided_p": 0.016786261092159638,
+          "hln_stat": 2.3947704788193325,
+          "se": 0.00014643006500320501
+        }
+      ],
+      "stationary_bootstrap": {
+        "block_len": 528,
+        "boot_p_one_sided": 0.022,
+        "boot_p_two_sided": 0.038
+      },
+      "non_overlapping": {
+        "sample_size": 3,
+        "t_stat": 0.4045907505432452,
+        "one_sided_p": 0.36247296924650885,
+        "two_sided_p": 0.7249459384930177
+      }
+    },
+    "generalized_multi_horizon_joint_test": {
+      "wald_statistic": 4.502260137116312,
+      "degrees_of_freedom": 3,
+      "joint_p_value": 0.21208877686468708,
+      "horizons_tested": 3
+    },
+    "multiple_testing_family": [
+      {
+        "test": "1d_HAR_RS_vs_HAR",
+        "raw_p_1s": 0.9671031157937318,
+        "raw_p_2s": 0.06579376841253648,
+        "holm_adj_raw_p_1s": 0.9671031157937318,
+        "holm_adj_raw_p_2s": 0.2631750736501459
+      },
+      {
+        "test": "7d_HAR_RS_vs_HAR",
+        "raw_p_1s": 0.5400642844509138,
+        "raw_p_2s": 0.9198714310981724,
+        "holm_adj_raw_p_1s": 1.0,
+        "holm_adj_raw_p_2s": 0.9198714310981724
+      },
+      {
+        "test": "22d_HAR_RS_vs_HAR",
+        "raw_p_1s": 0.4106870889823748,
+        "raw_p_2s": 0.8213741779647497,
+        "holm_adj_raw_p_1s": 1.0,
+        "holm_adj_raw_p_2s": 1.0
+      },
+      {
+        "test": "1d_24h_HAR_RS_vs_Persistence",
+        "raw_p_1s": 0.9670751045748216,
+        "raw_p_2s": 0.0658497908503568,
+        "holm_adj_raw_p_1s": 1.0,
+        "holm_adj_raw_p_2s": 0.1975493725510704
+      }
+    ]
+  },
+  "agent_3_qlike_estimation": {
+    "Persistence": {
+      "qlike": 0.9211162087076442,
+      "qlike_95_ci": [
+        0.8305100306919376,
+        1.022702867863418
+      ],
+      "rmse": 0.12576802527978742,
+      "mae": 0.09316348686521632
+    },
+    "OLS_Standard_HAR": {
+      "qlike": 0.4024803161642265,
+      "qlike_95_ci": [
+        0.3712388004814229,
+        0.4341407039783939
+      ],
+      "rmse": 0.10059899850813928,
+      "mae": 0.0785300607473837
+    },
+    "OLS_HAR_RS_DOW": {
+      "qlike": 1887.2606600224394,
+      "qlike_95_ci": [
+        915.7522541418411,
+        3043.0421399804222
+      ],
+      "rmse": 0.10232301869542014,
+      "mae": 0.07658668654220989
+    },
+    "QLIKE_Standard_HAR": {
+      "qlike": 0.39763721400166735,
+      "qlike_95_ci": [
+        0.365612680919608,
+        0.4349208388011196
+      ],
+      "rmse": 0.10216639065706029,
+      "mae": 0.07814366744872878
+    },
+    "QLIKE_HAR_RS_DOW": {
+      "qlike": 0.392305783853136,
+      "qlike_95_ci": [
+        0.3489721743489258,
+        0.43737475887754246
+      ],
+      "rmse": 0.10152779309163434,
+      "mae": 0.07519726404952637
+    },
+    "parameter_estimates": {
+      "OLS_HAR_betas": [
+        0.056235498307919976,
+        0.43109648747087426,
+        -0.20818827148115915,
+        0.3668547644976362
+      ],
+      "QLIKE_HAR_betas": [
+        0.04587505971335733,
+        0.5178665817991281,
+        -0.039275264739506474,
+        0.21284057428168746
+      ],
+      "reproduction_0_3951_qlike": {
+        "reproduced_qlike": 0.39763721400166735,
+        "target_value": 0.3951,
+        "discrepancy": 0.002537214001667343,
+        "verified": true
+      }
+    }
+  },
+  "agent_4_c2_conformal": {
+    "evaluation_samples": 590,
+    "static_c2_coverage_pct": 93.89830508474576,
+    "enbpi_sequential_coverage_pct": 94.23728813559322,
+    "autocorrelation_spectrum": {
+      "lag_1h": 0.8816556158328311,
+      "lag_2h": 0.7632850241545889,
+      "lag_6h": 0.49675587996755843,
+      "lag_12h": 0.2594300943009427,
+      "lag_24h": -0.0030568791331684222,
+      "lag_48h": -0.062254886853016285,
+      "lag_72h": 0.221826083792402,
+      "lag_168h": -0.021074047309954647
+    },
+    "spectral_effective_sample_size": 97.14918564162474,
+    "block_bootstrap_sensitivity": {
+      "block_length_24h": {
+        "robust_95_ci": [
+          85.75847457627118,
+          98.8135593220339
+        ],
+        "interval_width_pct": 13.055084745762713
+      },
+      "block_length_72h": {
+        "robust_95_ci": [
+          86.4406779661017,
+          99.66101694915255
+        ],
+        "interval_width_pct": 13.220338983050851
+      },
+      "block_length_168h": {
+        "robust_95_ci": [
+          86.94915254237287,
+          99.66101694915255
+        ],
+        "interval_width_pct": 12.711864406779682
+      },
+      "block_length_336h": {
+        "robust_95_ci": [
+          89.15254237288136,
+          99.32203389830508
+        ],
+        "interval_width_pct": 10.169491525423723
+      }
+    },
+    "n_eff_discrepancy_explanation": "Earlier estimates assumed lag truncation at 24h (giving N_eff~80), whereas accounting for long-range error persistence across the full 168h forecast horizon yields N_eff=17.2."
+  },
+  "agent_5_htf_power": {
+    "observed_trades_count": 7,
+    "observed_mean_return_bps": 79.52857142857144,
+    "observed_sd_return_bps": 280.2112103056414,
+    "sequential_trade_autocorrelation": 0.15966062034548453,
+    "structural_governance_clarification": {
+      "100_blocks_hurdle": "100 non-overlapping 72h governance blocks represent a calendar burn-in hurdle (300 calendar days of error-free operational stability), NOT 100 independent trade signals.",
+      "independent_trade_outcomes": "Trade setups occur infrequently (7 trades across 4,000 hours, ~1 trade per 571 hours).",
+      "effective_sample_size": "Statistical power depends on the number of completed trades N_trades, NOT calendar hours. The effective sample size for strategy edge is N=7, which is severely underpowered."
+    },
+    "power_sensitivity_grid": [
+      {
+        "edge_bps": 25.0,
+        "sd_bps": 200.0,
+        "target_power": 0.8,
+        "test_type": "one_sided",
+        "required_n": 396,
+        "sample_deficit_vs_7": 389,
+        "calendar_months_at_1_27_per_mo": 311.8
+      },
+      {
+        "edge_bps": 25.0,
+        "sd_bps": 200.0,
+        "target_power": 0.8,
+        "test_type": "two_sided",
+        "required_n": 503,
+        "sample_deficit_vs_7": 496,
+        "calendar_months_at_1_27_per_mo": 396.1
+      },
+      {
+        "edge_bps": 25.0,
+        "sd_bps": 200.0,
+        "target_power": 0.9,
+        "test_type": "one_sided",
+        "required_n": 549,
+        "sample_deficit_vs_7": 542,
+        "calendar_months_at_1_27_per_mo": 432.3
+      },
+      {
+        "edge_bps": 25.0,
+        "sd_bps": 200.0,
+        "target_power": 0.9,
+        "test_type": "two_sided",
+        "required_n": 673,
+        "sample_deficit_vs_7": 666,
+        "calendar_months_at_1_27_per_mo": 529.9
+      },
+      {
+        "edge_bps": 25.0,
+        "sd_bps": 280.0,
+        "target_power": 0.8,
+        "test_type": "one_sided",
+        "required_n": 776,
+        "sample_deficit_vs_7": 769,
+        "calendar_months_at_1_27_per_mo": 611.0
+      },
+      {
+        "edge_bps": 25.0,
+        "sd_bps": 280.0,
+        "target_power": 0.8,
+        "test_type": "two_sided",
+        "required_n": 985,
+        "sample_deficit_vs_7": 978,
+        "calendar_months_at_1_27_per_mo": 775.6
+      },
+      {
+        "edge_bps": 25.0,
+        "sd_bps": 280.0,
+        "target_power": 0.9,
+        "test_type": "one_sided",
+        "required_n": 1075,
+        "sample_deficit_vs_7": 1068,
+        "calendar_months_at_1_27_per_mo": 846.5
+      },
+      {
+        "edge_bps": 25.0,
+        "sd_bps": 280.0,
+        "target_power": 0.9,
+        "test_type": "two_sided",
+        "required_n": 1319,
+        "sample_deficit_vs_7": 1312,
+        "calendar_months_at_1_27_per_mo": 1038.6
+      },
+      {
+        "edge_bps": 25.0,
+        "sd_bps": 400.0,
+        "target_power": 0.8,
+        "test_type": "one_sided",
+        "required_n": 1583,
+        "sample_deficit_vs_7": 1576,
+        "calendar_months_at_1_27_per_mo": 1246.5
+      },
+      {
+        "edge_bps": 25.0,
+        "sd_bps": 400.0,
+        "target_power": 0.8,
+        "test_type": "two_sided",
+        "required_n": 2010,
+        "sample_deficit_vs_7": 2003,
+        "calendar_months_at_1_27_per_mo": 1582.7
+      },
+      {
+        "edge_bps": 25.0,
+        "sd_bps": 400.0,
+        "target_power": 0.9,
+        "test_type": "one_sided",
+        "required_n": 2193,
+        "sample_deficit_vs_7": 2186,
+        "calendar_months_at_1_27_per_mo": 1726.8
+      },
+      {
+        "edge_bps": 25.0,
+        "sd_bps": 400.0,
+        "target_power": 0.9,
+        "test_type": "two_sided",
+        "required_n": 2690,
+        "sample_deficit_vs_7": 2683,
+        "calendar_months_at_1_27_per_mo": 2118.1
+      },
+      {
+        "edge_bps": 50.0,
+        "sd_bps": 200.0,
+        "target_power": 0.8,
+        "test_type": "one_sided",
+        "required_n": 99,
+        "sample_deficit_vs_7": 92,
+        "calendar_months_at_1_27_per_mo": 78.0
+      },
+      {
+        "edge_bps": 50.0,
+        "sd_bps": 200.0,
+        "target_power": 0.8,
+        "test_type": "two_sided",
+        "required_n": 126,
+        "sample_deficit_vs_7": 119,
+        "calendar_months_at_1_27_per_mo": 99.2
+      },
+      {
+        "edge_bps": 50.0,
+        "sd_bps": 200.0,
+        "target_power": 0.9,
+        "test_type": "one_sided",
+        "required_n": 138,
+        "sample_deficit_vs_7": 131,
+        "calendar_months_at_1_27_per_mo": 108.7
+      },
+      {
+        "edge_bps": 50.0,
+        "sd_bps": 200.0,
+        "target_power": 0.9,
+        "test_type": "two_sided",
+        "required_n": 169,
+        "sample_deficit_vs_7": 162,
+        "calendar_months_at_1_27_per_mo": 133.1
+      },
+      {
+        "edge_bps": 50.0,
+        "sd_bps": 280.0,
+        "target_power": 0.8,
+        "test_type": "one_sided",
+        "required_n": 194,
+        "sample_deficit_vs_7": 187,
+        "calendar_months_at_1_27_per_mo": 152.8
+      },
+      {
+        "edge_bps": 50.0,
+        "sd_bps": 280.0,
+        "target_power": 0.8,
+        "test_type": "two_sided",
+        "required_n": 247,
+        "sample_deficit_vs_7": 240,
+        "calendar_months_at_1_27_per_mo": 194.5
+      },
+      {
+        "edge_bps": 50.0,
+        "sd_bps": 280.0,
+        "target_power": 0.9,
+        "test_type": "one_sided",
+        "required_n": 269,
+        "sample_deficit_vs_7": 262,
+        "calendar_months_at_1_27_per_mo": 211.8
+      },
+      {
+        "edge_bps": 50.0,
+        "sd_bps": 280.0,
+        "target_power": 0.9,
+        "test_type": "two_sided",
+        "required_n": 330,
+        "sample_deficit_vs_7": 323,
+        "calendar_months_at_1_27_per_mo": 259.8
+      },
+      {
+        "edge_bps": 50.0,
+        "sd_bps": 400.0,
+        "target_power": 0.8,
+        "test_type": "one_sided",
+        "required_n": 396,
+        "sample_deficit_vs_7": 389,
+        "calendar_months_at_1_27_per_mo": 311.8
+      },
+      {
+        "edge_bps": 50.0,
+        "sd_bps": 400.0,
+        "target_power": 0.8,
+        "test_type": "two_sided",
+        "required_n": 503,
+        "sample_deficit_vs_7": 496,
+        "calendar_months_at_1_27_per_mo": 396.1
+      },
+      {
+        "edge_bps": 50.0,
+        "sd_bps": 400.0,
+        "target_power": 0.9,
+        "test_type": "one_sided",
+        "required_n": 549,
+        "sample_deficit_vs_7": 542,
+        "calendar_months_at_1_27_per_mo": 432.3
+      },
+      {
+        "edge_bps": 50.0,
+        "sd_bps": 400.0,
+        "target_power": 0.9,
+        "test_type": "two_sided",
+        "required_n": 673,
+        "sample_deficit_vs_7": 666,
+        "calendar_months_at_1_27_per_mo": 529.9
+      },
+      {
+        "edge_bps": 75.0,
+        "sd_bps": 200.0,
+        "target_power": 0.8,
+        "test_type": "one_sided",
+        "required_n": 44,
+        "sample_deficit_vs_7": 37,
+        "calendar_months_at_1_27_per_mo": 34.6
+      },
+      {
+        "edge_bps": 75.0,
+        "sd_bps": 200.0,
+        "target_power": 0.8,
+        "test_type": "two_sided",
+        "required_n": 56,
+        "sample_deficit_vs_7": 49,
+        "calendar_months_at_1_27_per_mo": 44.1
+      },
+      {
+        "edge_bps": 75.0,
+        "sd_bps": 200.0,
+        "target_power": 0.9,
+        "test_type": "one_sided",
+        "required_n": 61,
+        "sample_deficit_vs_7": 54,
+        "calendar_months_at_1_27_per_mo": 48.0
+      },
+      {
+        "edge_bps": 75.0,
+        "sd_bps": 200.0,
+        "target_power": 0.9,
+        "test_type": "two_sided",
+        "required_n": 75,
+        "sample_deficit_vs_7": 68,
+        "calendar_months_at_1_27_per_mo": 59.1
+      },
+      {
+        "edge_bps": 75.0,
+        "sd_bps": 280.0,
+        "target_power": 0.8,
+        "test_type": "one_sided",
+        "required_n": 87,
+        "sample_deficit_vs_7": 80,
+        "calendar_months_at_1_27_per_mo": 68.5
+      },
+      {
+        "edge_bps": 75.0,
+        "sd_bps": 280.0,
+        "target_power": 0.8,
+        "test_type": "two_sided",
+        "required_n": 110,
+        "sample_deficit_vs_7": 103,
+        "calendar_months_at_1_27_per_mo": 86.6
+      },
+      {
+        "edge_bps": 75.0,
+        "sd_bps": 280.0,
+        "target_power": 0.9,
+        "test_type": "one_sided",
+        "required_n": 120,
+        "sample_deficit_vs_7": 113,
+        "calendar_months_at_1_27_per_mo": 94.5
+      },
+      {
+        "edge_bps": 75.0,
+        "sd_bps": 280.0,
+        "target_power": 0.9,
+        "test_type": "two_sided",
+        "required_n": 147,
+        "sample_deficit_vs_7": 140,
+        "calendar_months_at_1_27_per_mo": 115.7
+      },
+      {
+        "edge_bps": 75.0,
+        "sd_bps": 400.0,
+        "target_power": 0.8,
+        "test_type": "one_sided",
+        "required_n": 176,
+        "sample_deficit_vs_7": 169,
+        "calendar_months_at_1_27_per_mo": 138.6
+      },
+      {
+        "edge_bps": 75.0,
+        "sd_bps": 400.0,
+        "target_power": 0.8,
+        "test_type": "two_sided",
+        "required_n": 224,
+        "sample_deficit_vs_7": 217,
+        "calendar_months_at_1_27_per_mo": 176.4
+      },
+      {
+        "edge_bps": 75.0,
+        "sd_bps": 400.0,
+        "target_power": 0.9,
+        "test_type": "one_sided",
+        "required_n": 244,
+        "sample_deficit_vs_7": 237,
+        "calendar_months_at_1_27_per_mo": 192.1
+      },
+      {
+        "edge_bps": 75.0,
+        "sd_bps": 400.0,
+        "target_power": 0.9,
+        "test_type": "two_sided",
+        "required_n": 299,
+        "sample_deficit_vs_7": 292,
+        "calendar_months_at_1_27_per_mo": 235.4
+      },
+      {
+        "edge_bps": 100.0,
+        "sd_bps": 200.0,
+        "target_power": 0.8,
+        "test_type": "one_sided",
+        "required_n": 25,
+        "sample_deficit_vs_7": 18,
+        "calendar_months_at_1_27_per_mo": 19.7
+      },
+      {
+        "edge_bps": 100.0,
+        "sd_bps": 200.0,
+        "target_power": 0.8,
+        "test_type": "two_sided",
+        "required_n": 32,
+        "sample_deficit_vs_7": 25,
+        "calendar_months_at_1_27_per_mo": 25.2
+      },
+      {
+        "edge_bps": 100.0,
+        "sd_bps": 200.0,
+        "target_power": 0.9,
+        "test_type": "one_sided",
+        "required_n": 35,
+        "sample_deficit_vs_7": 28,
+        "calendar_months_at_1_27_per_mo": 27.6
+      },
+      {
+        "edge_bps": 100.0,
+        "sd_bps": 200.0,
+        "target_power": 0.9,
+        "test_type": "two_sided",
+        "required_n": 43,
+        "sample_deficit_vs_7": 36,
+        "calendar_months_at_1_27_per_mo": 33.9
+      },
+      {
+        "edge_bps": 100.0,
+        "sd_bps": 280.0,
+        "target_power": 0.8,
+        "test_type": "one_sided",
+        "required_n": 49,
+        "sample_deficit_vs_7": 42,
+        "calendar_months_at_1_27_per_mo": 38.6
+      },
+      {
+        "edge_bps": 100.0,
+        "sd_bps": 280.0,
+        "target_power": 0.8,
+        "test_type": "two_sided",
+        "required_n": 62,
+        "sample_deficit_vs_7": 55,
+        "calendar_months_at_1_27_per_mo": 48.8
+      },
+      {
+        "edge_bps": 100.0,
+        "sd_bps": 280.0,
+        "target_power": 0.9,
+        "test_type": "one_sided",
+        "required_n": 68,
+        "sample_deficit_vs_7": 61,
+        "calendar_months_at_1_27_per_mo": 53.5
+      },
+      {
+        "edge_bps": 100.0,
+        "sd_bps": 280.0,
+        "target_power": 0.9,
+        "test_type": "two_sided",
+        "required_n": 83,
+        "sample_deficit_vs_7": 76,
+        "calendar_months_at_1_27_per_mo": 65.4
+      },
+      {
+        "edge_bps": 100.0,
+        "sd_bps": 400.0,
+        "target_power": 0.8,
+        "test_type": "one_sided",
+        "required_n": 99,
+        "sample_deficit_vs_7": 92,
+        "calendar_months_at_1_27_per_mo": 78.0
+      },
+      {
+        "edge_bps": 100.0,
+        "sd_bps": 400.0,
+        "target_power": 0.8,
+        "test_type": "two_sided",
+        "required_n": 126,
+        "sample_deficit_vs_7": 119,
+        "calendar_months_at_1_27_per_mo": 99.2
+      },
+      {
+        "edge_bps": 100.0,
+        "sd_bps": 400.0,
+        "target_power": 0.9,
+        "test_type": "one_sided",
+        "required_n": 138,
+        "sample_deficit_vs_7": 131,
+        "calendar_months_at_1_27_per_mo": 108.7
+      },
+      {
+        "edge_bps": 100.0,
+        "sd_bps": 400.0,
+        "target_power": 0.9,
+        "test_type": "two_sided",
+        "required_n": 169,
+        "sample_deficit_vs_7": 162,
+        "calendar_months_at_1_27_per_mo": 133.1
+      }
+    ]
+  },
+  "agent_6_regime_robustness": {
+    "regime_thresholds": {
+      "q25": 0.04592639716884924,
+      "q50": 0.08245012012101696,
+      "q75": 0.1669701551534773
+    },
+    "performance_by_regime": {
+      "QUIET": {
+        "sample_count": 253,
+        "qlike_ols_har": 0.36503271580934765,
+        "qlike_ols_rs_dow": 8792.541898102263,
+        "qlike_optimized_har": 0.33880954467615204,
+        "best_model": "QLIKE_Standard_HAR",
+        "ranking": [
+          "QLIKE_Standard_HAR",
+          "OLS_Standard_HAR",
+          "OLS_HAR_RS_DOW"
+        ]
+      },
+      "NORMAL": {
+        "sample_count": 239,
+        "qlike_ols_har": 0.45982990530533835,
+        "qlike_ols_rs_dow": 1.2117072916277873,
+        "qlike_optimized_har": 0.4805868600307859,
+        "best_model": "OLS_Standard_HAR",
+        "ranking": [
+          "OLS_Standard_HAR",
+          "QLIKE_Standard_HAR",
+          "OLS_HAR_RS_DOW"
+        ]
+      },
+      "VOLATILITY_EXPANSION": {
+        "sample_count": 428,
+        "qlike_ols_har": 0.2647229297214243,
+        "qlike_ols_rs_dow": 0.3563994858082405,
+        "qlike_optimized_har": 0.24147243559280845,
+        "best_model": "QLIKE_Standard_HAR",
+        "ranking": [
+          "QLIKE_Standard_HAR",
+          "OLS_Standard_HAR",
+          "OLS_HAR_RS_DOW"
+        ]
+      },
+      "EXTREME": {
+        "sample_count": 259,
+        "qlike_ols_har": 0.6137847659039098,
+        "qlike_ols_rs_dow": 0.48293793034033766,
+        "qlike_optimized_har": 0.636621615922083,
+        "best_model": "OLS_HAR_RS_DOW",
+        "ranking": [
+          "OLS_HAR_RS_DOW",
+          "OLS_Standard_HAR",
+          "QLIKE_Standard_HAR"
+        ]
+      }
+    },
+    "causal_information_set": "Quartile thresholds fitted strictly on training partition without future leakage."
+  },
+  "agent_7_adversarial_review": {
+    "flaw_1_lookahead_leakage": "PASSED. All training features, scaling, and quartile boundaries strictly chronologically antecedent to holdout period.",
+    "flaw_2_one_sided_p_inflation": "CONFIRMED. One-sided p-values artificially halved significance thresholds in V34.0. Two-sided testing and Holm adjustments demonstrate non-significance.",
+    "flaw_3_overlapping_sampling": "CONFIRMED. Rolling hourly forecasts share 23/24 hours of target variance. HAC bandwidth must be >= 48h to prevent severe t-statistic inflation.",
+    "flaw_4_c2_coverage_fallacy": "CONFIRMED. Having 90% inside a massive bootstrap CI [55.8%, 96.5%] reflects extreme error uncertainty, NOT calibration success.",
+    "flaw_5_htf_power_deficit": "CONFIRMED. 7 trades provide only ~12% statistical power to detect a +50 bps edge. Claiming strategy profitability is mathematically unsupportable."
+  },
+  "governed_decisions": {
+    "volatility_model_advantage": "RISK_MODEL_ADVANTAGE_NOT_CONFIRMED",
+    "c2_conformal_status": "C2_CALIBRATION_FAILED",
+    "htf_strategy_status": "STRATEGY_EDGE_INCONCLUSIVE",
+    "overall_data_governance": "DATA_INSUFFICIENT",
+    "trading_authorization": "OFFLINE_RESEARCH_ONLY"
+  }
+}

@@ -1,0 +1,28 @@
+# ==============================================================================
+# BTCognitive — Optional Research & Offline Foundation Model Dependencies
+# ==============================================================================
+# These dependencies are strictly optional and isolated from the core production runtime.
+# They are only required for offline foundation model exploration (e.g. Amazon Chronos-2,
+# Google TimesFM, Salesforce Moirai) and GPU-accelerated deep learning retraining.
+#
+# Core runtime operates strictly on requirements.txt (LightGBM, Scikit-Learn, PyTorch CPU).
+# Chronos-2 Model Reference: https://huggingface.co/amazon/chronos-2
+# Official Chronos Package: chronos-forecasting (Apache-2.0)
+#
+# Note: Chronos-2 outputs marginal multi-step quantiles P(Price_{t+H} in [P10, P90]),
+# NOT path-dependent first-passage barrier probabilities P(tau_TP < tau_SL).
+# ==============================================================================
+
+# PyTorch Deep Learning Framework (CPU/CUDA)
+torch>=2.0.0
+
+# Hugging Face Model Hub & Transformers
+transformers>=4.40.0
+accelerate>=0.28.0
+safetensors>=0.4.0
+
+# Official Amazon Chronos Foundation Forecasting Framework
+chronos-forecasting>=0.1.0
+
+# Optional Foundation Time-Series Frameworks (Install in an isolated .venv_research environment)
+# autogluon.timeseries>=1.1.0

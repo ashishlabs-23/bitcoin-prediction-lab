@@ -199,10 +199,25 @@ class LongitudinalStatusService:
                 break
 
         # Reconciled Hawkes shadow metrics
-        conn = sqlite3.connect(MARKET_MEMORY_DB_PATH)
-        h_fc_count = conn.execute("SELECT COUNT(*) FROM hawkes_forecasts").fetchone()[0]
-        h_oc_count = conn.execute("SELECT COUNT(*) FROM hawkes_outcomes").fetchone()[0]
-        conn.close()
+        if not os.path.isfile(MARKET_MEMORY_DB_PATH):
+            raise FileNotFoundError(f"Database file not found: {MARKET_MEMORY_DB_PATH}")
+
+        from backtest.market_memory import _get_db
+        conn = _get_db(MARKET_MEMORY_DB_PATH)
+        try:
+            check = conn.execute("PRAGMA quick_check(1);").fetchone()
+            if check and check[0] != "ok":
+                raise sqlite3.DatabaseError(f"Database integrity check failed: {check[0]}")
+
+            h_fc_count = 0
+            h_oc_count = 0
+            tables = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+            if "hawkes_forecasts" in tables:
+                h_fc_count = conn.execute("SELECT COUNT(*) FROM hawkes_forecasts").fetchone()[0]
+            if "hawkes_outcomes" in tables:
+                h_oc_count = conn.execute("SELECT COUNT(*) FROM hawkes_outcomes").fetchone()[0]
+        finally:
+            conn.close()
 
         return LongitudinalStatusReport(
             evidence_phase="POST_REPAIR",

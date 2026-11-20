@@ -1,0 +1,14 @@
+{"action": "connect", "address": "('127.0.0.1', 57758)", "allowed": true, "owned_ports": [57758], "pid": 1720}
+{"action": "connect", "address": "('127.0.0.1', 57141)", "allowed": true, "owned_ports": [57141], "pid": 1720}
+{"action": "connect", "address": "('127.0.0.1', 57159)", "allowed": true, "owned_ports": [57159], "pid": 1720}
+{"action": "connect", "address": "('127.0.0.1', 59292)", "allowed": true, "owned_ports": [59292], "pid": 1720}
+{"action": "connect", "address": "('127.0.0.1', 59312)", "allowed": true, "owned_ports": [59312], "pid": 1720}
+{"action": "connect", "address": "('127.0.0.1', 59314)", "allowed": true, "owned_ports": [59314], "pid": 1720}
+{"action": "connect", "address": "('127.0.0.1', 59316)", "allowed": true, "owned_ports": [59316], "pid": 1720}
+{"action": "connect", "address": "('127.0.0.1', 59318)", "allowed": true, "owned_ports": [59318], "pid": 1720}
+{"action": "connect", "address": "('127.0.0.1', 59320)", "allowed": true, "owned_ports": [59320], "pid": 1720}
+{"action": "connect", "address": "('127.0.0.1', 59323)", "allowed": true, "owned_ports": [59323], "pid": 1720}
+{"action": "connect", "address": "('127.0.0.1', 59328)", "allowed": true, "owned_ports": [59328], "pid": 1720}
+{"action": "connect", "address": "('127.0.0.1', 51521)", "allowed": true, "owned_ports": [51521], "pid": 1720}
+{"action": "connect", "address": "('127.0.0.1', 63392)", "allowed": true, "owned_ports": [63392], "pid": 1720}
+{"action": "connect", "address": "('127.0.0.1', 63407)", "allowed": true, "owned_ports": [63407], "pid": 1720}

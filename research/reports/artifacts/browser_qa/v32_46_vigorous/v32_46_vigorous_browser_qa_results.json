@@ -1,0 +1,24 @@
+{
+  "timestamp_utc": "2026-10-26T07:17:27Z",
+  "base_url": "http://127.0.0.1:8090",
+  "tests": {
+    "desktop_terminal_workflow": "PASSED",
+    "research_paper_trading_isolation": "PASSED",
+    "manual_journal_isolation": "PASSED",
+    "navigation_and_history_regression": "PASSED",
+    "tablet_responsive": "PASSED",
+    "mobile_responsive": "PASSED",
+    "stale_market_data_fail_closed": "PASSED"
+  },
+  "screenshots": [
+    "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_46_vigorous\\v32_46_vigorous_terminal_desktop.png",
+    "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_46_vigorous\\v32_46_vigorous_research_paper_trading.png",
+    "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_46_vigorous\\v32_46_vigorous_manual_journal.png",
+    "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_46_vigorous\\v32_46_vigorous_terminal_tablet.png",
+    "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_46_vigorous\\v32_46_vigorous_terminal_mobile.png",
+    "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_46_vigorous\\v32_46_vigorous_terminal_stale_abstain.png"
+  ],
+  "console_errors": [],
+  "network_errors": [],
+  "overall_status": "PASSED"
+}

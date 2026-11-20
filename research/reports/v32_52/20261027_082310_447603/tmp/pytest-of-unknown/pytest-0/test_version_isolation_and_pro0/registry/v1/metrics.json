@@ -1,0 +1,70 @@
+{
+  "version": "v1",
+  "trained_at": "2026-10-27T03:22:53.716246+00:00",
+  "train_samples": 1176,
+  "test_samples": 250,
+  "metrics": {
+    "sharpe_ratio": -3.3913,
+    "sortino_ratio": -4.4151,
+    "calmar_ratio": -1.6139,
+    "deflated_sharpe": 0.0655,
+    "win_rate": 0.396,
+    "max_drawdown": 0.3045
+  },
+  "comparison_table": {
+    "n_samples": 250,
+    "tft_accuracy": {
+      "old": 0.424,
+      "new": 0.356,
+      "n": 250
+    },
+    "tft_auc": {
+      "old": 0.4982,
+      "new": 0.48,
+      "n": 250
+    },
+    "regime_accuracy": {
+      "old": 1.0,
+      "new": 1.0,
+      "n": 250
+    },
+    "meta_win_rate": {
+      "old": 0.496,
+      "new": 0.3725,
+      "n": 250
+    },
+    "meta_auc": {
+      "old": 0.5164,
+      "new": 0.4309,
+      "n": 250
+    },
+    "dsr": {
+      "old": 0.0661,
+      "new": 0.0758,
+      "n": 250
+    },
+    "cost_adjusted_sharpe": {
+      "old": -2.9791,
+      "new": -36.0862,
+      "n": 250
+    },
+    "sharpe_diagnostics": {
+      "n_trades": 250,
+      "calendar_span_days": 10.4167,
+      "trades_per_year": 8766.0,
+      "annualization_factor": "sqrt(8766.0) = 93.6269",
+      "new_mean_return": -0.001446,
+      "new_std_return": 0.003751,
+      "old_mean_return": -0.000122,
+      "old_std_return": 0.003843
+    }
+  },
+  "incumbent_dsr": 0.965,
+  "promoted": false,
+  "model_paths": {
+    "tft": "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\v32_52\\20261027_082310_447603\\tmp\\pytest-of-unknown\\pytest-0\\test_version_isolation_and_pro0\\registry\\v1\\tft.pt",
+    "regime": "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\v32_52\\20261027_082310_447603\\tmp\\pytest-of-unknown\\pytest-0\\test_version_isolation_and_pro0\\registry\\v1\\regime.pt",
+    "router": "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\v32_52\\20261027_082310_447603\\tmp\\pytest-of-unknown\\pytest-0\\test_version_isolation_and_pro0\\registry\\v1\\router.pt",
+    "meta": "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\v32_52\\20261027_082310_447603\\tmp\\pytest-of-unknown\\pytest-0\\test_version_isolation_and_pro0\\registry\\v1\\meta.pt"
+  }
+}

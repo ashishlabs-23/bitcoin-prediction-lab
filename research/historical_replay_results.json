@@ -1,0 +1,207 @@
+{
+  "dataset_hash": "bed0fbcd5592bc5884418aa71d05f2668d592c844787fa849507b1275caf2736",
+  "total_candles_analyzed": 41419,
+  "sample_period_start": "2022-01-01 00:00:00+00:00",
+  "sample_period_end": "2026-10-23 17:00:00+00:00",
+  "total_setups_evaluated": 41365,
+  "independent_24h_blocks": 1724,
+  "sample_shrinkage_ratio": 24.0,
+  "barrier_geometry": {
+    "k_tp": 1.5,
+    "k_sl": 1.0,
+    "horizon_bars": 24,
+    "theoretical_infinite_horizon_null": 0.4
+  },
+  "empirical_null_random_entry": 0.1792,
+  "finite_horizon_drag": 0.2208,
+  "realized_outcomes": {
+    "observed_tp_first_rate": 0.1792,
+    "observed_sl_first_rate": 0.33,
+    "observed_timeout_rate": 0.4908,
+    "excess_hit_rate_over_empirical_null": 0.0,
+    "excess_hit_rate_over_theory_null": -0.2208,
+    "mean_gross_r": 0.0118
+  },
+  "independent_blocks_validation": {
+    "n_independent_blocks": 1724,
+    "non_overlap_hit_rate": 0.1798,
+    "non_overlap_empirical_null": 0.1821,
+    "non_overlap_gross_r": 0.0183
+  },
+  "calibration_audit": {
+    "brier_score": 0.2499,
+    "brier_score_climatology": 0.1471,
+    "brier_skill_score": -0.6985,
+    "calibration_quality": "NO_SKILL_WORSE_THAN_BASE_RATE",
+    "decile_lift": 0.04,
+    "decile_breakdown": [
+      {
+        "decile": 0,
+        "count": 4143,
+        "mean_p_tp": 0.3521,
+        "realized_hit_rate": 0.1335,
+        "mean_gross_r": -0.0102
+      },
+      {
+        "decile": 1,
+        "count": 4130,
+        "mean_p_tp": 0.3949,
+        "realized_hit_rate": 0.1542,
+        "mean_gross_r": 0.0031
+      },
+      {
+        "decile": 2,
+        "count": 4141,
+        "mean_p_tp": 0.4247,
+        "realized_hit_rate": 0.1833,
+        "mean_gross_r": 0.0388
+      },
+      {
+        "decile": 3,
+        "count": 4145,
+        "mean_p_tp": 0.4526,
+        "realized_hit_rate": 0.1841,
+        "mean_gross_r": 0.009
+      },
+      {
+        "decile": 4,
+        "count": 4138,
+        "mean_p_tp": 0.4791,
+        "realized_hit_rate": 0.1921,
+        "mean_gross_r": 0.0071
+      },
+      {
+        "decile": 5,
+        "count": 4128,
+        "mean_p_tp": 0.5034,
+        "realized_hit_rate": 0.1996,
+        "mean_gross_r": 0.0036
+      },
+      {
+        "decile": 6,
+        "count": 4133,
+        "mean_p_tp": 0.5295,
+        "realized_hit_rate": 0.1865,
+        "mean_gross_r": -0.0019
+      },
+      {
+        "decile": 7,
+        "count": 4137,
+        "mean_p_tp": 0.5584,
+        "realized_hit_rate": 0.1873,
+        "mean_gross_r": -0.0188
+      },
+      {
+        "decile": 8,
+        "count": 4138,
+        "mean_p_tp": 0.5909,
+        "realized_hit_rate": 0.1982,
+        "mean_gross_r": 0.0446
+      },
+      {
+        "decile": 9,
+        "count": 4132,
+        "mean_p_tp": 0.6321,
+        "realized_hit_rate": 0.1735,
+        "mean_gross_r": 0.0423
+      }
+    ]
+  },
+  "cost_feasibility_analysis": {
+    "india_intl_27bps": {
+      "round_trip_bps": 27.0,
+      "mean_friction_r": 0.1619,
+      "required_breakeven_win_rate": 0.4648,
+      "realized_win_rate": 0.1792,
+      "net_edge_over_breakeven": -0.2855,
+      "mean_net_r_per_trade": -0.1502,
+      "total_net_r": -6211.0,
+      "sharpe_annualized": -3.115,
+      "is_profitable_net": false
+    },
+    "eu_uk_107bps": {
+      "round_trip_bps": 107.0,
+      "mean_friction_r": 0.6416,
+      "required_breakeven_win_rate": 0.6566,
+      "realized_win_rate": 0.1792,
+      "net_edge_over_breakeven": -0.4774,
+      "mean_net_r_per_trade": -0.6299,
+      "total_net_r": -26054.2,
+      "sharpe_annualized": -12.157,
+      "is_profitable_net": false
+    },
+    "us_retail_187bps": {
+      "round_trip_bps": 187.0,
+      "mean_friction_r": 1.1213,
+      "required_breakeven_win_rate": 0.8485,
+      "realized_win_rate": 0.1792,
+      "net_edge_over_breakeven": -0.6693,
+      "mean_net_r_per_trade": -1.1096,
+      "total_net_r": -45897.4,
+      "sharpe_annualized": -18.729,
+      "is_profitable_net": false
+    }
+  },
+  "yearly_performance": {
+    "2022": {
+      "bars": 8730,
+      "mean_p_tp": 0.4817,
+      "hit_rate": 0.143,
+      "timeout_rate": 0.4984,
+      "gross_r_mean": -0.087,
+      "mean_sigma_1h": 0.0058,
+      "mean_sigma_H": 0.02842
+    },
+    "2023": {
+      "bars": 8759,
+      "mean_p_tp": 0.4941,
+      "hit_rate": 0.2226,
+      "timeout_rate": 0.4781,
+      "gross_r_mean": 0.0906,
+      "mean_sigma_1h": 0.00383,
+      "mean_sigma_H": 0.01874
+    },
+    "2024": {
+      "bars": 8784,
+      "mean_p_tp": 0.4973,
+      "hit_rate": 0.1818,
+      "timeout_rate": 0.4987,
+      "gross_r_mean": 0.0421,
+      "mean_sigma_1h": 0.00497,
+      "mean_sigma_H": 0.02433
+    },
+    "2025": {
+      "bars": 8760,
+      "mean_p_tp": 0.4929,
+      "hit_rate": 0.1725,
+      "timeout_rate": 0.4981,
+      "gross_r_mean": 0.0195,
+      "mean_sigma_1h": 0.00411,
+      "mean_sigma_H": 0.02014
+    },
+    "2026": {
+      "bars": 6332,
+      "mean_p_tp": 0.493,
+      "hit_rate": 0.175,
+      "timeout_rate": 0.4768,
+      "gross_r_mean": -0.014,
+      "mean_sigma_1h": 0.00406,
+      "mean_sigma_H": 0.0199
+    }
+  },
+  "deflated_sharpe_ratio": {
+    "observed_sharpe": -2.9544,
+    "n_observations_t": 1724,
+    "skewness": 0.2902,
+    "kurtosis": 1.8104,
+    "n_trials_tested": 10,
+    "data_snooping_hurdle_sr": 0.7873,
+    "sigma_sharpe": 0.0459,
+    "z_dsr": -81.5664,
+    "deflated_sharpe_ratio": 0.0,
+    "is_significant_95pct": false,
+    "verdict": "FAIL_DATA_SNOOPING_OVERFIT_RISK",
+    "interpretation": "Observed SR=-2.954 fails to clear the multi-testing hurdle SR*=0.787 across 10 trials (DSR=0.0% < 95%)."
+  },
+  "scientific_verdict": "EDGE_REJECTED_NO_SKILL"
+}

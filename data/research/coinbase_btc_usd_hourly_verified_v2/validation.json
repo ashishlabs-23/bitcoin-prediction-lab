@@ -1,0 +1,46 @@
+{
+  "rows": 42237,
+  "expected_hourly_timestamps": 42250,
+  "first_timestamp_utc": "2022-01-01T00:00:00+00:00",
+  "last_timestamp_utc": "2026-10-27T09:00:00+00:00",
+  "timestamps_monotonic_increasing": true,
+  "duplicate_timestamps": 0,
+  "missing_interval_count": 3,
+  "gaps": [
+    {
+      "after_utc": "2023-03-04T17:00:00+00:00",
+      "resumes_utc": "2023-03-04T21:00:00+00:00",
+      "missing_intervals": 3
+    },
+    {
+      "after_utc": "2025-10-25T15:00:00+00:00",
+      "resumes_utc": "2025-10-25T21:00:00+00:00",
+      "missing_intervals": 5
+    },
+    {
+      "after_utc": "2026-05-08T01:00:00+00:00",
+      "resumes_utc": "2026-05-08T07:00:00+00:00",
+      "missing_intervals": 5
+    }
+  ],
+  "timestamp_timezone": "UTC",
+  "finite_ohlcv": true,
+  "valid_ohlc_bounds": true,
+  "nonnegative_volume": true,
+  "missing_expected_timestamps": [
+    "2023-03-04T18:00:00Z",
+    "2023-03-04T19:00:00Z",
+    "2023-03-04T20:00:00Z",
+    "2025-10-25T16:00:00Z",
+    "2025-10-25T17:00:00Z",
+    "2025-10-25T18:00:00Z",
+    "2025-10-25T19:00:00Z",
+    "2025-10-25T20:00:00Z",
+    "2026-05-08T02:00:00Z",
+    "2026-05-08T03:00:00Z",
+    "2026-05-08T04:00:00Z",
+    "2026-05-08T05:00:00Z",
+    "2026-05-08T06:00:00Z"
+  ],
+  "timestamps_outside_requested_range": []
+}

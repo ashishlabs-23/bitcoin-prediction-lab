@@ -1,0 +1,12 @@
+{
+  "run_id": "20261027_072352_0530",
+  "status": "NOT_RUN",
+  "screenshots_captured": 0,
+  "reason": "No normal application listener was available on the attached browser URLs; existing browser/CDP process was pre-existing and was not reused.",
+  "required_viewports": [
+    "1280x800",
+    "768x1024",
+    "375x667"
+  ],
+  "existing_prior_screenshots": "V32.50 artifacts were preserved but not copied or relabeled as V32.51."
+}

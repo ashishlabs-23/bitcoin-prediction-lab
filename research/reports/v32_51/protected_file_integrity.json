@@ -1,0 +1,122 @@
+{
+  "run_id": "20261027_072352_0530",
+  "captured_at_start": "2026-10-27T07:22:55.4741664+05:30",
+  "captured_at_end": "2026-10-27T07:35:32.1624506+05:30",
+  "historical_incident": {
+    "status": "OPEN_ROOT_CAUSE_UNRESOLVED",
+    "previously_observed_preincident_primary_sha256": "1e722f33734a89e74764c02fde0552752cc1ea2eff62ca9046c9d6edf2347d5c",
+    "v32_50_postincident_primary_sha256": "c007cd613bec3012fa427d047b466d5e250bd4451b5062d311f387e8afd0ce3f",
+    "prebackfill_backup_sha256": "c4949e5b5695ffa172677681b15af2ea6167e73317c3496546f2286a6730b1c8",
+    "backup_authorized_for_recovery": false,
+    "root_cause": "unknown",
+    "authoritative_source_or_recovery_decision": "not provided"
+  },
+  "files": [
+    {
+      "path": "data/prospective_entry_ledger.jsonl",
+      "start": {
+        "sha256": "91c3aed984002f611a59c78a2eb4c342c0970baebbd2e3d6df7973be7acf1dd7",
+        "size_bytes": 3385,
+        "mtime_local": "2026-10-20T00:37:38.1969448+05:30",
+        "mtime_utc": "2026-10-19T19:07:38.1969448Z"
+      },
+      "end": {
+        "sha256": "91c3aed984002f611a59c78a2eb4c342c0970baebbd2e3d6df7973be7acf1dd7",
+        "size_bytes": 3385,
+        "mtime_local": "2026-10-20T00:37:38.1969448+05:30",
+        "mtime_utc": "2026-10-19T19:07:38.1969448Z"
+      },
+      "within_run_result": "UNCHANGED"
+    },
+    {
+      "path": "data/prospective_shadow_v1.jsonl",
+      "start": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size_bytes": 0,
+        "mtime_local": "2026-10-23T15:54:07.8060474+05:30",
+        "mtime_utc": "2026-10-23T10:24:07.8060474Z"
+      },
+      "end": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size_bytes": 0,
+        "mtime_local": "2026-10-23T15:54:07.8060474+05:30",
+        "mtime_utc": "2026-10-23T10:24:07.8060474Z"
+      },
+      "within_run_result": "UNCHANGED"
+    },
+    {
+      "path": "data/prospective_entry_ledger_v2.jsonl",
+      "start": {
+        "sha256": "e6e33e3c7beb4c255467e967fc819b85481b0afb1052c3ea7bd248c53f87b604",
+        "size_bytes": 12744,
+        "mtime_local": "2026-10-24T15:34:04.1691418+05:30",
+        "mtime_utc": "2026-10-24T10:04:04.1691418Z"
+      },
+      "end": {
+        "sha256": "e6e33e3c7beb4c255467e967fc819b85481b0afb1052c3ea7bd248c53f87b604",
+        "size_bytes": 12744,
+        "mtime_local": "2026-10-24T15:34:04.1691418+05:30",
+        "mtime_utc": "2026-10-24T10:04:04.1691418Z"
+      },
+      "within_run_result": "UNCHANGED"
+    },
+    {
+      "path": "data/raw/ohlcv.parquet",
+      "start": {
+        "sha256": "c007cd613bec3012fa427d047b466d5e250bd4451b5062d311f387e8afd0ce3f",
+        "size_bytes": 2329745,
+        "mtime_local": "2026-10-26T23:12:20.3982917+05:30",
+        "mtime_utc": "2026-10-26T17:42:20.3982917Z"
+      },
+      "end": {
+        "sha256": "c007cd613bec3012fa427d047b466d5e250bd4451b5062d311f387e8afd0ce3f",
+        "size_bytes": 2329745,
+        "mtime_local": "2026-10-26T23:12:20.3982917+05:30",
+        "mtime_utc": "2026-10-26T17:42:20.3982917Z"
+      },
+      "within_run_result": "UNCHANGED; HISTORICAL MISMATCH REMAINS OPEN"
+    },
+    {
+      "path": "data/raw/ohlcv_pre_backfill_backup.parquet",
+      "start": {
+        "sha256": "c4949e5b5695ffa172677681b15af2ea6167e73317c3496546f2286a6730b1c8",
+        "size_bytes": 2284681,
+        "mtime_local": "2026-10-24T15:25:12.7979666+05:30",
+        "mtime_utc": "2026-10-24T09:55:12.7979666Z"
+      },
+      "end": {
+        "sha256": "c4949e5b5695ffa172677681b15af2ea6167e73317c3496546f2286a6730b1c8",
+        "size_bytes": 2284681,
+        "mtime_local": "2026-10-24T15:25:12.7979666+05:30",
+        "mtime_utc": "2026-10-24T09:55:12.7979666Z"
+      },
+      "within_run_result": "UNCHANGED; NOT AN AUTHORIZED RECOVERY SOURCE"
+    }
+  ],
+  "writer_investigation": {
+    "direct_or_default_writer_paths": [
+      "engine/prospective_worker.py::ProspectiveEvidenceWorker.sync_live_candles -> DEFAULT_OHLCV_PATH from engine.har_24h_features; atomic replace.",
+      "engine/shadow_feed_runner.py::ShadowFeedRunner.sync_candles_to_storage -> repository data/raw/ohlcv.parquet by default; atomic replace.",
+      "data/ingest.py::save_raw(name='ohlcv') through module __main__.",
+      "data/ingest_real_historical.py::download_binance_history through module __main__.",
+      "scripts/backfill_coinbase_data_gaps.py::execute_backfill(apply_to_main=True) through module __main__.",
+      "engine/feature_store.py::FeatureStore.export_to_parquet accepts a caller-selected output path; discovered test caller points at a temporary path."
+    ],
+    "api_startup": "FeatureCache.initialize reads the protected file; API lifespan contains no direct protected parquet writer. Research alert worker does not directly write it.",
+    "separate_15m_writer": "engine.coinbase_15m_adapter defaults to data/raw/coinbase_15m.parquet, not protected hourly parquet.",
+    "locks_and_jobs": {
+      "shadow_lock": "data/.prospective_shadow_runner.lock exists, mtime 2026-10-23T18:43:46.1891966+05:30, contains PID 31676, PID not running.",
+      "prospective_worker_lock": "data/.prospective_worker.lock absent.",
+      "matching_scheduled_tasks": 0,
+      "matching_active_collector_processes": 0
+    },
+    "attribution": "UNKNOWN; inspection identifies possible writer mechanisms but cannot identify which one caused the 2026-10-26 modification."
+  },
+  "qa_policy": {
+    "protected_files_modified_this_run": false,
+    "file_restored_or_regenerated": false,
+    "existing_collectors_stopped_or_reconfigured": false,
+    "api_service_started": false,
+    "release_integrity_gate": "FAIL"
+  }
+}

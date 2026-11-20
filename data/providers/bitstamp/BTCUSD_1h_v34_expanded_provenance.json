@@ -1,0 +1,13 @@
+{
+  "dataset_name": "Bitstamp BTC/USD 1h Expanded Research Dataset",
+  "version": "v34.0",
+  "file_path": "data/providers/bitstamp/BTCUSD_1h_v34_expanded.parquet",
+  "sha256": "9e8d92a2db78a5c71737146713541c3db5f27d398684114f09d5db3a4493ec81",
+  "row_count": 4000,
+  "earliest_timestamp_utc": "2026-05-20T02:00:00+00:00",
+  "latest_timestamp_utc": "2026-11-02T17:00:00+00:00",
+  "step_seconds": 3600,
+  "gaps_count": 0,
+  "creation_epoch_utc": "2026-11-02T18:49:00.894148+00:00",
+  "licensing_scope": "Bitstamp Public Market Data REST API (Private Educational/Research Scope)"
+}

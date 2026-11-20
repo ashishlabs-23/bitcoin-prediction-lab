@@ -33,6 +33,7 @@ import math
 import time
 import json
 import hashlib
+import threading
 from typing import Dict, Any, List, Tuple, Optional
 from datetime import datetime, timezone, timedelta
 
@@ -44,6 +45,7 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 from engine.execution_cost_model import ExecutionCostModel
+from engine.data_mode import get_data_mode, is_protected_file_access_permitted
 
 
 def compute_file_sha256(filepath: str) -> str:
@@ -382,11 +384,21 @@ class V12StrategyTournamentEngine:
         self.coinbase_15m_path = os.path.join(REPO_ROOT, "data", "raw", "coinbase_15m.parquet")
         self.df_1h: Optional[pd.DataFrame] = None
         self.df_4h: Optional[pd.DataFrame] = None
+        self.data_status = "DATA_UNAVAILABLE"
+        self.data_unavailable_reason = "Hourly market data has not been loaded."
+        if get_data_mode() == "fixture" and not is_protected_file_access_permitted(
+            self.data_path, mode="fixture"
+        ):
+            self.data_unavailable_reason = (
+                "Protected historical market data is unavailable in fixture mode."
+            )
+            return
         self._load_and_prepare_data()
 
     def _load_and_prepare_data(self):
         if not os.path.exists(self.data_path):
-            raise FileNotFoundError(f"Hourly dataset not found at {self.data_path}")
+            self.data_unavailable_reason = "Hourly market data file is unavailable."
+            return
 
         df = pd.read_parquet(self.data_path)
         if "timestamp" in df.columns:
@@ -538,6 +550,10 @@ class V12StrategyTournamentEngine:
 
         self.df_4h = df_resampled
 
+        if self.df_1h is not None and not self.df_1h.empty:
+            self.data_status = "AVAILABLE"
+            self.data_unavailable_reason = ""
+
     def build_market_snapshot(
         self,
         eval_time: Optional[datetime] = None,
@@ -645,7 +661,30 @@ class V12StrategyTournamentEngine:
         """
         df_target = df_override if df_override is not None else self.df_1h
         if df_target is None or len(df_target) == 0:
-            return {"status": "DATA_UNAVAILABLE", "regime": "TRANSITION_UNSUPPORTED"}
+            return {
+                "status": "DATA_UNAVAILABLE",
+                "instrument": "BTC-USD",
+                "venue": "UNAVAILABLE",
+                "granularity": "1h",
+                "latest_completed_time": None,
+                "latest_completed_price": None,
+                "regime": "TRANSITION_UNSUPPORTED",
+                "raw_regime": "TRANSITION_UNSUPPORTED",
+                "hysteresis_status": "UNAVAILABLE",
+                "adx_14": None,
+                "plus_di": None,
+                "minus_di": None,
+                "ema_20": None,
+                "ema_50": None,
+                "ema_200": None,
+                "atr_14": None,
+                "bb_width": None,
+                "bbw_percentile": None,
+                "classification_rule": "UNAVAILABLE",
+                "market_snapshot": self.build_market_snapshot(eval_time=eval_time),
+                "directional_authorization": "OFFLINE_RESEARCH_ONLY",
+                "execution_authorization": "DISABLED"
+            }
 
         latest = df_target.iloc[-1]
         prev = df_target.iloc[-2] if len(df_target) > 1 else latest
@@ -1134,8 +1173,16 @@ class V12StrategyTournamentEngine:
         Runs the full tournament across all 5 candidates and baselines.
         Evaluates on untouched holdout split (last 20% of dataset).
         """
-        if self.df_1h is None:
-            raise RuntimeError("Data not loaded")
+        if self.df_1h is None or len(self.df_1h) < 200:
+            return {
+                "status": "DATA_UNAVAILABLE",
+                "reason": self.data_unavailable_reason or "Insufficient historical candles.",
+                "cost_scenario_applied": cost_scenario,
+                "overall_decision": "ABSTAIN_DATA_UNAVAILABLE",
+                "live_trading_status": "DISABLED",
+                "top_candidates": [],
+                "baselines": {}
+            }
 
         total_bars = len(self.df_1h)
         split_idx = int(total_bars * 0.8)
@@ -1479,18 +1526,26 @@ class V12StrategyTournamentEngine:
         if self.df_1h is None or len(self.df_1h) < 200:
             return {
                 "strategy_id": strat_id,
+                "name": spec.get("name", strat_id),
+                "strategy_name": spec.get("name", strat_id),
                 "version": spec.get("version", "v1.0"),
+                "family": spec.get("family", "QUANTITATIVE"),
                 "spec_hash": spec_hash,
+                "specification_hash": spec_hash,
                 "source_instrument": "BTC-USD",
+                "asset": "BTC-USD",
                 "market_type": cost_info.get("market_type", "SPOT").lower() if costs_available else "spot",
                 "required_timeframe": spec.get("timeframe", "1h"),
                 "actual_source_timeframe": "1h",
+                "source_timeframe": "1h",
                 "latest_completed_candle_utc": None,
+                "latest_completed_candle_time": None,
                 "data_age_seconds": None,
                 "data_readiness": "BLOCKED_BY_DATA",
                 "feature_readiness": "DATA_UNAVAILABLE",
                 "supported_regimes": spec.get("supported_regimes", []),
                 "current_observed_regime": regime_info.get("regime", "EVALUATING"),
+                "observed_regime": regime_info.get("regime", "EVALUATING"),
                 "is_regime_compatible": False,
                 "rule_trigger_status": "NOT_TRIGGERED",
                 "setup_state": "BLOCKED_BY_DATA",
@@ -1525,6 +1580,7 @@ class V12StrategyTournamentEngine:
                 "cost_scenario": cost_scenario,
                 "cost_model_key": cost_scenario,
                 "cost_round_trip_bps": cost_bps,
+                "cost_assumptions_bps": cost_bps,
                 "market_snapshot": snapshot,
                 "economic_eligibility": {
                     "status": "INVALID_MARKET_INPUT",
@@ -1541,7 +1597,9 @@ class V12StrategyTournamentEngine:
                 "blocking_reason": "Insufficient historical warm-up candles (<200 bars).",
                 "governance_state": "OFFLINE_RESEARCH_ONLY",
                 "model_authorization": "OFFLINE_RESEARCH_ONLY",
-                "execution_authorization": "DISABLED"
+                "execution_authorization": "DISABLED",
+                "live_trading": "DISABLED",
+                "live_trading_status": "DISABLED"
             }
 
         latest = self.df_1h.iloc[-1]
@@ -1961,7 +2019,26 @@ class V12StrategyTournamentEngine:
 # =============================================================================
 
 COST_SCENARIOS = V12StrategyTournamentEngine.COST_SCENARIOS
-REGIME_TOURNAMENT_ENGINE = V12StrategyTournamentEngine()
+_regime_tournament_engine: Optional[V12StrategyTournamentEngine] = None
+_regime_tournament_engine_lock = threading.Lock()
+
+
+def get_regime_tournament_engine(
+    data_path: Optional[str] = None,
+) -> V12StrategyTournamentEngine:
+    """Return the shared engine, loading historical data only on first use."""
+    global _regime_tournament_engine
+    if _regime_tournament_engine is None:
+        with _regime_tournament_engine_lock:
+            if _regime_tournament_engine is None:
+                _regime_tournament_engine = V12StrategyTournamentEngine(data_path=data_path)
+    return _regime_tournament_engine
+
+
+def __getattr__(name: str):
+    if name == "REGIME_TOURNAMENT_ENGINE":
+        return get_regime_tournament_engine()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def build_market_snapshot(
@@ -1981,8 +2058,11 @@ def build_market_snapshot(
         candle_open_utc = (candle_ts - timedelta(hours=1)).isoformat()
         age_sec = (now_dt - candle_ts).total_seconds()
         is_candle_closed = True
-    elif REGIME_TOURNAMENT_ENGINE.df_1h is not None and len(REGIME_TOURNAMENT_ENGINE.df_1h) > 0:
-        latest = REGIME_TOURNAMENT_ENGINE.df_1h.iloc[-1]
+    elif (
+        get_regime_tournament_engine().df_1h is not None
+        and len(get_regime_tournament_engine().df_1h) > 0
+    ):
+        latest = get_regime_tournament_engine().df_1h.iloc[-1]
         candle_ts = pd.to_datetime(latest["timestamp"], utc=True)
         candle_close_utc = candle_ts.isoformat()
         candle_open_utc = (candle_ts - timedelta(hours=1)).isoformat()
@@ -2060,7 +2140,7 @@ def build_market_snapshot(
 
 class StrategyCandidateWrapper:
     """Wrapper exposing individual strategy candidates with evaluate_current_setup."""
-    def __init__(self, strat_id: str, engine: V12StrategyTournamentEngine):
+    def __init__(self, strat_id: str, engine: Optional[V12StrategyTournamentEngine] = None):
         self.id = strat_id
         self._engine = engine
 
@@ -2072,7 +2152,8 @@ class StrategyCandidateWrapper:
         eval_time: Optional[datetime] = None,
         live_quote: Optional[Dict[str, Any]] = None
     ) -> AttributeDict:
-        raw = self._engine._evaluate_current_setup(
+        engine = self._engine or get_regime_tournament_engine()
+        raw = engine._evaluate_current_setup(
             self.id,
             regime_info=regime_info or {},
             cost_scenario=cost_scenario,
@@ -2087,11 +2168,11 @@ class StrategyCandidateWrapper:
         return res
 
 
-REGIME_ADAPTIVE_ROUTER = StrategyCandidateWrapper("REGIME_ADAPTIVE_ROUTER", REGIME_TOURNAMENT_ENGINE)
-SHORT_HORIZON_MEAN_REVERSION = StrategyCandidateWrapper("SHORT_HORIZON_MEAN_REVERSION", REGIME_TOURNAMENT_ENGINE)
-VOL_COMPRESSION_BREAKOUT = StrategyCandidateWrapper("VOL_COMPRESSION_BREAKOUT", REGIME_TOURNAMENT_ENGINE)
-MTF_MOMENTUM_TREND = StrategyCandidateWrapper("MTF_MOMENTUM_TREND", REGIME_TOURNAMENT_ENGINE)
-HTF_RANGE_EXPANSION_BREAKOUT = StrategyCandidateWrapper("HTF_RANGE_EXPANSION_BREAKOUT", REGIME_TOURNAMENT_ENGINE)
+REGIME_ADAPTIVE_ROUTER = StrategyCandidateWrapper("REGIME_ADAPTIVE_ROUTER")
+SHORT_HORIZON_MEAN_REVERSION = StrategyCandidateWrapper("SHORT_HORIZON_MEAN_REVERSION")
+VOL_COMPRESSION_BREAKOUT = StrategyCandidateWrapper("VOL_COMPRESSION_BREAKOUT")
+MTF_MOMENTUM_TREND = StrategyCandidateWrapper("MTF_MOMENTUM_TREND")
+HTF_RANGE_EXPANSION_BREAKOUT = StrategyCandidateWrapper("HTF_RANGE_EXPANSION_BREAKOUT")
 TREND_FOLLOWING_BREAKOUT = MTF_MOMENTUM_TREND
 
 
@@ -2099,4 +2180,3 @@ if __name__ == "__main__":
     engine = V12StrategyTournamentEngine()
     manifest = engine.run_tournament("COINBASE_RETAIL_87BPS")
     print(json.dumps(manifest, indent=2))
-

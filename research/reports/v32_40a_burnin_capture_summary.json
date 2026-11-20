@@ -1,0 +1,48 @@
+{
+  "timestamp_utc": "2026-10-25T15:05:58Z",
+  "target_product": "BTC-USD",
+  "planned_duration_sec": 3600,
+  "actual_elapsed_sec": 3681.68,
+  "total_events_recorded": 69627,
+  "total_bytes_written": 52256883,
+  "events_log_path": "C:\\Projects\\BTCognitive\\BTCognitive\\data\\research\\l2_stream\\l2_burnin_events_20261025_140437.jsonl",
+  "event_counts_by_type": {
+    "snapshot": 1,
+    "l2update": 55750,
+    "match": 10278,
+    "heartbeat": 3598
+  },
+  "data_quality_metrics": {
+    "is_synchronized": true,
+    "final_sequence": 0,
+    "dropped_duplicates": 0,
+    "dropped_out_of_order": 0,
+    "sequence_gaps": 0,
+    "heartbeat_stalls": 0,
+    "reconnect_count": 0,
+    "last_error": null
+  },
+  "replay_verification": {
+    "events_replayed": 69627,
+    "replay_duration_ms": 76402.175,
+    "replay_best_bid": 80664.43,
+    "replay_best_ask": 80664.44,
+    "replay_mid_price": 80664.435,
+    "replay_passed": true
+  },
+  "feature_snapshot": {
+    "is_available": false,
+    "best_bid": null,
+    "best_ask": null,
+    "spread_bps": null,
+    "obi_5": null,
+    "ofi_15m": null,
+    "cvd_15m": null,
+    "data_age_seconds": 81.42657780647278
+  },
+  "governed_decisions": {
+    "economic_verdict": "NO_GO_NO_VALIDATED_EDGE",
+    "model_authorization": "OFFLINE_RESEARCH_ONLY",
+    "live_trading_state": "DISABLED"
+  }
+}

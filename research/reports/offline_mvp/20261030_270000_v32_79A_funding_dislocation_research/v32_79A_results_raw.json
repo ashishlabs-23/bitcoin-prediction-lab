@@ -1,0 +1,145 @@
+{
+  "experiment": "V32.79A",
+  "authorization": "APPROVED_EXPLORATORY_ONLY",
+  "threshold_8h": 0.00022831050228310502,
+  "threshold_ann_pct": 25.0,
+  "barrier_tp_pct": 3.0,
+  "barrier_sl_pct": 1.5,
+  "horizon_bars": 24,
+  "overlap_end": "2026-09-01 00:00:00+00:00",
+  "hash_verification": {
+    "data/raw/ohlcv_checkpoint_42233_bars.parquet": {
+      "expected": "f5c15cb11b9d51cf0077c8f8052086382deb1d8577749cbab8d0134842c7a94f",
+      "actual": "f5c15cb11b9d51cf0077c8f8052086382deb1d8577749cbab8d0134842c7a94f",
+      "status": "MATCH"
+    },
+    "data/raw/ohlcv_version_42326_bars.parquet": {
+      "expected": "ba06fb533c0b53387136b001c142efc90b5e2ccfb37937dc509879a76c2a4057",
+      "actual": "ba06fb533c0b53387136b001c142efc90b5e2ccfb37937dc509879a76c2a4057",
+      "status": "MATCH"
+    }
+  },
+  "summary": [
+    {
+      "label": "SHORT (funding>=+25%ann)",
+      "n": 64,
+      "tp_count": 19,
+      "sl_count": 29,
+      "expired_count": 16,
+      "tp_rate": 0.2969,
+      "sl_rate": 0.4531,
+      "expired_rate": 0.25,
+      "gross_ev_pct": 0.308,
+      "net_ev_binance_pct": 0.068,
+      "net_ev_coinbase_pct": -0.562,
+      "net_ev_binance_ci95": [
+        -0.4147,
+        0.5632
+      ],
+      "mfe_mean_pct": 1.8759,
+      "mae_mean_pct": -1.3002,
+      "chrono_h1_net_ev_b": -0.3902,
+      "chrono_h2_net_ev_b": 0.5262,
+      "breakeven_binance_tp_rate": 38.7,
+      "breakeven_coinbase_tp_rate": 52.7,
+      "binance_cost_pct": 0.24,
+      "coinbase_cost_pct": 0.8699999999999999
+    },
+    {
+      "label": "LONG  (funding<=-25%ann)",
+      "n": 3,
+      "tp_count": 2,
+      "sl_count": 1,
+      "expired_count": 0,
+      "tp_rate": 0.6667,
+      "sl_rate": 0.3333,
+      "expired_rate": 0.0,
+      "gross_ev_pct": 1.5,
+      "net_ev_binance_pct": 1.26,
+      "net_ev_coinbase_pct": 0.63,
+      "net_ev_binance_ci95": [
+        -1.74,
+        2.76
+      ],
+      "mfe_mean_pct": 3.0994,
+      "mae_mean_pct": -1.4182,
+      "chrono_h1_net_ev_b": 2.76,
+      "chrono_h2_net_ev_b": 0.51,
+      "breakeven_binance_tp_rate": 38.7,
+      "breakeven_coinbase_tp_rate": 52.7,
+      "binance_cost_pct": 0.24,
+      "coinbase_cost_pct": 0.8699999999999999
+    },
+    {
+      "label": "BASELINE_LONG",
+      "n": 1704,
+      "tp_count": 283,
+      "sl_count": 757,
+      "expired_count": 664,
+      "tp_rate": 0.1661,
+      "sl_rate": 0.4442,
+      "expired_rate": 0.3897,
+      "gross_ev_pct": 0.0152,
+      "net_ev_binance_pct": -0.2248,
+      "net_ev_coinbase_pct": -0.8548,
+      "net_ev_binance_ci95": [
+        -0.3051,
+        -0.1451
+      ],
+      "mfe_mean_pct": 1.4349,
+      "mae_mean_pct": -1.272,
+      "chrono_h1_net_ev_b": -0.2366,
+      "chrono_h2_net_ev_b": -0.213,
+      "breakeven_binance_tp_rate": 38.7,
+      "breakeven_coinbase_tp_rate": 52.7,
+      "binance_cost_pct": 0.24,
+      "coinbase_cost_pct": 0.8699999999999999
+    },
+    {
+      "label": "BASELINE_SHORT",
+      "n": 1704,
+      "tp_count": 293,
+      "sl_count": 734,
+      "expired_count": 677,
+      "tp_rate": 0.1719,
+      "sl_rate": 0.4308,
+      "expired_rate": 0.3973,
+      "gross_ev_pct": 0.0455,
+      "net_ev_binance_pct": -0.1945,
+      "net_ev_coinbase_pct": -0.8245,
+      "net_ev_binance_ci95": [
+        -0.275,
+        -0.1113
+      ],
+      "mfe_mean_pct": 1.473,
+      "mae_mean_pct": -1.2331,
+      "chrono_h1_net_ev_b": -0.2112,
+      "chrono_h2_net_ev_b": -0.1777,
+      "breakeven_binance_tp_rate": 38.7,
+      "breakeven_coinbase_tp_rate": 52.7,
+      "binance_cost_pct": 0.24,
+      "coinbase_cost_pct": 0.8699999999999999
+    }
+  ],
+  "dm_hln": {
+    "short_vs_baseline": {
+      "stat": 1.1158,
+      "p_value": 0.2688
+    },
+    "long_vs_baseline": {
+      "stat": NaN,
+      "p_value": NaN
+    },
+    "bonferroni_threshold": 0.025,
+    "short_significant": "False",
+    "long_significant": "False"
+  },
+  "episode_counts": {
+    "short_raw_observations": 144,
+    "long_raw_observations": 5,
+    "short_distinct_episodes": 64,
+    "long_distinct_episodes": 3,
+    "short_meets_100_minimum": false,
+    "long_meets_100_minimum": false
+  }
+}

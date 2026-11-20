@@ -22,8 +22,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from engine.observatory import (
     ForecastAccuracyObservatory,
-    CalibrationHealthStatus,
-    ObservatoryHealthSummary,
+    LazyForecastAccuracyObservatory,
     PROSPECTIVE_EXPERIMENT_ID,
     PROSPECTIVE_EPOCH_ID,
     PROSPECTIVE_START_TIMESTAMP,
@@ -33,12 +32,14 @@ from engine.observatory import (
 from engine.har_rs_dow_features import prepare_har_rs_dow_dataset, get_har_rs_dow_features
 from models.authoritative_model_registry import (
     get_active_production_model,
+    is_production_authorized,
     list_authoritative_models,
 )
 import joblib
 from validation.startup_gate import (
     FreezeIntegrityError,
     MODEL_ARTIFACT_PATH,
+    evaluate_runtime_readiness,
     verify_full_freeze_integrity,
     verify_scientific_contract,
 )
@@ -47,7 +48,7 @@ logger = logging.getLogger("btcognitive.routes_terminal")
 router = APIRouter(tags=["BTC Volatility Intelligence Terminal"])
 
 # Global Singleton Observatory Instance
-observatory = ForecastAccuracyObservatory(nominal_target=0.90)
+observatory = LazyForecastAccuracyObservatory(nominal_target=0.90)
 
 # Pre-load frozen models and historical state
 _pipeline = None
@@ -62,6 +63,23 @@ _path_eval_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
 def _init_live_terminal():
     global _pipeline, _rolling_std_last, _q_u_c2, _q_l_c2, _initialized, _initialization_failure
     if _initialized:
+        return
+    readiness = evaluate_runtime_readiness()
+    if not is_production_authorized(readiness):
+        authorization_status = readiness.get("authorization_status")
+        _initialization_failure = {
+            "state": (
+                "OFFLINE_RESEARCH_ONLY"
+                if authorization_status == "OFFLINE_RESEARCH_ONLY"
+                else "BLOCKED"
+            ),
+            "code": readiness.get("reason_code", "MODEL_UNAUTHORIZED"),
+        }
+        _initialized = True
+        logger.info(
+            "Canonical terminal inference withheld by authorization gate [%s].",
+            _initialization_failure["code"],
+        )
         return
     try:
         verify_scientific_contract()
@@ -173,13 +191,9 @@ def get_terminal_live_state():
             },
         )
 
-    health = observatory.evaluate_calibration_health()
-    
     # Latest resolved / active record
     last_rec = observatory.records[-1]
     point_forecast = last_rec.point_forecast_har_rs_dow
-    lower_bound = max(1e-4, last_rec.risk_envelope_lower)
-    upper_bound = last_rec.risk_envelope_upper
     regime = last_rec.macro_regime
     
     # Volatility state descriptor
@@ -208,18 +222,19 @@ def get_terminal_live_state():
                 "metric": "Forward 7-Day Realized Variance (Annualized)",
                 "point_forecast_har_rs_dow": round(point_forecast, 5),
                 "equivalent_annualized_vol_pct": f"{np.sqrt(point_forecast) * 100.0:.1f}%",
-                "model_version": "HAR-RS-DOW-v1.0 (QLIKE: 0.19300)"
+                "model_version": "Standard HAR forecast accuracy NOT ESTABLISHED"
             },
             "2_uncertainty_risk_envelope": {
-                "nominal_target_coverage": "90% Target Risk Envelope",
-                "lower_bound_variance": round(lower_bound, 5),
-                "upper_bound_variance": round(upper_bound, 5),
-                "envelope_width": round(upper_bound - lower_bound, 5),
-                "calibrated_engine": "C2 Dependence-Aware Conformal (Strictly Causal Delayed Resolution)",
-                "empirical_holdout_coverage": "84.89% (Causal 2026 Holdout, 95% CI: [73.14%, 93.14%]) | 92.84% (Pre-2026 In-Sample Calibration)",
-                "calibration_causality_status": "STRICTLY_CAUSAL_DELAYED_RESOLUTION",
-                "extreme_vol_q5_containment": "89.47% (95% CI: [82.39%, 96.65%])",
-                "tail_breach_balance": "Upper: 3.67% | Lower: 3.43% (Delta: 0.24%)"
+                "status": "UNAVAILABLE",
+                "nominal_target_coverage": None,
+                "lower_bound_variance": None,
+                "upper_bound_variance": None,
+                "envelope_width": None,
+                "calibrated_engine": None,
+                "empirical_holdout_coverage": None,
+                "calibration_causality_status": "UNAVAILABLE",
+                "extreme_vol_q5_containment": None,
+                "tail_breach_balance": None
             },
             "3_current_regime": {
                 "macro_epoch": regime,
@@ -228,22 +243,22 @@ def get_terminal_live_state():
                 "structural_warning": "Structural descriptor — not an independent trading signal or directional alpha."
             },
             "4_operational_calibration_trust": {
-                "calibration_health_status": health.status,
-                "status_rationale": health.status_rationale,
-                "30d_responsive_coverage_pct": health.coverage_30d_pct,
-                "30d_coverage_drift_pct": health.coverage_drift_30d_pct,
-                "90d_persistent_coverage_pct": health.coverage_90d_pct,
-                "tail_asymmetry_delta_pct": health.tail_asymmetry_30d_pct,
-                "mean_winkler_score_30d": health.mean_winkler_30d,
-                "resolved_forecasts_count": health.total_resolved_forecasts,
-                "pending_forecasts_count": health.pending_unresolved_forecasts,
-                "valid_resolved_count": health.valid_N,
-                "data_invalid_count": health.invalid_N,
-                "hash_failures_count": health.hash_failures,
-                "risk_defense_abstain_active": health.status in [CalibrationHealthStatus.DEGRADED, CalibrationHealthStatus.FAIL]
+                "calibration_health_status": "UNAVAILABLE",
+                "status_rationale": "C2 calibration is disabled pending a verifiable calibration artifact.",
+                "30d_responsive_coverage_pct": None,
+                "30d_coverage_drift_pct": None,
+                "90d_persistent_coverage_pct": None,
+                "tail_asymmetry_delta_pct": None,
+                "mean_winkler_score_30d": None,
+                "resolved_forecasts_count": None,
+                "pending_forecasts_count": None,
+                "valid_resolved_count": None,
+                "data_invalid_count": None,
+                "hash_failures_count": None,
+                "risk_defense_abstain_active": True
             }
         },
-        "epistemic_contract": "90% Target Risk Envelope | Empirical coverage is an observed estimate, not a permanent universal guarantee. Claims of '90% Confidence' or exact conditional coverage are prohibited."
+        "epistemic_contract": "C2 calibration and risk envelopes are unavailable; no coverage or calibrated-bound claims are emitted."
     }
 
 
@@ -272,10 +287,19 @@ def get_authoritative_registry_catalog():
 @router.get("/api/observatory/summary")
 def get_observatory_summary():
     """
-    Returns full calibration metrics and health summary.
+    Returns an explicit unavailable status while C2 calibration is disabled.
     """
     _init_live_terminal()
-    return observatory.evaluate_calibration_health().to_dict()
+    return {
+        "status": "UNAVAILABLE",
+        "calibration_health_status": "UNAVAILABLE",
+        "coverage_30d_pct": None,
+        "coverage_90d_pct": None,
+        "mean_winkler_30d": None,
+        "total_resolved_forecasts": None,
+        "pending_unresolved_forecasts": None,
+        "reason": "C2 calibration is disabled pending a verifiable calibration artifact."
+    }
 
 
 @router.get("/api/observatory/history")
@@ -537,27 +561,41 @@ def get_decision_anatomy():
                             action = "ABSTAIN"
                             reason = "EV_BELOW_COST"
 
-    # Evaluate risk authorization
-    health = observatory.evaluate_calibration_health()
-    c2_health_str = health.status.value
-    authorized = (c2_health_str in ["CALIBRATED", "CAUTION"]) and (action == "TRADE")
+    from validation.startup_gate import evaluate_runtime_readiness
+    readiness = evaluate_runtime_readiness()
+
+    # Runtime integrity is not governance authorization for production serving.
+    c2_health_str = "UNAVAILABLE"
+    authorized = (
+        is_production_authorized(readiness)
+        and c2_health_str in ["CALIBRATED", "CAUTION"]
+        and action == "TRADE"
+    )
 
     # Authoritative risk metadata: Never hard-code fixed budget percentages
     risk_meta = {
         "c2_model_health": c2_health_str,
         "trade_risk_check": "AUTHORIZED" if authorized else "BLOCKED",
-        "risk_block_reason": "NONE" if authorized else "C2_RISK_EXCEEDED",
+        "risk_block_reason": (
+            "NONE"
+            if authorized
+            else (
+                "MODEL_UNAUTHORIZED"
+                if not is_production_authorized(readiness)
+                else "C2_RISK_EXCEEDED"
+            )
+        ),
         "daily_budget_allocated_pct": None,
         "daily_budget_limit_pct": None,
-        "latency_health": "PASS",
-        "capacity_threshold": "PASS",
+        "latency_health": "UNAVAILABLE",
+        "capacity_threshold": "UNAVAILABLE",
         "authorized": authorized
     }
 
     if action == "TRADE" and not authorized:
         decision_stage = "ABSTAINING"
         action = "ABSTAIN"
-        reason = "C2_RISK_EXCEEDED"
+        reason = risk_meta["risk_block_reason"]
 
     # Non-mutating decision envelope (persist=False guarantees idempotency for GET requests)
     d_record = canonical_decision_ledger.create_decision_envelope(
@@ -582,17 +620,14 @@ def get_decision_anatomy():
 
     payload = canonical_decision_ledger.format_decision_anatomy_payload(d_record)
     
-    from validation.startup_gate import evaluate_runtime_readiness
-    readiness = evaluate_runtime_readiness()
     payload["research"] = {
         "status": readiness["status"],
         "authorized": readiness["authorized"],
         "authorization_status": readiness["authorization_status"],
-        "restricted_serving_scope": readiness.get("restricted_serving_scope", "AUTHORIZED_FOR_VOLATILITY_RISK_ONLY"),
+        "restricted_serving_scope": readiness.get("restricted_serving_scope", "NONE"),
         "canonical_model_id": readiness["canonical_model_id"],
         "reason": readiness["reason"],
         "governance_breakdown": readiness.get("governance_breakdown", {}),
     }
     payload["status_contract"] = evaluate_system_status().model_dump()
     return payload
-

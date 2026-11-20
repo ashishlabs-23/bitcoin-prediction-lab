@@ -1,0 +1,39 @@
+{
+  "timestamp_utc": "2026-10-25T17:12:04Z",
+  "status": "ALL_PASSED",
+  "viewports": {
+    "desktop": {
+      "has_nav_journal": true,
+      "has_journal_view": true,
+      "has_warning_banner": true,
+      "has_entered_trade_btn": true,
+      "has_open_records_section": true,
+      "has_closed_records_section": true,
+      "has_ai_evaluation_section": true,
+      "has_sample_disclaimer": true,
+      "screenshot": "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_42_manual_journal_desktop.png"
+    },
+    "tablet": {
+      "has_nav_journal": true,
+      "has_journal_view": true,
+      "has_warning_banner": true,
+      "has_entered_trade_btn": true,
+      "has_open_records_section": true,
+      "has_closed_records_section": true,
+      "has_ai_evaluation_section": true,
+      "has_sample_disclaimer": true,
+      "screenshot": "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_42_manual_journal_tablet.png"
+    },
+    "mobile": {
+      "has_nav_journal": true,
+      "has_journal_view": true,
+      "has_warning_banner": true,
+      "has_entered_trade_btn": true,
+      "has_open_records_section": true,
+      "has_closed_records_section": true,
+      "has_ai_evaluation_section": true,
+      "has_sample_disclaimer": true,
+      "screenshot": "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_42_manual_journal_mobile.png"
+    }
+  }
+}

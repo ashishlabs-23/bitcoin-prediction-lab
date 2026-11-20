@@ -41,7 +41,10 @@ class SystemStatusContract(BaseModel):
     feature_cache_status: FeatureCacheStatus = Field(..., description="Feature cache bar readiness")
     production_forecast_status: ProductionForecastStatus = Field(..., description="Production risk forecast availability")
     production_forecast_reason: str = Field(..., description="Exact authorization or blocking reason")
-    canonical_model_id: str = Field(..., description="Authorized production model ID")
+    canonical_model_id: Optional[str] = Field(
+        ...,
+        description="Authorized production model ID, or null when no identity is available",
+    )
     restricted_serving_scope: str = Field(..., description="Allowed forecast scope")
     entry_research_status: EntryResearchStatus = Field(..., description="V28 entry quality model status")
     entry_research_reason: str = Field(..., description="Reason for entry model state")
@@ -54,6 +57,12 @@ class SystemStatusContract(BaseModel):
     feature_cache_details: Dict[str, Any] = Field(default_factory=dict)
     decision_anatomy_stage: str = Field("INITIALIZING", description="Current stage of decision anatomy monitor")
     status_summary_message: str = Field("", description="Human-readable contextual summary")
+    data_mode: str = Field(default="offline_research", description="Authoritative data lane mode: fixture, offline_research, provider")
+    data_mode_contract: Dict[str, Any] = Field(default_factory=dict, description="Complete data lane contract metadata")
+    local_fixture_feed_enabled: bool = Field(
+        False,
+        description="Whether the deterministic local-only fixture chart feed was explicitly enabled",
+    )
 
 
 def evaluate_system_status(cache_override=None, readiness_override=None, research_gate_override=None) -> SystemStatusContract:
@@ -65,7 +74,19 @@ def evaluate_system_status(cache_override=None, readiness_override=None, researc
     now_iso = now.isoformat()
 
     # 1. Market Data Status & Feature Cache
-    if cache_override is not None:
+    from engine.data_mode import get_data_mode, get_data_mode_contract
+    current_data_mode = get_data_mode()
+    current_data_mode_contract = get_data_mode_contract()
+    is_snapshot = (
+        current_data_mode_contract.get("permitted_data_source") == "LOCAL_HISTORICAL_SNAPSHOT"
+        or current_data_mode == "offline_research"
+    )
+
+    if current_data_mode == "fixture" and cache_override is None:
+        # Fixture mode has no authorized market source; health reporting must
+        # not trigger lazy cache initialization or inspect protected snapshots.
+        df_cache = None
+    elif cache_override is not None:
         if hasattr(cache_override, "get_features_df"):
             df_cache = cache_override.get_features_df()
         elif isinstance(cache_override, pd.DataFrame):
@@ -88,30 +109,54 @@ def evaluate_system_status(cache_override=None, readiness_override=None, researc
             latest_close = float(df_cache["close"].iloc[-1])
             market_details["latest_price"] = latest_close
             market_details["symbol"] = "BTC/USD"
-            market_details["source"] = "Coinbase"
+            market_details["source"] = "LOCAL_HISTORICAL_SNAPSHOT" if is_snapshot else "Coinbase"
 
-        # Check timestamp freshness if index is DatetimeIndex
+        # Check timestamp freshness if index is DatetimeIndex or 'timestamp' column exists
+        last_dt = None
         if isinstance(df_cache.index, pd.DatetimeIndex) and len(df_cache.index) > 0:
             last_dt = df_cache.index[-1]
+        elif "timestamp" in df_cache.columns and len(df_cache) > 0:
+            val = df_cache["timestamp"].iloc[-1]
+            if isinstance(val, (int, float)):
+                last_dt = datetime.fromtimestamp(val, tz=timezone.utc)
+            elif isinstance(val, pd.Timestamp):
+                last_dt = val.to_pydatetime()
+            elif isinstance(val, str):
+                try:
+                    last_dt = datetime.fromisoformat(val)
+                except Exception:
+                    pass
+            elif isinstance(val, datetime):
+                last_dt = val
+
+        if is_snapshot:
+            market_details["is_historical_snapshot"] = True
+            time_str = last_dt.strftime("%d %B %Y, %H:%M UTC") if last_dt else "Unknown Date"
+            market_details["snapshot_label"] = (
+                f"Last observed close — {time_str} (STALE — NOT A CURRENT ENTRY REFERENCE)"
+            )
+
+        if last_dt is not None:
             if last_dt.tzinfo is None:
                 last_dt = last_dt.replace(tzinfo=timezone.utc)
             age_s = (now - last_dt).total_seconds()
             market_details["candle_age_seconds"] = round(age_s, 1)
             market_details["last_timestamp"] = last_dt.isoformat()
 
-            if age_s <= 3600:
+            if is_snapshot:
+                market_data_st = "STALE"
+            elif age_s <= 3600:
                 market_data_st = "LIVE"
             elif age_s <= 86400:
                 market_data_st = "STALE"
             else:
                 market_data_st = "UNAVAILABLE"
         else:
-            # Fallback to LIVE if cache is populated
-            market_data_st = "LIVE"
+            market_data_st = "STALE" if is_snapshot else "LIVE"
             market_details["last_timestamp"] = now_iso
 
         if n_bars >= 24:
-            cache_st = "READY" if market_data_st == "LIVE" else "STALE"
+            cache_st = "READY" if (market_data_st == "LIVE" or (is_snapshot and cache_override is None)) else "STALE"
         elif n_bars > 0:
             cache_st = "WARMING"
         else:
@@ -132,7 +177,7 @@ def evaluate_system_status(cache_override=None, readiness_override=None, researc
             "authorized": bool(getattr(research_gate_override, "authorized", False)),
             "reason": _safe_str(getattr(research_gate_override, "reason", None), "Research gate blocked"),
             "canonical_model_id": _safe_str(getattr(research_gate_override, "canonical_model_id", None), "HAR-RS-DOW-v1.0"),
-            "restricted_serving_scope": _safe_str(getattr(research_gate_override, "restricted_serving_scope", None), "AUTHORIZED_FOR_VOLATILITY_RISK_ONLY"),
+            "restricted_serving_scope": _safe_str(getattr(research_gate_override, "restricted_serving_scope", None), "NONE"),
             "status": _safe_str(getattr(research_gate_override, "status", None), "FAIL"),
         }
     elif readiness_override is not None:
@@ -140,7 +185,7 @@ def evaluate_system_status(cache_override=None, readiness_override=None, researc
             "authorized": bool(getattr(readiness_override, "authorized", False)),
             "reason": _safe_str(getattr(readiness_override, "reason", None), "Startup gate unverified"),
             "canonical_model_id": _safe_str(getattr(readiness_override, "canonical_model_id", None), "HAR-RS-DOW-v1.0"),
-            "restricted_serving_scope": _safe_str(getattr(readiness_override, "restricted_serving_scope", None), "AUTHORIZED_FOR_VOLATILITY_RISK_ONLY"),
+            "restricted_serving_scope": _safe_str(getattr(readiness_override, "restricted_serving_scope", None), "NONE"),
             "status": _safe_str(getattr(readiness_override, "status", None), "FAIL"),
         }
     else:
@@ -150,14 +195,20 @@ def evaluate_system_status(cache_override=None, readiness_override=None, researc
     prod_fc_st: ProductionForecastStatus = "BLOCKED"
     prod_fc_reason = readiness.get("reason", "Startup gate unverified")
     canonical_id = readiness.get("canonical_model_id", "HAR-RS-DOW-v1.0")
-    serving_scope = readiness.get("restricted_serving_scope", "AUTHORIZED_FOR_VOLATILITY_RISK_ONLY")
+    serving_scope = readiness.get("restricted_serving_scope", "NONE")
+    from models.authoritative_model_registry import is_production_authorized
 
-    if readiness.get("authorized") is True:
+    production_authorized = is_production_authorized(readiness)
+    if production_authorized:
         prod_fc_st = "AVAILABLE"
-    elif readiness.get("status") == "FAIL":
-        prod_fc_st = "BLOCKED"
     else:
         prod_fc_st = "BLOCKED"
+        serving_scope = "NONE"
+        if readiness.get("authorized") is True:
+            prod_fc_reason = (
+                "Runtime readiness cannot authorize serving without explicit "
+                "production authorization in the model registry."
+            )
 
     # 3. Entry Quality Research Engine Status
     from engine.probabilistic_entry_engine import entry_quality_engine
@@ -212,7 +263,9 @@ def evaluate_system_status(cache_override=None, readiness_override=None, researc
         svc_st: ServiceStatus = "DEGRADED"
 
     # Contextual Summary Message
-    if market_data_st == "LIVE" and opp_st == "NO_OPPORTUNITY":
+    if is_snapshot:
+        summary = "Offline historical snapshot (30 October 2026, 13:00 UTC) active. STALE — not a current entry reference."
+    elif market_data_st == "LIVE" and opp_st == "NO_OPPORTUNITY":
         summary = "Live monitoring is healthy. No qualifying event is present at this time."
     elif market_data_st == "LIVE" and opp_st == "IDENTIFIED":
         summary = "Live market event identified. Evaluating conditional evidence."
@@ -240,5 +293,10 @@ def evaluate_system_status(cache_override=None, readiness_override=None, researc
         market_data_details=market_details,
         feature_cache_details=cache_details,
         decision_anatomy_stage=stage,
-        status_summary_message=summary
+        status_summary_message=summary,
+        data_mode=current_data_mode,
+        data_mode_contract=current_data_mode_contract,
+        local_fixture_feed_enabled=(
+            current_data_mode_contract.get("local_fixture_feed_enabled") is True
+        ),
     )

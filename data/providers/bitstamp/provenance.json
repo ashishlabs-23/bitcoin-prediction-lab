@@ -1,0 +1,20 @@
+{
+  "provider": "BITSTAMP",
+  "source_exchange": "BITSTAMP",
+  "source_symbol": "BTC/USD",
+  "pair": "btcusd",
+  "instrument_type": "SPOT",
+  "interval": "1h",
+  "step_seconds": 3600,
+  "row_count": 1000,
+  "earliest_candle_open_utc": "2026-09-22T23:00:00+00:00",
+  "latest_candle_open_utc": "2026-11-03T14:00:00+00:00",
+  "latest_candle_close_utc": "2026-11-03T15:00:00+00:00",
+  "retrieval_timestamp_utc": "2026-11-03T15:08:31Z",
+  "raw_payload_sha256": "2680ef03ba3f57d361d37e3768cce654f34e75ef7298570093fa19fe88ecd87c",
+  "parquet_sha256": "d64cd2591b4cc5c5a6328785b1722ec5f8e01b78f30dee7f1dc7dff583e7fc54",
+  "parquet_path": "data/providers/bitstamp/BTCUSD_1h.parquet",
+  "licensing_scope": "Bitstamp Public Market Data REST API (Private Research Scope)",
+  "execution_status": "OFFLINE_RESEARCH_ONLY",
+  "live_trading_enabled": false
+}

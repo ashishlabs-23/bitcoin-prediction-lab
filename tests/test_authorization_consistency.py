@@ -18,18 +18,19 @@ from api.server import app
 from models.authoritative_model_registry import (
     get_active_production_model,
     AuthorizationStatus,
-    ModelClassification
+    ModelClassification,
+    is_production_authorized,
 )
 from validation.startup_gate import verify_scientific_contract
 
 
 def test_authoritative_model_registry_state():
-    """Verifies that ACTIVE_PRODUCTION_MODEL is authorized for volatility intelligence and non-directional."""
+    """Verified model identity remains offline-only until a governance decision."""
     model = get_active_production_model()
 
-    assert model.canonical_id == "HAR-RS-DOW-v1.0"
-    assert model.classification == ModelClassification.PRODUCTION_VOLATILITY
-    assert model.authorization_status == AuthorizationStatus.AUTHORIZED_FOR_PRODUCTION
+    assert model.canonical_id == "Standard-HAR-v1.0"
+    assert model.classification in [ModelClassification.BASELINE_VOLATILITY, ModelClassification.PRODUCTION_VOLATILITY]
+    assert model.authorization_status == AuthorizationStatus.OFFLINE_RESEARCH_ONLY
     assert model.directional_prediction_capability is False
     assert "rv7d_var_ann" in model.forecast_target
     assert "disabled" in model.applicable_limitations.lower()
@@ -40,10 +41,12 @@ def test_api_lifespan_research_gate_consistency():
     with TestClient(app) as client:
         assert hasattr(app.state, "research_gate")
         gate = app.state.research_gate
-        assert gate["status"] == "READY"
-        assert gate["authorized"] is True
-        assert gate["authorization_status"] == "AUTHORIZED_FOR_PRODUCTION"
-        assert gate["reason_code"] == "NONE"
+        assert gate["status"] == "OFFLINE_RESEARCH_ONLY"
+        assert gate["authorized"] is False
+        assert gate["authorization_status"] == "OFFLINE_RESEARCH_ONLY"
+        assert gate["reason_code"] == "MODEL_UNAUTHORIZED"
+        assert gate["research_edge_status"] == "NO_GO_NO_VALIDATED_EDGE"
+        assert gate["trading_enabled"] is False
 
 
 def test_terminal_model_identity_endpoint():
@@ -53,9 +56,9 @@ def test_terminal_model_identity_endpoint():
         assert res.status_code == 200
 
         data = res.json()
-        assert data["canonical_id"] == "HAR-RS-DOW-v1.0"
-        assert data["classification"] == "PRODUCTION_VOLATILITY"
-        assert data["authorization_status"] == "AUTHORIZED_FOR_PRODUCTION"
+        assert data["canonical_id"] == "Standard-HAR-v1.0"
+        assert data["classification"] in ["BASELINE_VOLATILITY", "PRODUCTION_VOLATILITY"]
+        assert data["authorization_status"] == "OFFLINE_RESEARCH_ONLY"
         assert data["directional_prediction_capability"] is False
 
 
@@ -66,7 +69,7 @@ def test_prediction_endpoints_fail_closed_as_baselines():
         res_latest = client.get("/prediction/latest")
         assert res_latest.status_code == 200
         latest_data = res_latest.json()
-        assert latest_data["status"] == "EXPERIMENTAL_BASELINE"
+        assert latest_data["status"] in ["DATA_UNAVAILABLE", "EXPERIMENTAL_BASELINE"]
         assert latest_data["production_forecast_available"] is False
         assert latest_data["trading_enabled"] is False
         assert "NOT VALIDATED FOR PREDICTIVE" in latest_data["validation_status"]
@@ -75,9 +78,48 @@ def test_prediction_endpoints_fail_closed_as_baselines():
         res_range = client.get("/prediction/range")
         assert res_range.status_code == 200
         range_data = res_range.json()
-        assert range_data["status"] == "EXPERIMENTAL_BASELINE"
+        assert range_data["status"] in ["DATA_UNAVAILABLE", "EXPERIMENTAL_BASELINE"]
         assert range_data["production_forecast_available"] is False
         assert range_data["trading_enabled"] is False
+
+
+def test_production_model_alignment_fails_closed_for_offline_model():
+    from models.authoritative_model_registry import verify_production_model_alignment
+
+    assert (
+        verify_production_model_alignment(
+            "/api/terminal/live", "HAR-RS-DOW-v1.0"
+        )
+        is False
+    )
+
+
+def test_runtime_readiness_cannot_override_registry_authorization():
+    """A positive runtime flag cannot supersede the registry's offline-only policy."""
+    runtime_readiness = {
+        "authorized": True,
+        "authorization_status": "AUTHORIZED_FOR_PRODUCTION",
+    }
+
+    assert is_production_authorized(runtime_readiness) is False
+
+
+def test_status_contract_does_not_grant_runtime_only_authorization():
+    """System status remains blocked when only the runtime gate claims authorization."""
+    from engine.status_contract import evaluate_system_status
+
+    status = evaluate_system_status(readiness_override={
+        "authorized": True,
+        "authorization_status": "AUTHORIZED_FOR_PRODUCTION",
+        "status": "READY",
+        "reason": "Integrity checks passed",
+        "restricted_serving_scope": "VOLATILITY_ONLY",
+    })
+
+    assert status.production_forecast_status == "BLOCKED"
+    assert status.restricted_serving_scope == "NONE"
+    assert "model registry" in status.production_forecast_reason
+    assert status.execution_status == "DISABLED — ANALYSIS ONLY"
 
 
 def test_trading_safeguards_disabled_everywhere():

@@ -1,0 +1,310 @@
+ M CHANGES.md
+ M README.md
+ M api/candle_manager.py
+ M api/market_monitor_routes.py
+ M api/notifications.py
+ M api/routes_prediction.py
+ M api/routes_research.py
+ M api/routes_terminal.py
+ M api/routes_tournament.py
+ M api/server.py
+ M backtest/market_memory.py
+ M data/prospective_forecast_ledger.jsonl
+ M data/research_alert_state.json
+ M docs/GATES.md
+ M engine/__init__.py
+ M engine/counterfactual_contract_engine.py
+ M engine/evidence_router.py
+ M engine/execution_cost_model.py
+ M engine/forecast_engine_15m.py
+ M engine/probabilistic_entry_engine.py
+ M engine/smart_entry_engine.py
+ M engine/status_contract.py
+ M engine/strategy_selection.py
+ M experiments/results/multi_regime_validation_report.json
+ M experiments/results/post_repair_milestone_5_lock.json
+ M experiments/results/stage10_shadow_validation/shadow_prediction_ledger.jsonl
+ M experiments/results/stage11_forward_validation/forward_prediction_ledger.jsonl
+ M models/authoritative_model_registry.py
+ M research/baseline_challenge_report.md
+ M research/challenger_bakeoff_report.md
+ M research/hawkes_latency_report.md
+ M research/hawkes_shadow_report.md
+ M research/independent_block_report.md
+ M research/information_inventory_report.md
+ M research/interval_sharpness_report.md
+ M research/live_baseline_comparison.md
+ M research/live_long_validation_report.md
+ M research/live_metric_reconciliation_report.md
+ M research/production_review_block_10.md
+ M research/range_stability_report.md
+ M research/reports/post_repair_5_block_observed.md
+ M research/reports/post_repair_baseline.md
+ M research/reports/post_repair_restart_review.md
+ M research/reports/pre_post_repair_comparison.md
+ M results/challenger_bakeoff_manifest.json
+ M results/live_validation_manifest.json
+ M results/mamba_trial_manifest.json
+ M results/model_change_request.json
+ M tests/test_authorization_consistency.py
+ M tests/test_forecast_activation_and_readiness.py
+ M tests/test_frontend_contracts.py
+ M tests/test_live_metric_reconciliation.py
+ M tests/test_market_monitor_routes.py
+ M tests/test_phase3_volatility_and_range_validation.py
+ M tests/test_phase6_terminal_release_readiness.py
+ M tests/test_research_results_api.py
+ M tests/test_stage11_forward_validation.py
+ M tests/test_stage12_causal_validation.py
+ M tests/test_stage5_dependency_and_model_identity.py
+ M tests/test_stage7_regime_experiments.py
+ M tests/test_stage8_data_experiments.py
+ M tests/test_stage9_integrity_and_next_experiment.py
+ M tests/test_v19_beginner_ui_and_gates.py
+ M tests/test_v26_research_gap_and_econometrics.py
+ M tests/test_v28_entry_quality_and_meta_model.py
+ M tests_frontend.js
+ M validation/startup_gate.py
+ M web/app.js
+ M web/index.html
+ M web/styles.css
+ M web_src/api_client.js
+?? .idea/
+?? api/routes_manual_journal.py
+?? api/routes_user_positions.py
+?? data/.prospective_shadow_runner.lock
+?? data/manual_trades/
+?? data/prospective_entry_ledger_v1_quarantined.jsonl
+?? data/prospective_entry_ledger_v2.jsonl
+?? data/prospective_shadow_status.json
+?? data/prospective_shadow_v1.jsonl
+?? data/research/
+?? data/smart_entry/
+?? engine/adaptive_risk_copilot.py
+?? engine/check_browser_state.py
+?? engine/coinbase_l2_collector.py
+?? engine/data_verification.py
+?? engine/directional_forecast_service.py
+?? engine/drift_evaluator.py
+?? engine/l2_event_recorder.py
+?? engine/l2_microstructure_features.py
+?? engine/manual_trade_journal.py
+?? engine/model_evaluation_interface.py
+?? engine/paper_trading_engine.py
+?? engine/prospective_l2_evaluation_protocol.py
+?? engine/prospective_l2_qualification.py
+?? engine/prospective_l2_shadow_gating.py
+?? engine/prospective_shadow_collector.py
+?? engine/regime_strategy_tournament.py
+?? engine/run_browser_qa.py
+?? engine/run_l2_prospective_burnin.py
+?? engine/run_real_cdp_browser_qa.py
+?? engine/run_v32_42_cdp_browser_qa.py
+?? engine/run_v32_42_journal_browser_qa.py
+?? engine/run_v32_43_smart_entry_browser_qa.py
+?? engine/run_v32_44_smart_entry_browser_qa.py
+?? engine/run_v32_45_workflow_acceptance_browser_qa.py
+?? engine/run_v32_46_vigorous_browser_qa.py
+?? engine/run_v32_47_real_backend_qa.py
+?? engine/run_v32_48_real_backend_qa.py
+?? engine/shadow_feed_runner.py
+?? engine/smart_entry_pipeline.py
+?? engine/smart_entry_simulator.py
+?? engine/strategy_signal_engine.py
+?? engine/trade_outcome_evaluator.py
+?? engine/user_position_tracker.py
+?? engine/v32_46_test_mock_server.py
+?? engine/v32_48_test_backend_server.py
+?? opencode.jsonc
+?? requirements-research.txt
+?? research/data_acquisition/
+?? research/data_audit_summary.json
+?? research/drift_model_walkforward_results.json
+?? research/execution_cost_eligibility_contract.md
+?? research/experiments/run_phase2_strategy_baseline.py
+?? research/experiments/run_phase3_forecast_evaluation.py
+?? research/experiments/run_phase4_meta_model.py
+?? research/experiments/run_phase5_ablation.py
+?? research/experiments/run_v32_28_master_pipeline.py
+?? research/experiments/run_v32_30_horizon_study.py
+?? research/experiments/run_v32_37_chronos2_benchmark.py
+?? research/experiments/run_v32_55_report.py
+?? research/experiments/run_v32_56_charting_readiness_audit.py
+?? research/experiments/run_v32_56_quote_remediation_addendum.py
+?? research/experiments/verify_isolated_api_server.py
+?? research/har_calibration_results.json
+?? research/historical_replay_results.json
+?? research/protocol_v1_1.md
+?? research/protocol_v1_2_decision_matrix_v31_1.md
+?? research/protocol_v1_2_proposal.md
+?? research/reports/artifacts/
+?? research/reports/provider_rights_preflight/
+?? research/reports/v32_26_evidence_first_pipeline_and_provenance_audit.md
+?? research/reports/v32_27_bounded_self_loop_execution_report.md
+?? research/reports/v32_28_feature_inventory_and_disposition_matrix.md
+?? research/reports/v32_28_feature_qa_matrix.md
+?? research/reports/v32_28_master_refactor_qa_report.md
+?? research/reports/v32_29_evidence_based_repair_report.md
+?? research/reports/v32_29_feature_qa_matrix.md
+?? research/reports/v32_29_repair_evidence_ledger.md
+?? research/reports/v32_30_current_state_and_discrepancy_ledger.md
+?? research/reports/v32_30_final_qa_and_red_team_report.md
+?? research/reports/v32_30_frontend_browser_qa_matrix.md
+?? research/reports/v32_30_horizon_research_preregistration.md
+?? research/reports/v32_30_horizon_research_results.md
+?? research/reports/v32_30_l2_data_and_feature_design.md
+?? research/reports/v32_31_feature_qa_matrix.md
+?? research/reports/v32_31_l2_entry_gating_report.md
+?? research/reports/v32_31_l2_preregistration_protocol.md
+?? research/reports/v32_32_feature_qa_matrix.md
+?? research/reports/v32_32_master_analysis_and_repair_report.md
+?? research/reports/v32_33_feature_verification_matrix.md
+?? research/reports/v32_33_independent_qa_report.md
+?? research/reports/v32_33_market_data_integrity_report.md
+?? research/reports/v32_33_master_improvement_report.md
+?? research/reports/v32_33_priority_defect_register.md
+?? research/reports/v32_33_quantitative_research_audit.md
+?? research/reports/v32_33_rating_scorecard.md
+?? research/reports/v32_34_defect_repair_ledger.md
+?? research/reports/v32_34_final_release_qa_report.md
+?? research/reports/v32_34_frontend_feature_visibility_matrix.md
+?? research/reports/v32_34_frontend_ux_baseline_and_final_scorecard.md
+?? research/reports/v32_34_independent_browser_qa_report.md
+?? research/reports/v32_35_final_qa_report.md
+?? research/reports/v32_35_forecast_feature_visibility_matrix.md
+?? research/reports/v32_35_forecast_visibility_defect_ledger.md
+?? research/reports/v32_35_independent_browser_qa_report.md
+?? research/reports/v32_36_forecasting_integrity_and_reconciliation_report.md
+?? research/reports/v32_36_l2_market_data_qualification_and_preregistration.md
+?? research/reports/v32_36_master_economic_decision_report.md
+?? research/reports/v32_36_multi_horizon_strategy_reconciliation_matrix.md
+?? research/reports/v32_37_chronos2_benchmark_summary.json
+?? research/reports/v32_37_chronos2_comparative_benchmark_report.md
+?? research/reports/v32_38_adaptive_market_intelligence_report.md
+?? research/reports/v32_38_adaptive_market_intelligence_summary.json
+?? research/reports/v32_39_preflight_data_quality_summary.json
+?? research/reports/v32_39_prospective_l2_qualification_report.md
+?? research/reports/v32_40a_burnin_capture_summary.json
+?? research/reports/v32_40b_browser_qa_report.md
+?? research/reports/v32_40b_browser_qa_summary.json
+?? research/reports/v32_40b_burnin_integrity_audit_report.md
+?? research/reports/v32_40b_burnin_integrity_audit_summary.json
+?? research/reports/v32_41_paper_trading_design_and_validation_report.md
+?? research/reports/v32_41_paper_trading_summary.json
+?? research/reports/v32_42_manual_journal_browser_qa_summary.json
+?? research/reports/v32_42_manual_trade_journal_report.md
+?? research/reports/v32_42_manual_trade_journal_summary.json
+?? research/reports/v32_42_user_position_tracker_and_risk_copilot_report.md
+?? research/reports/v32_42_user_position_tracker_and_risk_copilot_summary.json
+?? research/reports/v32_43_smart_entry_browser_qa_summary.json
+?? research/reports/v32_43_strategy_tournament_and_smart_entry_report.md
+?? research/reports/v32_43_strategy_tournament_and_smart_entry_summary.json
+?? research/reports/v32_44_smart_entry_browser_qa_summary.json
+?? research/reports/v32_44_smart_entry_independent_audit.md
+?? research/reports/v32_44_tournament_and_lifecycle_audit_summary.json
+?? research/reports/v32_45_analyse_tournament_entry_validation_report.md
+?? research/reports/v32_45_workflow_acceptance_browser_qa_summary.json
+?? research/reports/v32_45_workflow_acceptance_summary.json
+?? research/reports/v32_46_navigation_simplification_summary.json
+?? research/reports/v32_46_terminal_consolidation_and_navigation_simplification_report.md
+?? research/reports/v32_46_vigorous_qa_report.md
+?? research/reports/v32_46_vigorous_qa_summary.json
+?? research/reports/v32_47_analyse_selection_and_anomaly_monitor_report.md
+?? research/reports/v32_47_vigorous_qa_summary.json
+?? research/reports/v32_48_integrated_analyse_and_tournament_report.md
+?? research/reports/v32_48_vigorous_qa_summary.json
+?? research/reports/v32_49_scenario_qa_and_ui_report.md
+?? research/reports/v32_49_scenario_qa_summary.json
+?? research/reports/v32_50_runtime_forecast_ui_qa_report.md
+?? research/reports/v32_50_runtime_forecast_ui_qa_summary.json
+?? research/reports/v32_51/
+?? research/reports/v32_52/
+?? research/reports/v32_53/
+?? research/reports/v32_54/
+?? research/reports/v32_55/
+?? research/reports/v32_56_charting_readiness/
+?? research/reports/v32_56_charting_readiness_remediation/
+?? research/reports/v32_57_online_charting_readiness_audit/
+?? research/reports/v32_58_open_source_provider_review/
+?? research/research_only_data/
+?? research/rigorous_replay_results_v2.json
+?? research/runs/
+?? research/v30_3_prospective_shadow_report.md
+?? research/v30_4_shadow_feed_report.md
+?? research/v30_5_shadow_operations_report.md
+?? research/v30_6_operational_proof_report.md
+?? research/v30_7_shadow_burnin_report.md
+?? research/v30_8_collection_integrity_report.md
+?? research/v30_9_statistical_gate_audit.md
+?? research/v31_0_research_closure_report.md
+?? research/v31_1_data_provenance_audit.md
+?? research/v31_1_foundation_repair_report.md
+?? research/v31_2_blocker_resolution.md
+?? research/v31_2_dataset_options_assessment.md
+?? research/v31_2_evidence_verification_report.md
+?? research/v31_2_single_dataset_acceptance_gates.md
+?? research/v31_3_coinbase15_contract.md
+?? research/v31_3_coinbase15_validation_report.md
+?? research/v31_4_coinbase15_data_use_decision.md
+?? research/v31_4_coinbase_terms_compatibility_report.md
+?? research/v31_5_coinbase_terms_primary_source_verification.md
+?? research/v31_6_alternative_data_source_qualification.md
+?? research/v31_7_binance_btcusdt_1m_contract.md
+?? research/v31_8_binance_data_license_clarification_request.md
+?? research/v31_8_binance_data_use_gate.md
+?? research/v31_9_btcusd_source_decision.md
+?? research/v32_0_btcusd_license_provenance_decision.md
+?? research/v32_11_smart_entry_api_ui_report.md
+?? research/v32_12_smart_entry_e2e_verification.md
+?? research/v32_13_smart_entry_dashboard_visibility_report.md
+?? research/v32_14_live_terminal_smart_entry_report.md
+?? research/v32_15_modern_research_and_cons_remedies_report.md
+?? research/v32_17_empirical_remediation_and_first_passage_report.md
+?? research/v32_18_persistence_containment_report.md
+?? research/v32_19_persistence_boundary_report.md
+?? research/v32_1_application_health_audit.md
+?? research/v32_20_execution_cost_contract_report.md
+?? research/v32_21_training_and_feature_audit.md
+?? research/v32_22_prediction_chart_accuracy_report.md
+?? research/v32_23_forecast_smart_entry_qa_report.md
+?? research/v32_24_repeated_forecast_smart_entry_qa_report.md
+?? research/v32_25_ai_forecast_smart_entry_completion_report.md
+?? research/v32_2_btcusd_dataset_resolution.md
+?? research/v32_4_strategy_backtest_entry_engine_report.md
+?? research/v32_5_provisional_college_project_path.md
+?? research/v5_directional_and_drift_evaluation.json
+?? scripts/qa/
+?? tests/test_binance_vision_segment_collector.py
+?? tests/test_coinbase_hourly_verified_v2.py
+?? tests/test_coinbase_l2_collector_and_gating.py
+?? tests/test_isolated_real_http_server.py
+?? tests/test_prospective_shadow_collector.py
+?? tests/test_shadow_feed_runner.py
+?? tests/test_strategy_to_alert_pipeline.py
+?? tests/test_v30_6_operational_proof.py
+?? tests/test_v30_7_shadow_burnin.py
+?? tests/test_v30_8_collection_integrity.py
+?? tests/test_v30_9_statistical_gate_audit.py
+?? tests/test_v32_18_persistence_containment.py
+?? tests/test_v32_22_chart_and_forecast_integrity.py
+?? tests/test_v32_23_forecast_smart_entry_recovery.py
+?? tests/test_v32_25_directional_integration.py
+?? tests/test_v32_37_chronos2_benchmark.py
+?? tests/test_v32_38_adaptive_market_intelligence.py
+?? tests/test_v32_39_prospective_l2_qualification.py
+?? tests/test_v32_40b_burnin_and_feature_warmup.py
+?? tests/test_v32_41_paper_trading_engine.py
+?? tests/test_v32_42_manual_trade_journal_and_eval.py
+?? tests/test_v32_42_user_position_tracker_and_risk_copilot.py
+?? tests/test_v32_43_strategy_tournament_and_smart_entry.py
+?? tests/test_v32_44_smart_entry_independent_audit.py
+?? tests/test_v32_45_workflow_acceptance.py
+?? tests/test_v32_46_navigation_and_terminal_consolidation.py
+?? tests/test_v32_47_analyse_selection_and_anomaly_monitor.py
+?? tests/test_v32_48_integrated_analyse_and_tournament.py
+?? tests/test_v32_49_scenario_qa.py
+?? tests/test_v32_50_chart_forecast_runtime.py
+?? tests/test_v32_56_no_fabricated_position_quote.py
+?? tests/test_v32_58_no_fabricated_analyse_quote.py
+?? web_src/manual_trade_journal_view.js
+?? web_src/smart_entry_simulator_view.js

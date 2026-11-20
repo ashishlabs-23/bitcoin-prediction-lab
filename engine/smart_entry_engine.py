@@ -16,6 +16,7 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
@@ -251,7 +252,7 @@ class SmartEntryDecisionEngine:
         candles: Optional[Union[Sequence[Dict[str, Any]], Sequence[float], Dict[str, Sequence[float]]]] = None,
         enabled_indicators: Optional[List[str]] = None,
         regime: str = "VOL_EXPANDING",
-        c2_health: str = "CALIBRATED",
+        c2_health: str = "UNAVAILABLE",
         user_direction_preference: str = "AUTO",
         selective_threshold: float = 0.60,
         cost_scenario: str = "COINBASE_RETAIL_87BPS",
@@ -260,10 +261,21 @@ class SmartEntryDecisionEngine:
         sigma_t0: Optional[float] = None,
         k_tp: float = 1.5,
         k_sl: float = 1.0,
+        persist: bool = False,
+        ledger_path: Optional[Union[Path, str]] = None,
     ) -> Dict[str, Any]:
         """Integrate strategy ranking, risk gate, and barrier resolvers into a single research decision."""
         closes, highs, lows, bars, latest_price = self._coerce_market_history(candles, live_price)
         price = self._to_float(market_snapshot.get("spot_price"), latest_price) if market_snapshot else latest_price
+
+        # Agent 3: Evaluate genuine directional GBDT model evidence
+        from engine.directional_forecast_service import compute_directional_gbdt_forecast
+        directional_evidence = compute_directional_gbdt_forecast(
+            closes=closes,
+            timeframe=horizon,
+            horizon="1h",
+        )
+
         if price <= 0:
             return {
                 "status": "ABSTAIN",
@@ -272,6 +284,10 @@ class SmartEntryDecisionEngine:
                 "selection": None,
                 "candidate": None,
                 "resolution": None,
+                "drift_parameter_mu": 0.0,
+                "drift_status": "DRIFTLESS_NULL_BASELINE",
+                "directional_model_evidence": directional_evidence,
+                "persisted": False,
                 "execution_authorization": self.execution_authorization,
                 "governance_status": self.governance_status,
             }
@@ -299,6 +315,10 @@ class SmartEntryDecisionEngine:
                 "selection": selection,
                 "candidate": None,
                 "resolution": None,
+                "drift_parameter_mu": 0.0,
+                "drift_status": "DRIFTLESS_NULL_BASELINE",
+                "directional_model_evidence": directional_evidence,
+                "persisted": False,
                 "execution_authorization": self.execution_authorization,
                 "governance_status": self.governance_status,
             }
@@ -325,14 +345,30 @@ class SmartEntryDecisionEngine:
             k_sl=k_sl,
             features=features,
         )
-        # Append-only prospective logging to V2 ledger with 5 mandatory fields
-        try:
-            self.entry_engine.log_prospective_decision(decision)
-        except Exception:
-            pass
+
+        # Opt-in prospective logging: default is write-free (persist=False)
+        persisted = False
+        persisted_ts: Optional[str] = None
+        persistence_error: Optional[str] = None
+
+        if persist:
+            try:
+                persisted_ts = self.entry_engine.log_prospective_decision(
+                    decision, ledger_path=ledger_path
+                )
+                persisted = True
+            except Exception as e:
+                persisted = False
+                persistence_error = str(e)
+
+        decision["persisted"] = persisted
+        if persisted_ts:
+            decision["persisted_timestamp_utc"] = persisted_ts
+        if persistence_error:
+            decision["persistence_error"] = persistence_error
 
         if decision.get("action") != "ACCEPTED_RESEARCH_CANDIDATE":
-            return {
+            res_abstain: Dict[str, Any] = {
                 "status": "ABSTAIN",
                 "decision_action": "ABSTAIN",
                 "primary_reason": decision.get("primary_reason", "NO_VALIDATED_EDGE_ABSTAIN"),
@@ -341,10 +377,18 @@ class SmartEntryDecisionEngine:
                 "candidate": None,
                 "resolution": None,
                 "decision": decision,
+                "drift_parameter_mu": 0.0,
+                "drift_status": "DRIFTLESS_NULL_BASELINE",
+                "directional_model_evidence": directional_evidence,
                 "first_passage_geometry_baseline": decision.get("probabilities"),
+                "persisted": persisted,
+                "persisted_timestamp_utc": persisted_ts,
                 "execution_authorization": self.execution_authorization,
                 "governance_status": self.governance_status,
             }
+            if persistence_error:
+                res_abstain["persistence_error"] = persistence_error
+            return res_abstain
 
         decision_ts = self._iso_utc()
         fill_ts = self._iso_utc(datetime.now(timezone.utc) + timedelta(minutes=1))
@@ -411,7 +455,7 @@ class SmartEntryDecisionEngine:
                 "Economically equivalent to DEFENSIVE_CASH_HOLD or requiring a perpetual futures venue."
             )
 
-        return {
+        res_success: Dict[str, Any] = {
             "status": "SUCCESS",
             "decision_action": "ACCEPTED_RESEARCH_CANDIDATE",
             "primary_reason": decision.get("primary_reason", "POSITIVE_NET_EXPECTANCY_CONFIRMED"),
@@ -421,15 +465,21 @@ class SmartEntryDecisionEngine:
             "candidate": candidate.to_dict(),
             "entry_decision": decision,
             "resolution": resolution.to_dict(),
+            "directional_model_evidence": directional_evidence,
             "modern_econometrics": {
                 "finite_horizon_monte_carlo_null": mc_null,
                 "purged_sample_size": purged_stats,
                 "deflated_sharpe_ratio": dsr_stats,
             },
             "spot_execution_advisory": spot_short_advisory,
+            "persisted": persisted,
+            "persisted_timestamp_utc": persisted_ts,
             "execution_authorization": self.execution_authorization,
             "governance_status": self.governance_status,
         }
+        if persistence_error:
+            res_success["persistence_error"] = persistence_error
+        return res_success
 
     def decide_entry(self, **kwargs: Any) -> Dict[str, Any]:
         return self.evaluate_market(**kwargs)

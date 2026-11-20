@@ -8,14 +8,40 @@ Verifies:
 
 import os
 import sys
+import importlib
+import sqlite3
+from pathlib import Path
 import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from research.longitudinal_monitor import longitudinal_evidence_store
+from research.longitudinal_monitor import LongitudinalEvidenceStore
 
 
-def test_longitudinal_reused_data_rejection():
+def test_longitudinal_module_import_does_not_connect_to_persistent_database(monkeypatch):
+    module_name = "research.longitudinal_monitor"
+    persistent_db = os.path.normcase(os.path.realpath(
+        Path(__file__).resolve().parents[1] / "results" / "longitudinal_evidence.db"
+    ))
+    original_connect = sqlite3.connect
+    persistent_connections = []
+
+    def guarded_connect(database, *args, **kwargs):
+        target = os.path.normcase(os.path.realpath(os.path.abspath(os.fspath(database))))
+        if target == persistent_db:
+            persistent_connections.append(target)
+            raise AssertionError(f"Import attempted to connect to persistent database: {target}")
+        return original_connect(database, *args, **kwargs)
+
+    monkeypatch.setattr(sqlite3, "connect", guarded_connect)
+    monkeypatch.delitem(sys.modules, module_name)
+    importlib.import_module(module_name)
+
+    assert persistent_connections == []
+
+
+def test_longitudinal_reused_data_rejection(tmp_path):
+    store = LongitudinalEvidenceStore(str(tmp_path / "longitudinal_integrity.db"))
     stale_record = {
         "forecast_id": "REUSED-001",
         "forecast_timestamp": "2026-08-10T12:00:00Z",  # Before frozen boundary
@@ -40,10 +66,11 @@ def test_longitudinal_reused_data_rejection():
         "data_quality": "VALID",
         "block_id": 10
     }
-    assert longitudinal_evidence_store.record_evidence(stale_record) is False
+    assert store.record_evidence(stale_record) is False
 
 
-def test_longitudinal_model_hash_mismatch_rejection():
+def test_longitudinal_model_hash_mismatch_rejection(tmp_path):
+    store = LongitudinalEvidenceStore(str(tmp_path / "longitudinal_integrity.db"))
     mutated_record = {
         "forecast_id": "MUTATED-001",
         "forecast_timestamp": "2026-08-22T12:00:00Z",
@@ -68,4 +95,4 @@ def test_longitudinal_model_hash_mismatch_rejection():
         "data_quality": "VALID",
         "block_id": 33
     }
-    assert longitudinal_evidence_store.record_evidence(mutated_record) is False
+    assert store.record_evidence(mutated_record) is False

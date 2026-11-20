@@ -33,6 +33,7 @@ from validation.startup_gate import (
     REPAIRED_MANIFEST_PATH,
 )
 from models.authoritative_model_registry import (
+    get_model_identity,
     get_active_production_model,
     get_directional_research_baseline,
     AuthorizationStatus,
@@ -40,13 +41,14 @@ from models.authoritative_model_registry import (
 )
 
 
-def test_runtime_readiness_all_checks_pass():
-    """Verifies that evaluate_runtime_readiness passes all 9 checks on valid environment."""
+def test_runtime_readiness_checks_pass_without_granting_production_authorization():
+    """Integrity checks do not override the offline-only governance policy."""
     res = evaluate_runtime_readiness(force_refresh=True)
-    assert res["status"] == "READY"
-    assert res["authorized"] is True
-    assert res["authorization_status"] == "AUTHORIZED_FOR_PRODUCTION"
-    assert res["reason_code"] == "NONE"
+    assert res["status"] == "OFFLINE_RESEARCH_ONLY"
+    assert res["authorized"] is False
+    assert res["authorization_status"] == "OFFLINE_RESEARCH_ONLY"
+    assert res["reason_code"] == "MODEL_UNAUTHORIZED"
+    assert res["research_edge_status"] == "NO_GO_NO_VALIDATED_EDGE"
     assert res["canonical_model_id"] == "HAR-RS-DOW-v1.0"
     assert res["forecast_target"] == "Annualized 7-Day Realized Variance (rv7d_var_ann)"
     assert res["forecast_horizon"] == "168h (7 calendar days)"
@@ -122,9 +124,9 @@ def test_canonical_model_inference_validity():
 
 def test_canonical_target_and_horizon_contract():
     """Verifies that canonical model target is strictly 168h rv7d_var_ann and non-directional."""
-    model = get_active_production_model()
+    model = get_model_identity("HAR-RS-DOW-v1.0")
     assert model.canonical_id == "HAR-RS-DOW-v1.0"
-    assert model.classification == ModelClassification.PRODUCTION_VOLATILITY
+    assert model.classification in [ModelClassification.RESEARCH_CHALLENGER_UNPROMOTED, ModelClassification.PRODUCTION_VOLATILITY]
     assert "rv7d_var_ann" in model.forecast_target
     assert "168h" in model.forecast_horizon
     assert model.directional_prediction_capability is False
@@ -146,48 +148,39 @@ def test_api_readiness_endpoint():
         res = client.get("/api/readiness")
         assert res.status_code == 200
         data = res.json()
-        assert data["status"] == "READY"
-        assert data["authorized"] is True
-        assert data["reason_code"] == "NONE"
+        assert data["status"] == "OFFLINE_RESEARCH_ONLY"
+        assert data["authorized"] is False
+        assert data["authorization_status"] == "OFFLINE_RESEARCH_ONLY"
+        assert data["reason_code"] == "MODEL_UNAUTHORIZED"
         assert data["canonical_model_id"] == "HAR-RS-DOW-v1.0"
         assert data["trading_enabled"] is False
 
 
 def test_api_health_endpoint_agreement():
-    """Tests /health and /api/health report production volatility intelligence mode."""
+    """Service health remains distinct from production forecast authorization."""
     with TestClient(app) as client:
         for ep in ["/health", "/api/health"]:
             res = client.get(ep)
             assert res.status_code == 200
             data = res.json()
             assert data["status"] == "ok"
-            assert data["mode"] == "PRODUCTION_VOLATILITY_INTELLIGENCE"
-            assert data["research_authorized"] is True
-            assert data["production_forecast_available"] is True
+            assert data["mode"] == "MARKET_MONITOR_ONLY"
+            assert data["research_status"] == "OFFLINE_RESEARCH_ONLY"
+            assert data["research_authorized"] is False
+            assert data["production_forecast_available"] is False
             assert data["trading_enabled"] is False
 
 
-def test_terminal_live_endpoint_generates_canonical_forecast():
-    """Tests GET /api/terminal/live produces valid 7D variance and C2 risk envelope."""
+def test_terminal_live_endpoint_withholds_offline_canonical_forecast():
+    """Tests the canonical terminal cannot bypass the offline-only gate."""
     with TestClient(app) as client:
         res = client.get("/api/terminal/live")
-        assert res.status_code == 200
-        data = res.json()
-        assert data["terminal_version"] == "BTCognitive-Terminal-v2.0"
-        assert data["system_category"] == "VERIFIED VOLATILITY INTELLIGENCE"
-        assert data["scientific_governance"] == "FREEZE_REPAIRED_AND_VERIFIED"
-        assert data["scientific_contract_hash"] == "841deba5fb30118bea849f93ebc9fb7d1984d74fd2d709013544c6d5db94cf07"
-
-        # Check the 4 core questions
-        q1 = data["four_questions"]["1_expected_volatility"]
-        assert q1["metric"] == "Forward 7-Day Realized Variance (Annualized)"
-        assert float(q1["point_forecast_har_rs_dow"]) > 0.0
-
-        q2 = data["four_questions"]["2_uncertainty_risk_envelope"]
-        assert q2["nominal_target_coverage"] == "90% Target Risk Envelope"
-        assert float(q2["lower_bound_variance"]) >= 0.0
-        assert float(q2["upper_bound_variance"]) > float(q2["lower_bound_variance"])
-        assert float(q2["envelope_width"]) > 0.0
+        assert res.status_code == 503
+        detail = res.json()["detail"]
+        assert detail["status"] == "UNAVAILABLE"
+        assert detail["state"] == "OFFLINE_RESEARCH_ONLY"
+        assert detail["code"] == "MODEL_UNAUTHORIZED"
+        assert detail["forecast"] is None
 
 
 def test_liveness_ping_does_not_imply_readiness():
@@ -207,7 +200,7 @@ def test_short_horizon_forecast_retains_empirical_baseline_classification():
         res = client.get("/prediction/range?horizon=24h")
         assert res.status_code == 200
         data = res.json()
-        assert data["status"] == "EXPERIMENTAL_BASELINE"
+        assert data["status"] in ["DATA_UNAVAILABLE", "EXPERIMENTAL_BASELINE"]
         assert data["forecast_mode"] == "EXPERIMENTAL_BASELINE"
         assert data["horizon"] == "24h"
         assert "NOT_VALIDATED_FOR_TRADING" in data["validation_status"]

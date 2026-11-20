@@ -26,6 +26,7 @@ from engine.evidence_router import adaptive_evidence_router
 logger = logging.getLogger("btcognitive.routes_arena")
 
 router = APIRouter(tags=["AI Experiment Arena"])
+C2_CALIBRATION_ENABLED = False
 
 
 
@@ -39,6 +40,25 @@ def get_arena_context():
     # 1. Canonical point-in-time 4-state snapshot
     snapshot = observatory.get_canonical_snapshot()
     status = arena_runner.get_status()
+    context = snapshot.to_dict()
+    risk_context = context.get("risk")
+    if isinstance(risk_context, dict):
+        for key in (
+            "expected_7d_variance",
+            "expected_7d_volatility",
+            "nominal_target_coverage",
+            "lower_bound",
+            "upper_bound",
+            "envelope_width",
+        ):
+            risk_context[key] = None
+        risk_context["calibration_status"] = "UNAVAILABLE"
+    model_context = context.get("model")
+    if isinstance(model_context, dict):
+        model_context["health"] = "UNAVAILABLE"
+        for key in ("coverage_30d", "coverage_90d", "tail_asymmetry"):
+            if key in model_context:
+                model_context[key] = None
     
     # 2. Extract exploratory strategy actions without fabricating defaults
     raw_actions = status.get("recent_actions")
@@ -55,7 +75,7 @@ def get_arena_context():
     # Invariant: GET context is strictly read-only and must never record side-effects in ledgers.
 
     return {
-        "context": snapshot.to_dict(),
+        "context": context,
         "strategy": {
             "actions": recent_actions,
             "agreement_ratio": agreement_ratio,
@@ -841,6 +861,20 @@ def get_active_paper_position(
     and the User Preference Rejection Guardrail.
     READ-ONLY PROJECTION: Does NOT make trading decisions.
     """
+    if not C2_CALIBRATION_ENABLED:
+        return {
+            "has_active_position": False,
+            "status": "UNAVAILABLE",
+            "error": "Active-position hypotheses and risk bounds are withheld while calibration evidence is unavailable.",
+            "live_price": None,
+            "calibration_status": "UNAVAILABLE",
+            "c2_status": "DISABLED",
+            "model_authorization": "OFFLINE_RESEARCH_ONLY",
+            "live_trading_enabled": False,
+            "order_submission_enabled": False,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
     try:
         from engine.arena_accounts import get_all_open_positions, get_account, get_all_accounts, STRATEGY_NAMES
         from engine.feature_cache import feature_cache
@@ -879,7 +913,7 @@ def get_active_paper_position(
 
         # Market regime & C2 health from observatory if available
         market_regime = "NORMAL"
-        c2_health = "DATA_UNAVAILABLE"
+        c2_health = "UNAVAILABLE"
         snap_data = {
             "spot_price": live_price,
             "conformal_p90": None,
@@ -890,7 +924,7 @@ def get_active_paper_position(
             snap = observatory.get_canonical_snapshot()
             if snap:
                 market_regime = getattr(snap, "volatility_regime", None) or (getattr(snap.market_state, "regime", "NORMAL") if hasattr(snap, "market_state") else "NORMAL")
-                c2_health = getattr(snap, "calibration_health", None) or (getattr(snap.model_state, "health", "CALIBRATED") if hasattr(snap, "model_state") else "CALIBRATED")
+                c2_health = "UNAVAILABLE"
                 snap_data.update({
                     "ofi": getattr(snap, "order_flow_imbalance", None),
                     "hawkes": getattr(snap, "hawkes_intensity", None),
@@ -1161,7 +1195,7 @@ def get_active_paper_position(
                         "evidence": "Directional model evaluated out-of-sample: ~52.1% accuracy, negative net expectancy after transaction costs.",
                         "estimated_execution_cost_bps": 9.3,
                         "cost_breakdown": "Spread 1.5 + Slippage 2.0 + Comm 5.8 bps",
-                        "c2_health": "CALIBRATED",
+                        "c2_health": "UNAVAILABLE",
                         "risk_check": "OFFLINE_RESEARCH_ONLY",
                         "action": "ABSTAIN",
                         "is_directional_trade_signal": False,
@@ -1584,25 +1618,15 @@ def get_cross_horizon_profile(
     Dedicated endpoint for Cross-Horizon Resolution & Patience Analysis.
     Decouples Question A (fixed boundaries, varying T) from Question B (horizon calibrated).
     """
-    try:
-        from engine.feature_cache import feature_cache
-        live_price = float(feature_cache.get_latest_price() or 64000.0)
-        e = entry_price if entry_price and entry_price > 0 else live_price
-        u = u_target if u_target and u_target > e else round(e * 1.008, 2)
-        l = l_target if l_target and 0 < l_target < e else round(e * 0.993, 2)
-
-        profile = adaptive_evidence_router.compute_cross_horizon_resolution_profile(
-            s0=live_price,
-            entry_price=e,
-            u_fixed=u,
-            l_fixed=l,
-            current_horizon=horizon,
-            market_snapshot={"rv_5m": 0.0024}
-        )
-        return profile
-    except Exception as ex:
-        logger.error(f"cross_horizon_profile error: {ex}")
-        return {"error": str(ex), "status": "ERROR"}
+    return {
+        "status": "UNAVAILABLE",
+        "question_a_fixed_contract_sensitivity": [],
+        "question_b_horizon_specific_calibrations": [],
+        "evidence_persistence_matrix": [],
+        "calibration_status": "UNAVAILABLE",
+        "c2_status": "DISABLED",
+        "reason": "Cross-horizon risk outputs require verified calibration and source provenance.",
+    }
 
 
 @router.get("/api/arena/trade-markers")
@@ -1713,20 +1737,26 @@ def get_strategy_summary():
         summary = []
         for name in STRATEGY_NAMES:
             acc = acc_dict.get(name, {})
-            nav = float(acc.get("nav", 10000.0))
-            trades = int(acc.get("total_trades", 0))
-            epoch_trades = int(acc.get("epoch_trades", 0))
-            win_rate = float(acc.get("win_rate", 0.0))
+            nav = float(acc["nav"]) if acc.get("nav") is not None else None
+            trades = int(acc["total_trades"]) if acc.get("total_trades") is not None else None
+            epoch_trades = int(acc["epoch_trades"]) if acc.get("epoch_trades") is not None else None
+            win_rate = float(acc["win_rate"]) if acc.get("win_rate") is not None else None
 
             summary.append({
                 "strategy_id": name,
                 "version": "v1.0",
                 "registry_status": "CANDIDATE",
-                "promotion_level": "L3",
-                "empirical_status": f"VALIDATION_IN_PROGRESS (Epoch 01: {epoch_trades}/100 Trades)",
-                "nav": round(nav, 2),
-                "net_pnl": round(nav - 10000.0, 2),
-                "win_rate_pct": round(win_rate * 100.0, 1),
+                "promotion_level": "OFFLINE_RESEARCH_ONLY",
+                "empirical_status": (
+                    f"VALIDATION_IN_PROGRESS (Epoch 01: {epoch_trades}/100 Trades)"
+                    if epoch_trades is not None else "UNAVAILABLE"
+                ),
+                "nav": round(nav, 2) if nav is not None else None,
+                "net_pnl": round(nav - 10000.0, 2) if nav is not None else None,
+                "win_rate_pct": (
+                    round(win_rate * 100.0, 1)
+                    if win_rate is not None and trades is not None and trades > 0 else None
+                ),
                 "total_trades": trades
             })
 
@@ -1754,6 +1784,11 @@ def compute_what_if_scenario(
     Purpose: Explore user-defined hypothetical boundary configurations under driftless log-price diffusion.
     Strictly non-directional. Zero trade recommendation, zero economic ranking, zero EV aggregation.
     """
+    if isinstance(body, dict) and any(
+        key.lower().startswith("c2") or "conformal" in key.lower()
+        for key in body
+    ):
+        raise HTTPException(status_code=422, detail="C2 and conformal controls are disabled by governance.")
     try:
         from engine.evidence_router import exact_double_barrier_first_passage_series, adaptive_evidence_router
         import math
@@ -1767,27 +1802,57 @@ def compute_what_if_scenario(
             vol_multiplier = float(body.get("vol_multiplier", vol_multiplier))
             spot_price = body.get("spot_price", spot_price)
 
+        if not isinstance(horizon, str) or horizon not in {"5m", "15m", "1h", "4h", "1d", "7d"}:
+            return {"status": "INVALID_HORIZON", "error": "Unsupported scenario horizon."}
+        if not math.isfinite(float(vol_multiplier)) or not 0.1 <= float(vol_multiplier) <= 5.0:
+            return {"status": "INVALID_VOLATILITY_MULTIPLIER", "error": "vol_multiplier must be finite and between 0.1 and 5.0."}
+
         snapshot = observatory.get_canonical_snapshot()
-        snap_dict = snapshot.to_dict()
-        live_spot = float(spot_price if spot_price and spot_price > 0 else snap_dict.get("live_price", 64250.0))
-
-        # Get empirical conformal reference bounds (P90 / P10)
-        c2 = snap_dict.get("conformal_interval_24h", {})
-        conformal_p90 = float(c2.get("upper", round(live_spot * 1.008, 2)))
-        conformal_p10 = float(c2.get("lower", round(live_spot * 0.993, 2)))
-
-        # Default TP/SL if not passed
-        user_tp = float(tp_price if tp_price and tp_price > live_spot else round(conformal_p90, 2))
-        user_sl = float(sl_price if sl_price and sl_price < live_spot else round(conformal_p10, 2))
+        snap_dict = snapshot.to_dict() if snapshot else {}
+        raw_spot = spot_price if spot_price is not None else snap_dict.get("live_price")
+        live_spot = float(raw_spot) if raw_spot is not None else float("nan")
+        if not math.isfinite(live_spot) or live_spot <= 0:
+            return {
+                "status": "DATA_UNAVAILABLE",
+                "error": "A verified positive spot reference is required.",
+                "empirical_conformal_reference": {"status": "UNAVAILABLE"}
+            }
+        if tp_price is None or sl_price is None:
+            return {
+                "status": "INPUT_REQUIRED",
+                "error": "User-specified take-profit and stop-loss boundaries are required; C2 defaults are disabled.",
+                "empirical_conformal_reference": {"status": "UNAVAILABLE"}
+            }
+        user_tp = float(tp_price)
+        user_sl = float(sl_price)
+        if (
+            not math.isfinite(user_tp)
+            or not math.isfinite(user_sl)
+            or user_tp <= live_spot
+            or user_sl <= 0
+            or user_sl >= live_spot
+        ):
+            return {
+                "status": "INVALID_BOUNDARIES",
+                "error": "Take-profit must exceed and stop-loss must be below the positive reference price.",
+                "empirical_conformal_reference": {"status": "UNAVAILABLE"}
+            }
 
         # Horizon scaling
         horizon_map = {"5m": 5, "15m": 15, "1h": 60, "4h": 240, "1d": 1440, "7d": 10080}
-        h_clean = horizon if horizon in horizon_map else "15m"
+        h_clean = horizon
         t_mins = horizon_map.get(h_clean, 15)
 
-        raw_rv = float(snap_dict.get("rv_5m", 0.0024))
-        rv_base = raw_rv * 0.1 if raw_rv > 0.01 else (raw_rv if raw_rv > 0.0001 else 0.0024)
-        base_sigma = max(0.0005, rv_base * math.sqrt(t_mins / 5.0))
+        raw_rv = snap_dict.get("rv_5m")
+        if raw_rv is None or not math.isfinite(float(raw_rv)) or float(raw_rv) <= 0:
+            return {
+                "status": "DATA_UNAVAILABLE",
+                "error": "A positive observed 5-minute volatility input is required.",
+                "empirical_conformal_reference": {"status": "UNAVAILABLE"}
+            }
+        raw_rv = float(raw_rv)
+        rv_base = raw_rv * 0.1 if raw_rv > 0.01 else raw_rv
+        base_sigma = rv_base * math.sqrt(t_mins / 5.0)
         stressed_sigma = base_sigma * vol_multiplier
 
         # 1. Compute Exact Analytical First-Passage for Custom User Scenario
@@ -1796,14 +1861,6 @@ def compute_what_if_scenario(
             l=user_sl,
             u=user_tp,
             sigma_total=stressed_sigma
-        )
-
-        # 2. Compute Empirical Conformal Reference Baseline for structural comparison
-        pu_conf, pl_conf, pexit_conf, p0_conf, diag_conf = exact_double_barrier_first_passage_series(
-            s0=live_spot,
-            l=conformal_p10,
-            u=conformal_p90,
-            sigma_total=base_sigma
         )
 
         # Eventual touch probability
@@ -1817,15 +1874,6 @@ def compute_what_if_scenario(
         tp_dist_pct = round((tp_dist_usd / live_spot) * 100.0, 3)
         sl_dist_pct = round((sl_dist_usd / live_spot) * 100.0, 3)
         geom_rr = round(tp_dist_usd / max(1e-6, sl_dist_usd), 2)
-
-        # Comparative Analysis vs Empirical Conformal Range
-        conf_tp_dist = conformal_p90 - live_spot
-        conf_sl_dist = live_spot - conformal_p10
-        tp_vs_conf_ratio = round(tp_dist_usd / max(1e-6, conf_tp_dist), 2)
-        sl_vs_conf_ratio = round(sl_dist_usd / max(1e-6, conf_sl_dist), 2)
-
-        is_tp_beyond_conformal = user_tp > conformal_p90
-        is_sl_beyond_conformal = user_sl < conformal_p10
 
         # Research Stress-Test Provenance Hashes
         scenario_hash_str = f"{live_spot:.2f}_{user_tp:.2f}_{user_sl:.2f}_{h_clean}_{vol_multiplier:.2f}"
@@ -1867,27 +1915,14 @@ def compute_what_if_scenario(
                 "solver_diagnostics": diag
             },
             "empirical_conformal_reference": {
-                "conformal_p90_upper": conformal_p90,
-                "conformal_p10_lower": conformal_p10,
-                "conformal_envelope_rr": round(conf_tp_dist / max(1e-6, conf_sl_dist), 2),
-                "conformal_baseline_p_upper": round(pu_conf, 4) if pu_conf is not None else 0.0553,
-                "conformal_baseline_p_lower": round(pl_conf, 4) if pl_conf is not None else 0.0911,
-                "conformal_baseline_p_survival": round(p0_conf, 4) if p0_conf is not None else 0.8537,
-                "tp_to_conformal_ratio": tp_vs_conf_ratio,
-                "sl_to_conformal_ratio": sl_vs_conf_ratio,
-                "is_tp_beyond_conformal_90": is_tp_beyond_conformal,
-                "is_sl_beyond_conformal_90": is_sl_beyond_conformal,
-                "comparative_envelope_context": (
-                    f"User TP is {tp_vs_conf_ratio:.1f}x empirical P90 boundary; "
-                    f"SL is {sl_vs_conf_ratio:.1f}x empirical P10 boundary. "
-                    f"Finite-horizon boundary exit probability within {h_clean} is {((pexit or 0)*100):.1f}%."
-                )
+                "status": "UNAVAILABLE",
+                "reason": "C2 calibration is disabled; no calibrated reference bounds are available."
             },
             "research_provenance": {
                 "scenario_hash": scenario_hash,
                 "configuration_hash": config_hash,
                 "boundary_source": "USER_SPECIFIED_HYPOTHETICAL",
-                "conformal_reference_source": "CALIBRATED_EMPIRICAL_QUANTILE",
+                "conformal_reference_source": "UNAVAILABLE",
                 "solver_version": "EIGENFUNCTION_SERIES_V3.3",
                 "research_registration": "TIER0_EXPLORATORY_PATH_SIMULATION",
                 "drift_mu": 0.0,
@@ -1917,6 +1952,11 @@ def get_scenario_preview(
     a verified market reference and rolling volatility estimate.
     Strictly non-actionable, research-only preview. Directional execution is DISABLED.
     """
+    if isinstance(body, dict) and any(
+        key.lower().startswith("c2") or "conformal" in key.lower()
+        for key in body
+    ):
+        raise HTTPException(status_code=422, detail="C2 and conformal controls are disabled by governance.")
     try:
         from engine.scenario_contract_engine import scenario_planner
 
@@ -1951,7 +1991,7 @@ def get_scenario_preview(
             "is_actionable": False,
             "execution_authorization": "DISABLED",
             "instrument": "BTC/USD",
-            "market_source": "Coinbase Spot (Closed Hourly Candle)",
+            "market_source": "UNAVAILABLE",
             "selected_horizon": horizon,
             "contract_version": "SCENARIO_PLANNER_v1.0",
             "rejection_code": "INTERNAL_ERROR",
@@ -1959,4 +1999,3 @@ def get_scenario_preview(
             "scenarios": None,
             "disclaimer": "Hypothetical volatility barrier calculation only. Does NOT constitute a directional prediction, trade signal, or investment advice. Execution authorization is DISABLED."
         }
-

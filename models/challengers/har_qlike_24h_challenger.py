@@ -131,7 +131,7 @@ class ConventionalHAR24H:
         n = X.shape[0]
         X_design = np.column_stack([np.ones(n), X])
         log_pred = np.clip(X_design @ self.beta, -10.0, 10.0)
-        return np.exp(log_pred)
+        return np.maximum(1e-6, np.nan_to_num(np.exp(log_pred), nan=1e-6, posinf=1e4, neginf=1e-6))
 
 
 class HARQLIKE24HChallenger:
@@ -170,7 +170,7 @@ class HARQLIKE24HChallenger:
         n = X.shape[0]
         X_design = np.column_stack([np.ones(n), X])
         log_pred = np.clip(X_design @ self.beta, -10.0, 10.0)
-        return np.exp(log_pred)
+        return np.maximum(1e-6, np.nan_to_num(np.exp(log_pred), nan=1e-6, posinf=1e4, neginf=1e-6))
 
 
 def evaluate_24h_volatility_suite(

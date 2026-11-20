@@ -1,0 +1,50 @@
+# BTCognitive — Phase 1 Changed Files Ledger
+# Baseline Commit: 25d483f4c3646661b57311de9d0b53d2be881adb
+# Audit Date: 2026-10-29
+
+## New Core Modules & Tests Created
+1. engine/data_mode.py
+   - Single authoritative contract defining DataMode enum ('fixture', 'offline_research', 'provider').
+   - Mode defaulting, fail-closed parsing (InvalidDataModeError), external network checks.
+   - Network assertions (assert_no_external_network -> ExternalNetworkBlockedError).
+   - Protected file access barrier (assert_protected_file_access_permitted -> ProtectedFileAccessBlockedError).
+   - System metadata contract provider (get_data_mode_contract).
+
+2. tests/test_v32_64_data_lane_separation.py
+   - 11 comprehensive automated tests covering mode parsing, default rules, protected file barriers,
+     offline snapshot serving, comparator fail-closed behavior, transport network guards, canonical BTC-USD
+     symbol & envelope, provider fail-closed gating, truthful nulls, and protected artifact bit-invariance.
+
+## Existing Files Modified
+3. engine/status_contract.py
+   - Added data_mode (str) and data_mode_contract (Dict[str, Any]) to SystemStatusContract.
+   - Populated dynamically in evaluate_system_status().
+
+4. api/market_monitor_routes.py
+   - Fixed missing 'provenance_status': 'UNVERIFIED' in fallback gate dictionary.
+   - Made /api/market/candles mode-aware, canonical symbol 'BTC-USD', with 0 external network calls.
+   - Added /api/market/dashboard alias to prevent 404s.
+
+5. api/market_drivers.py
+   - Guarded _get_json with assert_no_external_network().
+   - Added get_fixture_candles() deterministic generator and get_offline_historical_candles() local parquet loader.
+   - Made get_market_dashboard() mode-aware: serves fixture or local historical snapshot directly, failing closed on provider mode with 0 network calls.
+
+6. engine/spot_exchange_comparator.py
+   - Added fail-closed check if not is_external_network_permitted(): returns DATA_UNAVAILABLE with primary_price_usd=None and 0 socket connections.
+
+7. engine/coinbase_15m_adapter.py
+   - Added assert_no_external_network() to fetch_single_chunk().
+   - In get_or_sync_15m_candles(): prevents live network sync when network is restricted, serving cached data if available or failing closed.
+
+8. web/app.js
+   - In fetchHistory: removed direct browser fetch to Coinbase REST (leaking external network).
+   - Routed candle fetching directly through backend /api/market/candles?symbol=BTC-USD.
+   - Handled both envelope objects and candle arrays.
+   - In connectCoinbaseWS: prevented WebSocket connection to wss://ws-feed.exchange.coinbase.com in offline mode.
+   - In handleAnalyse: expanded ready check to accept 'LOCAL_HISTORICAL_SNAPSHOT', 'BACKEND_CANDLE_API', and 'DETERMINISTIC_FIXTURE'.
+   - Conditioned enforce_freshness on live feeds so historical replay does not fail on stale timestamps.
+
+9. tests/test_v32_63_calculation_correctness.py
+   - Realigned test_09 assertion with actual /api/tournament/analyse endpoint response schema.
+

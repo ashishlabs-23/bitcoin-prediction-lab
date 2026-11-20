@@ -1,0 +1,29 @@
+{
+  "timestamp_utc": "2026-10-26T10:48:04Z",
+  "base_url": "http://127.0.0.1:8094",
+  "tests": {
+    "test_a_one_click_integrated_workflow": "PASSED",
+    "test_b_chart_data_integrity": "PASSED",
+    "test_c_d_tournament_provenance_and_debouncing": "PASSED",
+    "test_e_entry_and_ai_monitoring": "PASSED",
+    "test_f_viewports_and_protected_files": "PASSED"
+  },
+  "network_traces": [],
+  "screenshots": [
+    "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_48_real_backend\\v32_48_test_a_one_click_integrated_workflow.png",
+    "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_48_real_backend\\v32_48_test_b_chart_data_integrity.png",
+    "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_48_real_backend\\v32_48_test_c_d_tournament_provenance.png",
+    "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_48_real_backend\\v32_48_test_e_entry_and_ai_monitoring.png",
+    "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_48_real_backend\\v32_48_test_f_desktop_1280.png",
+    "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_48_real_backend\\v32_48_test_f_tablet_768.png",
+    "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_48_real_backend\\v32_48_test_f_mobile_375.png"
+  ],
+  "protected_files_status": "INTACT",
+  "governance_verdicts": {
+    "research_experiment": "PASS",
+    "prospective_evidence": "NOT_STARTED",
+    "model_authorization": "OFFLINE_RESEARCH_ONLY",
+    "live_trading": "DISABLED"
+  },
+  "overall_status": "PASSED"
+}

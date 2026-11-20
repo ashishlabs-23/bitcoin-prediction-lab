@@ -1,0 +1,34 @@
+{
+  "audit_version": "V32.45",
+  "timestamp_utc": "2026-10-26T03:57:32Z",
+  "status": "ALL_PASSED",
+  "viewports": {
+    "desktop": {
+      "has_smart_entry_view": true,
+      "has_warning_banner": true,
+      "has_forecast_panel": true,
+      "has_analyse_btn": true,
+      "has_analyse_section": true,
+      "has_evaluation_section": true,
+      "screenshot": "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_45_smart_entry_desktop.png"
+    },
+    "tablet": {
+      "has_smart_entry_view": true,
+      "has_warning_banner": true,
+      "has_forecast_panel": true,
+      "has_analyse_btn": true,
+      "has_analyse_section": true,
+      "has_evaluation_section": true,
+      "screenshot": "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_45_smart_entry_tablet.png"
+    },
+    "mobile": {
+      "has_smart_entry_view": true,
+      "has_warning_banner": true,
+      "has_forecast_panel": true,
+      "has_analyse_btn": true,
+      "has_analyse_section": true,
+      "has_evaluation_section": true,
+      "screenshot": "C:\\Projects\\BTCognitive\\BTCognitive\\research\\reports\\artifacts\\browser_qa\\v32_45_smart_entry_mobile.png"
+    }
+  }
+}

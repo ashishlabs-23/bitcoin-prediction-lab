@@ -1,0 +1,10 @@
+BTCognitive V32.63 Environment & Execution Metadata
+===================================================
+Timestamp: 2026-10-29T22:34:00+05:30
+Python Version: 3.13.14 (tags/v3.13.14:fd17997, Jun 10 2026, 13:03:48) [MSC v.1944 64 bit (AMD64)]
+Platform: Windows-11-10.0.26300-SP0
+Git Branch: main
+Git Commit SHA: 25d483f4c3646661b57311de9d0b53d2be881adb
+Audit Type: FEATURE_VALUE_AND_CALCULATION_CORRECTNESS_AUDIT
+Workspace Mode: INTERNAL_OFFLINE_RESEARCH_MODE
+Host Binding: 127.0.0.1:8000

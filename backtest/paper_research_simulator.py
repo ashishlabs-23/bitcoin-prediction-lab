@@ -206,7 +206,7 @@ class PaperResearchSimulator:
 
         # Performance statistics
         returns_series = pd.Series(equity_curve).pct_change().dropna()
-        sr = float(sharpe_ratio(returns_series)) if len(returns_series) > 1 else 0.0
+        sr = float(sharpe_ratio(returns_series, periods_per_year=8760)) if len(returns_series) > 1 else 0.0
         mdd = float(maximum_drawdown(np.array(equity_curve))) if len(equity_curve) > 1 else 0.0
 
         win_count = sum(1 for t in trades if t.net_return_pct > 0)

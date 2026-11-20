@@ -1,280 +1,582 @@
-# BTCognitive — Market Risk Intelligence & Research Terminal
+# BTCognitive — Probabilistic Market Risk Intelligence & Research Terminal
 
-BTCognitive is a scientific market risk intelligence platform and empirical research terminal for Bitcoin (`BTC/USD`). Built under strict epistemic and econometrics governance, the system provides real-time market monitoring, point-in-time volatility modeling, and an offline research lab for selective, cost-aware trade setups.
-
-> **Research Governance & Epistemic Boundary:**
-> - **Strict Non-Execution:** No live broker execution or capital routing.
-> - **Epistemic Integrity:** Volatility forecasting accuracy (QLIKE, RMSE) is never conflated with directional return prediction or unconditional profitability.
-> - **Production Lock:** Research models remain `OFFLINE_RESEARCH_ONLY`. Production trading is permanently `DISABLED`.
+<p align="center">
+  <img src="https://img.shields.io/badge/Asset-Bitcoin_(BTC%2FUSD)-F7931A?style=for-the-badge&logo=bitcoin&logoColor=white" alt="Bitcoin BTC/USD" />
+  <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.13-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11+" />
+  <img src="https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
+  <img src="https://img.shields.io/badge/Tests-114%20Passed%20(100%25)-brightgreen?style=for-the-badge&logo=pytest&logoColor=white" alt="Tests" />
+  <img src="https://img.shields.io/badge/Protocol-PROTOCOL--SHADOW--V1.1-blueviolet?style=for-the-badge" alt="Protocol" />
+  <img src="https://img.shields.io/badge/Trading-PERMANENTLY_DISABLED-red?style=for-the-badge" alt="Trading Disabled" />
+</p>
 
 ---
 
-## 1. System Architecture
+## 1. Overview & Core Mission
 
-BTCognitive is structured into four primary layers:
+**BTCognitive** is an open, empirical research platform and real-time market risk intelligence terminal designed specifically for **Bitcoin (`BTC/USD`)**. 
+
+Unlike conventional trading bots that make unsupported claims of directional accuracy or market timing, BTCognitive operates under **strict epistemic governance and peer-reviewed financial econometrics principles**:
+1. **Unconditional Return Predictability is a Myth:** Financial returns on short horizons are dominated by noise and volatility clustering (Engle 1982, Bollerslev 1986). BTCognitive separates **volatility/excursion risk estimation** from directional speculation.
+2. **Strict Non-Execution:** Live trading, automated order routing, broker APIs, and real capital deployment are **permanently disabled**. The system serves market risk intelligence, excursion envelopes, and shadow validation.
+3. **Point-in-Time Causality:** Features at time $t$ strictly use closed candles and data available at or before time $t$. Zero lookahead bias.
+4. **Real-Market Transaction Cost Reality:** All strategies and excursions are evaluated against realistic, non-zero friction models (e.g. Coinbase Retail at **87.0 bps** round-trip).
+
+---
+
+## 2. High-Level Architecture
+
+BTCognitive is organized into a modular, research-governed quantitative architecture:
+
+```mermaid
+flowchart TD
+    subgraph DataSources["1. Real-Time Market Data Tier"]
+        CB["Coinbase Advanced REST/WS<br/>(Single Authoritative Spot Benchmark: BTC-USD)"]
+        BS["Bitstamp Spot Tickers (Reference)"]
+        KR["Kraken Spot Tickers (Reference)"]
+        DERIV["Derivatives Feeds (Isolated Funding/OI Metrics)"]
+    end
+
+    subgraph IngestionTier["2. Ingestion & Point-in-Time Data Pipeline"]
+        CANDLE_MGR["Candle Ingestion Manager<br/>(Drops forming bars, validates OHLC invariants)"]
+        PARQUET_STORE[("Raw Parquet Storage<br/>data/raw/coinbase_15m.parquet & ohlcv.parquet<br/>41,000+ Closed Bars")]
+        PIT_CACHE["Point-in-Time (PIT) Feature Cache<br/>(Causal Lags: ret_1h, ret_4h, ret_24h, ret_168h, ADX, Realized Vol)"]
+    end
+
+    subgraph StrategyTier["3. Candidate Strategy Tier (Primary vs Comparator)"]
+        TSMOM["Primary Candidate: Slower/Faster Donchian Breakout<br/>(Macro 168h EMA Filter + 24h Trigger + Vol-Scaled ATR Stops)"]
+        MEAN_REV["Comparator: Range-Bound Bollinger/RSI Mean Reversion<br/>(Strictly Confined to VOL_COMPRESSING Regimes)"]
+    end
+
+    subgraph AIMetaTier["4. AI Forecast & Meta-Labeling Layer"]
+        DIR_GBDT["Directional GBDT Research Service<br/>(directional-gbm-1h-v1: Class Probabilities P_up / P_down)"]
+        HAR_VOL["HAR-RS / Conformal Diffusion Engine<br/>(P10–P90 Range Envelopes, Realized Semi-Variance)"]
+        META_EVAL["Meta-Labeling Viability Evaluator<br/>(López de Prado 2018: Evaluates P(Net Win | Market State))"]
+    end
+
+    subgraph SmartEntryTier["5. Smart Entry Risk Gate (Decision Engine)"]
+        REGIME_GATE["Regime & Toxicity Gate<br/>(VOL_EXPANDING vs VOL_COMPRESSING vs TOXIC_IMBALANCE)"]
+        COST_MODEL["Tiered Execution Cost Model<br/>(Retail 87.0 bps vs VIP 27.0 bps Round-Trip)"]
+        PDE_RESOLVER["First-Passage Driftless PDE (mu=0.0)<br/>(Deterministic Triple-Barrier Intrabar SL_FIRST)"]
+        EV_GATE["Closed-Form Net Expected Value Gate<br/>EV_net = p*G - (1-p)*L - C > 0"]
+        DECISION{"Smart Entry Decision"}
+    end
+
+    subgraph ExecutionBoundaries["6. Strict Operational Boundaries"]
+        ABSTAIN["ABSTAIN<br/>(Negative Net Edge, Toxic Regime, or Insufficient Evidence)"]
+        SHADOW_TRACK["Eligible for Research-Only Shadow Tracking<br/>(Append-Only Prospective Ledger; NO LIVE ORDERS)"]
+    end
+
+    DataSources --> CANDLE_MGR
+    CANDLE_MGR --> PARQUET_STORE
+    PARQUET_STORE --> PIT_CACHE
+    
+    PIT_CACHE --> TSMOM
+    PIT_CACHE --> MEAN_REV
+    PIT_CACHE --> DIR_GBDT
+    PIT_CACHE --> HAR_VOL
+
+    TSMOM -->|"Proposed Setup (Direction, Entry, Stop, Target)"| SmartEntryTier
+    MEAN_REV -->|"Proposed Setup (Direction, Entry, Stop, Target)"| SmartEntryTier
+    
+    DIR_GBDT -->|"Directional Probability Evidence"| META_EVAL
+    HAR_VOL -->|"Excursion Bands & Volatility Sigma"| META_EVAL
+    META_EVAL -->|"Meta-Label Probability p_meta"| EV_GATE
+
+    SmartEntryTier --> REGIME_GATE
+    REGIME_GATE --> PDE_RESOLVER
+    COST_MODEL --> EV_GATE
+    PDE_RESOLVER --> EV_GATE
+    EV_GATE --> DECISION
+
+    DECISION -->|"EV_net <= 0 or High Uncertainty"| ABSTAIN
+    DECISION -->|"EV_net > 0 & Cost Hurdle Cleared"| SHADOW_TRACK
+```
+
+---
+
+## 3. Key Features & Capabilities
+
+### 3.1 Interactive Web Research Terminal
+- **TradingView-Grade Interactive Visuals:** Smooth candlestick charts rendering closed hourly and 4-hour candles in synchronized UTC time.
+- **Conformal Volatility Excursion Bands:** Real-time P10–P90 empirical diffusion envelopes projected over forward horizons.
+- **Market Driver Radar:** Multi-exchange spot spread analysis, 1h/4h/24h momentum, realized volatility, and Wilder ADX(14) regime classification.
+- **Shadow Ledger Inspector:** Direct, live view of prospective candidates, barrier resolutions, MFE/MAE excursions, and fee audits.
+- **Zero Build Dependency:** Built using vanilla JavaScript and CSS — no Node compilation or bundler overhead required to run.
+
+### 3.2 Quantitative & Volatility Modeling
+- **Heterogeneous Autoregressive (HAR-RS) Models:** Captures short-term (1h), medium-term (24h), and weekly (168h) realized semi-variance components.
+- **Conformal Risk Envelopes:** Distribution-free prediction intervals calibrated via Winkler interval scoring and marginal-vs-joint path containment.
+- **Hawkes Self-Exciting Jump Processes:** Point-process estimation of trade cluster intensity and volatility feedback.
+
+### 3.3 Strategy Excursion & Barrier Resolution
+- **Track V3 Structural Setup Engine (`BTC-ENTRY-TP-SL-V3`):** Causal detection of liquidity sweeps and consolidation range reclaims on a 15-minute cadence.
+- **Track D High-Timeframe Range Expansion (`HTF_RANGE_EXPANSION_BREAKOUT`):** 4-hour 20-bar Donchian breakout engine with causal next-bar open fills and trailing horizontal timeout (18 bars / 72 hours).
+- **Deterministic Barrier Resolver:**
+  - Conservative Intrabar Collision Rule: If both take-profit and stop-loss are penetrated inside the same candle, resolves strictly to `SL_FIRST` with `is_ambiguous_touch = True`.
+  - Opening Gap Protection: Gaps beyond a barrier are executed at the actual opening price, capturing realistic market slippage.
+
+### 3.4 Realistic Cost Accounting Engine
+- **Primary Pre-Registered Scenario (`COINBASE_RETAIL_87BPS`):**
+  - Taker commission: 40.0 bps per side (80.0 bps round-trip).
+  - Top-of-book half-spread: 1.5 bps per side (3.0 bps round-trip).
+  - Execution slippage: 2.0 bps per side (4.0 bps round-trip).
+  - **Total Friction:** Exactly **87.0 bps round-trip**.
+- **Dimensional Metric Separation:**
+  - Basis points (`net_return_bps`) measure return relative to entry price: $[(P_{\text{exit}} - P_{\text{entry}}) / P_{\text{entry}}] \times 10{,}000 - 87.0$.
+  - R-multiples (`net_r`) measure return relative to initial risk unit $1R = P_{\text{entry}} - P_{\text{stop}}$.
+  - The two metrics are dimensionally distinct and never combined arithmetically.
+
+### 3.5 Autonomous Prospective Shadow Feed Runner
+- **Continuous Background Loop:** Ingests freshly closed candles every hour from public APIs without human intervention (`python -m engine.shadow_feed_runner --loop --interval 3600`).
+- **Single-Instance Process Lock:** Prevents concurrent duplicate loops via `data/.prospective_shadow_runner.lock` with cross-platform PID liveness detection.
+- **In-Position Gating:** While an emitted candidate is open, all subsequent breakout signals are suppressed, guaranteeing zero overlapping trade contamination.
+- **Fail-Closed Resilience:** Feed outages fall back gracefully to local storage without creating synthetic data or corrupting ledgers.
+
+### 3.6 Multi-Channel Alert & Monitoring System
+- Real-time research alert engine evaluating market coiling, regime shifts, and strategy conditions every 60 seconds.
+- Multi-channel notification dispatchers supporting Webhooks, Telegram, and Email.
+- 15-minute deduplication and cooldown state persisted to `data/research_alert_state.json`.
+
+### 3.7 AI Forecasts & Risk Outlook Workspace (V32.35)
+- **Dedicated Discovery Route (`#/forecast`):** Accessible in one click from the primary navigation bar (`#nav-forecast`), hero landing card (`#hero-btn-forecast`), top research status banner (`#banner-forecast-btn`), and workstation tabs (`tab-btn-forecast`).
+- **Section A — Directional Research GBDTs:** LightGBM multi-horizon (`1h`, `4h`, `24h`) point-in-time inference (`directional-gbm-1h-v1`), $P(\text{UP})$ vs $P(\text{DOWN})$ class probabilities, causal candle timestamps, data freshness verification, and the mandatory interpretation disclaimer:
+  > *"Directional probability is not the probability of a trade hitting take-profit before stop-loss and is not a profit guarantee. All directional models operate under research-only governance with net negative expectancy after transaction friction."*
+- **Section B — Volatility & Risk Intelligence:** Heterogeneous Autoregressive (`HAR-RS-DOW-v1.0`) annualized continuous realized variance (`rv168h_var_ann`), C2 dependence-aware conformal risk envelope bounds (90% target coverage, 84.89% empirical holdout), and observatory calibration health metrics.
+- **Section C — Truthful Model Registry:** Honest status semantics for non-operational or foundation architectures:
+  - `Amazon Chronos-2`: **`INFERENCE NOT EXECUTED`** (zero-shot foundation model; PyTorch inference/weights unexecuted in CPU runtime; zero fabricated charts).
+  - `Hawkes Process / Order Flow`: **`DATA UNAVAILABLE`** (requires tick-level L3 message feed; unavailable from spot OHLCV).
+  - `Mamba State-Space`: **`REJECTED`** (eliminated during research trials due to execution latency penalties).
+- **Section D — Price Forecasting Tournament & Baselines:** Empirical price quantiles (P10, P50, P90), Random Walk persistence benchmark ($E[r]=0$), and Ridge L2 regressor.
+
+---
+
+## 4. Strategy-to-Alert Quantitative Pipeline Architecture
+
+BTCognitive executes an end-to-end, fail-closed quantitative pipeline designed for market risk intelligence and excursion analysis:
+
+$$\text{Verified Data} \longrightarrow \text{Strategy Signal} \longrightarrow \text{Horizon-Matched Forecast} \longrightarrow \text{Cost \& Uncertainty Evaluation} \longrightarrow \text{Smart Entry Gate} \longrightarrow \text{Positive-Edge Research Alert}$$
+
+> [!IMPORTANT]
+> **Strict Non-Execution & Research Boundary:**
+> - Live trading, broker execution, and order placement are **PERMANENTLY DISABLED**.
+> - Model authorization is strictly **`OFFLINE_RESEARCH_ONLY`**.
+> - An estimated positive net edge ($EV_{\text{net}} > 0$) is a probabilistic research metric, **never a guarantee of profit** or an order instruction.
+> - **V32.27 Execution Audit Outcome (`NO_GO_EVIDENCE_GAP`):** In the October 2026 self-loop research execution ([V32.27 Report](file:///c:/Projects/BTCognitive/BTCognitive/research/reports/v32_27_bounded_self_loop_execution_report.md)), 33,424 authenticated Coinbase BTC-USD hourly candles were captured. The baseline strategy (`TSMOM_DONCHIAN_24H_168H`) exhibited negative after-cost expectancy (-0.2465 R at 27 bps, -0.9898 R at 87 bps). A calibrated tri-state meta-model correctly abstained 100% of the time, protecting capital but proving zero positive net after-cost edge. In accordance with epistemic governance, all features fail closed with `NO_VALIDATED_EDGE` / `META_MODEL_UNAVAILABLE`, and **zero positive-edge alerts are emitted**.
+
+---
+
+### 4.1 Implementation Status by Pipeline Stage
+
+| Pipeline Stage | Implementation Status | Repository Evidence | Runtime Reality |
+| :--- | :--- | :--- | :--- |
+| **1. Verified Data Contract** | `IMPLEMENTED` | [engine/data_verification.py](file:///c:/Projects/BTCognitive/BTCognitive/engine/data_verification.py) | Enforces `BTC-USD`, `COINBASE` spot venue, schema integrity, monotonic UTC timestamps, duplicate rejection, and freshness within $2\times$ timeframe. Authenticated Coinbase hourly dataset (33,424 bars, 2023–2026) was captured directly from official Coinbase Exchange public REST endpoint (`/products/BTC-USD/candles?granularity=3600`) with local SHA-256 and gap tracking (does not carry a cryptographic digital signature signed by Coinbase). Legacy dataset `data/raw/ohlcv.parquet` remains quarantined (`UNVERIFIED_SOURCE`). Fails closed with `DATA_CONTRACT_BREACH`, `UNVERIFIED_SOURCE`, `STALE_DATA`, or `FEATURE_UNAVAILABLE`. |
+| **2. Strategy Signal Generator** | `IMPLEMENTED` | [engine/strategy_signal_engine.py](file:///c:/Projects/BTCognitive/BTCognitive/engine/strategy_signal_engine.py) | Evaluates deterministic strategies on completed bars. Channels strictly use `shift(1)` to exclude signal bar $t$. Fills occur causally at $t+1$ Open. Coinbase Spot shorts map strictly to `CASH` / `SPOT_SHORT_INELIGIBLE`. |
+| **3. Horizon-Matched Forecast** | `IMPLEMENTED` (Context Only) | [engine/directional_forecast_service.py](file:///c:/Projects/BTCognitive/BTCognitive/engine/directional_forecast_service.py) | Frozen LightGBM return-sign classifiers (1h, 4h, 24h). Matches strategy holding horizon or fails with `HORIZON_MISMATCH`. Directional $P(\text{UP})$ is **never** substituted for trade-outcome $p_{\text{TP}}$. Chronos-2 pre-registered as Stage 3 challenger only. |
+| **4. Cost & Uncertainty Evaluation** | `IMPLEMENTED` (Fails Closed) | [engine/trade_outcome_evaluator.py](file:///c:/Projects/BTCognitive/BTCognitive/engine/trade_outcome_evaluator.py) | Closed-form 3-outcome triple-barrier equation with $p_{\text{TP}} + p_{\text{SL}} + p_{\text{TO}} = 1.0$. Converts assumed fee scenarios to R units. Fails closed with `META_MODEL_UNAVAILABLE` due to the missing calibrated meta-model. |
+| **5. Smart Entry Decision Gate** | `IMPLEMENTED` | [engine/smart_entry_pipeline.py](file:///c:/Projects/BTCognitive/BTCognitive/engine/smart_entry_pipeline.py) | Deterministic 7-point decision gate. Returns `ABSTAIN` with explicit machine-readable failure reason codes. `ELIGIBLE_FOR_SHADOW_EVALUATION` grants shadow tracking only. |
+| **6. Research Alert Engine** | `IMPLEMENTED` (0 Emitted) | [engine/smart_entry_pipeline.py](file:///c:/Projects/BTCognitive/BTCognitive/engine/smart_entry_pipeline.py) & [api/notifications.py](file:///c:/Projects/BTCognitive/BTCognitive/api/notifications.py) | Emits `"Potential positive-edge research signal"` only when every gate passes. Currently 0 alerts emitted due to the meta-model blocker. Candidate rejection states are logged with reasons. |
+
+---
+
+### 4.2 Candidate Strategy Specifications
+
+#### Primary Candidate: Asymmetric Donchian Volatility-Scaled Breakout (`TSMOM_DONCHIAN_24H_168H`)
+- **Macro Trend Context:** Slower 168-hour (7-day) Exponential Moving Average ($\text{EMA}_{168h}$) computed on closed bars. Long candidates require $P_t > \text{EMA}_{168h}$; Short candidates require $P_t < \text{EMA}_{168h}$. *Empirical Bitcoin momentum literature confirms slower momentum signals exhibit superior risk-adjusted stability and lower false-positive rates than intraday momentum.*
+- **Local Breakout Trigger:** 24-hour Donchian High/Low channel computed strictly on prior completed bars $[t-24, t-1]$ via `high.shift(1).rolling(24).max()` and `low.shift(1).rolling(24).min()`, strictly excluding bar $t$.
+- **Causal Execution:** Triggered at close of bar $t$, filled at Open of bar $t+1$ ($P_{\text{entry}} = O_{t+1}$).
+- **Standardized Risk Geometry:**
+  - Standardized Risk Unit: $1R = |P_{\text{entry}} - P_{\text{stop}}| = 1.5 \times \sigma_{\text{Parkinson}}(24h) \times P_{\text{entry}}$.
+  - Profit Target Distance: $k_{\text{tp}} = 1.5 R = 2.25 \times \sigma_{\text{Parkinson}}(24h) \times P_{\text{entry}}$ ($1.5:1$ reward-to-risk ratio).
+  - Maximum Holding Horizon: $H = 24$ hours (timeout resolution at open of $t+1+H$).
+- **Spot Short Restriction:** On Coinbase Spot `BTC-USD`, short-to-open candidates are mapped to `CASH` with reason code `SPOT_SHORT_INELIGIBLE` (margin borrow facility not modeled).
+
+#### Comparator Strategy: Range-Bound Bollinger-RSI Mean Reversion (`RANGE_BOLLINGER_REVERSION_20H`)
+- **Regime Precondition:** Strictly confined to consolidating, range-bound regimes: Wilder $ADX(14) < 20$ and Annualized Realized Volatility $\sigma_{\text{ann}} < 40\%$.
+- **Mean-Reversion Trigger:** Touch of 20-hour Bollinger Band ($2.0\sigma$) with RSI(14) overbought/oversold levels (RSI $< 30$ for Long, RSI $> 70$ for Short). *Note: Defined accurately as overbought/oversold boundaries, not structural divergence.*
+- **Barrier Geometry:**
+  - Profit Target: 20-hour Simple Moving Average midline.
+  - Stop Distance: $1.0\sigma$ beyond the entry band ($1.0R$).
+  - Maximum Holding Horizon: $H = 24$ hours.
+- **Spot Short Restriction:** Overbought short signals map to `CASH` / `SPOT_SHORT_INELIGIBLE`.
+
+---
+
+### 4.3 Cost Accounting & Assumed Benchmark Scenarios
+
+All transaction frictions are modeled explicitly as **assumed benchmark scenarios**, not guaranteed account-specific costs:
+- **`COINBASE_RETAIL_87BPS` (Assumed Retail Scenario):**
+  - Taker commission: 40.0 bps per side (80.0 bps round-trip).
+  - Top-of-book half-spread: 1.5 bps per side (3.0 bps round-trip).
+  - Execution slippage: 2.0 bps per side (4.0 bps round-trip).
+  - **Total Friction:** Exactly **87.0 bps round-trip**.
+- **`COINBASE_ACTIVE_27BPS` (Assumed Active/VIP Scenario):**
+  - Taker commission: 10.0 bps per side (20.0 bps round-trip).
+  - Top-of-book half-spread: 1.5 bps per side (3.0 bps round-trip).
+  - Execution slippage: 2.0 bps per side (4.0 bps round-trip).
+  - **Total Friction:** Exactly **27.0 bps round-trip**.
+
+**Friction Conversion to Risk Units ($R$):**
+$$C_R = \frac{\text{Round-Trip Friction (bps)} / 10{,}000}{|P_{\text{entry}} - P_{\text{stop}}| / P_{\text{entry}}}$$
+
+---
+
+### 4.4 The Closed-Form Net Expected Value Hurdle ($EV_{\text{net}}$)
+
+A raw directional probability (e.g., $P(\text{UP}) = 55.85\%$) does **not** signify trade profitability. The Smart Entry decision gate requires a mathematically closed-form evaluation of net edge partitioning all three mutually exclusive outcomes ($p_{\text{TP}} + p_{\text{SL}} + p_{\text{TO}} = 1.0$):
+
+$$EV_{\text{net}} = p_{\text{TP}} \cdot (k_{\text{tp}} - C_R) - p_{\text{SL}} \cdot (k_{\text{sl}} + C_R) + p_{\text{TO}} \cdot (\mathbb{E}[R_{\text{TO}}] - C_R)$$
+
+Where:
+- $k_{\text{tp}} = 1.5 R$ is the gross reward multiple.
+- $k_{\text{sl}} = 1.0 R$ is the gross risk multiple.
+- $C_R$ is total round-trip friction converted into R units.
+- $p_{\text{TP}}$ is the calibrated probability of reaching target before stop.
+- $p_{\text{SL}}$ is the calibrated probability of reaching stop before target.
+- $p_{\text{TO}}$ is the calibrated probability of reaching neither barrier before horizon $H$.
+- $\mathbb{E}[R_{\text{TO}}]$ is the expected signed return at timeout exit in R units.
+
+**Deterministic Smart Entry Gate Invariants:**
+1. **Data Validity:** Must pass schema, monotonicity, and freshness checks. Else $\implies \mathbf{ABSTAIN}$ (`DATA_CONTRACT_BREACH` / `STALE_DATA`).
+2. **Causal Timing & Side:** Instrument must be `BTC-USD`; side must be `LONG`. Short on spot $\implies \mathbf{ABSTAIN}$ (`SPOT_SHORT_INELIGIBLE`).
+3. **Forecast Compatibility:** Model horizon must match strategy holding horizon. Else $\implies \mathbf{ABSTAIN}$ (`HORIZON_MISMATCH`).
+4. **Calibrated Meta-Model:** Valid calibrated $p_{\text{TP}}, p_{\text{SL}}, p_{\text{TO}}$ summing to 1.0 must be supplied. Missing meta-model $\implies \mathbf{ABSTAIN}$ (`META_MODEL_UNAVAILABLE`).
+5. **Net Expected Edge:** $EV_{\text{net}} > 0.0$. Negative net edge $\implies \mathbf{ABSTAIN}$ (`NEGATIVE_NET_EXPECTANCY`).
+6. **Statistical Uncertainty:** $95\%\text{ CI}$ lower bound of $EV_{\text{net}} > 0.0$. Missing or non-positive lower bound $\implies \mathbf{ABSTAIN}$ (`UNCERTAINTY_NOT_ESTABLISHED` / `STATISTICAL_UNCERTAINTY`).
+7. **Regime Constraints:** Strategy regime must match market state. Else $\implies \mathbf{ABSTAIN}$ (`REGIME_MISMATCH`).
+
+Only if **all 7 gates pass** does Smart Entry emit `ELIGIBLE_FOR_SHADOW_EVALUATION` and authorize a positive-edge research alert.
+
+---
+
+### 4.5 Positive-Edge Research Alerts & Deduplication
+
+When a candidate clears all gates, a research alert is dispatched:
+- **Title:** `"Potential positive-edge research signal"` (Never "profitable trade" or "buy signal").
+- **Mandatory Notice:** `"Research only — no order placed; not a guarantee of profit."`
+- **Payload:** Timestamp (UTC), strategy ID, instrument, side, horizon, entry, stop, target, cost scenario, $EV_{\text{net}}$, 95% CI interval, and model version.
+- **Deduplication:** Hash key `hash(strategy_id + instrument + side + decision_timestamp_utc + model_version)` prevents repeated alerts during periodic API polling.
+
+
+To prove whether the AI filter adds genuine economic value without overfitting, BTCognitive mandates a strict 5-stage research progression:
 
 ```
-┌────────────────────────────────────────────────────────┐
-│                   Web Research Terminal                │
-│       Vanilla JS / CSS UI with UTC Candle Charts       │
-└───────────────────────────▲────────────────────────────┘
-                            │ REST & WebSocket (/ws)
-┌───────────────────────────┴────────────────────────────┐
-│              Hardened FastAPI Backend Server           │
-│  - OWASP ASVS 5.0 Security Headers & Trusted Host      │
-│  - Rate Limiting, CORS & Sanitized Exception Handling  │
-│  - Market Monitor, Prediction, Arena, & Health Routes  │
-└───────────────────────────▲────────────────────────────┘
-                            │
-┌───────────────────────────┴────────────────────────────┐
-│            Quantitative & Execution Engines            │
-│  - Point-in-Time (PIT) Feature Cache & Data Invariants │
-│  - Triple-Barrier Outcome Labeling & Reference Oracle  │
-│  - Canonical Decision Records (D_t) & Paper Ledger     │
-│  - Realized Semi-Variance & HAR Volatility Models      │
-└───────────────────────────▲────────────────────────────┘
-                            │
-┌───────────────────────────┴────────────────────────────┐
-│                  Public Data Providers                 │
-│      Coinbase Exchange • Bitstamp • Kraken Spot        │
-└────────────────────────────────────────────────────────┘
+[ Step 1: Read-Only Audit ] ──> [ Step 2: Frozen Specification ] ──> [ Step 3: Formal Integration Contract ]
+                                                                                   │
+                                                                                   v
+[ Step 5: Append-Only Shadow Tracking ] <── [ Step 4: Component Ablation (A vs B) ]
+```
+
+1. **Step 1 — Read-Only Architecture & Contract Audit:** Audit existing signal generators, causal barrier resolvers, and API paths. Verify exactly what is executed vs theoretical.
+2. **Step 2 — Specify Primary Strategy & Comparator:** Lock all parameters in advance (zero parameter tuning to historical data).
+3. **Step 3 — Define AI–Smart Entry Integration Contract:** Enforce that every proposed trade payload includes: `strategy_id`, `instrument`, `side`, `horizon`, `entry_price`, `stop_price`, `target_price`, `estimated_costs_bps`, `volatility_sigma`, `calibrated_p_meta`, and an explicit machine-readable `veto_reason_code`.
+4. **Step 4 — Component Ablation on Untouched Holdout Data:**
+   Compare the exact strategy executed under two conditions:
+   - **Condition A (Baseline):** Strategy rules alone with realistic friction.
+   - **Condition B (Treatment):** Strategy rules + AI Meta-Veto gate.
+   - *Statistical Hurdles:* Must demonstrate Deflated Sharpe Ratio ($\text{DSR} > 0.95$, *Bailey & López de Prado, 2014*) to adjust for selection bias, along with a statistically significant reduction in QLIKE loss and drawdown via Harvey-Leybourne-Newbold (1997) paired tests ($p < 0.05$).
+5. **Step 5 — Append-Only Prospective Shadow Evaluation:** Deploy in real-time shadow tracking mode. Observe untouched prospective candles without live capital deployment. Accumulate a minimum of 100 non-overlapping closed trades before evaluating confirmatory gates.
+
+---
+
+### 4.6 Single-Market Data & Execution Cost Invariant
+
+To eliminate data provenance ambiguity and lookahead bias:
+- **Single Trading Instrument:** Coinbase Spot `BTC-USD`. Foreign exchange rates, derivative funding rates, and cross-currency feeds (e.g., Binance USDT perps) are strictly quarantined from spot trade logic.
+- **Pre-Registered Cost Scenarios:**
+  - **Tier 1 (Retail Benchmark):** 80.0 bps taker fees + 3.0 bps half-spread + 4.0 bps slippage = **87.0 bps round-trip**.
+  - **Tier 2 (Active/VIP Benchmark):** 20.0 bps taker fees + 3.0 bps half-spread + 4.0 bps slippage = **27.0 bps round-trip**.
+- **Immutable Historical Data:** Source datasets (`data/raw/ohlcv.parquet`, `data/prospective_entry_ledger.jsonl`) remain strictly read-only and bit-identical.
+
+---
+
+## 5. Repository Layout
+
+```
+BTCognitive/
+├── README.md                          # Master canonical documentation
+├── requirements.txt                   # Production Python dependencies
+├── pytest.ini                         # Pytest test discovery & timeout settings
+│
+├── api/                               # FastAPI backend services
+│   ├── server.py                      # Core ASGI app, security middleware & lifespan
+│   ├── routes_market.py               # Live market data & quotes endpoints
+│   ├── routes_prediction.py           # Conformal ranges & volatility routes
+│   ├── routes_research.py             # Prospective ledger & research routes
+│   └── notifications.py               # Alert engine & webhook dispatchers
+│
+├── engine/                            # Quantitative & runtime engines
+│   ├── data_verification.py           # Deterministic causal data contract validator
+│   ├── strategy_signal_engine.py      # TSMOM Donchian, Bollinger mean-reversion & Strategy D
+│   ├── trade_outcome_evaluator.py     # 3-outcome triple-barrier net expectancy evaluator
+│   ├── smart_entry_pipeline.py        # End-to-end strategy-to-alert 6-stage pipeline
+│   ├── directional_forecast_service.py# Directional LightGBM inference & lag feature extraction
+│   ├── smart_entry_engine.py          # Smart Entry decision gate & causal null integration
+│   ├── shadow_feed_runner.py          # Continuous prospective shadow collector CLI
+│   ├── prospective_shadow_collector.py# HTF breakout logic, in-position gating & ledger
+│   ├── barrier_resolver.py            # Deterministic triple-barrier excursion resolver
+│   ├── entry_contracts.py             # Immutable dataclass contracts (CandidateSetup, Outcome)
+│   ├── probabilistic_entry_engine.py  # Bayesian & logistic entry gate models
+│   ├── stationary_bootstrap.py        # Politis & Romano (1994) stationary bootstrap
+│   └── price_forecast_engine.py       # Multi-horizon forecast & Diebold-Mariano tests
+│
+├── models/                            # Volatility & forecasting models
+│   ├── directional_gbm_1h_v1.joblib   # 1-hour directional classifier artifact
+│   ├── directional_gbm_4h_v1.joblib   # 4-hour directional classifier artifact
+│   ├── directional_gbm_24h_v1.joblib  # 24-hour directional classifier artifact
+│   ├── challengers/                   # Registered research challengers (HAR-RS, HAR-QLIKE)
+│   └── calibrated_signal_classifier.py# Calibrated probability classifiers
+│
+├── data/                              # Data storage & ledgers (PROTECTED - READ ONLY)
+│   ├── raw/ohlcv.parquet              # 41,000+ validated historical hourly candles
+│   ├── prospective_entry_ledger.jsonl # Frozen historical prospective entry ledger
+│   ├── prospective_shadow_v1.jsonl    # Append-only forward shadow evaluation ledger
+│   └── prospective_shadow_status.json # Real-time operational telemetry
+│
+├── research/                          # Research audit reports & protocols
+│   ├── protocol_v1_1.md               # Frozen prospective shadow protocol
+│   ├── v32_25_ai_forecast_smart_entry_completion_report.md # Directional & Smart Entry verification
+│   ├── v30_3_prospective_shadow_report.md
+│   ├── v30_4_shadow_feed_report.md
+│   ├── v30_5_shadow_operations_report.md
+│   ├── v30_6_operational_proof_report.md
+│   ├── v30_7_shadow_burnin_report.md
+│   ├── v30_8_collection_integrity_report.md
+│   └── v30_9_statistical_gate_audit.md
+│
+├── tests/                             # Test & verification suites (65+ tests)
+│   ├── test_v32_25_directional_integration.py # End-to-end directional & Smart Entry test
+│   ├── test_entry_contracts_and_resolver.py
+│   ├── test_prospective_shadow_collector.py
+│   ├── test_shadow_feed_runner.py
+│   ├── test_v30_6_operational_proof.py
+│   ├── test_v30_7_shadow_burnin.py
+│   ├── test_v30_8_collection_integrity.py
+│   └── test_v30_9_statistical_gate_audit.py
+│
+└── web/                               # Web research terminal frontend
+    ├── index.html                     # Terminal markup & UI panels
+    ├── app.js                         # React 18 component tree & WebSocket client
+    └── styles.css                     # Modern dark-mode glassmorphic styling
 ```
 
 ---
 
-## 2. Market Data & API Endpoints
+## 6. Quickstart Guide
 
-The backend queries public exchange endpoints without creating synthetic cross-instrument blend prices:
-- **Spot Providers:** Real Coinbase, Bitstamp, and Kraken REST/WS tickers and closed candles.
-- **Derivatives Separation:** Binance `BTCUSDT` perpetual data is strictly isolated as a derivatives context.
-- **Derived Metrics:** Calculates point-in-time momentum, realized volatility, RSI, and relative volume exclusively from validated closed candles.
-
-### Core Endpoints
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/dashboard?horizon=24h` | Unified dashboard payload (quotes, closed candles, drivers, baseline ranges). |
-| `GET` | `/api/market-drivers` | Point-in-time market driver indicators across spot venues. |
-| `GET` | `/prediction/latest?horizon=24h` | Empirical historical-distribution baseline range (P10–P90 80% quantile band). |
-| `GET` | `/api/research/entry-tp-sl` | Research milestone status and barrier contract parameters (governed gate). |
-| `GET` | `/api/notifications/recent` | Recent research condition alerts from in-memory ring buffer (limit=20). |
-| `GET` | `/api/notifications/settings` | Current notification channel configurations (webhook, telegram, email). |
-| `POST` | `/api/notifications/test` | Dispatch a neutral delivery-test alert across configured channels (Admin only). |
-| `POST` | `/api/notifications/research-alerts/evaluate` | Manually evaluate documented research conditions on fresh market data. |
-| `GET` | `/health` | API operational health, circuit-breaker states, and model authorization flag. |
-| `WS` | `/ws` | Hardened real-time intelligence stream (broadcasts candle updates & NEW_ALERT). |
-
----
-
-## 3. Strategy and Entry Intelligence
-
-BTCognitive evaluates Bitcoin (`BTC/USD`) market structure through three distinct, unmerged research frameworks:
-
-### A. The Structural Entry / TP / SL Track (`BTC-ENTRY-TP-SL-V3`)
-This is the formal directional research track registered in `research/entry_tp_sl/`:
-- **Market Conditions Evaluated:**
-  - Operates on a **15-minute decision cadence** (:00, :15, :30, :45 UTC) using closed 15-minute aggregated spot candles.
-  - Detects two causal structural setup archetypes:
-    1. **A1 (Sweep and Reclaim):** Identifies when price sweeps a 20-bar rolling swing high or low by 0.1% to 1.5% and closes back inside the prior extreme within 3 bars. Direction: `SHORT` on sweep of highs; `LONG` on sweep of lows.
-    2. **A2 (Range Reclaim):** Identifies when price consolidates in a 48-bar range (1.5% to 6.0% width), deviates outside by 0.1% to 1.0%, and closes back within the range boundary.
-- **Entry, Take-Profit, and Stop-Loss Calculation:**
-  - **Entry Execution Basis:** Fills at the **Open of the immediate next 1-minute bar** ($t_{\text{fill}} = t_0 + 60\text{s}$) following the completed decision bar. If price gaps at open, the order fills at actual open. If the 1-minute bar is missing, the setup fails closed (`DATA_GAP`).
-  - **Volatility Scaling:** Uses 14-period Average True Range calculated on 15-minute bars ($\text{ATR}_{14, 15\text{m}}$).
-  - **Predetermined Barrier Grid:**
-    - Long Setups: $\text{TP} = \text{Entry} + (\text{Multiplier}_{\text{TP}} \times \text{ATR})$, $\text{SL} = \text{Entry} - (\text{Multiplier}_{\text{SL}} \times \text{ATR})$.
-    - Short Setups: $\text{TP} = \text{Entry} - (\text{Multiplier}_{\text{TP}} \times \text{ATR})$, $\text{SL} = \text{Entry} + (\text{Multiplier}_{\text{SL}} \times \text{ATR})$.
-    - **Primary Reference (`barrier_pair_01`):** $1.0\times\text{ATR}$ TP, $1.0\times\text{ATR}$ SL ($R:R = 1.0$), 240-minute vertical timeout (16 bars).
-    - **Confirmatory Secondary:** Pairs ranging from $1.5\times / 1.0\times$ ($R:R = 1.5$) to $2.0\times / 1.0\times$ ($R:R = 2.0$), plus tight (120m) and wide (480m) horizons.
-  - **Path Evaluation:** Evaluates 1-minute discrete high/low paths using conservative dual-touch collision resolution. If high hits TP and low hits SL in the same 1-minute bar, the outcome is marked `UNRESOLVED_INTRABAR` and penalized.
-- **Friction & Transaction Cost Accounting:**
-  - **BASE Scenario:** 10 bps entry fee + 10 bps exit fee + 5 bps entry slip + 5 bps exit slip + 2.5 bps half-spread = **35.0 bps round-trip**.
-  - **CONSERVATIVE Scenario:** 15 bps entry fee + 15 bps exit fee + 10 bps entry slip + 15 bps exit slip + 5 bps half-spread = **65.0 bps round-trip**.
-- **Empirical Evidence & Governance Verdict:**
-  - Evaluated out-of-sample via walk-forward testing on $N = 20,244$ trades across 14 years (2012–2026, 7.7M 1m bars).
-  - Setup rules $B_3$ proved statistical separation over matched random baseline $B_0$ ($B_3 > B_0$).
-  - LightGBM meta-labeling ($B_4$) achieved a 47.1% win rate (base), but mean net return was **$-0.5678R$** (BASE) and **$-1.0954R$** (CONSERVATIVE).
-  - Failed the pre-registered economic hurdle ($E_{\text{min}} \ge +0.10R$).
-  - **Scientific Decision:** **`COST_ERASED`**. Live capital deployment is **STRICTLY PROHIBITED**.
-
-### B. Volatility-Compression Strategy (`STRAT-VOLCOMP-01`)
-This is the non-directional compression framework registered in `results/volatility_compression_arena_preregistration.md`:
-- **Market Conditions Evaluated:** Evaluates the 24-hour conformal excursion envelope width $W_t = \hat{y}_{\text{MFE}, 24h}^{\text{P90}} + \hat{y}_{\text{MAE}, 24h}^{\text{P90}}$.
-- **Entry Trigger:** Triggers when $W_t$ compresses below the 10th percentile of its rolling 168-hour history ($\text{CompressionPercentile}_{168h}(W_t) \le 0.10$).
-- **Evidence & Current Status:** Proved volatility compression precedes elevated realized price dispersion ($\bar{r} = +1.03\%$). However, economic tradability was unvalidated due to the synthetic "free option" straddle artifact. **Status: `FROZEN / RESEARCH_ONLY`**.
-
-### C. Active Regime-Adaptive Tournament Rules (`V12StrategyTournamentEngine`)
-- **Market Conditions Evaluated:** Evaluates completed 1-hour candles using Wilder ADX(14) and 3-candle persistence hysteresis across 4 regimes: `TRENDING_BULL`, `TRENDING_BEAR`, `CONSOLIDATION_RANGE`, `VOL_COMPRESSION_RANGE`.
-- **Candidate Strategies:** `MTF_MOMENTUM_TREND` (Donchian breakout with 50% partial exit at 1R), `VOL_COMPRESSION_BREAKOUT` (BBW compression with 12-bar breakout), and `SHORT_HORIZON_MEAN_REVERSION`.
-- **System Abstentions:** The system explicitly records an `ABSTAIN` event whenever:
-  - Market data has gaps or missing bars ($>60$s missing interval).
-  - Regime is `UNKNOWN` or `TRANSITION_UNSUPPORTED`.
-  - Signal cooldown is active (within 4 bars of previous setup).
-  - Risk budget is exhausted or circuit-breaker state is tripped.
-  - Expected net payoff $EV_{\text{net}} \le 0$ after transaction friction.
-  - Model authorization is locked (`OFFLINE_RESEARCH_ONLY`).
-
----
-
-## 4. Entry Alerts and Notifications
-
-BTCognitive includes a multi-channel alert engine that evaluates market conditions in real time without executing live orders.
-
-### A. Alert Evaluation & Trigger Conditions
-A background worker in `api/server.py` evaluates market conditions every 60 seconds (or on-demand via `POST /api/notifications/research-alerts/evaluate`):
-1. **Data Availability Gate:** Requires at least 200 validated hourly bars from the Coinbase spot feed.
-2. **Freshness Gate:** The latest candle timestamp must be $\le 7,200\text{ seconds}$ (2 hours) old. Stale feeds immediately return `STALE_MARKET_DATA` with zero alerts dispatched.
-3. **Reference Price Gate:** Requires a valid positive, finite spot price.
-4. **Regime Gate:** Gated if market regime is `UNKNOWN` or `TRANSITION_UNSUPPORTED`.
-5. **Condition Detection:**
-   - **Strategy Rule Triggered:** Active candidate rule (`MTF_MOMENTUM_TREND`, `VOL_COMPRESSION_BREAKOUT`, or `SHORT_HORIZON_MEAN_REVERSION`) satisfied on completed 1h bar in a compatible regime.
-   - **Volatility-Compression Coiling:** Bollinger Bandwidth (BBW 20) $\le 20$th percentile or regime is `VOL_COMPRESSION_RANGE`.
-   - **Regime Confirmed:** Wilder ADX(14) confirms a persistent 3-candle regime state.
-
-### B. Alert Payload Contents
-When triggered, the engine emits a standardized, auditable research alert:
-- `id`: Unique identifier (e.g., `rc_1730000000_a1b2c3d4`).
-- `type`: `"RESEARCH_CONDITION_ALERT"`.
-- `tier`: `"RESEARCH_INTELLIGENCE"` with badge `"RESEARCH ONLY"`.
-- `timestamp`: UTC ISO timestamp.
-- `reference_price_usd`: Current spot price.
-- `condition_name`: Name of the triggered condition (e.g. `VOLATILITY_COMPRESSION_COILING`).
-- `condition_hypothesis`: The underlying econometrics hypothesis.
-- `trigger_reason`: Exact quantitative condition satisfied.
-- `regime`: Active confirmed market regime.
-- `limitations`: Explicit statement that live trading and automated execution are permanently disabled.
-- `governance`: Object with `product_mode: "ANALYSIS_ONLY"`, `live_trading_enabled: false`, `execution_status: "DISABLED_ANALYSIS_ONLY"`.
-
-> **Note on Directional Levels in Alerts:**
-> Specific directional trade targets (entry price, TP, SL) are **intentionally omitted from live production alerts**. Because Track V3 concluded with a `COST_ERASED` verdict, broadcasting directional signals would violate scientific and capital-safety guardrails.
-
-### C. Deduplication, Cooldown, and Quality Controls
-- **Cooldown:** Enforces a mandatory **15-minute cooldown** (`COOLDOWN_SECONDS = 900.0`) per condition ID.
-- **Hourly Deduplication:** Constructs a deduplication key based on `{condition_id}_{hourly_bucket}_{price_rounded_to_100}` stored in `seen_dedup_hashes`.
-- **Restart Persistence:** Cooldown timestamps and seen hashes are persisted to disk at `data/research_alert_state.json`. They are reloaded on process startup to prevent duplicate alerts following server restarts.
-- **Non-Research Blocking:** The dispatch router (`dispatch_alert`) strictly blocks any alert where `is_research_alert` and `is_test` are false, preventing unverified market signals from leaking into communication channels.
-
----
-
-## 5. Implementation Status & Feature Matrix
-
-| Component | Required Behavior | Current State | Verification / Location | Notes |
-|---|---|---|---|---|
-| **Terminal Alert Feed** | Display real-time research alerts, cooldown badges, and trigger rationales in the Web Terminal UI. | **Operational & Wired** | `web/app.js`, `api/notifications.py` | Handles `NEW_ALERT` and `RESEARCH_CONDITION_ALERT` over `/ws`, sounds alert chime, and presents active alert modal. |
-| **AI Forecast Chart Overlay** | Render 15m/1h price persistence baseline and diffusion envelope on TradingView canvas. | **Operational (Research Only)** | `web/app.js` (`ChartTopBar`), `engine/forecast_engine_15m.py` | V29 null-guard applied to `ChartTopBar`. Labeled explicitly as `RESEARCH ONLY · LIVE TRADING DISABLED`. |
-| **Directional Signals in Live Alerts** | Include TP, SL, and trade direction in alert notifications. | **Blocked by Governance (`COST_ERASED`)** | `api/notifications.py`, `models/` | Track V3 demonstrated negative net expectancy ($-0.5678R$). Cannot be exposed until prospective edge validation on live L2 order book depth passes pre-registered hurdles. |
-| **Real-time L2 Order Book Depth** | Replace square-root volume slippage models with empirical order book depth fills. | **Modeled Approximation Only** | `engine/execution_cost_model.py` | Connect real-time WebSocket Level-2 book feeds (Coinbase/Kraken) to compute dynamic sweep slippage. |
-
----
-
-## 6. Local Quickstart & Deployment
-
-> **Comprehensive Deployment Guide:** For full Docker, Docker Compose, Fly.io, Render.com, VPS (systemd/nginx), security hardening, and troubleshooting instructions, see [docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md).
-
-### Quickstart (Windows PowerShell)
+### 6.1 Installation & Setup
 
 ```powershell
-# 1. Clone repository
+# Clone the repository
 git clone https://github.com/ashishlabs-23/bitcoin-prediction-lab.git
-cd bitcoin-prediction-lab
+cd bitcoin-prediction-lab/BTCognitive
 
-# 2. Activate virtual environment
+# Activate virtual environment
 .\.venv_win\Scripts\Activate.ps1
 
-# 3. Install dependencies
+# Install core production runtime requirements
 pip install -r requirements.txt
 
-# 4. Copy environment configuration
-cp .env.example .env
+# (Optional) For offline foundation model exploration (Chronos-2, Transformers):
+# pip install -r requirements-research.txt
+```
 
-# 5. Launch the backend server (FastAPI + uvicorn)
+### 6.2 Launch the FastAPI Backend & Web Terminal
+
+```powershell
+# Start FastAPI backend on port 8000
 python -m uvicorn api.server:app --host 127.0.0.1 --port 8000 --reload
 ```
+Open **`http://127.0.0.1:8000`** in your browser to view the real-time research terminal.
 
-### Quickstart (macOS / Linux)
+### 6.3 Shadow Feed Runner CLI Commands
 
-```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-uvicorn api.server:app --host 127.0.0.1 --port 8000 --reload
-```
+The prospective shadow collector runs as a standalone Python CLI:
 
-Access the research terminal at **`http://127.0.0.1:8000`**. The static frontend (`web/index.html` and `web/app.js`) is served directly by FastAPI without any required Node compilation step.
+```powershell
+# 1. Run a single evaluation cycle on fresh Coinbase market data
+python -m engine.shadow_feed_runner --once
 
-### IDE Configuration (VS Code / Antigravity)
+# 2. Check feed data freshness and staleness diagnostic
+python -m engine.shadow_feed_runner --check-freshness
 
-When opening the parent directory, ensure `.vscode/settings.json` points to the project virtual environment and includes `BTCognitive` in python extraPaths:
+# 3. Check runner process lock status and ledger summary
+python -m engine.shadow_feed_runner --status
 
-```json
-{
-    "python.defaultInterpreterPath": "${workspaceFolder}/BTCognitive/.venv_win/Scripts/python.exe",
-    "python.analysis.extraPaths": [
-        "${workspaceFolder}/BTCognitive"
-    ],
-    "python.autoComplete.extraPaths": [
-        "${workspaceFolder}/BTCognitive"
-    ]
-}
+# 4. Run a read-only evaluation without modifying the ledger
+python -m engine.shadow_feed_runner --once --dry-run
+
+# 5. Start continuous hourly collection loop with single-instance lock
+python -m engine.shadow_feed_runner --loop --interval 3600
+
+# To stop the continuous loop: Press Ctrl+C for graceful shutdown.
 ```
 
 ---
 
-## 7. Test Suite Execution
+## 7. Testing & Independent Verification
 
-BTCognitive enforces strict contract verification across backend endpoints, causal point-in-time features, and frontend assets:
+BTCognitive maintains a rigorous test suite across quantitative contracts, causal boundaries, and failure modes:
 
-```bash
-# 1. Frontend build verification & smoke tests (Node.js)
-node build_frontend.js
+```powershell
+# 1. Run the core regression and L2 test suite (86 tests, 100% pass)
+# (Evolution: 73 in V32.29/V32.30 -> 86 in V32.31 with 13 deterministic L2 collector & gating tests)
+python -m pytest tests/test_strategy_to_alert_pipeline.py tests/test_entry_contracts_and_resolver.py tests/test_smart_entry_api.py tests/test_v32_25_directional_integration.py tests/test_prospective_shadow_collector.py tests/test_prospective_worker_and_resilience.py tests/test_isolated_real_http_server.py tests/test_coinbase_l2_collector_and_gating.py -v
 
-# 2. Fast market-driver and route baseline tests (Python pytest)
-pytest tests/test_market_drivers.py tests/test_market_monitor_routes.py -v
+# 2. Run the frontend UI verification tests (formatters, deduplication, polling budget, L2 UI markers, V32.35 AI Forecasts & Risk Outlook)
+node tests_frontend.js
 
-# 3. Forecast chart and frontend contract tests
-pytest tests/test_v10_market_data_and_forecast_chart.py tests/test_frontend_contracts.py -v
+# 3. Reproduce the full V32.28 master research pipeline (Phases 2-5)
+python -m research.experiments.run_v32_28_master_pipeline
 
-# 4. V29 Status contract and fail-closed decision anatomy tests
-pytest tests/test_v29_status_contract_and_decision_anatomy.py -v
-
-# 5. Entry/TP/SL contract freeze, PIT invariants, and barrier resolver tests
-pytest tests/entry_tp_sl/ -v
-
-# 6. V29.1 Deployment integrity, storage persistence, and environment tests
-pytest tests/test_v29_1_deployment_integrity.py -v
+# 4. Reproduce the V32.30 pre-registered multi-horizon study (24h vs 72h vs 168h)
+python research/experiments/run_v32_30_horizon_study.py
 ```
 
 ---
 
-## 8. Architectural & System Limitations (Cons)
+## 8. V32.31 Opt-In Coinbase L2 Entry-Gating Research
 
-A critical assessment of the current application reveals the following limitations and trade-offs:
+BTCognitive V32.31 implements an auditable, opt-in Level-2 (L2) market data ingestion and shadow-evaluation pipeline for testing whether contemporaneous order-flow features improve the BTCUSD 168-hour breakout strategy (`TSMOM_DONCHIAN_168H_336H`) after transaction costs.
 
-1. **Workspace Layout & Nested Directory Ambiguity:**
-   - The git repository and package code are located in a nested subdirectory (`BTCognitive/BTCognitive`) rather than the workspace root. Without explicit `extraPaths` and interpreter paths in `.vscode/settings.json`, external tooling and linters suffer import resolution errors.
-
-2. **Strict Production & Model Lock (No Live Trading):**
-   - The platform deliberately enforces `OFFLINE_RESEARCH_ONLY` model authorization and `DISABLED` live trading. Directional accuracy is treated as an unvalidated hypothesis; users looking for automated signal execution or broker connectivity will find these capabilities blocked by protocol.
-
-3. **Flat File Data Ingestion & I/O Overhead:**
-   - Historical 1-minute bar data (~394 MB CSV) is stored in raw flat files (`data/raw/btcusd_1-min_data.csv`). Frequent full-file SHA-256 verifications and CSV parsing introduce noticeable disk I/O latency and memory overhead compared to columnar formats (e.g., Parquet, Arrow, or TimescaleDB).
-
-4. **Public REST API Rate Limits & Upstream Fragility:**
-   - Market data ingestion depends on public exchange REST endpoints (Coinbase, Bitstamp, Kraken). Outages, network partitions, or rate limits immediately trigger "fail-closed" unavailable states. There is no enterprise-tier multi-source tick aggregator or resilient failover gateway.
-
-5. **Monolithic Frontend Architecture:**
-   - The terminal frontend uses React 18 with in-browser components (`web/app.js`, ~12,000 lines) and TradingView Lightweight Charts served directly without an npm build pipeline. While zero-build simplifies deployment, modular bundlers (e.g., Vite/TypeScript) would improve code splitting and component encapsulation.
-
-6. **Single-Node SQLite Concurrency Limits:**
-   - Paper trading transactions, canonical decisions ($D_t$), and audit ledgers rely on SQLite and local disk persistence. This architecture is not designed for multi-node distributed clustering or horizontal horizontal write scaling without encountering database lock contention.
-
-7. **Prospective Validation Delay:**
-   - In accordance with the governing econometrics contract, at least 100 non-overlapping post-freeze forward blocks must be collected before prospective confirmatory evaluation. As a result, prospective model promotion takes several weeks of continuous live data accumulation.
+### Operational Guardrails & Invariants:
+1. **Disabled by Default:** The collector is strictly off unless explicitly opted-in via `COINBASE_L2_COLLECTOR_ENABLED=1`. It never launches automatically on application startup or during test runs.
+2. **BTC-USD Spot Only:** Connects exclusively to `wss://ws-feed.exchange.coinbase.com` for `BTC-USD`. Unauthorized derivatives or altcoins are rejected at initialization.
+3. **Dedicated Research Ledger:** All shadow evaluations are logged to `data/research/prospective_l2_gated_ledger_v1.jsonl`. Existing protected datasets are never touched or modified.
+4. **Frozen Pre-Registration Gating ($H_1$):**
+   - $\text{OFI}_{15\text{m}} > 0.0$ (Cont, Kukanov & Stoikov 2014)
+   - $\text{OBI}_5 > -0.20$ (depth-5 order book imbalance)
+   - $\text{Spread}_{\text{bps}} \le 5.0\text{ bps}$
+   - Fail-closed mode: Stale (>5.0s) or desynchronized feeds emit `GATE_ABSTAIN_L2_UNAVAILABLE`.
+5. **Operating Instructions:**
+   ```powershell
+   # To explicitly enable L2 ingestion in an authorized research session:
+   $env:COINBASE_L2_COLLECTOR_ENABLED = "1"
+   python -m uvicorn api.server:app --host 127.0.0.1 --port 8000
+   
+   # Inspect research status via API:
+   curl http://127.0.0.1:8000/api/research/l2-gating-status
+   curl http://127.0.0.1:8000/api/research/l2-shadow-evaluation
+   ```
 
 ---
 
-## 9. Research Governance & Epistemic Principles
+## 9. V32.32 Full-Project Verification & Master Audit
 
-- **Target Separation:** 24-hour forward realized variance (`rv24h_var_ann`) is an hourly-sampled variance proxy across 24 closed hourly candles, distinct from longer 168-hour targets.
-- **Loss Functions & Evaluation:** Models are evaluated via asymmetric QLIKE and robust RMSE metrics, with Diebold-Mariano tests applying the Harvey-Leybourne-Newbold (1997) finite-sample correction.
-- **Point-in-Time Discipline:** Strict causality ($t_{\text{feature}} \le t_{\text{decision}} < t_{\text{maturity}}$); no lookahead or retroactive dataset revisions.
+BTCognitive V32.32 delivers a comprehensive, evidence-driven audit and verification of the complete quantitative application:
+1. **Sub-Hourly MEIE Mechanism Reconciliation:** Resolved the mathematical discrepancy between generalized multi-venue cost accounting (`ExecutionCostModel`) and calibrated sub-hourly empirical regressions (`MEIE-IGNITION`: 41.5 bps gross, 9.3 bps drag, 32.2 bps net).
+2. **Pyramid Test Health (114/114 Tests Passing):** Full automated coverage spanning pipeline integrity (22), entry contracts (13), Smart Entry API (7), directional integration (9), shadow collector (12), resilience (6), loopback TCP server (4), L2 gating (13), V9 acceptance data integrity (5), strategy selection (9), audit resolutions (6), and frontend unit test suites (8).
+3. **Zero Tampering of Protected Ledgers:** Verified all 5 protected ledgers and historical datasets are 100% bit-identical against initial SHA-256 baseline hashes.
+4. **Independent Browser QA:** Complete end-to-end traversal of all four main views (`#/terminal`, `#/smart-entry`, `#/arena`, `#/research`) with **zero console errors** and full responsiveness across desktop, tablet, and mobile viewports.
+5. **Authoritative Governance Reports:**
+   - [v32_32_master_analysis_and_repair_report.md](file:///c:/Projects/BTCognitive/BTCognitive/research/reports/v32_32_master_analysis_and_repair_report.md)
+   - [v32_32_feature_qa_matrix.md](file:///c:/Projects/BTCognitive/BTCognitive/research/reports/v32_32_feature_qa_matrix.md)
+
+---
+
+---
+
+## 10. V32.34 Frontend Visibility, UX Upgrade & Independent Browser QA
+
+BTCognitive V32.34 delivers a comprehensive frontend visibility, user-experience, and architectural transparency upgrade while strictly preserving epistemic boundaries and non-execution invariants:
+
+1. **System at a Glance Telemetry Card:** Embedded an 8-metric institutional summary directly at the top of the landing page answering at a glance: System Mode, Market Data, Strategy State, Gate, Risk Model, Friction, Alerts, and Verdict.
+2. **WCAG 2.2 AA Focus & Touch Targets:** Implemented visible `#00E5A8` glow focus indicators (`:focus-visible`), standard 24x24px minimum touch targets, and high-contrast typography tokens (`#F8FAFC`, `#CBD5E1`).
+3. **Four-Tab Research Hub:** Structured the research view into 4 dedicated sub-tabs:
+   - **Verified Reports:** 11 peer-reviewed research reports with contradiction reconciliation banner and raw markdown modal inspector (`Escape` key closes).
+   - **Models & Forecast Architecture:** Explicit model execution status badges (`ACTIVE`, `INFERENCE NOT EXECUTED`, `DATA UNAVAILABLE`, `REJECTED`).
+   - **Historical Regimes & Precedents:** Nearest-neighbor volatility analog explorer.
+   - **Data Provenance & Diagnostics:** Certified canonical vs quarantined dataset audit and bit-identical hash verification.
+4. **Independent Browser QA Automation (Agent F):** Verified full functionality across Desktop (`1536x800`), Tablet (`768x1024`), and Mobile (`375x812`) with **0 console errors** and **0 network failures**.
+5. **Software UX Scorecard Upgrade:** Elevated composite software UX score from 7.11 to **9.14 / 10** across all 9 software dimensions ($\ge 8.0$), while keeping the scientific/economic edge score honestly bounded at **4.5 / 10** under `NO_GO_NO_VALIDATED_EDGE`.
+6. **Authoritative Versioned Deliverables:**
+   - [v32_34_frontend_feature_visibility_matrix.md](file:///c:/Projects/BTCognitive/BTCognitive/research/reports/v32_34_frontend_feature_visibility_matrix.md)
+   - [v32_34_frontend_ux_baseline_and_final_scorecard.md](file:///c:/Projects/BTCognitive/BTCognitive/research/reports/v32_34_frontend_ux_baseline_and_final_scorecard.md)
+   - [v32_34_independent_browser_qa_report.md](file:///c:/Projects/BTCognitive/BTCognitive/research/reports/v32_34_independent_browser_qa_report.md)
+   - [v32_34_defect_repair_ledger.md](file:///c:/Projects/BTCognitive/BTCognitive/research/reports/v32_34_defect_repair_ledger.md)
+   - [v32_34_final_release_qa_report.md](file:///c:/Projects/BTCognitive/BTCognitive/research/reports/v32_34_final_release_qa_report.md)
+
+## 11. V32.36 Research Reconciliation & After-Cost Economic Evaluation
+
+BTCognitive V32.36 executes an exhaustive research reconciliation and after-cost economic evaluation to determine whether visible forecasts and existing features can produce positive net expectancy:
+
+1. **Forecasting Integrity Audit & Coverage Reconciliation:**
+   - **Directional GBDTs:** Proved that live displayed probabilities ($54\% - 57\%$) represent uncalibrated point estimates. On the 2026 holdout ($N = 7,127$ bars), true accuracy is **51.0% - 51.8%**, AUC is **0.51 - 0.53**, and Brier Skill Score is $\le 0.0005$ (zero edge over climatological base rates).
+   - **Conformal Coverage Discrepancy:** Reconciled nominal target ($90\%$) vs. in-sample calibration ($92.84\%$) vs. legacy leaked calculation ($92.36\%$, superseded) vs. true causal holdout (**84.89%**, $95\%$ CI: $[73.14\%, 93.14\%]$).
+2. **Multi-Horizon Strategy Reconciliation Matrix:**
+   - Master comparative analysis of 24h, 72h, and 168h breakouts on 33,424 authenticated bars.
+   - Slower 168h horizon doubles gross return ($+0.088\text{ R} \to +0.163\text{ R}$) and cuts turnover by $60.7\%$, but remains net negative: **$-0.1778\text{ R}$** at 27 bps (breakeven fee: **$12.9\text{ bps}$**) and **$-0.9349\text{ R}$** at 87 bps.
+   - Simply rerunning unconditioned breakouts cannot achieve positive net expectancy.
+3. **Level-2 Market Data Qualification & Pre-Registration:**
+   - Coinbase L2 WebSocket collector (`engine/coinbase_l2_collector.py`) qualified for prospective research only (opt-in default disabled; sequence gap detection; heartbeat stall invalidation).
+   - Pre-registered hypothesis $H_1$ (Cont et al. OFI, OBI, CVD) requiring at least **$N \ge 100$ independent prospective trades** before confirmatory testing. Zero historical L2 fabrication from OHLCV. Zero promotion to Smart Entry live trading.
+4. **Final Economic Decision Gate:**
+   - Retained **`NO_GO_NO_VALIDATED_EDGE`**. Live trading remains `DISABLED`, and positive-edge alerts remain `MUTED`.
+5. **Authoritative Versioned Reports:**
+   - [v32_36_forecasting_integrity_and_reconciliation_report.md](file:///c:/Projects/BTCognitive/BTCognitive/research/reports/v32_36_forecasting_integrity_and_reconciliation_report.md)
+   - [v32_36_multi_horizon_strategy_reconciliation_matrix.md](file:///c:/Projects/BTCognitive/BTCognitive/research/reports/v32_36_multi_horizon_strategy_reconciliation_matrix.md)
+   - [v32_36_l2_market_data_qualification_and_preregistration.md](file:///c:/Projects/BTCognitive/BTCognitive/research/reports/v32_36_l2_market_data_qualification_and_preregistration.md)
+   - [v32_36_master_economic_decision_report.md](file:///c:/Projects/BTCognitive/BTCognitive/research/reports/v32_36_master_economic_decision_report.md)
+
+---
+
+## 12. V32.37 Chronos-2 Comparative Forecast Benchmark
+
+BTCognitive V32.37 executes an exhaustive, inference-only offline research benchmark testing Amazon's official pretrained `amazon/chronos-2` foundation model (120M parameters) against existing directional LightGBM GBDTs and quantitative baselines on the full 2026 Coinbase holdout dataset ($N = 7,104$ valid forecast origins across 1h, 4h, and 24h horizons):
+
+1. **Directional Discrimination:** Chronos-2 produces an inverted directional hit rate (< 50%) across all horizons: **48.76% (1h)**, **49.66% (4h)**, and **48.11% (24h)**. The existing GBDTs outperform Chronos-2 across all horizons (**51.77% (1h)**, **51.69% (4h)**, and **51.04% (24h)**).
+2. **Point Forecast Return Accuracy:** Simple Random Walk persistence ($E[r]=0$) achieves lower return MAE and RMSE than Chronos-2 across all three horizons (Random Walk has **7.4% lower MAE at 1h**, **8.1% lower MAE at 4h**, and **9.9% lower MAE at 24h**).
+3. **Paired Statistical Significance (Diebold–Mariano with HLN Correction):** Random Walk is statistically significantly superior to Chronos-2 on squared return errors ($DM^* = +7.1503, p < 10^{-6}$ at 4h; $DM^* = +4.4325, p = 9.0 \times 10^{-6}$ at 24h).
+4. **Quantile Calibration:** Simple 168-hour empirical quantiles achieve lower Pinball loss and superior Winkler calibration than Chronos-2 across all horizons. At 24 hours, Chronos-2 nominal 80% coverage degrades to **70.34%**.
+5. **Master Exit Decision:** **`NO_INCREMENTAL_FORECAST_VALUE`**. Chronos-2 is quarantined as an offline research artifact; no fine-tuning, dashboard promotion, or live activation is authorized.
+6. **Authoritative Deliverables:**
+   - [v32_37_chronos2_comparative_benchmark_report.md](file:///c:/Projects/BTCognitive/BTCognitive/research/reports/v32_37_chronos2_comparative_benchmark_report.md)
+   - [v32_37_chronos2_benchmark_summary.json](file:///c:/Projects/BTCognitive/BTCognitive/research/reports/v32_37_chronos2_benchmark_summary.json)
+
+---
+
+## 13. V32.38 Adaptive Market Intelligence & Causal Microstructure
+
+BTCognitive V32.38 implements the foundational engineering for adaptive, microstructure-aware market intelligence:
+1. **Level-2 Data Integrity:** Fail-closed order book reconstruction with sequence continuity enforcement, duplicate and out-of-order drop handling, heartbeat stall invalidation (5.0s threshold), and deterministic event replay via SHA-256 checksummed `v32.38.l2_event` logs.
+2. **Causal Point-in-Time Feature Engine:** Microstructure features (OFI 1m/5m/15m, OBI 5/10/25/50, spread bps, depth) and micro-liquidity proxies (Kyle's lambda, Amihud illiquidity) computed strictly from causal events with zero lookahead.
+3. **Drift-Aware Prequential Evaluation:** Pre-outcome forecast registration, delayed maturity resolution, and continuous tracking using Page-Hinkley and CUSUM statistical change-point detectors.
+4. **Master Exit Decision:** **`RESEARCH_EVALUATION_READY`**. Authoritative reports:
+   - [v32_38_adaptive_market_intelligence_report.md](file:///c:/Projects/BTCognitive/BTCognitive/research/reports/v32_38_adaptive_market_intelligence_report.md)
+   - [v32_38_adaptive_market_intelligence_summary.json](file:///c:/Projects/BTCognitive/BTCognitive/research/reports/v32_38_adaptive_market_intelligence_summary.json)
+
+---
+
+## 14. V32.39 Prospective L2 Shadow Qualification
+
+BTCognitive V32.39 moves from research infrastructure to controlled, forward-only Coinbase BTC-USD Level-2 market-data qualification:
+1. **Public Feed Handling & Reconnect Recovery:** Resilient ingestion of public Coinbase `level2_batch`, `matches`, and `heartbeat` feeds with deterministic sequence check, exponential backoff reconnection, automatic resynchronization via fresh snapshots, and fail-closed disk-space protection ($\ge 500\text{ MB}$).
+2. **Frozen Hypothesis ($H_1$):** Complete preservation of the pre-registered TSMOM 168h + L2 gating criteria ($\text{OFI}_{15\text{m}} > 0.0$, $\text{OBI}_5 > -0.20$, $\text{Spread} \le 5.0\text{ bps}$, feed age $\le 5.0\text{s}$) with zero post-hoc threshold mutation.
+3. **Unbiased Evaluation Ledger (`PROSPECTIVE_L2_GATED_V2`):** Records **both** gate-accepted and gate-rejected baseline candidates so the gated strategy can be compared against the identical ungated baseline without survivorship bias.
+4. **Independent Sample Unit & Overlap Handling:** Non-overlapping 168-hour blocks define the primary statistical unit; overlapping candidate setups trigger block tagging (`is_independent_block = False`).
+5. **Locked Statistical Evaluation Rules:** Primary outcome defined as paired Net R difference under the `ACTIVE_TRADER_27BPS` cost scenario (27.0 bps round trip). Confirmatory evaluation requires $\ge 100$ independent blocks with Diebold-Mariano HLN $p < 0.05$ and $\Delta \text{Net } R \ge +0.05\text{ R}$.
+6. **Repeatable Operator Burn-in Runbook:** Safe CLI runner (`engine/run_l2_prospective_burnin.py`) supporting dry-run simulation and operator-authorized live capture guarded by `$env:COINBASE_L2_COLLECTOR_ENABLED = "1"` and `--authorize-collection`.
+7. **Master Exit Decision:** **`READY_FOR_OPERATOR_AUTHORIZATION`**. Authoritative reports:
+   - [v32_39_prospective_l2_qualification_report.md](file:///c:/Projects/BTCognitive/BTCognitive/research/reports/v32_39_prospective_l2_qualification_report.md)
+   - [v32_39_preflight_data_quality_summary.json](file:///c:/Projects/BTCognitive/BTCognitive/research/reports/v32_39_preflight_data_quality_summary.json)
+
+---
+
+## 15. Statistical Governance & Release Decisions
+
+All models and strategies are subject to a four-part governed decision protocol:
+
+| Governed Dimension | Current Status | Scientific Rationale |
+| :--- | :--- | :--- |
+| **Research Experiment** | `RETAIN_BASELINE_CHALLENGER_RESEARCH_ONLY` | Pre-registered $H_1$ L2 gate stands as challenger against baseline TSMOM 168h. Zero in-sample threshold tuning. |
+| **Prospective Evidence** | `COLLECTING` (Ready for Operator Authorization) | Preflight checks and dry-run verified. Standing by for authorized operator invocation; minimum 100 non-overlapping blocks required before confirmatory gate. |
+| **Model Authorization** | `OFFLINE_RESEARCH_ONLY` | Production promotion is strictly prohibited until confirmatory prospective gates pass. |
+| **Live Trading** | `DISABLED` | Live broker routing, order placement, and capital deployment remain permanently disabled. |
+
+---
+
+## 16. License & Epistemic Boundaries
+
+This repository is maintained for empirical scientific research, quantitative risk modeling, and market excursion intelligence. It does not provide financial or investment advice.
+
+
+

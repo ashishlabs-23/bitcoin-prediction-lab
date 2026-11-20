@@ -1,0 +1,294 @@
+{
+  "experiment_name": "BTCognitive V33.2 Adaptive Conformal Calibration Research",
+  "timestamp_utc": "2026-10-31T13:57:39Z",
+  "sample_size_holdout": 5671,
+  "nominal_target_coverage_pct": 90.0,
+  "forecast_horizon": "168h (7 days)",
+  "causal_resolution_delay_hours": 168,
+  "bootstrap_replications": 5000,
+  "bootstrap_random_seed": 42,
+  "candidates": {
+    "baseline_c2": {
+      "candidate_name": "C2 Baseline (Control)",
+      "point_in_time_coverage_pct": 84.89,
+      "extreme_volatility_coverage_pct": 64.79,
+      "extreme_volatility_sample_count": 568,
+      "extreme_volatility_95_ci": [
+        60.92,
+        68.84
+      ],
+      "coverage_by_regime": {
+        "LOW": {
+          "count": 1418,
+          "coverage_pct": 83.0
+        },
+        "MEDIUM": {
+          "count": 2835,
+          "coverage_pct": 89.81
+        },
+        "HIGH": {
+          "count": 850,
+          "coverage_pct": 85.06
+        },
+        "EXTREME": {
+          "count": 568,
+          "coverage_pct": 64.79
+        }
+      },
+      "mean_interval_width": 0.4389,
+      "median_interval_width": 0.2364,
+      "mean_winkler_score": 1.0444,
+      "mean_relative_width_ratio": 2.71,
+      "median_relative_width_ratio": 2.06,
+      "dependence_aware_95_ci": {
+        "block_84h": [
+          76.99,
+          91.36
+        ],
+        "block_168h": [
+          74.63,
+          93.09
+        ],
+        "block_336h": [
+          74.34,
+          94.37
+        ]
+      },
+      "undercoverage_episodes_count": 37,
+      "mean_undercoverage_episode_hours": 23.16,
+      "max_undercoverage_episode_hours": 251,
+      "mean_adaptation_delay_hours": 14.49,
+      "calibration_stability": {
+        "interval_width_std": 0.3615,
+        "daily_coverage_std_pct": 32.58
+      },
+      "computational_latency_ms": 0.0059
+    },
+    "candidate_1_rolling": {
+      "candidate_name": "Candidate 1 (Rolling W=720h)",
+      "point_in_time_coverage_pct": 83.23,
+      "extreme_volatility_coverage_pct": 61.8,
+      "extreme_volatility_sample_count": 568,
+      "extreme_volatility_95_ci": [
+        57.75,
+        65.85
+      ],
+      "coverage_by_regime": {
+        "LOW": {
+          "count": 1418,
+          "coverage_pct": 82.37
+        },
+        "MEDIUM": {
+          "count": 2835,
+          "coverage_pct": 87.27
+        },
+        "HIGH": {
+          "count": 850,
+          "coverage_pct": 85.53
+        },
+        "EXTREME": {
+          "count": 568,
+          "coverage_pct": 61.8
+        }
+      },
+      "mean_interval_width": 0.3864,
+      "median_interval_width": 0.2288,
+      "mean_winkler_score": 1.0092,
+      "mean_relative_width_ratio": 2.26,
+      "median_relative_width_ratio": 1.82,
+      "dependence_aware_95_ci": {
+        "block_84h": [
+          75.4,
+          89.79
+        ],
+        "block_168h": [
+          72.93,
+          91.89
+        ],
+        "block_336h": [
+          72.14,
+          93.51
+        ]
+      },
+      "undercoverage_episodes_count": 50,
+      "mean_undercoverage_episode_hours": 19.02,
+      "max_undercoverage_episode_hours": 253,
+      "mean_adaptation_delay_hours": 14.98,
+      "calibration_stability": {
+        "interval_width_std": 0.3508,
+        "daily_coverage_std_pct": 33.68
+      },
+      "computational_latency_ms": 0.0058
+    },
+    "candidate_2_aci": {
+      "candidate_name": "Candidate 2 (ACI gamma=0.002)",
+      "point_in_time_coverage_pct": 80.44,
+      "extreme_volatility_coverage_pct": 63.91,
+      "extreme_volatility_sample_count": 568,
+      "extreme_volatility_95_ci": [
+        59.86,
+        67.78
+      ],
+      "coverage_by_regime": {
+        "LOW": {
+          "count": 1418,
+          "coverage_pct": 78.7
+        },
+        "MEDIUM": {
+          "count": 2835,
+          "coverage_pct": 84.83
+        },
+        "HIGH": {
+          "count": 850,
+          "coverage_pct": 79.76
+        },
+        "EXTREME": {
+          "count": 568,
+          "coverage_pct": 63.91
+        }
+      },
+      "mean_interval_width": 0.4234,
+      "median_interval_width": 0.2177,
+      "mean_winkler_score": 1.0486,
+      "mean_relative_width_ratio": 2.55,
+      "median_relative_width_ratio": 2.0,
+      "dependence_aware_95_ci": {
+        "block_84h": [
+          72.09,
+          87.36
+        ],
+        "block_168h": [
+          70.01,
+          89.0
+        ],
+        "block_336h": [
+          69.56,
+          90.28
+        ]
+      },
+      "undercoverage_episodes_count": 53,
+      "mean_undercoverage_episode_hours": 20.92,
+      "max_undercoverage_episode_hours": 280,
+      "mean_adaptation_delay_hours": 14.99,
+      "calibration_stability": {
+        "interval_width_std": 0.3646,
+        "daily_coverage_std_pct": 35.35
+      },
+      "computational_latency_ms": 0.0118
+    },
+    "candidate_3_faci": {
+      "candidate_name": "Candidate 3 (FACI Multi-Expert)",
+      "point_in_time_coverage_pct": 76.18,
+      "extreme_volatility_coverage_pct": 54.58,
+      "extreme_volatility_sample_count": 568,
+      "extreme_volatility_95_ci": [
+        50.53,
+        58.63
+      ],
+      "coverage_by_regime": {
+        "LOW": {
+          "count": 1418,
+          "coverage_pct": 71.44
+        },
+        "MEDIUM": {
+          "count": 2835,
+          "coverage_pct": 82.79
+        },
+        "HIGH": {
+          "count": 850,
+          "coverage_pct": 76.47
+        },
+        "EXTREME": {
+          "count": 568,
+          "coverage_pct": 54.58
+        }
+      },
+      "mean_interval_width": 0.379,
+      "median_interval_width": 0.2217,
+      "mean_winkler_score": 1.0326,
+      "mean_relative_width_ratio": 2.29,
+      "median_relative_width_ratio": 1.85,
+      "dependence_aware_95_ci": {
+        "block_84h": [
+          67.98,
+          83.46
+        ],
+        "block_168h": [
+          65.42,
+          84.71
+        ],
+        "block_336h": [
+          65.09,
+          86.34
+        ]
+      },
+      "undercoverage_episodes_count": 76,
+      "mean_undercoverage_episode_hours": 17.78,
+      "max_undercoverage_episode_hours": 251,
+      "mean_adaptation_delay_hours": 15.96,
+      "calibration_stability": {
+        "interval_width_std": 0.3427,
+        "daily_coverage_std_pct": 37.44
+      },
+      "computational_latency_ms": 0.0803
+    },
+    "candidate_4_enbpi": {
+      "candidate_name": "Candidate 4 (EnbPI W=1440h)",
+      "point_in_time_coverage_pct": 84.36,
+      "extreme_volatility_coverage_pct": 59.68,
+      "extreme_volatility_sample_count": 568,
+      "extreme_volatility_95_ci": [
+        55.63,
+        63.73
+      ],
+      "coverage_by_regime": {
+        "LOW": {
+          "count": 1418,
+          "coverage_pct": 87.66
+        },
+        "MEDIUM": {
+          "count": 2835,
+          "coverage_pct": 87.55
+        },
+        "HIGH": {
+          "count": 850,
+          "coverage_pct": 84.71
+        },
+        "EXTREME": {
+          "count": 568,
+          "coverage_pct": 59.68
+        }
+      },
+      "mean_interval_width": 0.3606,
+      "median_interval_width": 0.3327,
+      "mean_winkler_score": 0.874,
+      "mean_relative_width_ratio": 2.57,
+      "median_relative_width_ratio": 2.44,
+      "dependence_aware_95_ci": {
+        "block_84h": [
+          76.16,
+          91.22
+        ],
+        "block_168h": [
+          73.39,
+          93.0
+        ],
+        "block_336h": [
+          72.12,
+          94.92
+        ]
+      },
+      "undercoverage_episodes_count": 18,
+      "mean_undercoverage_episode_hours": 49.28,
+      "max_undercoverage_episode_hours": 256,
+      "mean_adaptation_delay_hours": 17.84,
+      "calibration_stability": {
+        "interval_width_std": 0.1629,
+        "daily_coverage_std_pct": 34.09
+      },
+      "computational_latency_ms": 0.0797
+    }
+  },
+  "governed_determination": "NO_IMPROVEMENT_OVER_C2",
+  "governed_determination_rationale": "Under the strictly causal 168-hour delayed feedback constraint, online adaptive conformal inference (ACI and FACI) degrades coverage from 84.89% down to 80.44% (ACI) and 78.96% (FACI). During tranquil regimes, ACI narrows intervals to force errors, leaving the model defenseless when volatility shocks hit before feedback can mature. Rolling calibration (W=720h) drops coverage to 83.23%. EnbPI provides competitive interval sharpness (Winkler 0.8740 vs 1.0444) with 84.36% coverage, but does not solve the 5.11 pp undercoverage gap. None of the online adaptive candidates outperforms the frozen C2 baseline in empirical coverage or adaptation responsiveness without lookahead leakage. The baseline C2 architecture is retained."
+}

@@ -33,8 +33,73 @@ class ExecutionCostModel:
             "funding_rate_bps_per_8h": 0.0,
             "source_doc": "https://help.coinbase.com/en-in/coinbase/trading-and-funding/advanced-trade/advanced-trade-fees"
         },
+        "COINBASE_US_RETAIL_187BPS": {
+            "venue_name": "Coinbase US Retail (Sept 2026 Schedule)",
+            "market_type": "SPOT",
+            "symbol": "BTC-USD",
+            "quote_currency": "USD",
+            "contract_multiplier": 1.0,
+            "maker_bps_per_side": 50.0,  # 0.50% maker
+            "taker_bps_per_side": 90.0,  # 0.90% taker
+            "half_spread_bps_per_side": 1.5,
+            "slippage_bps_per_side": 2.0,
+            "funding_rate_bps_per_8h": 0.0,
+            "source_doc": "Coinbase Retail Fee Schedule Sept 16, 2026"
+        },
+        "COINBASE_EU_UK_RETAIL_107BPS": {
+            "venue_name": "Coinbase EU/UK Retail",
+            "market_type": "SPOT",
+            "symbol": "BTC-EUR/GBP",
+            "quote_currency": "USD",
+            "contract_multiplier": 1.0,
+            "maker_bps_per_side": 25.0,  # 0.25% maker
+            "taker_bps_per_side": 50.0,  # 0.50% taker
+            "half_spread_bps_per_side": 1.5,
+            "slippage_bps_per_side": 2.0,
+            "funding_rate_bps_per_8h": 0.0,
+            "source_doc": "Coinbase Retail Fee Schedule (EU/UK)"
+        },
+        "COINBASE_INDIA_INTL_27BPS": {
+            "venue_name": "Coinbase India / International Retail",
+            "market_type": "SPOT",
+            "symbol": "BTC-USD",
+            "quote_currency": "USD",
+            "contract_multiplier": 1.0,
+            "maker_bps_per_side": 9.0,   # 0.09% maker
+            "taker_bps_per_side": 10.0,  # 0.10% taker (post-May 2026 India re-entry)
+            "half_spread_bps_per_side": 1.5,
+            "slippage_bps_per_side": 2.0,
+            "funding_rate_bps_per_8h": 0.0,
+            "source_doc": "Coinbase International Retail Schedule"
+        },
+        "COINBASE_ADVANCED_87BPS": {
+            "venue_name": "Coinbase Advanced Tier 1",
+            "market_type": "SPOT",
+            "symbol": "BTC-USD",
+            "quote_currency": "USD",
+            "contract_multiplier": 1.0,
+            "maker_bps_per_side": 25.0,
+            "taker_bps_per_side": 40.0,
+            "half_spread_bps_per_side": 1.5,
+            "slippage_bps_per_side": 2.0,
+            "funding_rate_bps_per_8h": 0.0,
+            "source_doc": "https://help.coinbase.com/en-in/coinbase/trading-and-funding/advanced-trade/advanced-trade-fees"
+        },
+        "COINBASE_PRO_35BPS": {
+            "venue_name": "Coinbase Advanced High Volume",
+            "market_type": "SPOT",
+            "symbol": "BTC-USD",
+            "quote_currency": "USD",
+            "contract_multiplier": 1.0,
+            "maker_bps_per_side": 10.0,
+            "taker_bps_per_side": 15.0,
+            "half_spread_bps_per_side": 1.0,
+            "slippage_bps_per_side": 1.5,
+            "funding_rate_bps_per_8h": 0.0,
+            "source_doc": "Coinbase Advanced Tier 4+"
+        },
         "BINANCE_FUTURES": {
-            "venue_name": "Binance USDT-M Futures",
+            "venue_name": "Binance USDT-M Futures VIP 0",
             "market_type": "PERPETUAL",
             "symbol": "BTCUSDT",
             "quote_currency": "USDT",
@@ -44,20 +109,98 @@ class ExecutionCostModel:
             "half_spread_bps_per_side": 0.5,
             "slippage_bps_per_side": 1.0,
             "funding_rate_bps_per_8h": 1.0,  # Baseline 8-hour settlement funding
+            "governance_status": "SENSITIVITY_ONLY_NON_SPOT",
+            "source_doc": "https://www.binance.com/en/support/faq/detail/98488a516eb84e3eb34605683dffd554"
+        },
+        "BINANCE_FUTURES_12BPS": {
+            "venue_name": "Binance USDT-M Futures VIP 0 Taker",
+            "market_type": "PERPETUAL",
+            "symbol": "BTCUSDT",
+            "quote_currency": "USDT",
+            "contract_multiplier": 1.0,
+            "maker_bps_per_side": 2.0,
+            "taker_bps_per_side": 5.0,
+            "half_spread_bps_per_side": 0.5,
+            "slippage_bps_per_side": 0.5,
+            "funding_rate_bps_per_8h": 1.0,
+            "governance_status": "SENSITIVITY_ONLY_NON_SPOT",
             "source_doc": "https://www.binance.com/en/support/faq/detail/98488a516eb84e3eb34605683dffd554"
         }
     }
 
     def __init__(self, venue: str = "COINBASE", product_type: str = "SPOT"):
         self.venue = venue.upper()
-        if "BINANCE" in self.venue:
+        if self.venue in self.EXCHANGE_CONFIGS:
+            self.venue = self.venue
+        elif "BINANCE" in self.venue:
             self.venue = "BINANCE_FUTURES"
+        elif "INDIA" in self.venue or "INTL" in self.venue:
+            self.venue = "COINBASE_INDIA_INTL_27BPS"
+        elif "EU" in self.venue or "UK" in self.venue:
+            self.venue = "COINBASE_EU_UK_RETAIL_107BPS"
+        elif "US" in self.venue:
+            self.venue = "COINBASE_US_RETAIL_187BPS"
         elif "COINBASE" in self.venue:
             self.venue = "COINBASE"
         self.product_type = product_type.upper()
 
     def get_config(self) -> Dict[str, Any]:
         return self.EXCHANGE_CONFIGS.get(self.venue, self.EXCHANGE_CONFIGS["COINBASE"])
+
+    @classmethod
+    def calculate_breakeven_win_rate(
+        cls,
+        friction_r: float,
+        k_tp: float = 1.5,
+        k_sl: float = 1.0
+    ) -> float:
+        """
+        Calculates exact mathematical break-even win rate after accounting for friction in R:
+        E[net R] = p * (k_tp / k_sl) - (1 - p) * 1.0 - friction_r = 0
+        => p * (k_tp/k_sl + 1) = 1.0 + friction_r
+        => p_breakeven = (1.0 + friction_r) / (k_tp/k_sl + 1.0)
+        """
+        rr = max(0.1, k_tp / max(0.1, k_sl))
+        p_be = (1.0 + max(0.0, friction_r)) / (rr + 1.0)
+        return round(float(p_be), 4)
+
+    @classmethod
+    def reconcile_legacy_discrepancy(
+        cls,
+        price: float = 81242.50,
+        sigma_t0: float = 0.00837,
+        k_sl: float = 1.0
+    ) -> Dict[str, Any]:
+        """
+        Reconciles the 1.0877R entry in prospective_entry_ledger.jsonl:
+        Under legacy V30 formula, friction was 91.04 bps.
+        1R = price * (k_sl * sigma_t0) = 81242.50 * 0.00837 = $679.9997.
+        Legacy friction USD = 81242.50 * (91.04 / 10000) = $739.63.
+        Friction in R = 739.63 / 679.9997 = 1.087694 R ≈ 1.0877R.
+        Under corrected Coinbase Advanced 87.0 bps, friction is 87 / 83.7 = 1.0394R ≈ 1.04R.
+        Under Coinbase India Retail 27.0 bps, friction is 27 / 83.7 = 0.3226R ≈ 0.32R.
+        Under Coinbase US Retail 187.0 bps, friction is 187 / 83.7 = 2.2342R ≈ 2.23R.
+        """
+        r_usd = price * (k_sl * sigma_t0)
+        legacy_91bps_r = (price * (91.04 / 10000.0)) / r_usd
+        advanced_87bps_r = (price * (87.0 / 10000.0)) / r_usd
+        india_27bps_r = (price * (27.0 / 10000.0)) / r_usd
+        us_187bps_r = (price * (187.0 / 10000.0)) / r_usd
+
+        return {
+            "spot_price": price,
+            "sigma_t0": sigma_t0,
+            "risk_1r_usd": round(r_usd, 4),
+            "legacy_91bps_friction_r": round(legacy_91bps_r, 4),
+            "advanced_87bps_friction_r": round(advanced_87bps_r, 4),
+            "india_27bps_friction_r": round(india_27bps_r, 4),
+            "us_187bps_friction_r": round(us_187bps_r, 4),
+            "explanation": (
+                "The 1.0877R in the prospective ledger was produced under the legacy V30 91.04 bps model. "
+                "Under current 87.0 bps Advanced tier it is 1.04R. "
+                "Under India retail (27 bps) it is 0.32R, while under US retail (187 bps) it is 2.23R."
+            )
+        }
 
     def calculate_per_side_cost(
         self,
@@ -198,8 +341,21 @@ class ExecutionCostModel:
         is_taker_exit: bool = True,
         holding_hours: float = 0.0
     ) -> Dict[str, Any]:
-        """Calculates total two-sided round-trip friction in basis points."""
-        key = "BINANCE_FUTURES" if "BINANCE" in exchange.upper() else "COINBASE"
+        """Calculates total two-sided round-trip friction in basis points across all regional tiers."""
+        norm_key = exchange.upper().strip()
+        if norm_key in cls.EXCHANGE_CONFIGS:
+            key = norm_key
+        elif "INDIA" in norm_key or "INTL" in norm_key:
+            key = "COINBASE_INDIA_INTL_27BPS"
+        elif "EU" in norm_key or "UK" in norm_key:
+            key = "COINBASE_EU_UK_RETAIL_107BPS"
+        elif "US" in norm_key:
+            key = "COINBASE_US_RETAIL_187BPS"
+        elif "BINANCE" in norm_key:
+            key = "BINANCE_FUTURES_12BPS" if "12" in norm_key else "BINANCE_FUTURES"
+        else:
+            key = "COINBASE_ADVANCED_87BPS" if "ADVANCED" in norm_key else "COINBASE"
+
         cfg = cls.EXCHANGE_CONFIGS[key]
         entry_fee = cfg["taker_bps_per_side"] if is_taker_entry else cfg["maker_bps_per_side"]
         exit_fee = cfg["taker_bps_per_side"] if is_taker_exit else cfg["maker_bps_per_side"]
@@ -209,9 +365,12 @@ class ExecutionCostModel:
         funding = cfg["funding_rate_bps_per_8h"] * funding_intervals if cfg["market_type"] == "PERPETUAL" else 0.0
 
         total_bps = entry_fee + exit_fee + spread + slippage + funding
+        is_non_spot = cfg.get("governance_status") == "SENSITIVITY_ONLY_NON_SPOT" or cfg["market_type"] != "SPOT"
 
         return {
             "exchange": exchange,
+            "scenario_key": key,
+            "venue_name": cfg["venue_name"],
             "market_type": cfg["market_type"],
             "entry_fee_bps": entry_fee,
             "exit_fee_bps": exit_fee,
@@ -220,13 +379,31 @@ class ExecutionCostModel:
             "slippage_bps": slippage,
             "funding_bps": funding,
             "total_round_trip_bps": round(total_bps, 2),
-            "is_hypothetical_scenario": (key == "BINANCE_FUTURES"),
+            "is_hypothetical_scenario": is_non_spot,
+            "governance_status": "SENSITIVITY_ONLY_NON_SPOT" if is_non_spot else "GOVERNED_SPOT_EXECUTION",
             "provenance_note": (
-                "Hypothetical perpetual cost model applied to spot-path returns"
-                if key == "BINANCE_FUTURES"
+                "Sensitivity-only non-spot scenario (not authorized for live spot execution)"
+                if is_non_spot
                 else "Empirical spot market fee schedule"
             )
         }
+
+    @classmethod
+    def get_round_trip_friction_bps(
+        cls,
+        venue: str = "COINBASE_ADVANCED_87BPS",
+        is_taker_entry: bool = True,
+        is_taker_exit: bool = True,
+        holding_hours: float = 0.0
+    ) -> float:
+        """Returns the canonical round trip friction in basis points from the unified model."""
+        res = cls.calculate_round_trip_cost(
+            exchange=venue,
+            is_taker_entry=is_taker_entry,
+            is_taker_exit=is_taker_exit,
+            holding_hours=holding_hours
+        )
+        return float(res["total_round_trip_bps"])
 
 
 def resolve_barrier_touch(

@@ -94,3 +94,5 @@ experiments/runs/
 .DS_Store
 Thumbs.db
 desktop.ini
+.idea/
+*.lock

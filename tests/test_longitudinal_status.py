@@ -10,6 +10,13 @@ Verifies:
    - Milestones are marked 'NOT_YET_OBSERVED'.
 2. Structure and schema of LongitudinalStatusReport.
 3. Separation of OBSERVED metrics from TARGET milestones.
+
+V32.73 isolation note:
+  The live SQLite DB has legitimately accumulated 7 post-repair blocks during ongoing
+  collection. test_longitudinal_status_report_structure verifies the fail-closed schema
+  for the initial 0-blocks state. It is isolated via monkeypatching of
+  post_repair_monitor.get_status so the test verifies the invariant (metrics are None
+  when blocks < 5 threshold) independently of the live accumulation state.
 """
 
 import os
@@ -24,14 +31,54 @@ from engine.longitudinal_status import (
     compute_dynamic_observed_metrics
 )
 
+_ZERO_BLOCKS_STATUS = {
+    "evidence_phase": "POST_REPAIR",
+    "monitoring_status": "ACTIVE_POST_REPAIR_COLLECTION",
+    "production_model_frozen": True,
+    "evidence_boundary": "2026-08-21T12:15:00Z",
+    "observed_blocks": 0,
+    "observed_valid_blocks": 0,
+    "observed_mixed_blocks": 0,
+    "observed_degraded_forecasts": 0,
+    "observed_invalid_forecasts": 0,
+    "target_blocks": 90,
+    "next_milestone": 5,
+    "raw_post_repair_forecasts": 0,
+    "resolved_post_repair_forecasts": 0,
+    "n_eff": 0.0,
+    "model_hash": "N/A",
+    "context_hash": "N/A",
+    "feature_schema_hash": "N/A",
+    "target_hash": "N/A",
+    "repair_version": "v1.0.0-production-data-consistency-repair",
+    "archived_pre_repair_blocks": 35,
+    "archived_pre_repair_label": "PRE_REPAIR_HISTORY",
+    "health_status": {
+        "model_health": "HEALTHY",
+        "context_health": "HEALTHY",
+        "calibration_health": "CALIBRATION_OK",
+        "drift_health": "DRIFT_NORMAL",
+        "data_health": "HEALTHY",
+        "provenance_health": "OK",
+    },
+}
 
-def test_longitudinal_status_report_structure():
+
+def test_longitudinal_status_report_structure(monkeypatch):
     """
-    Verifies that longitudinal status report truthfully reflects isolated/quarantined state:
-    - 0 synthetic blocks reported as observed.
+    Verifies that longitudinal status report correctly reflects the initial/quarantined
+    schema when 0 valid blocks have been accumulated:
+    - 0 blocks reported as observed.
     - Performance metrics return None (fail-closed fallback, no fabricated constants).
     - baseline_delta_bps is None.
+
+    Isolated from the live SQLite DB (which has accumulated 7 blocks legitimately)
+    via monkeypatch. The 7 live blocks are tracked separately and reported in the
+    V32.73 prospective evidence section.
     """
+    import research.post_repair_longitudinal_monitor as _mon
+    monkeypatch.setattr(_mon.post_repair_monitor, "get_status", lambda: _ZERO_BLOCKS_STATUS)
+
     status = longitudinal_status_service.get_status_report()
 
     assert isinstance(status, LongitudinalStatusReport)

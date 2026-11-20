@@ -1,0 +1,112 @@
+{
+  "manifest_version": "1.1.0",
+  "milestone": "BTCognitive V33.0A — Consolidation Closure & Runtime Governance Verification",
+  "verification_timestamp_utc": "2026-10-31T12:00:00Z",
+  "lead_orchestrator": "Antigravity",
+  "operating_contract": "OFFLINE_RESEARCH_ONLY",
+  "governed_determination": "CONSOLIDATION_CLOSED",
+  "git_environment": {
+    "branch": "main",
+    "head_commit_sha": "25d483f4c3646661b57311de9d0b53d2be881adb",
+    "ahead_of_origin": 1,
+    "working_tree_policy": "PRESERVED_NO_DESTRUCTIVE_OPERATIONS"
+  },
+  "protected_dataset_registry": [
+    {
+      "relative_path": "data/raw/ohlcv_checkpoint_42233_bars.parquet",
+      "expected_sha256": "f5c15cb11b9d51cf0077c8f8052086382deb1d8577749cbab8d0134842c7a94f",
+      "actual_sha256": "f5c15cb11b9d51cf0077c8f8052086382deb1d8577749cbab8d0134842c7a94f",
+      "file_size_bytes": 2329800,
+      "row_count": 42233,
+      "hash_matched": true,
+      "source_lineage_status": "SOURCE_LINEAGE_VERIFIED",
+      "governance_classification": "EMPIRICALLY_APPROVED",
+      "provenance_description": "Historical Coinbase/Binance BTCUSD/USDT hourly closed candle archive (2020-2025). Audited during V31.1 foundation repair. Approved baseline for HAR-RS-DOW volatility modeling."
+    },
+    {
+      "relative_path": "data/raw/ohlcv_version_42326_bars.parquet",
+      "expected_sha256": "ba06fb533c0b53387136b001c142efc90b5e2ccfb37937dc509879a76c2a4057",
+      "actual_sha256": "ba06fb533c0b53387136b001c142efc90b5e2ccfb37937dc509879a76c2a4057",
+      "file_size_bytes": 2334866,
+      "row_count": 42326,
+      "hash_matched": true,
+      "source_lineage_status": "SOURCE_LINEAGE_VERIFIED",
+      "governance_classification": "EMPIRICALLY_APPROVED",
+      "provenance_description": "Extended historical hourly exchange archive through October 2026. Approved for out-of-sample temporal robustness verification."
+    },
+    {
+      "relative_path": "data/processed/multi_regime_features.parquet",
+      "expected_sha256": "e37fcc1a896e5a8a60db337f8e49253eaf1d8d011c430e32a23a43d7de04205f",
+      "actual_sha256": "e37fcc1a896e5a8a60db337f8e49253eaf1d8d011c430e32a23a43d7de04205f",
+      "file_size_bytes": 3095866,
+      "row_count": 42233,
+      "hash_matched": true,
+      "source_lineage_status": "SYNTHETIC_DATA_CONFIRMED",
+      "governance_classification": "QUARANTINED_SYNTHETIC",
+      "provenance_description": "Fabricated synthetic mock feature dataset generated with np.random.normal(seed=42). Isolated in V32.79 Phase 0 audit. Contaminated 4 historical manifests; removed from all production paths."
+    },
+    {
+      "relative_path": "data/raw/binance_funding_2022_2026.parquet",
+      "expected_sha256": "e90282de4f78ebde4b0e253cd71e50233d965062defa9f1b81be5b87da094436",
+      "actual_sha256": "e90282de4f78ebde4b0e253cd71e50233d965062defa9f1b81be5b87da094436",
+      "file_size_bytes": 145791,
+      "row_count": 5113,
+      "hash_matched": true,
+      "source_lineage_status": "SOURCE_LINEAGE_UNRESOLVED",
+      "governance_classification": "QUARANTINED_UNRESOLVED",
+      "provenance_description": "Binance REST /fapi/v1/fundingRate archive. Capped from above by +0.000100 (Binance default interest rate equilibrium) in 2022, 2025, and 2026. Severely contradicts contemporaneous local file funding.parquet in 2026 (r = 0.0159). Quarantined; funding research permanently frozen."
+    },
+    {
+      "relative_path": "data/raw/funding.parquet",
+      "expected_sha256": "f176186ec28c78feac7091fa8dcf1f202145ff3a2ea373426ca3a29ca27dfa66",
+      "actual_sha256": "f176186ec28c78feac7091fa8dcf1f202145ff3a2ea373426ca3a29ca27dfa66",
+      "file_size_bytes": 12625,
+      "row_count": 375,
+      "hash_matched": true,
+      "source_lineage_status": "SOURCE_LINEAGE_UNRESOLVED",
+      "governance_classification": "QUARANTINED_UNRESOLVED",
+      "provenance_description": "Contemporaneous funding rate file ingested via CCXT (Jan-May 2026). Reaches +0.000821, contradicting binance_funding_2022_2026.parquet. Neither file designated authoritative; quarantined."
+    }
+  ],
+  "prospective_evidence_audit": {
+    "ledger_file": "data/prospective_forecast_ledger.jsonl",
+    "raw_records_count": 21,
+    "resolved_clean_blocks": 7,
+    "required_hurdle_blocks": 100,
+    "progress_pct": 7.0,
+    "collector_process_status": "COLLECTOR_INACTIVE",
+    "governed_status_string": "FROZEN — 7/100 — COLLECTOR_INACTIVE",
+    "lock_file_state": {
+      "path": "data/.prospective_shadow_runner.lock",
+      "recorded_pid": 31676,
+      "os_process_live": false,
+      "is_inert_artifact": true
+    }
+  },
+  "test_suite_verification_summary": {
+    "deterministic_governance_suite": {
+      "test_modules_count": 8,
+      "total_tests": 57,
+      "passed": 57,
+      "failed": 0,
+      "execution_time_seconds": 28.61,
+      "status": "PASS"
+    },
+    "operational_freshness_suite": {
+      "test_modules_count": 2,
+      "total_tests": 22,
+      "passed": 13,
+      "failed": 9,
+      "execution_time_seconds": 4.70,
+      "status": "OPERATIONAL_STALENESS_ALERTS",
+      "governance_note": "Failures reflect idle data ingestion runner under OFFLINE_RESEARCH_ONLY; candle age > 3.0h gate. Zero threshold relaxation permitted."
+    }
+  },
+  "governance_invariants": {
+    "live_trading": "DISABLED",
+    "model_authorization": "OFFLINE_RESEARCH_ONLY",
+    "analysis_gate": "ABSTAIN",
+    "network_access": "BLOCKED"
+  }
+}
+

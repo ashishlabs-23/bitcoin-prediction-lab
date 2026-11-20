@@ -1,0 +1,184 @@
+{
+  "dataset": "Coinbase BTC-USD Hourly (data/raw/ohlcv.parquet)",
+  "evaluation_period": "2022-01-08 to 2026-10-23",
+  "total_bars_evaluated": 41133,
+  "geometry": {
+    "horizon_hours": 24,
+    "k_tp": 1.5,
+    "k_sl": 1.0,
+    "reward_risk_ratio": 1.5
+  },
+  "discrimination": {
+    "auc_roc_all_bars": 0.5145,
+    "auc_roc_resolved_only": 0.5194,
+    "auc_95ci_bootstrap": [
+      0.5044,
+      0.524
+    ],
+    "spearman_rank_correlation": 0.0049,
+    "spearman_p_value": 0.31841,
+    "discrimination_verdict": "NO_DISCRIMINATION (AUC ~ 0.50, p > 0.05)"
+  },
+  "calibration_deciles": [
+    {
+      "decile": 1,
+      "count": 4114,
+      "mean_predicted_p": 19.87,
+      "tp_rate_all_pct": 19.32,
+      "tp_rate_resolved_pct": 33.38,
+      "mean_r_gross": 0.009
+    },
+    {
+      "decile": 2,
+      "count": 4113,
+      "mean_predicted_p": 31.98,
+      "tp_rate_all_pct": 18.43,
+      "tp_rate_resolved_pct": 34.47,
+      "mean_r_gross": 0.012
+    },
+    {
+      "decile": 3,
+      "count": 4113,
+      "mean_predicted_p": 37.79,
+      "tp_rate_all_pct": 16.39,
+      "tp_rate_resolved_pct": 33.37,
+      "mean_r_gross": -0.005
+    },
+    {
+      "decile": 4,
+      "count": 4113,
+      "mean_predicted_p": 41.77,
+      "tp_rate_all_pct": 15.41,
+      "tp_rate_resolved_pct": 34.34,
+      "mean_r_gross": 0.017
+    },
+    {
+      "decile": 5,
+      "count": 4114,
+      "mean_predicted_p": 45.02,
+      "tp_rate_all_pct": 15.44,
+      "tp_rate_resolved_pct": 35.04,
+      "mean_r_gross": 0.021
+    },
+    {
+      "decile": 6,
+      "count": 4113,
+      "mean_predicted_p": 48.16,
+      "tp_rate_all_pct": 14.86,
+      "tp_rate_resolved_pct": 34.12,
+      "mean_r_gross": 0.01
+    },
+    {
+      "decile": 7,
+      "count": 4113,
+      "mean_predicted_p": 51.47,
+      "tp_rate_all_pct": 16.73,
+      "tp_rate_resolved_pct": 36.19,
+      "mean_r_gross": 0.025
+    },
+    {
+      "decile": 8,
+      "count": 4113,
+      "mean_predicted_p": 55.44,
+      "tp_rate_all_pct": 17.02,
+      "tp_rate_resolved_pct": 34.95,
+      "mean_r_gross": 0.011
+    },
+    {
+      "decile": 9,
+      "count": 4113,
+      "mean_predicted_p": 61.25,
+      "tp_rate_all_pct": 19.69,
+      "tp_rate_resolved_pct": 37.28,
+      "mean_r_gross": 0.027
+    },
+    {
+      "decile": 10,
+      "count": 4114,
+      "mean_predicted_p": 74.63,
+      "tp_rate_all_pct": 22.22,
+      "tp_rate_resolved_pct": 38.91,
+      "mean_r_gross": 0.026
+    }
+  ],
+  "one_position_gated_execution": {
+    "n_gated_trades": 2440,
+    "average_holding_hours": 16.87,
+    "tp_hits": 454,
+    "tp_win_rate_pct": 18.61,
+    "sl_hits": 871,
+    "sl_loss_rate_pct": 35.7,
+    "timeouts": 1115,
+    "timeout_rate_pct": 45.7,
+    "mean_gross_r_per_trade": 0.0037,
+    "mean_gross_r_95ci": [
+      -0.0335,
+      0.0411
+    ],
+    "net_pnl_by_tier": {
+      "india_retail_27bps": {
+        "mean_net_r": -0.1656,
+        "net_r_95ci": [
+          -0.2035,
+          -0.1272
+        ],
+        "total_net_r": -404.0,
+        "annualized_sharpe": -3.97
+      },
+      "eu_uk_retail_107bps": {
+        "mean_net_r": -0.6672,
+        "net_r_95ci": [
+          -0.7084,
+          -0.6249
+        ],
+        "total_net_r": -1628.07,
+        "annualized_sharpe": -14.55
+      },
+      "us_retail_187bps": {
+        "mean_net_r": -1.1689,
+        "net_r_95ci": [
+          -1.2179,
+          -1.1206
+        ],
+        "total_net_r": -2852.14,
+        "annualized_sharpe": -21.74
+      }
+    }
+  },
+  "empirical_null_10000_resamples": {
+    "null_tp_win_rate_mean_pct": 17.55,
+    "null_tp_win_rate_90ci_pct": [
+      13.28,
+      22.05
+    ],
+    "observed_gated_tp_win_rate_pct": 18.61,
+    "p_value_observed_vs_null": 0.3424,
+    "null_verdict": "FAIL_TO_REJECT_NULL (observed win rate is statistically indistinguishable from random block entries)"
+  },
+  "selective_rule_thresholds": {
+    "ev_gate_0.00R": {
+      "threshold_r": 0.0,
+      "setups_evaluated": 41133,
+      "setups_accepted": 12297,
+      "acceptance_rate_pct": 29.9,
+      "tp_hit_rate_pct": 19.68,
+      "mean_net_r_india": -0.145
+    },
+    "ev_gate_0.05R": {
+      "threshold_r": 0.05,
+      "setups_evaluated": 41133,
+      "setups_accepted": 12297,
+      "acceptance_rate_pct": 29.9,
+      "tp_hit_rate_pct": 19.68,
+      "mean_net_r_india": -0.145
+    },
+    "ev_gate_0.10R": {
+      "threshold_r": 0.1,
+      "setups_evaluated": 41133,
+      "setups_accepted": 12297,
+      "acceptance_rate_pct": 29.9,
+      "tp_hit_rate_pct": 19.68,
+      "mean_net_r_india": -0.145
+    }
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "audit_version": "v32.57",
+  "audit_title": "BTCognitive Online Charting Readiness Audit & Governed 30/60/90-Day Execution Plan",
+  "created_at_utc": "2026-10-29T11:06:00.000000+00:00",
+  "environment": {
+    "python": "3.13.14",
+    "os": "Windows (win32)",
+    "branch": "main",
+    "commit_sha": "untracked/uncommitted changes preserved"
+  },
+  "protected_hashes_before": {
+    "data/raw/ohlcv.parquet": "c007cd613bec3012fa427d047b466d5e250bd4451b5062d311f387e8afd0ce3f",
+    "data/raw/ohlcv_pre_backfill_backup.parquet": "c4949e5b5695ffa172677681b15af2ea6167e73317c3496546f2286a6730b1c8",
+    "data/raw/ohlcv_backfilled.parquet": "1e722f33734a89e74764c02fde0552752cc1ea2eff62ca9046c9d6edf2347d5c",
+    "data/prospective_entry_ledger.jsonl": "91c3aed984002f611a59c78a2eb4c342c0970baebbd2e3d6df7973be7acf1dd7",
+    "data/prospective_shadow_v1.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "data/prospective_entry_ledger_v2.jsonl": "e6e33e3c7beb4c255467e967fc819b85481b0afb1052c3ea7bd248c53f87b604"
+  },
+  "protected_hashes_after": {
+    "data/raw/ohlcv.parquet": "c007cd613bec3012fa427d047b466d5e250bd4451b5062d311f387e8afd0ce3f",
+    "data/raw/ohlcv_pre_backfill_backup.parquet": "c4949e5b5695ffa172677681b15af2ea6167e73317c3496546f2286a6730b1c8",
+    "data/raw/ohlcv_backfilled.parquet": "1e722f33734a89e74764c02fde0552752cc1ea2eff62ca9046c9d6edf2347d5c",
+    "data/prospective_entry_ledger.jsonl": "91c3aed984002f611a59c78a2eb4c342c0970baebbd2e3d6df7973be7acf1dd7",
+    "data/prospective_shadow_v1.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "data/prospective_entry_ledger_v2.jsonl": "e6e33e3c7beb4c255467e967fc819b85481b0afb1052c3ea7bd248c53f87b604"
+  },
+  "protected_hashes_identical": true,
+  "market_data_rights": "BLOCKED",
+  "data_rights_reason": "Coinbase Market Data Terms (updated 7 Aug 2026) prohibit public redistribution, display of derived works, and AI/ML model training/validation without express written consent. No written license exists.",
+  "inherited_test_ids_count": 47,
+  "classification_counts": {
+    "CONFIRMED_CODE_DEFECT": 0,
+    "TEST_OR_CONTRACT_MISMATCH": 7,
+    "DATA_PROVENANCE_BLOCKED": 16,
+    "NOT_REPRODUCED": 23,
+    "ENVIRONMENT_OR_FLAKY": 1,
+    "FIXED_AND_RETESTED": 0
+  },
+  "remediated_p0_items": [
+    {
+      "component": "api/routes_user_positions.py",
+      "defect": "Hard-coded 80000.0 price fallback on quote provider failure",
+      "remediation": "Replaced with explicit status=UNAVAILABLE and price=None",
+      "test_evidence": "tests/test_v32_56_no_fabricated_position_quote.py PASSED (1 passed in 1.63s)"
+    }
+  ],
+  "governed_decisions": {
+    "research_experiment": "INCONCLUSIVE",
+    "prospective_evidence": "COLLECTING",
+    "model_authorization": "OFFLINE_RESEARCH_ONLY",
+    "live_trading": "DISABLED",
+    "public_charting_release": "BLOCKED"
+  },
+  "verdict": "PARTIAL_PASS_BLOCKED",
+  "verdict_reason": "Protected files intact, zero live trading code, P0 quote fabrication fixed, but public release is BLOCKED pending written market data rights and prospective evidence accumulation."
+}
+

@@ -1,0 +1,14 @@
+{
+  "test_timestamp": 1793555512.5974977,
+  "http_status": 200,
+  "roundtrip_duration_ms": 393.31,
+  "is_read_only": true,
+  "attempts_created": 0,
+  "market_intelligence_status": "SUCCESS",
+  "strategy_assessment_status": "EVIDENCE_UNAVAILABLE",
+  "decision_action": "ABSTAIN",
+  "dom_mi_bar_present": true,
+  "dom_sa_badge_text": "STRATEGY ASSESSMENT: EVIDENCE_UNAVAILABLE",
+  "console_errors_count": 0,
+  "verification_pass": true
+}

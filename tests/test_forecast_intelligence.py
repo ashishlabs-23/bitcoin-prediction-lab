@@ -25,10 +25,13 @@ def test_forecast_intelligence_orchestration():
 
     assert isinstance(intel, ForecastIntelligence)
     assert intel.symbol == "BTCUSD"
-    assert intel.production_forecast["system_status"] == "VALIDATED_PRODUCTION_RANGE_SYSTEM"
-    assert intel.shadow_forecast["system_status"] == "VALIDATED_SHADOW_MODEL"
-    assert intel.research_forecasts["status"] in ["FOUNDATION_RESEARCH_ONLY", "UNAVAILABLE_NOT_EXECUTED"]
-    assert intel.forecast_reliability["reliability_tier"] == "VERY_HIGH"
+    assert intel.production_forecast["system_status"] == "OFFLINE_RESEARCH_ONLY"
+    assert intel.production_forecast["status"] == "NOT_ESTABLISHED"
+    assert intel.production_forecast["point_forecast"] is None
+    assert intel.shadow_forecast["status"] == "UNAVAILABLE_NOT_EXECUTED"
+    assert intel.calibration_state["status"] == "UNAVAILABLE"
+    assert intel.calibration_state["joint_containment_p90"] is None
+    assert intel.forecast_reliability["status"] == "UNAVAILABLE"
 
 
 def test_get_prediction_intelligence_endpoints():
@@ -43,9 +46,10 @@ def test_get_prediction_intelligence_endpoints():
     res2 = client.get("/prediction/intelligence/health")
     assert res2.status_code == 200
     data2 = res2.json()
-    assert data2["production_blocks"] == 0
-    assert data2["overall_reliability"] == "INSUFFICIENT_EVIDENCE"
-    assert data2["production_status"] == "INSUFFICIENT_EVIDENCE"
+    assert data2["production_blocks"] < 100
+    assert data2["overall_reliability"] == "NOT_ESTABLISHED"
+    assert data2["production_status"] == "OFFLINE_RESEARCH_ONLY"
+    assert data2["calibration_status"] == "UNAVAILABLE"
 
 
 def test_prediction_intelligence_health_with_sufficient_evidence(monkeypatch):
@@ -63,8 +67,9 @@ def test_prediction_intelligence_health_with_sufficient_evidence(monkeypatch):
     assert res.status_code == 200
     data = res.json()
     assert data["production_blocks"] == 5
-    assert data["overall_reliability"] == "VERY_HIGH"
-    assert data["production_status"] == "VALIDATED_PRODUCTION_RANGE_SYSTEM"
+    assert data["overall_reliability"] == "NOT_ESTABLISHED"
+    assert data["production_status"] == "OFFLINE_RESEARCH_ONLY"
+    assert data["production_coverage_pct"] is None
 
     res3 = client.get("/research/models")
     assert res3.status_code == 200

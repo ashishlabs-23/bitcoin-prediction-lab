@@ -1,0 +1,108 @@
+{
+  "protocol_version": "V32.41_PAPER_TRADING",
+  "evaluated_at_utc": "2026-10-25T21:15:00Z",
+  "engine_decision": "PAPER_ENGINE_READY",
+  "governed_decisions": {
+    "economic_verdict": "NO_GO_NO_VALIDATED_EDGE",
+    "model_authorization": "OFFLINE_RESEARCH_ONLY",
+    "live_trading_state": "DISABLED"
+  },
+  "safety_and_non_execution_audit": {
+    "broker_execution_adapters_present": false,
+    "authenticated_trading_apis": false,
+    "live_order_placement_routes": false,
+    "live_trading_toggle_enabled": false,
+    "quarantined_models": [
+      "Chronos-2"
+    ],
+    "collector_runtime_status": "STOPPED",
+    "protected_files_status": "BIT_IDENTICAL_ALL_PASS"
+  },
+  "virtual_execution_engine": {
+    "base_storage_dir": "data/research/paper_trading",
+    "execution_ledger_path": "data/research/paper_trading/paper_execution_ledger.jsonl",
+    "portfolio_state_path": "data/research/paper_trading/paper_portfolio_state.json",
+    "gbdt_eval_ledger_path": "data/research/paper_trading/paper_gbdt_eval_ledger.jsonl",
+    "latency_delay_ms": 250.0,
+    "order_book_depth_modeling": "TOP_50_LEVELS_VWAP",
+    "max_permitted_slippage_bps": 50.0,
+    "depth_exhaustion_protection": true,
+    "partial_fill_modeling": true,
+    "dual_sleeves": {
+      "gated_sleeve": {
+        "sleeve_id": "TSMOM_DONCHIAN_168H_336H_L2_GATED",
+        "initial_capital_usd": 100000.0,
+        "gating_rules": {
+          "ofi_15m_threshold": "> 0.0",
+          "obi_5_threshold": "> -0.20",
+          "spread_max_bps": 5.0,
+          "staleness_max_sec": 5.0,
+          "warmup_required_history_sec": 900.0,
+          "fail_closed_abstention": "GATE_ABSTAIN_L2_UNAVAILABLE"
+        }
+      },
+      "ungated_sleeve": {
+        "sleeve_id": "TSMOM_DONCHIAN_168H_336H_UNGATED",
+        "initial_capital_usd": 100000.0,
+        "role": "CONTEMPORANEOUS_IDENTICAL_CONTROL_BENCHMARK"
+      }
+    },
+    "cost_scenarios_evaluated": {
+      "ACTIVE_TRADER_27BPS": {
+        "round_trip_bps": 27.0,
+        "entry_commission_bps": 10.0,
+        "exit_commission_bps": 10.0,
+        "half_spread_bps": 3.0,
+        "slippage_bps": 4.0,
+        "is_primary": true
+      },
+      "RETAIL_87BPS": {
+        "round_trip_bps": 87.0,
+        "entry_commission_bps": 40.0,
+        "exit_commission_bps": 40.0,
+        "half_spread_bps": 3.0,
+        "slippage_bps": 4.0,
+        "is_primary": false
+      }
+    }
+  },
+  "gbdt_evaluation_engine": {
+    "horizons_logged": [
+      "1h",
+      "4h",
+      "24h"
+    ],
+    "models_verified": [
+      "directional-gbm-1h-v1",
+      "directional-gbm-4h-v1",
+      "directional-gbm-24h-v1"
+    ],
+    "delayed_maturity_safeguard": true
+  },
+  "verification_suite": {
+    "frontend_tests": {
+      "runner": "node tests_frontend.js",
+      "status": "PASSED"
+    },
+    "backend_tests": {
+      "runner": "pytest",
+      "test_files": [
+        "tests/test_v32_41_paper_trading_engine.py",
+        "tests/test_v32_40b_burnin_and_feature_warmup.py",
+        "tests/test_coinbase_l2_collector_and_gating.py",
+        "tests/test_v32_38_adaptive_market_intelligence.py",
+        "tests/test_v32_39_prospective_l2_qualification.py"
+      ],
+      "total_tests": 47,
+      "passed_tests": 47,
+      "failed_tests": 0
+    }
+  },
+  "protected_files_sha256": {
+    "data/prospective_entry_ledger.jsonl": "91c3aed984002f611a59c78a2eb4c342c0970baebbd2e3d6df7973be7acf1dd7",
+    "data/prospective_shadow_v1.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "data/prospective_entry_ledger_v2.jsonl": "e6e33e3c7beb4c255467e967fc819b85481b0afb1052c3ea7bd248c53f87b604",
+    "data/raw/ohlcv.parquet": "1e722f33734a89e74764c02fde0552752cc1ea2eff62ca9046c9d6edf2347d5c",
+    "data/raw/ohlcv_pre_backfill_backup.parquet": "c4949e5b5695ffa172677681b15af2ea6167e73317c3496546f2286a6730b1c8"
+  }
+}

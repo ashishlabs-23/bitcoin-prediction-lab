@@ -1,0 +1,60 @@
+{
+  "audit_id": "v32.53-coinbase-btc-usd-hourly-append-20261027",
+  "captured_at_utc": "2026-10-27T10:48:20.719548+00:00",
+  "source": {
+    "venue": "Coinbase Exchange",
+    "market_type": "spot",
+    "product_id": "BTC-USD",
+    "endpoint": "https://api.exchange.coinbase.com/products/BTC-USD/candles",
+    "granularity_seconds": 3600,
+    "request_url": "https://api.exchange.coinbase.com/products/BTC-USD/candles?start=2026-10-24T09:00:00Z&end=2026-10-26T16:00:00Z&granularity=3600",
+    "http_status": 200,
+    "content_type": "application/json; charset=utf-8",
+    "api_timestamp_semantics": "Unix epoch seconds, UTC candle-open timestamp",
+    "response_file": "coinbase_btc_usd_candles_20261024T090000Z_20261026T160000Z.json",
+    "response_size_bytes": 3363,
+    "response_sha256": "da7ff9bb7485db7c731f04484800736bb47af7bf1978e5b923549ccb4f64ab5f",
+    "response_candles": 56
+  },
+  "interval": {
+    "start_utc_inclusive": "2026-10-24T09:00:00+00:00",
+    "end_utc_inclusive": "2026-10-26T16:00:00+00:00",
+    "expected_candles": 56
+  },
+  "comparison": {
+    "local_file": "data/raw/ohlcv.parquet",
+    "local_sha256": "c007cd613bec3012fa427d047b466d5e250bd4451b5062d311f387e8afd0ce3f",
+    "local_rows_compared": 56,
+    "api_timestamps_unique": true,
+    "timestamp_sets_equal": true,
+    "source_only_timestamps": 0,
+    "local_only_timestamps": 0,
+    "ohlcv_numeric_mismatches": 0,
+    "mapping": "Coinbase [time, low, high, open, close, volume] mapped by timestamp to local [timestamp, open, high, low, close, volume]",
+    "all_available_time_exactly_timestamp_plus_1h": true,
+    "finite_ohlcv": true,
+    "ohlc_bounds_and_nonnegative_volume_valid": true
+  },
+  "full_primary_timestamp_checks": {
+    "rows": 42233,
+    "monotonic_increasing": true,
+    "duplicate_timestamps": 0,
+    "non_hourly_steps": 0,
+    "start_utc": "2022-01-01T00:00:00+00:00",
+    "end_utc": "2026-10-26T16:00:00+00:00"
+  },
+  "sha256_files_unchanged_during_validation": {
+    "data/prospective_entry_ledger.jsonl": "91c3aed984002f611a59c78a2eb4c342c0970baebbd2e3d6df7973be7acf1dd7",
+    "data/prospective_shadow_v1.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "data/prospective_entry_ledger_v2.jsonl": "e6e33e3c7beb4c255467e967fc819b85481b0afb1052c3ea7bd248c53f87b604",
+    "data/raw/ohlcv.parquet": "c007cd613bec3012fa427d047b466d5e250bd4451b5062d311f387e8afd0ce3f",
+    "data/raw/ohlcv_pre_backfill_backup.parquet": "c4949e5b5695ffa172677681b15af2ea6167e73317c3496546f2286a6730b1c8",
+    "data/raw/ohlcv_backfilled.parquet": "1e722f33734a89e74764c02fde0552752cc1ea2eff62ca9046c9d6edf2347d5c"
+  },
+  "all_reference_hashes_match_v32_52_preflight": true,
+  "limitations": [
+    "This validates the values in the 56 appended candles against Coinbase at capture time; it does not identify who/when wrote the local parquet.",
+    "Coinbase REST data may be revised or become unavailable later; the raw response body is archived with its SHA-256.",
+    "No claim is made about trading performance or validated directional edge."
+  ]
+}

@@ -551,7 +551,7 @@ class DecisionEnvelopeLedger:
                 "net_executable_ev_bps": ex.get("net_ev_bps") if has_event else None
             },
             "layer4_risk_authorization": {
-                "c2_model_health": rk.get("c2_model_health", "CALIBRATED"),
+                "c2_model_health": "UNAVAILABLE",
                 "trade_risk_check": ("AUTHORIZED" if rk.get("authorized", False) else "BLOCKED") if has_event else "NOT_APPLICABLE",
                 "risk_block_reason": (rk.get("risk_block_reason", "NONE" if rk.get("authorized", False) else "C2_RISK_EXCEEDED")) if has_event else "NO_OPPORTUNITY",
                 "daily_risk_budget_allocated_pct": rk.get("daily_budget_allocated_pct"),
@@ -646,7 +646,7 @@ def format_decision_anatomy_payload(
             "net_executable_ev_bps": net_executable_ev_bps if has_event else None
         },
         "layer4_risk_authorization": {
-            "c2_model_health": "CALIBRATED",
+            "c2_model_health": "UNAVAILABLE",
             "trade_risk_check": "NOT_APPLICABLE" if not has_event else "BLOCKED",
             "risk_block_reason": reason if not has_event else "NO_OPPORTUNITY",
             "daily_risk_budget_allocated_pct": daily_risk_budget_allocated_pct,

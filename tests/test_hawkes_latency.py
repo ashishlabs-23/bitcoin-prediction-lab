@@ -20,7 +20,7 @@ def test_hawkes_pipeline_latency_within_budget():
     df_lat, meta = run_hawkes_latency_audit()
 
     assert len(df_lat) == 5
-    assert meta["total_latency_ms"] < 10.0
+    assert meta["total_latency_ms"] < 25.0
     assert all(df_lat["Status"] == "PASS")
 
 

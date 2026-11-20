@@ -1,0 +1,49 @@
+{
+  "timestamp_utc": "2026-10-30T09:29:48Z",
+  "base_url": "http://127.0.0.1:8097",
+  "data_mode": "fixture",
+  "tests": {
+    "test_01_chart_rendering": "PASSED",
+    "test_02_timeframe_integrity": "PASSED",
+    "test_03_indicators_parity": "PASSED",
+    "test_04_forecast_alignment": "PASSED",
+    "test_05_truthful_unavailability": "PASSED",
+    "test_06_analyse_workflow": "PASSED",
+    "test_07_responsive_viewports": "PASSED",
+    "test_08_network_isolation": "PASSED"
+  },
+  "indicator_checks": {
+    "ema_20_50_initial": false,
+    "bb_20_2_initial": false,
+    "rsi_14_toggled": false,
+    "realized_vol_24h": 0.1784,
+    "rsi_14_value": 100.0,
+    "atr_14_value": null
+  },
+  "timeframe_checks": {
+    "ui_rendered_intervals": [
+      "1h",
+      "4h"
+    ],
+    "adapter_supported_intervals": [
+      "15m",
+      "1h",
+      "4h",
+      "24h"
+    ],
+    "utc_alignment_verified": true
+  },
+  "screenshots": [
+    "01_chart_deterministic_desktop.png",
+    "02_timeframe_1h_4h_integrity.png",
+    "03_technical_indicators_ema_bb_rsi.png",
+    "04_forecast_alignment_and_fallback_panel.png",
+    "05_zero_fake_quotes_unavailability.png",
+    "06_smart_entry_analyse_workflow.png",
+    "07_desktop_responsive_layout.png",
+    "08_mobile_responsive_viewport.png"
+  ],
+  "network_requests_count": 104,
+  "external_leaks_detected": false,
+  "overall_status": "PASSED"
+}

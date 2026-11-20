@@ -1,0 +1,35 @@
+"""
+engine/reason_codes.py — Canonical Reason Code Registry
+=========================================================
+Single traceable enumeration of standard status and reason codes
+governing data availability, conformal calibration, and research gating.
+"""
+from enum import Enum
+
+
+class ReasonCode(str, Enum):
+    # Data & Feed Availability
+    MARKET_DATA_UNAVAILABLE = "MARKET_DATA_UNAVAILABLE"
+    MARKET_DATA_STALE = "MARKET_DATA_STALE"
+    STALE_MARKET_DATA_BLOCKED = "STALE_MARKET_DATA_BLOCKED"
+    BITSTAMP_RETRIEVAL_FAILED = "BITSTAMP_RETRIEVAL_FAILED"
+    DATA_UNAVAILABLE = "DATA_UNAVAILABLE"
+    DATA_LANE_SEPARATION_VIOLATION = "DATA_LANE_SEPARATION_VIOLATION"
+
+    # Calibration & Conformal Risk
+    C2_CALIBRATION_UNAVAILABLE = "C2_CALIBRATION_UNAVAILABLE"
+    CALIBRATION_SOURCE_MISMATCH = "CALIBRATION_SOURCE_MISMATCH"
+    UNVERIFIED_SOURCE_CALIBRATION = "UNVERIFIED_SOURCE_CALIBRATION"  # Backward-compatible alias
+
+    # Strategy & Setup
+    NO_SETUP = "NO_SETUP"
+    ABSTAIN = "ABSTAIN"
+    SUPPRESSED = "SUPPRESSED"
+    EVIDENCE_UNAVAILABLE = "BACKTEST_EVIDENCE_UNAVAILABLE"
+    NO_ELIGIBLE_CANDIDATES = "NOT_RUN_NO_ELIGIBLE_CANDIDATES"
+
+    # Governance & Execution
+    LIVE_TRADING_DISABLED = "LIVE_TRADING_DISABLED"
+    OFFLINE_RESEARCH_ONLY = "OFFLINE_RESEARCH_ONLY"
+    PROSPECTIVE_EVIDENCE_INSUFFICIENT = "PROSPECTIVE_EVIDENCE_INSUFFICIENT"
+

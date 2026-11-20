@@ -1,0 +1,100 @@
+{
+  "experiment_id": "V32.38_ADAPTIVE_MARKET_INTELLIGENCE",
+  "evaluated_at_utc": "2026-10-25T12:25:00.000000+00:00",
+  "epistemic_posture": "RESEARCH_FOUNDATION_NON_ACTIVATION",
+  "governance_authorization": "OFFLINE_RESEARCH_ONLY",
+  "live_trading_status": "DISABLED",
+  "economic_verdict": "NO_GO_NO_VALIDATED_EDGE",
+  "master_decision": "RESEARCH_EVALUATION_READY",
+  "decision_rationale": "The Level-2 causal feature layer, immutable event replay engine, drift-aware prequential evaluation interface, and model extensibility adapters are fully verified and operational. The collector remains safely stopped by default.",
+  "l2_data_integrity_audit": {
+    "snapshot_synchronization": "VERIFIED_DETERMINISTIC",
+    "sequence_gap_detection": "FAIL_CLOSED_IMMEDIATE_DESYNC",
+    "duplicate_event_handling": "DROPPED_WITH_METRIC_ACCOUNTING",
+    "out_of_order_event_handling": "DROPPED_WITH_METRIC_ACCOUNTING",
+    "heartbeat_stall_threshold_sec": 5.0,
+    "heartbeat_stall_behavior": "FAIL_CLOSED_FEATURE_UNAVAILABLE",
+    "reconnect_recovery_procedure": "CLEAN_SNAPSHOT_RESET_REQUIRED",
+    "raw_event_immutability": "VERIFIED_SHA256_CHECKSUMMED",
+    "replay_determinism": "100_PERCENT_BIT_IDENTICAL",
+    "zero_synthetic_l2_assertion": true
+  },
+  "causal_feature_layer": {
+    "schema_version": "v32.38.causal_l2",
+    "features_implemented": [
+      "multi_window_ofi (1m, 5m, 15m Cont-Kukanov-Stoikov)",
+      "multi_depth_obi (depths 5, 10, 25, 50)",
+      "tier_cumulative_volumes (bid_depth_5, ask_depth_5, bid_depth_25, ask_depth_25)",
+      "depth_within_basis_points (bid_depth_10bps, ask_depth_10bps)",
+      "top_of_book_spread_bps",
+      "multi_window_cvd (1m, 5m, 15m aggressor delta)",
+      "hf_realized_vol_15m (high-frequency mid-quote return variance)",
+      "kyles_lambda_proxy (price impact per unit OFI)",
+      "amihud_illiquidity_proxy"
+    ],
+    "causality_boundary": "STRICTLY_LEQ_DECISION_EPOCH",
+    "input_event_range_tracking": {
+      "first_event_epoch_recorded": true,
+      "last_event_epoch_recorded": true,
+      "consumed_events_counted": true
+    }
+  },
+  "drift_aware_research_evaluation": {
+    "prequential_protocol": "TWO_PHASE_ISSUE_THEN_RESOLVE",
+    "lookahead_leakage_guard": "REJECTS_PREMATURE_OUTCOME_RESOLUTION",
+    "statistical_drift_detectors": [
+      "Page-Hinkley cumulative sum loss drift test",
+      "Two-sided CUSUM mean residual error shift test"
+    ],
+    "data_quality_vs_drift_separation": "SEPARATE_STATE_ASSIGNMENT",
+    "governed_states": [
+      "NORMAL",
+      "DRIFT_SUSPECTED",
+      "DATA_INVALID",
+      "ABSTAIN",
+      "RESEARCH_CANDIDATE"
+    ],
+    "non_destructive_guardrails": {
+      "model_weight_mutation": "PROHIBITED_ZERO",
+      "automatic_retraining": "PROHIBITED_ZERO",
+      "trading_rule_modification": "PROHIBITED_ZERO",
+      "positive_edge_alerts": "MUTED_ZERO",
+      "order_execution": "DISABLED_ZERO"
+    }
+  },
+  "model_extensibility_layer": {
+    "interface_class": "ForecastModelInterface",
+    "adapters_implemented": [
+      "GBDTDirectionalModelAdapter (directional-gbm-1h, 4h, 24h)",
+      "RandomWalkPersistenceAdapter (martingale benchmark E[r]=0)",
+      "RollingEmpiricalQuantileAdapter (168h rolling return quantiles)"
+    ],
+    "frontend_impact": "ZERO_MODIFICATION_REQUIRED",
+    "protected_dataset_impact": "ZERO_MODIFICATION_REQUIRED"
+  },
+  "prospective_l2_qualification": {
+    "collector_operational_status": "STOPPED_DISABLED",
+    "collector_permission_respected": true,
+    "preregistered_hypothesis_id": "H1_L2_CONT_MICROSTRUCTURE_GATE",
+    "target_strategy": "TSMOM_DONCHIAN_168H_336H",
+    "cost_scenario": "ACTIVE_TRADER_27BPS",
+    "operational_block_hurdle": 100,
+    "current_prospective_blocks_accumulated": 0,
+    "hurdle_achieved": false,
+    "historical_l2_fabrication": "PROHIBITED_ZERO"
+  },
+  "protected_files_audit": {
+    "data/prospective_entry_ledger.jsonl": "MATCH",
+    "data/prospective_shadow_v1.jsonl": "MATCH",
+    "data/prospective_entry_ledger_v2.jsonl": "MATCH",
+    "data/raw/ohlcv.parquet": "MATCH",
+    "data/raw/ohlcv_pre_backfill_backup.parquet": "MATCH"
+  },
+  "verification_suite": {
+    "test_file": "tests/test_v32_38_adaptive_market_intelligence.py",
+    "total_tests": 10,
+    "passed_tests": 10,
+    "failed_tests": 0,
+    "combined_regression_passed": 31
+  }
+}

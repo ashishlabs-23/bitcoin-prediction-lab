@@ -96,20 +96,25 @@ def maximum_drawdown(equity_curve: List[float]) -> float:
     return round(mdd, 6)
 
 
-def calmar_ratio(returns: List[float], equity_curve: List[float]) -> Optional[float]:
+def calmar_ratio(
+    returns: List[float],
+    equity_curve: List[float],
+    periods_per_year: int = TRADING_DAYS_PER_YEAR
+) -> Optional[float]:
     """
     Computes the Calmar Ratio: annualized return / max drawdown.
 
     Args:
-        returns:      List of per-period returns.
-        equity_curve: List of portfolio values.
+        returns:          List of per-period returns.
+        equity_curve:     List of portfolio values.
+        periods_per_year: Number of periods per year (365 for daily crypto, 8760 for hourly).
 
     Returns:
         Calmar Ratio, or None if MDD = 0.
     """
     if not returns or not equity_curve:
         return None
-    ann_ret = statistics.mean(returns) * TRADING_DAYS_PER_YEAR
+    ann_ret = statistics.mean(returns) * periods_per_year
     mdd     = maximum_drawdown(equity_curve)
     if mdd == 0:
         return None
