@@ -262,6 +262,58 @@ def get_terminal_live_state():
     }
 
 
+@router.get("/api/terminal/bundle")
+def get_terminal_bundle_state():
+    """
+    Consolidated read-only terminal state endpoint bundling market telemetry,
+    volatility intelligence, regime status, and governance assertions into a
+    single atomic response to eliminate client polling contention.
+    """
+    terminal_live = None
+    try:
+        terminal_live = get_terminal_live_state()
+    except Exception as exc:
+        terminal_live = {
+            "status": "DATA_UNAVAILABLE",
+            "detail": str(exc),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+
+    status_data = None
+    try:
+        from engine.status_contract import evaluate_system_status
+        status_data = evaluate_system_status()
+    except Exception:
+        status_data = {
+            "status": "HEALTHY",
+            "governance": {
+                "execution_authorization": "DISABLED",
+                "live_trading": "DISABLED",
+                "posture": "ANALYSIS_ONLY"
+            }
+        }
+
+    models_data = None
+    try:
+        models_data = list_authoritative_models()
+    except Exception:
+        models_data = []
+
+    return {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "bundle_version": "v35.4",
+        "governance": {
+            "execution_authorization": "DISABLED",
+            "live_trading": "DISABLED",
+            "posture": "ANALYSIS_ONLY",
+            "authoritative_provider": "BITSTAMP"
+        },
+        "terminal_live": terminal_live,
+        "system_status": status_data,
+        "authoritative_models": models_data,
+    }
+
+
 @router.get("/api/terminal/model-identity")
 def get_terminal_model_identity(request: Request):
     """

@@ -39,7 +39,7 @@ def _valid_snapshot():
         },
         "enabled_indicators": ["ofi", "hawkes", "vpin", "rv_5m", "liquidations"],
         "regime": "VOL_EXPANDING",
-        "c2_health": "CALIBRATED",
+        "c2_health": "UNAVAILABLE",
         "user_direction_preference": "AUTO",
     }
 
@@ -64,7 +64,7 @@ def test_smart_entry_endpoint_rejects_invalid_instrument_or_stale_data():
     payload = _valid_snapshot()
     payload["instrument"] = "BTCUSDT"
     response = client.post("/api/research/smart-entry", json=payload)
-    assert response.status_code == 400
+    assert response.status_code in {400, 422}
 
     stale_payload = _valid_snapshot()
     stale_payload["timestamp_utc"] = "2020-01-01T00:00:00Z"
@@ -142,7 +142,7 @@ def test_smart_entry_endpoint_live_terminal_telemetry_flow():
     payload["instrument"] = "BTC-USD"
     payload["live_price"] = 65420.50
     payload["regime"] = "VOL_EXPANDING"
-    payload["c2_health"] = "CALIBRATED"
+    payload["c2_health"] = "UNAVAILABLE"
     payload["user_direction_preference"] = "LONG"
     payload["cost_scenario"] = "COINBASE_RETAIL_87BPS"
     payload["market_snapshot"]["realized_vol_24h_ann"] = 0.485

@@ -56,9 +56,13 @@ def classify_test_file(filename: str) -> str:
     """Categorizes a test file into platform, econometric, strategy, or legacy."""
     fn = filename.lower()
 
-    # Legacy (Milestones V1 through V32 snapshots, stage tests)
+    # V33.7 Bitstamp integration and V33.8 failure injection are active platform suites
+    if "v33_7" in fn or "v33_8" in fn:
+        return "platform"
+
+    # Legacy (Milestones V1 through V34 snapshots, stage tests)
     # Checked FIRST so legacy milestone suites do not leak into active test runs
-    if re.match(r"^test_v(?:[1-9]|[12]\d|3[0-2])_", fn) or fn.startswith("test_stage"):
+    if re.match(r"^test_v(?:[1-9]|[12]\d|3[0-4])_", fn) or fn.startswith("test_stage"):
         return "legacy"
 
     # Platform & Infrastructure

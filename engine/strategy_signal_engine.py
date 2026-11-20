@@ -57,13 +57,25 @@ class StrategyCandidate:
         return asdict(self)
 
 
-def compute_parkinson_volatility(highs: np.ndarray, lows: np.ndarray) -> float:
-    """Computes Parkinson (High-Low) realized volatility."""
+def compute_parkinson_volatility(
+    highs: np.ndarray,
+    lows: np.ndarray,
+    annualize: bool = False,
+    periods_per_year: float = 8760.0
+) -> float:
+    """Computes Parkinson (High-Low) realized volatility.
+
+    By default returns per-candle volatility (e.g. hourly standard deviation).
+    When annualize=True, scales by sqrt(periods_per_year) (8760 for 24/7 crypto hourly).
+    """
     if len(highs) == 0 or len(lows) == 0:
         return 0.015
     hl_ratio = np.log(highs / np.maximum(lows, 1e-8))
     parkinson_var = float(np.mean(hl_ratio ** 2) / (4.0 * math.log(2.0)))
-    return math.sqrt(max(1e-8, parkinson_var))
+    per_candle_vol = math.sqrt(max(1e-8, parkinson_var))
+    if annualize:
+        return float(per_candle_vol * math.sqrt(periods_per_year))
+    return float(per_candle_vol)
 
 
 def compute_rsi(closes: np.ndarray, period: int = 14) -> float:

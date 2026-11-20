@@ -270,7 +270,7 @@ class CandleStateManager:
         # Construct tick update message payload for /ws/price
         tick_event = {
             "type": "tick",
-            "symbol": "BTCUSDT",
+            "symbol": "BTC-USD",
             "price": price,
             "high": self.current_candle["high"],
             "low": self.current_candle["low"],

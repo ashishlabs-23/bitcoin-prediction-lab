@@ -202,5 +202,17 @@ def test_compute_full_metrics(positive_returns, equity_curve, pnl_list):
     assert 0.0 <= m["win_rate"] <= 1.0
 
 
+def test_sharpe_freq_annualization():
+    """Verify that hourly freq scales by sqrt(8760) and daily by sqrt(365)."""
+    returns = [0.001, -0.0005, 0.002, 0.0008, -0.0003]
+    sr_hourly = sharpe_ratio(returns, freq="1h")
+    sr_daily = sharpe_ratio(returns, freq="1d")
+    assert sr_hourly is not None and sr_daily is not None
+    # Ratio should be sqrt(8760 / 365) = sqrt(24) ≈ 4.899
+    expected_ratio = math.sqrt(8760 / 365)
+    observed_ratio = sr_hourly / sr_daily
+    assert abs(observed_ratio - expected_ratio) < 0.05, f"Expected ratio ~{expected_ratio:.2f}, got {observed_ratio:.2f}"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

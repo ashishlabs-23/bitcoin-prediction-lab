@@ -41,6 +41,13 @@ from models.authoritative_model_registry import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _set_offline_research_mode(monkeypatch):
+    """Enables testing full canonical startup gate contracts in offline_research mode."""
+    monkeypatch.setenv("BTC_DATA_MODE", "offline_research")
+    monkeypatch.setenv("DATA_MODE", "offline_research")
+
+
 def test_runtime_readiness_checks_pass_without_granting_production_authorization():
     """Integrity checks do not override the offline-only governance policy."""
     res = evaluate_runtime_readiness(force_refresh=True)

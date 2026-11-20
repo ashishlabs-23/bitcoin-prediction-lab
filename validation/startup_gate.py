@@ -32,7 +32,9 @@ from config import RESULTS_DIR
 
 logger = logging.getLogger("btcognitive.startup_gate")
 
-FREEZE_DIR = os.path.join(RESULTS_DIR, "freeze")
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CANONICAL_FREEZE_DIR = os.path.join(REPO_ROOT, "experiments", "results", "freeze")
+FREEZE_DIR = CANONICAL_FREEZE_DIR if os.path.exists(CANONICAL_FREEZE_DIR) else os.path.join(RESULTS_DIR, "freeze")
 REPAIRED_MANIFEST_PATH = os.path.join(FREEZE_DIR, "repaired_scientific_contract_manifest.json")
 MODEL_ARTIFACT_PATH = os.path.join(FREEZE_DIR, "har_rs_dow_v1.joblib")
 FULL_FREEZE_VERIFIER_PATH = os.path.join(

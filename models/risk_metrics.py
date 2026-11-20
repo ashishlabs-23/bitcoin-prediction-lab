@@ -22,13 +22,24 @@ from typing import List, Optional
 
 # Trading days per year (crypto = 365)
 TRADING_DAYS_PER_YEAR = 365
+HOURLY_PERIODS_PER_YEAR = 8760
+
+
+def _resolve_periods_per_year(periods_per_year: Optional[int], freq: Optional[str]) -> int:
+    if freq is not None:
+        freq_lower = freq.lower().strip()
+        if freq_lower in ("1h", "hourly", "hour"):
+            return HOURLY_PERIODS_PER_YEAR
+        elif freq_lower in ("1d", "daily", "day"):
+            return TRADING_DAYS_PER_YEAR
+    return periods_per_year if periods_per_year is not None else TRADING_DAYS_PER_YEAR
 
 
 # ---------------------------------------------------------------------------
 # Core Risk Metrics
 # ---------------------------------------------------------------------------
 
-def sharpe_ratio(returns: List[float], risk_free_rate: float = 0.0, periods_per_year: int = TRADING_DAYS_PER_YEAR) -> Optional[float]:
+def sharpe_ratio(returns: List[float], risk_free_rate: float = 0.0, periods_per_year: int = TRADING_DAYS_PER_YEAR, freq: Optional[str] = None) -> Optional[float]:
     """
     Computes the annualized Sharpe Ratio.
 
@@ -36,21 +47,23 @@ def sharpe_ratio(returns: List[float], risk_free_rate: float = 0.0, periods_per_
         returns:          List of per-period returns (e.g., daily or hourly).
         risk_free_rate:   Annualized risk-free rate (default: 0.0).
         periods_per_year: Number of periods per year (365 for daily crypto, 8760 for hourly).
+        freq:             Optional frequency indicator ('1h', 'hourly', '1d', 'daily'). When provided, overrides periods_per_year.
 
     Returns:
         Annualized Sharpe Ratio, or None if insufficient data.
     """
     if len(returns) < 2:
         return None
-    excess = [r - risk_free_rate / periods_per_year for r in returns]
+    actual_periods = _resolve_periods_per_year(periods_per_year, freq)
+    excess = [r - risk_free_rate / actual_periods for r in returns]
     mean_e = statistics.mean(excess)
     std_e  = statistics.stdev(excess)
     if std_e == 0:
         return None
-    return round(mean_e / std_e * math.sqrt(periods_per_year), 4)
+    return round(mean_e / std_e * math.sqrt(actual_periods), 4)
 
 
-def sortino_ratio(returns: List[float], risk_free_rate: float = 0.0, target_return: float = 0.0, periods_per_year: int = TRADING_DAYS_PER_YEAR) -> Optional[float]:
+def sortino_ratio(returns: List[float], risk_free_rate: float = 0.0, target_return: float = 0.0, periods_per_year: int = TRADING_DAYS_PER_YEAR, freq: Optional[str] = None) -> Optional[float]:
     """
     Computes the annualized Sortino Ratio (downside deviation only).
 
@@ -59,19 +72,21 @@ def sortino_ratio(returns: List[float], risk_free_rate: float = 0.0, target_retu
         risk_free_rate:   Annualized risk-free rate.
         target_return:    Minimum acceptable return per period.
         periods_per_year: Number of periods per year (365 for daily crypto, 8760 for hourly).
+        freq:             Optional frequency indicator ('1h', 'hourly', '1d', 'daily'). When provided, overrides periods_per_year.
 
     Returns:
         Annualized Sortino Ratio, or None if insufficient data.
     """
     if len(returns) < 2:
         return None
+    actual_periods = _resolve_periods_per_year(periods_per_year, freq)
     mean_r    = statistics.mean(returns)
-    excess    = mean_r - risk_free_rate / periods_per_year
+    excess    = mean_r - risk_free_rate / actual_periods
     downside  = [min(0.0, r - target_return) ** 2 for r in returns]
     down_std  = math.sqrt(sum(downside) / len(downside))
     if down_std == 0:
         return None
-    return round(excess / down_std * math.sqrt(periods_per_year), 4)
+    return round(excess / down_std * math.sqrt(actual_periods), 4)
 
 
 def maximum_drawdown(equity_curve: List[float]) -> float:
@@ -99,7 +114,8 @@ def maximum_drawdown(equity_curve: List[float]) -> float:
 def calmar_ratio(
     returns: List[float],
     equity_curve: List[float],
-    periods_per_year: int = TRADING_DAYS_PER_YEAR
+    periods_per_year: int = TRADING_DAYS_PER_YEAR,
+    freq: Optional[str] = None
 ) -> Optional[float]:
     """
     Computes the Calmar Ratio: annualized return / max drawdown.
@@ -108,13 +124,15 @@ def calmar_ratio(
         returns:          List of per-period returns.
         equity_curve:     List of portfolio values.
         periods_per_year: Number of periods per year (365 for daily crypto, 8760 for hourly).
+        freq:             Optional frequency indicator ('1h', 'hourly', '1d', 'daily'). When provided, overrides periods_per_year.
 
     Returns:
         Calmar Ratio, or None if MDD = 0.
     """
     if not returns or not equity_curve:
         return None
-    ann_ret = statistics.mean(returns) * periods_per_year
+    actual_periods = _resolve_periods_per_year(periods_per_year, freq)
+    ann_ret = statistics.mean(returns) * actual_periods
     mdd     = maximum_drawdown(equity_curve)
     if mdd == 0:
         return None

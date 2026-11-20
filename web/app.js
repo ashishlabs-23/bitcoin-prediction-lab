@@ -19912,6 +19912,58 @@ function App() {
   );
 }
 
+// Application Root Error Boundary — Prevents blank unmounts
+class AppErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("[BTCognitive] Root UI Exception Caught:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return h("div", {
+        style: {
+          padding: "40px",
+          margin: "40px auto",
+          maxWidth: "800px",
+          background: "rgba(220, 38, 38, 0.15)",
+          border: "1px solid rgba(239, 68, 68, 0.4)",
+          borderRadius: "8px",
+          color: "#f87171",
+          fontFamily: "monospace"
+        }
+      },
+        h("h2", { style: { marginBottom: "12px", color: "#ef4444" } }, "BTCognitive Terminal Render Exception"),
+        h("p", { style: { fontSize: "14px", color: "#fca5a5" } },
+          "An unhandled presentation error occurred. Epistemic boundary and non-execution safety remain intact."
+        ),
+        h("pre", { style: { padding: "12px", background: "rgba(0,0,0,0.5)", borderRadius: "4px", overflow: "auto" } },
+          String(this.state.error?.stack || this.state.error?.message || this.state.error)
+        ),
+        h("button", {
+          onClick: () => window.location.reload(),
+          style: {
+            marginTop: "16px",
+            padding: "8px 16px",
+            background: "#ef4444",
+            color: "#ffffff",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+            fontWeight: "bold"
+          }
+        }, "Reload Terminal")
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // Mount
 function mountApp() {
   const el = document.getElementById("root");
@@ -19919,7 +19971,7 @@ function mountApp() {
     if (!window._btcognitiveRoot) {
       window._btcognitiveRoot = ReactDOM.createRoot(el);
     }
-    window._btcognitiveRoot.render(h(App));
+    window._btcognitiveRoot.render(h(AppErrorBoundary, null, h(App)));
   }
 }
 

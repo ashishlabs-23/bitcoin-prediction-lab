@@ -224,7 +224,7 @@ async def lifespan(app: FastAPI):
 
     # Bitstamp trade ingestion is observational only; the feed's ingestion path
     # does not invoke inference or emit exchange-mixed ticks.
-    trade_feed = None if fixture_mode else getattr(app.state, "bitstamp_trade_feed", None)
+    trade_feed = getattr(app.state, "bitstamp_trade_feed", None)
     from engine.data_mode import is_external_network_permitted
     from engine.market_data_feed import BitstampTradeFeed
     if trade_feed is None and not fixture_mode:

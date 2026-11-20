@@ -20,6 +20,7 @@ import socket
 import tempfile
 import hashlib
 import pathlib
+import builtins
 import pytest
 import pandas as pd
 from typing import Generator
@@ -63,12 +64,28 @@ _original_sqlite3_connect = sqlite3.connect
 _original_socket_connect = socket.socket.connect
 _original_socket_connect_ex = socket.socket.connect_ex
 _original_to_parquet = pd.DataFrame.to_parquet
+_original_open = builtins.open
 
 _ALLOWED_HOSTS = {"127.0.0.1", "localhost", "::1", "0.0.0.0", "::"}
 _PROTECTED_FS_EVENTS = {
     "os.mkdir", "os.remove", "os.rmdir", "os.rename", "os.replace",
     "os.chmod", "os.chown", "os.truncate", "os.link", "os.symlink",
 }
+
+
+def _safe_open(file, *args, **kwargs):
+    mode = args[0] if args else kwargs.get("mode", "r")
+    is_write = (
+        isinstance(mode, str) and any(flag in mode for flag in "wax+")
+    )
+    if is_write and isinstance(file, (str, os.PathLike)):
+        p = os.fspath(file)
+        if _is_protected_path(p):
+            rel = os.path.relpath(os.path.abspath(p), PROJECT_ROOT)
+            redirected = os.path.join(_SESSION_TEMP_DIR, rel)
+            os.makedirs(os.path.dirname(redirected), exist_ok=True)
+            return _original_open(redirected, *args, **kwargs)
+    return _original_open(file, *args, **kwargs)
 
 
 def _safe_to_parquet(self, path, *args, **kwargs):
@@ -214,6 +231,7 @@ def pytest_configure(config):
     socket.socket.connect = _offline_guarded_connect
     socket.socket.connect_ex = _offline_guarded_connect_ex
     pd.DataFrame.to_parquet = _safe_to_parquet
+    builtins.open = _safe_open
 
 
 def pytest_sessionfinish(session, exitstatus):
@@ -246,6 +264,7 @@ def pytest_unconfigure(config):
     socket.socket.connect = _original_socket_connect
     socket.socket.connect_ex = _original_socket_connect_ex
     pd.DataFrame.to_parquet = _original_to_parquet
+    builtins.open = _original_open
     if _ORIGINAL_SQLITE_DB_PATH is None:
         os.environ.pop("SQLITE_DB_PATH", None)
     else:

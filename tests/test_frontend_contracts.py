@@ -181,12 +181,13 @@ def test_active_frontend_is_the_research_terminal_and_discloses_forecast_gate():
     assert '/styles.css?v=' in html
     assert '/app.js?v=' in html
     assert "BTCognitive Research Terminal" in app_js
-    assert "function useCoinbaseFeed" in app_js
+    assert "function useMarketCandleFeed" in app_js
     assert "function useBinanceFeed" not in app_js
-    assert '"1m": 60, "5m": 300, "15m": 900, "1h": 3600, "4h": 3600, "1d": 86400' in app_js
+    assert '"1m": 60, "5m": 300, "15m": 900' in app_js
+    assert '"1h": 3600, "4h": 14400, "1d": 86400' in app_js
     assert "function candleBucketStart" in app_js
     assert "function formatCandleCountdown" in app_js
-    assert "setExchangeClock({ timestampMs: time * 1000" in app_js
+    assert "timestampMs: receiveMs" in app_js
     assert "const clockNow = exchangeClock" in app_js
     assert "wsStatus: coinbaseWsStatus" in app_js
     assert "Forecast unavailable · frozen inputs unverified" in app_js
@@ -195,7 +196,7 @@ def test_active_frontend_is_the_research_terminal_and_discloses_forecast_gate():
     assert "Coverage: ${liveCov}%" not in app_js
     assert "updateExcursionEnvelope" not in app_js
     assert "RESEARCH RESULTS UNAVAILABLE" in app_js
-    assert "BTC / USD · Coinbase Exchange" in app_js
+    assert "Bitstamp" in app_js
     assert "generating simulated live alert" not in app_js
     assert "Math.random() > 0.3" not in app_js
     assert "64654.60" not in app_js
@@ -207,6 +208,6 @@ def test_active_frontend_is_the_research_terminal_and_discloses_forecast_gate():
         styles = f.read()
     assert "#root > div > nav {\n  z-index: 1000;" in styles
     assert "BTCognitive" in html
-    assert sorted(os.listdir(root)) == ["app.js", "index.html", "styles.css"]
+    assert sorted(os.listdir(root)) == ["analysis_contract.js", "app.js", "index.html", "styles.css"]
     assert "guaranteed profit" not in (html + "\n" + app_js).lower()
     assert "place order" not in (html + "\n" + app_js).lower()

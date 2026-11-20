@@ -91,16 +91,7 @@ def _get_db(db_file: Optional[str] = None) -> sqlite3.Connection:
         )
         if db_path.startswith("file:"):
             db_path = db_path[5:].split("?", 1)[0]
-        try:
-            is_disposable_path = os.path.commonpath(
-                [
-                    os.path.normcase(os.path.abspath(tempfile.gettempdir())),
-                    os.path.normcase(os.path.abspath(db_path)),
-                ]
-            ) == os.path.normcase(os.path.abspath(tempfile.gettempdir()))
-        except ValueError:
-            is_disposable_path = False
-        if not is_memory_uri and not is_disposable_path:
+        if db_file is None or not is_memory_uri:
             global _fixture_db_anchor
             with _fixture_db_lock:
                 if _fixture_db_anchor is None:
