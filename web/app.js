@@ -2635,7 +2635,7 @@ function ThreeBackground({ enabled = true }) {
 function OpportunityToastContainer({ alerts = [], onDismiss, onSelectAlert }) {
   if (!alerts || alerts.length === 0) return null;
 
-  return h("div", { className: "high-profit-toast-container" },
+  return h("div", { className: "high-profit-toast-container", "aria-live": "polite" },
     alerts.map((alert) => {
       if (alert.is_test) {
         return h("div", {
@@ -2671,7 +2671,12 @@ function OpportunityToastContainer({ alerts = [], onDismiss, onSelectAlert }) {
 
       return h("div", {
         key: alert.id,
-        className: `high-profit-toast ${isUltra ? "tier-ultra" : ""} ${isLong ? "tier-long" : "tier-short"}`
+        // Announce the alert to assistive tech and keep the transient content
+        // inside a live region (axe "region" rule: toast text used to sit
+        // outside every landmark).
+        className: `high-profit-toast ${isUltra ? "tier-ultra" : ""} ${isLong ? "tier-long" : "tier-short"}`,
+        role: "status",
+        "aria-live": "polite"
       },
         h("div", { className: "toast-header" },
           h("div", { style: { display: "flex", alignItems: "center", gap: "6px" } },

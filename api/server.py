@@ -141,6 +141,49 @@ from validation.startup_gate import evaluate_runtime_readiness, verify_scientifi
 # Application Lifespan Context Manager
 # ---------------------------------------------------------------------------
 
+async def _ingest_closed_candles(app) -> bool:
+    """Append newly closed hourly Coinbase candles to data/raw/ohlcv.parquet.
+
+    The dataset used to be written only by manual backfill scripts, so the raw
+    file stopped at the last backfill and every downstream freshness gate
+    (correctly) reported the feed as stale. Only CLOSED bars are persisted: the
+    in-progress candle is dropped, so no partial bar can leak into training or
+    into a "latest price" reading.
+
+    Returns True when the file actually gained rows.
+    """
+    import pandas as pd
+
+    from api.market_drivers import _fetch_history
+    from data.ingest import save_raw
+
+    client = getattr(app.state, "http", None)
+    candles = await _fetch_history("coinbase", client)
+    if not candles:
+        return False
+    df = pd.DataFrame(candles)
+    required = {"time", "open", "high", "low", "close", "volume"}
+    if not required.issubset(df.columns):
+        return False
+    df["timestamp"] = pd.to_datetime(df["time"], unit="s", utc=True)
+    now = pd.Timestamp.now(tz="UTC")
+    df = df[df["timestamp"] + pd.Timedelta(hours=1) <= now]
+    if df.empty:
+        return False
+    newest = df["timestamp"].iloc[-1]
+    last_cached = feature_cache.last_observation_time()
+    if last_cached is not None and newest <= pd.Timestamp(last_cached):
+        return False
+    df = df.copy()
+    df["available_time"] = df["timestamp"] + pd.Timedelta(hours=1)
+    for column in ("open", "high", "low", "close", "volume"):
+        df[column] = df[column].astype(float)
+    df = df[["timestamp", "open", "high", "low", "close", "volume", "available_time"]]
+    await asyncio.to_thread(save_raw, df, "ohlcv")
+    await asyncio.to_thread(feature_cache.refresh)
+    return True
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Authoritative lifecycle initializing market monitoring and verified production models."""
@@ -206,8 +249,26 @@ async def lifespan(app: FastAPI):
         shim = SimpleNamespace(app=app)  # _dashboard only needs .app.state.http
         first = True
         last_persisted_bar = None
+        last_ingest_check = 0.0
         while True:
             try:
+                # Ingest newly CLOSED hourly candles into data/raw/ohlcv.parquet.
+                # Nothing used to append to the dataset, so the raw file stopped
+                # at the moment of the last manual backfill and every freshness
+                # gate eventually (correctly) reported STALE. Checked at most
+                # once a minute; the write itself only happens on a new bar.
+                if time.monotonic() - last_ingest_check > 60.0:
+                    last_ingest_check = time.monotonic()
+                    try:
+                        persisted = await _ingest_closed_candles(app)
+                        if persisted:
+                            logger.info(
+                                "Warm-up: ingested candles up to %s",
+                                feature_cache.last_observation_time(),
+                            )
+                    except Exception as exc:
+                        logger.debug("Candle ingestion skipped: %s", type(exc).__name__)
+
                 started = time.perf_counter()
                 await _dashboard(shim, "24h")
                 if first:
@@ -240,7 +301,9 @@ async def lifespan(app: FastAPI):
                         from engine.market_state import market_state_engine
 
                         await asyncio.to_thread(
-                            lambda: market_state_engine.evaluate_market_state(persist=True)
+                            lambda: market_state_engine.evaluate_market_state(
+                                persist=True, bar_ts=str(bar)
+                            )
                         )
                         last_persisted_bar = bar
                         logger.info("Warm-up: persisted market-state snapshot at %s", bar)

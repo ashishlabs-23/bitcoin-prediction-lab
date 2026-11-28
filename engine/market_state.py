@@ -182,6 +182,7 @@ class MarketStateEngine:
         hawkes_direction: Optional[str] = None,
         uncertainty: Optional[float] = None,
         persist: bool = False,
+        bar_ts: Optional[str] = None,
     ) -> MarketState:
         """
         Build the market state from REAL inputs only.
@@ -321,7 +322,7 @@ class MarketStateEngine:
 
         if persist:
             # Persistence is opt-in: a GET must never truncate the history file.
-            self._append_snapshot(ms, vol_ts.regime)
+            self._append_snapshot(ms, vol_ts.regime, bar_ts)
 
         return ms
 
@@ -330,18 +331,27 @@ class MarketStateEngine:
     # as price 65200.0), so a mismatched header is quarantined rather than
     # appended to, which would interleave two schemas in one file.
     SNAPSHOT_COLUMNS = (
-        "timestamp", "current_price", "volatility_regime",
+        "timestamp", "bar_timestamp", "current_price", "volatility_regime",
         "short_direction", "long_risk_state", "uncertainty", "data_quality",
     )
 
     @classmethod
-    def _append_snapshot(cls, ms: "MarketState", regime: str) -> None:
+    def _append_snapshot(cls, ms: "MarketState", regime: str, bar_ts: Optional[str] = None) -> None:
         csv_path = os.path.join(RESULTS_DIR, "market_state.csv")
         if os.path.exists(csv_path):
             try:
                 existing_header = tuple(pd.read_csv(csv_path, nrows=0).columns)
             except Exception:
                 existing_header = ()
+            if existing_header == cls.SNAPSHOT_COLUMNS:
+                # One row per closed bar: a restart (or a second producer) must
+                # not append a duplicate snapshot for a bar already recorded.
+                try:
+                    tail = pd.read_csv(csv_path, usecols=["bar_timestamp"]).tail(1)
+                    if bar_ts is not None and not tail.empty and str(tail["bar_timestamp"].iloc[0]) == str(bar_ts):
+                        return
+                except Exception:
+                    pass
             if existing_header != cls.SNAPSHOT_COLUMNS:
                 legacy_path = os.path.join(
                     RESULTS_DIR, f"market_state.legacy-{int(time.time())}.csv"
@@ -350,6 +360,7 @@ class MarketStateEngine:
                 print(f"Market-state store had a legacy schema; archived to {legacy_path}")
         row = pd.DataFrame([{
             "timestamp": ms.timestamp,
+            "bar_timestamp": bar_ts,
             "current_price": ms.current_price,
             "volatility_regime": regime,
             "short_direction": ms.short_term_state.get("short_term_direction"),
