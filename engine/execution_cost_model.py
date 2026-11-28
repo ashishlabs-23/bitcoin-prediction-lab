@@ -229,77 +229,105 @@ class ExecutionCostModel:
         }
 
 
-def resolve_barrier_touch(
-    entry_price: float,
+def _evaluate_barriers(
     direction: str,
-    tp_price: float,
-    sl_price: float,
-    bar_high: float,
-    bar_low: float,
-    bar_close: float,
-    conservative_policy: str = "SL_FIRST_CONSERVATIVE"
+    entry: float,
+    tp: float,
+    sl: float,
+    high: float,
+    low: float,
+    close: Optional[float] = None,
+    policy: str = "SL_FIRST_CONSERVATIVE",
 ) -> Dict[str, Any]:
     """
-    Resolves triple-barrier touches within a single OHLC candle.
-    Prevents false win claims when both boundaries are penetrated.
-    """
-    dir_upper = direction.upper()
+    Single source of truth for same-bar triple-barrier resolution.
 
-    if dir_upper == "LONG":
-        tp_touched = bar_high >= tp_price
-        sl_touched = bar_low <= sl_price
-    else:  # SHORT
-        tp_touched = bar_low <= tp_price
-        sl_touched = bar_high >= sl_price
+    A bar that pierces both barriers carries no information about which one was
+    reached first, so the outcome is either resolved conservatively to the stop
+    loss (``SL_FIRST_CONSERVATIVE``, the default) or flagged ambiguous and
+    excluded from statistics (``EXCLUDE_AMBIGUOUS``). We never infer TP-first
+    from a single OHLC bar.
+
+    Returns:
+        Canonical dict with ``outcome`` in {STOP_LOSS, TAKE_PROFIT, AMBIGUOUS,
+        TIMEOUT_OR_OPEN}, the ``exit_price`` used for PnL, the ambiguity and
+        conservative flags, the applied ``policy`` and a human narrative.
+    """
+    dir_u = str(direction).upper()
+    if dir_u == "LONG":
+        tp_touched = high >= tp
+        sl_touched = low <= sl
+    elif dir_u == "SHORT":
+        tp_touched = low <= tp
+        sl_touched = high >= sl
+    else:
+        raise ValueError(f"direction must be LONG or SHORT, got {direction!r}")
+
+    conservative = policy == "SL_FIRST_CONSERVATIVE"
+    # Fallback mark used when no close is supplied (ambiguous / no-touch exits).
+    fallback_exit = entry if close is None else close
 
     if tp_touched and sl_touched:
-        # Same-candle collision: order of arrival is unknown without tick data
-        if conservative_policy == "SL_FIRST_CONSERVATIVE":
+        if conservative:
             return {
-                "outcome": "SL_FIRST",
+                "outcome": "STOP_LOSS",
                 "collision": True,
-                "resolution_policy": "SL_FIRST_CONSERVATIVE",
-                "exit_price": sl_price,
+                "ambiguity_flag": True,
                 "is_ambiguous": True,
-                "narrative": "Both TP and SL penetrated in the same bar; resolved conservatively to Stop Loss."
+                "conservative_applied": True,
+                "exit_price": sl,
+                "policy": "SL_FIRST_CONSERVATIVE",
+                "narrative": (
+                    "Both TP and SL penetrated in the same bar; resolved conservatively to the stop loss."
+                ),
             }
-        else:
-            return {
-                "outcome": "AMBIGUOUS_COLLISION",
-                "collision": True,
-                "resolution_policy": "EXCLUDE_AMBIGUOUS",
-                "exit_price": bar_close,
-                "is_ambiguous": True,
-                "narrative": "Both TP and SL penetrated in the same bar; flagged as ambiguous."
-            }
+        return {
+            "outcome": "AMBIGUOUS",
+            "collision": True,
+            "ambiguity_flag": True,
+            "is_ambiguous": True,
+            "conservative_applied": False,
+            "exit_price": fallback_exit,
+            "policy": "EXCLUDE_AMBIGUOUS",
+            "narrative": (
+                "Both TP and SL penetrated in the same bar; order of arrival is unknown, "
+                "so the bar is flagged ambiguous and excluded from statistics."
+            ),
+        }
 
     if tp_touched:
         return {
-            "outcome": "TP_FIRST",
+            "outcome": "TAKE_PROFIT",
             "collision": False,
-            "resolution_policy": "DETERMINISTIC_SINGLE_TOUCH",
-            "exit_price": tp_price,
+            "ambiguity_flag": False,
             "is_ambiguous": False,
-            "narrative": "Take profit barrier cleanly touched first."
+            "conservative_applied": False,
+            "exit_price": tp,
+            "policy": "DETERMINISTIC_SINGLE_TOUCH",
+            "narrative": "Take profit barrier cleanly touched first.",
         }
 
     if sl_touched:
         return {
-            "outcome": "SL_FIRST",
+            "outcome": "STOP_LOSS",
             "collision": False,
-            "resolution_policy": "DETERMINISTIC_SINGLE_TOUCH",
-            "exit_price": sl_price,
+            "ambiguity_flag": False,
             "is_ambiguous": False,
-            "narrative": "Stop loss barrier cleanly touched first."
+            "conservative_applied": False,
+            "exit_price": sl,
+            "policy": "DETERMINISTIC_SINGLE_TOUCH",
+            "narrative": "Stop loss barrier cleanly touched first.",
         }
 
     return {
-        "outcome": "NO_TOUCH",
+        "outcome": "TIMEOUT_OR_OPEN",
         "collision": False,
-        "resolution_policy": "WITHIN_BARRIERS",
-        "exit_price": bar_close,
+        "ambiguity_flag": False,
         "is_ambiguous": False,
-        "narrative": "Price remained strictly within boundary envelope."
+        "conservative_applied": False,
+        "exit_price": fallback_exit,
+        "policy": "WITHIN_BARRIERS",
+        "narrative": "Price remained strictly within the barrier envelope.",
     }
 
 
@@ -310,64 +338,47 @@ def simulate_barrier_collision_resolution(
     sl: float,
     high: float,
     low: float,
-    policy: str = "SL_FIRST_CONSERVATIVE"
+    policy: str = "SL_FIRST_CONSERVATIVE",
 ) -> Dict[str, Any]:
     """
-    Simulates collision resolution when both TP and SL are penetrated within a single bar.
-    Conservative policy defaults to SL_FIRST_CONSERVATIVE, flagging ambiguity and avoiding win fabrication.
-    """
-    dir_u = str(direction).upper()
-    if dir_u == "LONG":
-        tp_touched = high >= tp
-        sl_touched = low <= sl
-    else:
-        tp_touched = low <= tp
-        sl_touched = high >= sl
+    Backtest-facing view of :func:`_evaluate_barriers`.
 
-    if tp_touched and sl_touched:
-        if policy == "SL_FIRST_CONSERVATIVE":
-            return {
-                "outcome": "STOP_LOSS",
-                "conservative_applied": True,
-                "ambiguity_flag": True,
-                "exit_price": sl,
-                "policy": policy,
-                "narrative": "Both TP and SL penetrated in same candle; conservative SL enforced."
-            }
-        else:
-            return {
-                "outcome": "AMBIGUOUS",
-                "conservative_applied": False,
-                "ambiguity_flag": True,
-                "exit_price": entry,
-                "policy": policy,
-                "narrative": "Both TP and SL penetrated in same candle; marked ambiguous."
-            }
-    elif tp_touched:
-        return {
-            "outcome": "TAKE_PROFIT",
-            "conservative_applied": False,
-            "ambiguity_flag": False,
-            "exit_price": tp,
-            "policy": policy,
-            "narrative": "Take profit hit first."
-        }
-    elif sl_touched:
-        return {
-            "outcome": "STOP_LOSS",
-            "conservative_applied": False,
-            "ambiguity_flag": False,
-            "exit_price": sl,
-            "policy": policy,
-            "narrative": "Stop loss hit first."
-        }
-    else:
-        return {
-            "outcome": "TIMEOUT_OR_OPEN",
-            "conservative_applied": False,
-            "ambiguity_flag": False,
-            "exit_price": entry,
-            "policy": policy,
-            "narrative": "Neither barrier touched."
-        }
+    Kept as a thin wrapper so existing callers and documented results do not
+    change: the ambiguous / no-touch exit falls back to the entry price because
+    this signature has no bar close.
+    """
+    return _evaluate_barriers(direction, entry, tp, sl, high, low, None, policy)
+
+
+def resolve_barrier_touch(
+    entry_price: float,
+    direction: str,
+    tp_price: float,
+    sl_price: float,
+    bar_high: float,
+    bar_low: float,
+    bar_close: float,
+    conservative_policy: str = "SL_FIRST_CONSERVATIVE",
+) -> Dict[str, Any]:
+    """
+    Signal-engine view of :func:`_evaluate_barriers`, using the historical
+    ``SL_FIRST`` / ``TP_FIRST`` / ``NO_TOUCH`` / ``AMBIGUOUS_COLLISION``
+    vocabulary. Every canonical field is included, plus the legacy ``outcome``
+    code in ``outcome_legacy``.
+    """
+    resolved = _evaluate_barriers(
+        direction, entry_price, tp_price, sl_price, bar_high, bar_low, bar_close, conservative_policy
+    )
+    legacy_codes = {
+        "STOP_LOSS": "SL_FIRST",
+        "TAKE_PROFIT": "TP_FIRST",
+        "TIMEOUT_OR_OPEN": "NO_TOUCH",
+        "AMBIGUOUS": "AMBIGUOUS_COLLISION",
+    }
+    view = dict(resolved)
+    view["outcome_legacy"] = legacy_codes[resolved["outcome"]]
+    view["resolution_policy"] = resolved["policy"]
+    # Historical key: the signal engine reads "outcome" in its own vocabulary.
+    view["outcome"] = view["outcome_legacy"]
+    return view
 

@@ -15,7 +15,7 @@ import numpy as np
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from config import RESULTS_DIR
-from xgboost import XGBClassifier
+from models._lazy_deps import xgb_classifier
 from models.train_baselines import make_dataset
 from validation.purged_split import PurgedWalkForwardSplit
 from models.risk_metrics import sharpe_ratio, maximum_drawdown
@@ -235,7 +235,7 @@ if __name__ == "__main__":
     X_tr, y_tr = X.iloc[train_idx], y.iloc[train_idx]
     X_te, y_te = X.iloc[test_idx], y.iloc[test_idx]
 
-    model = XGBClassifier(n_estimators=100, eval_metric='logloss', random_state=42, n_jobs=-1)
+    model = xgb_classifier()(n_estimators=100, eval_metric='logloss', random_state=42, n_jobs=-1)
     model.fit(X_tr, y_tr)
     y_prob_te = model.predict_proba(X_te)[:, 1]
 

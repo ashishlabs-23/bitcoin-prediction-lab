@@ -66,3 +66,15 @@ jobs:
             tests/test_volatility_harness_guards_2026_11_28.py \
             tests/test_security_regressions.py \
             tests/test_route_authorization.py
+
+      # 2026-11-29 P2 cleanup: torch/xgboost must stay lazily imported (the
+      # module-import test shells out to a clean interpreter), and the two
+      # duplicate same-bar barrier resolvers must share one implementation.
+      - name: Test lazy dependencies and unified barrier resolver
+        run: |
+          python -m pytest -q \
+            tests/test_lazy_deps_and_barrier_consolidation_2026_11_29.py \
+            tests/test_research_to_signal_engine_v2.py \
+            tests/test_signal_integrity_and_risk_engine.py \
+            tests/test_regime_detector_v3.py \
+            tests/test_regime_runtime_path.py

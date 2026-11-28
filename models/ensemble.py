@@ -14,7 +14,10 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
-from xgboost import XGBClassifier
+# xgboost is imported lazily (models/_lazy_deps.py): it is only needed when
+# the ensemble is actually fitted, and importing it at module scope made the
+# API server pay ~1 s of startup and hard-fail when the wheel was absent.
+from models._lazy_deps import xgb_classifier
 
 # Ensure project root is in sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -25,7 +28,7 @@ class AdaptiveRegimeEnsemble:
 
     def __init__(self, dynamic_weighting: bool = True):
         self.rf = RandomForestClassifier(n_estimators=300, random_state=42, n_jobs=-1)
-        self.xgb = XGBClassifier(n_estimators=100, eval_metric='logloss', random_state=42, n_jobs=-1)
+        self.xgb = xgb_classifier()(n_estimators=100, eval_metric='logloss', random_state=42, n_jobs=-1)
         self.logreg = make_pipeline(StandardScaler(), LogisticRegression(max_iter=200))
         self.dynamic_weighting = dynamic_weighting
         self.weights_trending = {"rf": 0.60, "xgb": 0.40}
@@ -51,7 +54,7 @@ class AdaptiveRegimeEnsemble:
                     y_tr, y_val = y.iloc[train_idx], y.iloc[val_idx]
 
                     rf_f = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1).fit(X_tr, y_tr)
-                    xgb_f = XGBClassifier(n_estimators=50, eval_metric='logloss', random_state=42, n_jobs=-1).fit(X_tr, y_tr)
+                    xgb_f = xgb_classifier()(n_estimators=50, eval_metric='logloss', random_state=42, n_jobs=-1).fit(X_tr, y_tr)
                     lr_f = make_pipeline(StandardScaler(), LogisticRegression(max_iter=200)).fit(X_tr, y_tr)
 
                     p_rf = np.clip(rf_f.predict_proba(X_val)[:, 1], 1e-4, 1.0 - 1e-4)

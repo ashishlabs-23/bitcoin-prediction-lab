@@ -34,16 +34,56 @@ import threading
 from typing import Dict, List, Optional, Any, Union, Tuple
 import numpy as np
 import pandas as pd
-try:
-    import torch
-    import torch.nn as nn
-    import torch.nn.functional as F
-    HAS_TORCH = True
-except ImportError:
-    torch = None
-    nn = None
-    F = None
-    HAS_TORCH = False
+# PyTorch is imported LAZILY. Importing it costs ~2-3 s of process startup and
+# the API server only needs it when the supervised refinement path actually
+# runs; a missing torch must degrade this module, not the whole application.
+_TORCH_STATE: Dict[str, Any] = {"loaded": False, "torch": None, "nn": None, "F": None}
+
+
+def _load_torch() -> Dict[str, Any]:
+    """Import torch once on first use; remember a failure instead of retrying."""
+    state = _TORCH_STATE
+    if not state["loaded"]:
+        try:
+            import torch as _torch
+            import torch.nn as _nn
+            import torch.nn.functional as _F
+
+            state.update(loaded=True, torch=_torch, nn=_nn, F=_F)
+        except ImportError:
+            state.update(loaded=True)
+    return state
+
+
+def has_torch() -> bool:
+    """True when PyTorch can be imported (cheap after the first call)."""
+    return _load_torch()["torch"] is not None
+
+
+class _LazyTorchModule:
+    """Attribute proxy that resolves the real torch module on first access."""
+
+    __slots__ = ("_key",)
+
+    def __init__(self, key: str):
+        self._key = key
+
+    def _resolve(self):
+        module = _load_torch()[self._key]
+        if module is None:
+            raise RuntimeError("PyTorch is not installed in this environment")
+        return module
+
+    def __getattr__(self, item):
+        return getattr(self._resolve(), item)
+
+    def __repr__(self):
+        return f"<lazy torch.{self._key}>"
+
+
+torch = _LazyTorchModule("torch")
+nn = _LazyTorchModule("nn")
+F = _LazyTorchModule("F")
 
 from sklearn.cluster import KMeans
 
@@ -70,35 +110,68 @@ REGIMES: List[str] = [
 NUM_REGIMES = len(REGIMES) # Exactly 7
 
 
-if HAS_TORCH:
-    class RegimeClassifierNN(nn.Module):
+def _build_nn_class():
+    """Build RegimeClassifierNN against the real torch, or its fallback stub."""
+    state = _load_torch()
+    if state["torch"] is None:
+        class RegimeClassifierNN:
+            """Lightweight fallback when PyTorch is not installed."""
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def eval(self):
+                pass
+
+            def train(self):
+                pass
+
+            def parameters(self):
+                return []
+
+        return RegimeClassifierNN
+
+    _nn = state["nn"]
+
+    class RegimeClassifierNN(_nn.Module):
         """Deep refinement neural network for continuous regime classification."""
+
         def __init__(self, input_dim: int = 7, hidden_dim: int = 32, num_classes: int = 7, dropout: float = 0.1):
             super().__init__()
-            self.net = nn.Sequential(
-                nn.Linear(input_dim, hidden_dim),
-                nn.LayerNorm(hidden_dim),
-                nn.LeakyReLU(0.1),
-                nn.Dropout(dropout),
-                nn.Linear(hidden_dim, hidden_dim),
-                nn.LayerNorm(hidden_dim),
-                nn.LeakyReLU(0.1),
-                nn.Linear(hidden_dim, num_classes)
+            self.net = _nn.Sequential(
+                _nn.Linear(input_dim, hidden_dim),
+                _nn.LayerNorm(hidden_dim),
+                _nn.LeakyReLU(0.1),
+                _nn.Dropout(dropout),
+                _nn.Linear(hidden_dim, hidden_dim),
+                _nn.LayerNorm(hidden_dim),
+                _nn.LeakyReLU(0.1),
+                _nn.Linear(hidden_dim, num_classes)
             )
 
-        def forward(self, x: torch.Tensor) -> torch.Tensor:
+        def forward(self, x):
             return self.net(x)
-else:
-    class RegimeClassifierNN:
-        """Lightweight fallback when PyTorch is not installed."""
-        def __init__(self, *args, **kwargs):
-            pass
-        def eval(self):
-            pass
-        def train(self):
-            pass
-        def parameters(self):
-            return []
+
+    return RegimeClassifierNN
+
+
+_NN_CLASS = None
+
+
+def nn_class():
+    """Return the (cached) RegimeClassifierNN class, importing torch on first use."""
+    global _NN_CLASS
+    if _NN_CLASS is None:
+        _NN_CLASS = _build_nn_class()
+    return _NN_CLASS
+
+
+def RegimeClassifierNN(*args, **kwargs):
+    """Lazy factory returning a fresh network instance.
+
+    Kept as a module-level name so existing ``RegimeClassifierNN(...)`` call
+    sites keep working while torch is only imported on the first construction.
+    """
+    return nn_class()(*args, **kwargs)
 
 
 class MarketRegimeDetector:
@@ -110,7 +183,7 @@ class MarketRegimeDetector:
     def __init__(self, checkpoint_path: Optional[str] = None, lazy: bool = True):
         self.checkpoint_path = checkpoint_path or REGIME_CHECKPOINT_PATH
         self.kmeans: Optional[KMeans] = None
-        self.model: Optional[RegimeClassifierNN] = None
+        self.model: Optional["RegimeClassifierNN"] = None
         self._is_loaded = False
         self._lock = threading.Lock()
         self.status = "WARMING"
@@ -124,7 +197,7 @@ class MarketRegimeDetector:
         with self._lock:
             if self._is_loaded:
                 return
-            if not HAS_TORCH:
+            if not has_torch():
                 self.model = RegimeClassifierNN()
                 self.status = "UNAVAILABLE"
                 self._is_loaded = True
@@ -157,7 +230,7 @@ class MarketRegimeDetector:
 
     def _seed_baseline_weights(self) -> None:
         """Seeds initial network weights with financial domain heuristics."""
-        if not HAS_TORCH or not self.model:
+        if not has_torch() or not self.model:
             return
         with torch.no_grad():
             for p in self.model.parameters():
@@ -337,7 +410,7 @@ class MarketRegimeDetector:
         N = len(feats)
         is_batch = (isinstance(data, pd.DataFrame) and len(data) > 1) or (isinstance(data, np.ndarray) and data.ndim == 3 and len(data) > 1)
 
-        if HAS_TORCH and self.model is not None:
+        if has_torch() and self.model is not None:
             self.model.eval()
             with torch.no_grad():
                 tensor_x = torch.from_numpy(feats).float()

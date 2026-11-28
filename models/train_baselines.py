@@ -15,7 +15,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
-from xgboost import XGBClassifier
+from models._lazy_deps import xgb_classifier
 from sklearn.metrics import accuracy_score, roc_auc_score, brier_score_loss
 
 # Ensure project root is in sys.path
@@ -143,7 +143,7 @@ def run_model_ladder(
             'persistence': 'persistence',
             'logreg': Pipeline([('scaler', StandardScaler()), ('clf', LogisticRegression(max_iter=1000, random_state=42))]),
             'random_forest': RandomForestClassifier(n_estimators=300, random_state=42, n_jobs=-1),
-            'xgboost': XGBClassifier(n_estimators=100, eval_metric='logloss', random_state=42, n_jobs=-1)
+            'xgboost': xgb_classifier()(n_estimators=100, eval_metric='logloss', random_state=42, n_jobs=-1)
         }
 
         train_base_rate = y_tr.mean()
