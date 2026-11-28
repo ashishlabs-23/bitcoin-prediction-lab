@@ -15,6 +15,7 @@ authoritative subsystems — never inferred merely from HTTP 200 or WS connectio
 8. execution_status:           DISABLED — ANALYSIS ONLY (always)
 """
 
+import threading
 import time
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, Literal
@@ -253,3 +254,56 @@ def evaluate_system_status(cache_override=None, readiness_override=None, researc
         decision_anatomy_stage=stage,
         status_summary_message=summary
     )
+
+
+# --------------------------------------------------------------------------- #
+# Short-TTL cache for read-only callers
+# --------------------------------------------------------------------------- #
+# evaluate_system_status() inspects live feeds on every call: ~0.55-0.65 s warm
+# and up to 5 s cold. /api/terminal/status is hit on every dashboard load (and
+# again by the decision-anatomy view), so each page view paid that cost on a
+# worker thread. The contract is advisory, not a trading signal, so a few
+# seconds of staleness is harmless: candle-age buckets move at hourly granularity.
+STATUS_CACHE_TTL_SECONDS: float = 5.0
+_STATUS_CACHE: Dict[str, Any] = {"value": None, "at": 0.0}
+_STATUS_CACHE_LOCK = threading.Lock()
+
+
+def reset_status_cache() -> None:
+    """Drop the cached contract (tests, and after configuration changes)."""
+    with _STATUS_CACHE_LOCK:
+        _STATUS_CACHE["value"] = None
+        _STATUS_CACHE["at"] = 0.0
+
+
+def evaluate_system_status_cached(
+    ttl_seconds: float = STATUS_CACHE_TTL_SECONDS,
+    **overrides: Any,
+) -> SystemStatusContract:
+    """Return the status contract, recomputing at most once per ``ttl_seconds``.
+
+    Calls that pass explicit overrides always bypass the cache, so tests that
+    inject fixtures keep their exact behaviour. Concurrent callers wait on one
+    lock, so an expiry triggers exactly one evaluation rather than a stampede.
+    """
+    if overrides:
+        return evaluate_system_status(**overrides)
+
+    now = time.monotonic()
+    cached = _STATUS_CACHE["value"]
+    if cached is not None and (now - _STATUS_CACHE["at"]) < ttl_seconds:
+        return cached
+
+    with _STATUS_CACHE_LOCK:
+        cached = _STATUS_CACHE["value"]
+        if cached is not None and (time.monotonic() - _STATUS_CACHE["at"]) < ttl_seconds:
+            return cached
+        try:
+            fresh = evaluate_system_status()
+        except Exception:
+            if cached is not None:  # serve the last good contract rather than 500
+                return cached
+            raise
+        _STATUS_CACHE["value"] = fresh
+        _STATUS_CACHE["at"] = time.monotonic()
+        return fresh

@@ -150,3 +150,51 @@ def test_invalid_direction_is_rejected():
             direction="SIDEWAYS", entry=80000.0, tp=82000.0, sl=79000.0,
             high=80500.0, low=79500.0,
         )
+
+
+# --------------------------------------------------------------------------- #
+# Short-TTL system-status cache
+# --------------------------------------------------------------------------- #
+def test_status_contract_is_cached_for_the_ttl(monkeypatch):
+    import engine.status_contract as sc
+
+    calls = []
+
+    def fake_evaluate(**kwargs):
+        calls.append(kwargs)
+        return f"contract-{len(calls)}"
+
+    sc.reset_status_cache()
+    monkeypatch.setattr(sc, "evaluate_system_status", fake_evaluate)
+    try:
+        first = sc.evaluate_system_status_cached(ttl_seconds=60)
+        second = sc.evaluate_system_status_cached(ttl_seconds=60)
+        assert first == second == "contract-1"
+        assert len(calls) == 1
+
+        # Expiring the entry forces exactly one recomputation.
+        sc._STATUS_CACHE["at"] = 0.0
+        assert sc.evaluate_system_status_cached(ttl_seconds=60) == "contract-2"
+        assert len(calls) == 2
+    finally:
+        sc.reset_status_cache()
+
+
+def test_status_cache_bypasses_on_overrides_and_survives_errors(monkeypatch):
+    import engine.status_contract as sc
+
+    sc.reset_status_cache()
+    monkeypatch.setattr(sc, "evaluate_system_status", lambda **kw: {"kw": kw})
+    try:
+        assert sc.evaluate_system_status_cached(cache_override="x") == {"kw": {"cache_override": "x"}}
+        # Prime the cache, then break the evaluator: the last good value is served.
+        good = sc.evaluate_system_status_cached(ttl_seconds=60)
+        sc._STATUS_CACHE["at"] = 0.0
+
+        def boom(**kwargs):
+            raise RuntimeError("feed inspection failed")
+
+        monkeypatch.setattr(sc, "evaluate_system_status", boom)
+        assert sc.evaluate_system_status_cached(ttl_seconds=60) is good
+    finally:
+        sc.reset_status_cache()

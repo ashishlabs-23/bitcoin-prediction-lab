@@ -299,8 +299,10 @@ def get_terminal_status():
     Returns the authoritative BTCognitive V29 Unified Status Contract (PRD-STAT-29)
     representing the 8 independent subsystems.
     """
-    from engine.status_contract import evaluate_system_status
-    return evaluate_system_status().model_dump()
+    # Cached for a few seconds: a dashboard load hits this endpoint (and the
+    # decision-anatomy view) and each uncached evaluation costs ~0.6 s.
+    from engine.status_contract import evaluate_system_status_cached
+    return evaluate_system_status_cached().model_dump()
 
 
 @router.get("/api/terminal/decision-anatomy")
@@ -318,7 +320,6 @@ def get_decision_anatomy():
     _init_live_terminal()
     from engine.decision_envelope import canonical_decision_ledger
     from engine.feature_cache import feature_cache
-    from engine.status_contract import evaluate_system_status
     from models.market_state_v4 import TwoSpeedMarketState
     from models.mechanism_hypotheses import MechanismDetector
     from backtest.execution_reality import ExecutionRealityEngine
@@ -598,6 +599,6 @@ def get_decision_anatomy():
         "reason": readiness["reason"],
         "governance_breakdown": readiness.get("governance_breakdown", {}),
     }
-    payload["status_contract"] = evaluate_system_status().model_dump()
+    payload["status_contract"] = evaluate_system_status_cached().model_dump()
     return payload
 
