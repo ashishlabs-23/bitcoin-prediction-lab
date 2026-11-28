@@ -205,6 +205,7 @@ async def lifespan(app: FastAPI):
 
         shim = SimpleNamespace(app=app)  # _dashboard only needs .app.state.http
         first = True
+        last_persisted_bar = None
         while True:
             try:
                 started = time.perf_counter()
@@ -228,6 +229,23 @@ async def lifespan(app: FastAPI):
                         )
                 except Exception as exc:
                     logger.debug("Feature-cache refresh skipped: %s", type(exc).__name__)
+
+                # Persist one market-state snapshot per new closed bar. History
+                # is only real if something writes it: the endpoint returns
+                # persisted rows and nothing else, so without this producer the
+                # UI history would legitimately stay empty forever.
+                try:
+                    bar = feature_cache.last_observation_time()
+                    if bar is not None and bar != last_persisted_bar:
+                        from engine.market_state import market_state_engine
+
+                        await asyncio.to_thread(
+                            lambda: market_state_engine.evaluate_market_state(persist=True)
+                        )
+                        last_persisted_bar = bar
+                        logger.info("Warm-up: persisted market-state snapshot at %s", bar)
+                except Exception as exc:
+                    logger.debug("Market-state persistence skipped: %s", type(exc).__name__)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:

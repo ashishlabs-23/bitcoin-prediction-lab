@@ -667,7 +667,11 @@ class NotificationManager:
             except Exception:
                 supplied_age_sec = None
 
-        is_stale = candle_age_sec > 7200.0
+        # Bar-aware threshold shared with the status contract (see
+        # engine/status_contract.py): the newest CLOSED hourly bar is already
+        # 1h..2h old on a healthy feed.
+        from engine.status_contract import LIVE_MAX_CANDLE_AGE_SECONDS
+        is_stale = candle_age_sec > LIVE_MAX_CANDLE_AGE_SECONDS
         override_freshness = bool(market_data and market_data.get("override_freshness"))
         if is_stale and not override_freshness:
             return _finish({

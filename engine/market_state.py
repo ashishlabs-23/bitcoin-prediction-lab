@@ -96,7 +96,12 @@ def classify_derivatives_quadrant(price_change_pct: float, oi_change_pct: float,
 # from the local dataset and refuse to answer when the observation is stale.
 _LIVE_INPUT_CACHE: Dict[str, Any] = {"ts": 0.0, "value": None}
 LIVE_INPUT_TTL_SECONDS = 60.0
-MARKET_STATE_MAX_AGE_SECONDS = 7200.0
+# Shared with the status contract: age is measured from the newest CLOSED
+# hourly bar, which is already 1h..2h old on a perfectly healthy feed. A bare
+# 7200 s cut-off made the market state go DATA_UNAVAILABLE for part of every
+# hour even though the feed was current.
+from engine.status_contract import LIVE_MAX_CANDLE_AGE_SECONDS as _LIVE_MAX_AGE
+MARKET_STATE_MAX_AGE_SECONDS = float(_LIVE_MAX_AGE)
 
 
 def _load_live_inputs(ttl: float = LIVE_INPUT_TTL_SECONDS) -> Optional[Dict[str, Any]]:
@@ -320,17 +325,39 @@ class MarketStateEngine:
 
         return ms
 
-    @staticmethod
-    def _append_snapshot(ms: "MarketState", regime: str) -> None:
+    # One canonical column order for every snapshot row. Rows written before
+    # 2026-11-28 used a different layout (and contained fabricated defaults such
+    # as price 65200.0), so a mismatched header is quarantined rather than
+    # appended to, which would interleave two schemas in one file.
+    SNAPSHOT_COLUMNS = (
+        "timestamp", "current_price", "volatility_regime",
+        "short_direction", "long_risk_state", "uncertainty", "data_quality",
+    )
+
+    @classmethod
+    def _append_snapshot(cls, ms: "MarketState", regime: str) -> None:
         csv_path = os.path.join(RESULTS_DIR, "market_state.csv")
+        if os.path.exists(csv_path):
+            try:
+                existing_header = tuple(pd.read_csv(csv_path, nrows=0).columns)
+            except Exception:
+                existing_header = ()
+            if existing_header != cls.SNAPSHOT_COLUMNS:
+                legacy_path = os.path.join(
+                    RESULTS_DIR, f"market_state.legacy-{int(time.time())}.csv"
+                )
+                os.replace(csv_path, legacy_path)
+                print(f"Market-state store had a legacy schema; archived to {legacy_path}")
         row = pd.DataFrame([{
             "timestamp": ms.timestamp,
             "current_price": ms.current_price,
             "volatility_regime": regime,
+            "short_direction": ms.short_term_state.get("short_term_direction"),
+            "long_risk_state": ms.long_term_state.get("long_term_risk_state"),
+            "uncertainty": ms.uncertainty_state.get("composite_uncertainty"),
             "data_quality": ms.overall_data_quality,
-        }])
-        header = not os.path.exists(csv_path)
-        row.to_csv(csv_path, index=False, mode="a", header=header)
+        }], columns=list(cls.SNAPSHOT_COLUMNS))
+        row.to_csv(csv_path, index=False, mode="a", header=not os.path.exists(csv_path))
 
     def _unavailable_state(self, now_iso: str, session_ctx: Optional[Dict[str, Any]], reason: str) -> MarketState:
         """Explicit typed unavailable state (never invented values)."""

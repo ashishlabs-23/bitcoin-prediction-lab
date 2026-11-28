@@ -215,6 +215,27 @@ def _protect_research_artifacts() -> Generator[None, None, None]:
         return {line.strip() for line in out.splitlines() if line.strip()}
 
     before = _dirty()
+    # Gitignored artefacts (the processed feature store, the raw dataset) are
+    # invisible to the revert below, yet a full run was observed leaving
+    # data/processed/features.parquet deleted, which silently degrades the live
+    # feature cache. Snapshot them and put anything missing back afterwards.
+    import shutil
+    import tempfile
+
+    backup_dir = tempfile.mkdtemp(prefix="btcognitive_artifact_backup_")
+    gitignored = (
+        os.path.join(PROJECT_ROOT, "data", "processed", "features.parquet"),
+        os.path.join(PROJECT_ROOT, "data", "processed", "multi_regime_features.parquet"),
+    )
+    backups = {}
+    for path in gitignored:
+        if os.path.exists(path):
+            target = os.path.join(backup_dir, os.path.basename(path))
+            try:
+                shutil.copy2(path, target)
+                backups[path] = target
+            except OSError:
+                pass
     yield
 
     protected_prefixes = ("research/", "results/", "data/", "experiments/")
@@ -231,6 +252,16 @@ def _protect_research_artifacts() -> Generator[None, None, None]:
             f"\n[conftest] reverted {len(leaked)} research artefact(s) mutated by "
             f"tests: {leaked[:5]}{' ...' if len(leaked) > 5 else ''}"
         )
+
+    restored = []
+    for path, target in backups.items():
+        if not os.path.exists(path):
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            shutil.copy2(target, path)
+            restored.append(os.path.relpath(path, PROJECT_ROOT))
+    if restored:
+        print(f"\n[conftest] restored gitignored artefact(s) deleted by tests: {restored}")
+    shutil.rmtree(backup_dir, ignore_errors=True)
 
 
 

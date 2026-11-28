@@ -573,17 +573,29 @@ async def get_market_dashboard(client: Any = None, horizon: str = "24h") -> dict
         errors: dict[str, str] = {}
         first_quote: dict[str, Any] | None = None
         for provider in PROVIDERS:
-            try:
-                quote = await _fetch_quote(provider, client)
-                if first_quote is None:
-                    first_quote = quote
-                candles = await _fetch_history(provider, client)
-                if candles:
-                    selected = (quote, candles)
-                    break
+            # The spot quote and the candle history are independent requests to
+            # the same venue, so run them together: sequential fetches cost the
+            # full latency of both (measured ~2.8 s + ~4.5 s cold).
+            quote_res, history_res = await asyncio.gather(
+                _fetch_quote(provider, client),
+                _fetch_history(provider, client),
+                return_exceptions=True,
+            )
+            if isinstance(quote_res, BaseException):
+                errors[f"{provider}_quote"] = type(quote_res).__name__
+            elif first_quote is None:
+                first_quote = quote_res
+            if isinstance(history_res, BaseException):
+                errors[provider] = type(history_res).__name__
+            elif not history_res:
                 errors[provider] = "NO_USABLE_CANDLES"
-            except Exception as exc:
-                errors[provider] = type(exc).__name__
+            elif isinstance(quote_res, BaseException):
+                # A candle series is only usable together with its own venue's
+                # quote; never pair one venue's bars with another's price.
+                errors[provider] = "QUOTE_UNAVAILABLE"
+            else:
+                selected = (quote_res, history_res)
+                break
 
         if selected is None:
             quote = first_quote
@@ -621,10 +633,18 @@ async def get_market_dashboard(client: Any = None, horizon: str = "24h") -> dict
         bid, ask = quote.get("bid"), quote.get("ask")
         # Compare separately observed USD spot quotes; never average venues into a synthetic price.
         other_providers = [provider for provider in PROVIDERS if provider != quote["provider"]]
-        quote_results = await asyncio.gather(
-            *(_fetch_quote(provider, client) for provider in other_providers),
+        # Comparator quotes and the derivatives snapshot are unrelated requests
+        # (~3 s each); fetch them in one round trip instead of two.
+        quote_results, derivatives = await asyncio.gather(
+            asyncio.gather(
+                *(_fetch_quote(provider, client) for provider in other_providers),
+                return_exceptions=True,
+            ),
+            _fetch_derivatives(client),
             return_exceptions=True,
         )
+        if isinstance(derivatives, BaseException):
+            raise derivatives
         venue_quotes = [{
             "provider": quote["provider"], "instrument": "BTC/USD",
             "price_usd": round(quote["price"], 2), "retrieved_at": quote["retrieved_at"],
@@ -651,7 +671,6 @@ async def get_market_dashboard(client: Any = None, horizon: str = "24h") -> dict
             for value in ("1h", "4h", "24h")
         }
         forecast["all_horizons"] = horizons
-        derivatives = await _fetch_derivatives(client)
         drivers = [
             {"id": key, "label": label, "value": technical.get(key), "unit": "%" if key.endswith("_pct") else "", "status": "AVAILABLE" if technical.get(key) is not None else "INSUFFICIENT_HISTORY"}
             for key, label in (

@@ -781,7 +781,9 @@ def get_prediction_market_state_history(limit: int = Query(50, ge=1, le=200)):
             "history": [],
             "reason": "The market-state store could not be parsed.",
         }
-    records = df.to_dict(orient="records")
+    # NaN is not valid JSON (FastAPI's strict encoder rejects it), so an
+    # unavailable column must surface as null, never as "nan".
+    records = _sanitize_records(df.to_dict(orient="records"))
     return {
         "status": "OBSERVED" if records else "UNAVAILABLE_NOT_PERSISTED",
         "count": len(records),

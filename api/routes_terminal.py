@@ -390,7 +390,8 @@ def get_decision_anatomy():
             last_dt = df_cache.index[-1]
             if last_dt.tzinfo is None:
                 last_dt = last_dt.replace(tzinfo=timezone.utc)
-            if (datetime.now(timezone.utc) - last_dt).total_seconds() > 7200:
+            from engine.status_contract import LIVE_MAX_CANDLE_AGE_SECONDS
+            if (datetime.now(timezone.utc) - last_dt).total_seconds() > LIVE_MAX_CANDLE_AGE_SECONDS:
                 is_stale = True
 
         if is_stale:

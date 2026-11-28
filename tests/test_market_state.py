@@ -41,15 +41,20 @@ def test_market_state_evaluation():
     assert "utc_hour" in state.session_context
     assert state.session_context["session_version"] == "1.0.0"
 
-    # Derivatives quadrant neutral labeling
+    # Derivatives quadrant neutral labeling. Without a funding/OI observation the
+    # quadrant is None and the layer is marked UNAVAILABLE — never a fabricated
+    # "STABLE" label derived from placeholder defaults.
     assert "derivatives_quadrant" in state.derivatives_state
-    assert state.derivatives_state["derivatives_quadrant"] in (
+    quadrant = state.derivatives_state["derivatives_quadrant"]
+    assert quadrant is None or quadrant in (
         "PRICE_UP_OI_UP",
         "PRICE_DOWN_OI_UP",
         "PRICE_DOWN_OI_DOWN",
         "PRICE_UP_OI_DOWN",
         "STABLE"
     )
+    if quadrant is None:
+        assert state.derivatives_state.get("governance_status") == "UNAVAILABLE"
 
 
 def test_classify_utc_session():
@@ -95,4 +100,36 @@ def test_get_market_state_endpoints():
     res2 = client.get("/prediction/market-state/history?limit=10")
     assert res2.status_code == 200
     data2 = res2.json()
-    assert data2["count"] == 10
+    # The endpoint returns only genuinely persisted snapshots (it used to repeat
+    # the current evaluation ten times and call that "history"). With a seeded
+    # store it must return exactly those rows, newest last, capped by `limit`.
+    assert data2["status"] in ("OBSERVED", "UNAVAILABLE_NOT_PERSISTED")
+    assert data2["count"] == len(data2["history"])
+    assert data2["count"] <= 10
+
+
+def test_market_state_history_returns_only_persisted_snapshots(tmp_path, monkeypatch):
+    """Seeded store -> exactly those rows; empty store -> explicit empty state."""
+    import pandas as pd
+    import api.routes_prediction as rp
+
+    seeded = tmp_path / "market_state.csv"
+    pd.DataFrame({
+        "timestamp": [f"2026-11-28T{h:02d}:00:00+00:00" for h in range(12)],
+        "symbol": ["BTCUSD"] * 12,
+        "current_price": [59000.0 + h for h in range(12)],
+    }).to_csv(seeded, index=False)
+    monkeypatch.setattr("engine.market_state.RESULTS_DIR", str(tmp_path))
+
+    body = rp.get_prediction_market_state_history(limit=10)
+    assert body["status"] == "OBSERVED"
+    assert body["count"] == 10
+    # NaN must never reach the wire: FastAPI's strict JSON encoder raises on it.
+    import json
+    json.dumps(body, allow_nan=False)
+    assert body["history"][-1]["current_price"] == 59011.0  # newest last
+
+    seeded.unlink()
+    empty = rp.get_prediction_market_state_history(limit=10)
+    assert empty["status"] == "UNAVAILABLE_NOT_PERSISTED"
+    assert empty["count"] == 0
