@@ -328,10 +328,14 @@ async def get_counterfactual_contract_detail(
 
 @router.get("/regime/latest")
 @router.get("/api/regime")
-async def get_market_regime(live: bool = False):
+def get_market_regime(live: bool = False):
     """
     Returns causal Volatility Regime Routing (PRD-REG-13) based on Wilder ADX(14),
     EMA 200/50/20, Bollinger Bandwidth, and 3-bar hysteresis confirmation.
+
+    Deliberately a sync handler: get_current_market_regime() is CPU/IO bound
+    (11.7 s on the very first call while the engine loads history), so FastAPI
+    runs it in the threadpool instead of blocking the event loop for everyone.
     """
     from api.routes_tournament import get_tournament_engine
     try:

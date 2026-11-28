@@ -276,6 +276,24 @@ async def lifespan(app: FastAPI):
                         "Warm-up: dashboard primed in %.2fs",
                         time.perf_counter() - started,
                     )
+                    # Prime the V12 tournament engine. Its first
+                    # get_current_market_regime() call loads years of candles
+                    # (measured 11.7 s) and used to happen inside the async
+                    # /api/regime handler, i.e. on the event loop: one cold
+                    # visitor stalled every other request for those seconds.
+                    try:
+                        from api.routes_tournament import get_tournament_engine
+
+                        primed_at = time.perf_counter()
+                        await asyncio.to_thread(
+                            get_tournament_engine().get_current_market_regime
+                        )
+                        logger.info(
+                            "Warm-up: tournament regime engine primed in %.2fs",
+                            time.perf_counter() - primed_at,
+                        )
+                    except Exception as exc:
+                        logger.debug("Tournament engine prime skipped: %s", type(exc).__name__)
                     first = False
                 # The feature cache used to be populated once at boot and never
                 # refreshed, while the status contract still called it LIVE.

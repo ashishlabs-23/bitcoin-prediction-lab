@@ -320,6 +320,7 @@ def get_decision_anatomy():
     _init_live_terminal()
     from engine.decision_envelope import canonical_decision_ledger
     from engine.feature_cache import feature_cache
+    from engine.status_contract import evaluate_system_status_cached
     from models.market_state_v4 import TwoSpeedMarketState
     from models.mechanism_hypotheses import MechanismDetector
     from backtest.execution_reality import ExecutionRealityEngine
