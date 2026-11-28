@@ -8,6 +8,7 @@ Verifies that:
 """
 
 import pandas as pd
+import pytest
 from datetime import datetime, timezone
 from research.post_repair_dataset_audit import POST_REPAIR_EVIDENCE_START, audit_dataset
 

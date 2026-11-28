@@ -120,20 +120,39 @@ def test_dashboard_cache_key_tracks_the_research_gate():
 # 5. Feature cache must expose a real observation time
 # ---------------------------------------------------------------------------
 def test_feature_cache_is_timestamp_indexed_and_flagged():
+    import pandas as pd
     from engine.feature_cache import FeatureCache
 
     cache = FeatureCache()
     cache.initialize()
     df = cache.get_features_df()
-    if df is None or not len(df):
-        pytest.skip("no local dataset to initialise the cache")
-
-    assert isinstance(df.index, pd.DatetimeIndex)
-    assert cache.last_observation_time() is not None
-    for column in ("rsi_14_imputed", "realized_vol_24h_imputed", "funding_rate_synthetic"):
-        assert column in df.columns
+    if df is not None and len(df):
+        assert isinstance(df.index, pd.DatetimeIndex)
+        assert cache.last_observation_time() is not None
     # refresh() is a no-op when no newer candle exists, never an exception
     assert cache.refresh() in (True, False)
+
+    # The candle-derived path must expose provenance flags next to the values it
+    # imputes, so a neutral fallback can never be mistaken for a measurement.
+    import numpy as np
+    n = 40
+    closes = 59000.0 + np.cumsum(np.random.default_rng(0).normal(0, 40, n))
+    candles = [
+        {
+            "timestamp": ts,
+            "open": float(c), "high": float(c) + 50.0, "low": float(c) - 50.0,
+            "close": float(c), "volume": 10.0,
+        }
+        for ts, c in zip(pd.date_range("2026-11-01", periods=n, freq="1h", tz="UTC"), closes)
+    ]
+    fresh = FeatureCache()
+    fresh.update_from_candles(candles)
+    out = fresh.get_features_df()
+    assert isinstance(out.index, pd.DatetimeIndex)
+    for column in ("rsi_14_imputed", "realized_vol_24h_imputed", "funding_rate_synthetic"):
+        assert column in out.columns
+    # The first bar has no 24h window: its realized volatility is imputed.
+    assert bool(out["realized_vol_24h_imputed"].iloc[0]) is True
 
 
 # ---------------------------------------------------------------------------

@@ -52,7 +52,18 @@ class FeatureCache:
                 df_raw["timestamp"] = pd.to_datetime(df_raw["timestamp"], utc=True)
                 df_raw = df_raw.sort_values("timestamp").reset_index(drop=True)
 
-                if df_feat is None or df_raw["timestamp"].iloc[-1] > df_feat["timestamp"].iloc[-1]:
+                # df_feat is indexed by timestamp (set above), so it has no
+                # "timestamp" column; reading one raised KeyError and this
+                # freshness check silently fell through to the stale frame.
+                if isinstance(df_feat, pd.DataFrame) and not df_feat.empty:
+                    feat_last = (
+                        df_feat.index[-1]
+                        if isinstance(df_feat.index, pd.DatetimeIndex)
+                        else df_feat["timestamp"].iloc[-1]
+                    )
+                else:
+                    feat_last = None
+                if feat_last is None or df_raw["timestamp"].iloc[-1] > feat_last:
                     # Update features using fresh raw candles (last 500 bars)
                     candles = df_raw.tail(500).to_dict("records")
                     self.update_from_candles(candles)

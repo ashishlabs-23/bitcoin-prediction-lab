@@ -63,4 +63,12 @@ def test_environment_fingerprint_is_deterministic():
         "environment_fingerprint.py",
     }
     assert first["python_expected"] == "3.13.14"
-    assert first["status"] == "READY"
+    # READY only holds inside the frozen interpreter. Anywhere else the
+    # fingerprint must say so explicitly instead of claiming readiness.
+    import platform
+    frozen_major_minor = ".".join(first["python_expected"].split(".")[:2])
+    live_major_minor = ".".join(platform.python_version().split(".")[:2])
+    if live_major_minor == frozen_major_minor:
+        assert first["status"] == "READY"
+    else:
+        assert first["status"] == "LOCKED_NOT_INSTANTIATED"
