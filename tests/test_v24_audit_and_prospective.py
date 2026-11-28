@@ -1,3 +1,6 @@
+# Generated artifacts are gitignored; see tests/conftest.py.
+REQUIRES_ARTIFACTS = ['experiments/results/market_memory.csv']
+
 import json
 import sqlite3
 import pandas as pd

@@ -8,6 +8,10 @@ Tests:
 5. Prospective worker execution in single-cycle mode.
 6. Research API exposure of worker telemetry and ledger records.
 """
+REQUIRES_ARTIFACTS = [
+    'experiments/results/research_improvement/har_qlike_24h_v1.joblib',
+    'experiments/results/research_improvement/har_ols_24h_v1.joblib',
+]  # gitignored research artefacts; see tests/conftest.py
 
 import os
 import json

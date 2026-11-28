@@ -11,6 +11,7 @@ Verifies that:
 6. The active model feature schema contains zero implied volatility features.
 =============================================================================
 """
+REQUIRES_ARTIFACTS = ['data/raw/iv7d.parquet']  # gitignored research artefacts; see tests/conftest.py
 
 import os
 import sys

@@ -2568,6 +2568,7 @@ function ThreeBackground({ enabled = true }) {
   return h("div", {
     ref: mountRef,
     className: "three-bg-canvas",
+    "aria-hidden": "true",
     style: {
       position: "fixed",
       top: 0,
@@ -3585,7 +3586,7 @@ function InstitutionalTickerBar({ livePrice, changePct, marketSummary }) {
     ? "Awaiting first poll"
     : `${venues} venue${venues === 1 ? "" : "s"} · price age ${priceAge.toFixed(1)}s`;
 
-  return h("div", { className: "institutional-ticker-bar" },
+  return h("div", { className: "institutional-ticker-bar", role: "region", "aria-label": "Live market telemetry" },
     h("div", { className: "ticker-item" },
       h("span", { style: { color: "#F8FAFC", fontWeight: "800" } }, "BTC/USD · Coinbase"),
       h("span", { className: `val ${isUp ? "up" : "down"}` }, price === null ? "Unavailable" : `$${price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`),
@@ -3765,7 +3766,7 @@ function HeroSection({ setPath, livePrice, changePct, predictionData, regimeData
     // About Feature Highlight — Explaining 5-Min Intelligence Radar Auto Refresh
     h("div", { style: { marginTop: "24px", background: "rgba(18, 26, 42, 0.6)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "20px", padding: "28px" } },
       h("div", { style: { fontSize: "0.78rem", color: "#A78BFA", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "8px" } }, "🛰️ SOURCE-BACKED MARKET MONITOR"),
-      h("h3", { style: { fontSize: "1.3rem", fontWeight: "800", color: "#F8FAFC", marginBottom: "12px" } }, "Market data and research authorization are reported separately"),
+      h("h2", { style: { fontSize: "1.3rem", fontWeight: "800", color: "#F8FAFC", marginBottom: "12px" } }, "Market data and research authorization are reported separately"),
       h("p", { style: { fontSize: "0.92rem", color: "#CBD5E1", lineHeight: "1.6", maxWidth: "900px" } },
         "The Terminal displays exchange-sourced BTC/USD prices and candles when the public Coinbase feed is available. Unverified derivatives, capital-flow and macro data are not substituted with estimates. Forecasts and execution remain unavailable until frozen research inputs and evaluation provenance are authenticated."
       )
@@ -4079,7 +4080,7 @@ function PredictionPanel({ predictionData, engineState = "offline" }) {
       h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" } },
         h("div", null,
           h("div", { style: { fontSize: "0.78rem", color: "#38BDF8", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.05em" } }, "Production forecast unavailable"),
-          h("h3", { style: { fontSize: "1.2rem", fontWeight: "800", color: "#F8FAFC", margin: "8px 0" } }, "Frozen research inputs and evaluation provenance are not authenticated."),
+          h("h2", { style: { fontSize: "1.2rem", fontWeight: "800", color: "#F8FAFC", margin: "8px 0" } }, "Frozen research inputs and evaluation provenance are not authenticated."),
           h("p", { style: { color: "#CBD5E1", margin: 0, lineHeight: 1.5, maxWidth: "700px" } },
             researchGate?.reason || "Model forecasts and trading remain disabled. Live spot-market data is shown separately."
           )
@@ -4162,7 +4163,7 @@ function PredictionPanel({ predictionData, engineState = "offline" }) {
     h("div", { className: "prediction-header-bar", style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" } },
       h("div", null,
         h("div", { style: { fontSize: "0.78rem", color: "#38BDF8", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.05em" } }, "🔬 CURRENT RESEARCH INFERENCE · BTC/USD"),
-        h("h3", { style: { fontSize: "1.3rem", fontWeight: "800", color: "#F8FAFC", marginTop: "2px" } }, "Hypothetical Research Scenario")
+        h("h2", { style: { fontSize: "1.3rem", fontWeight: "800", color: "#F8FAFC", marginTop: "2px" } }, "Hypothetical Research Scenario")
       ),
       h("div", { style: { display: "flex", alignItems: "center", flexWrap: "wrap", gap: "8px" } },
         h("span", {
@@ -11709,6 +11710,27 @@ function App() {
   const [marketSummary, setMarketSummary] = useState(null);
   const [healthData,      setHealthData]      = useState(null);
   const [securityBlocked, setSecurityBlocked] = useState(false);
+  // Accessibility (axe: scrollable-region-focusable). Panels with their own
+  // scrollbar could only be scrolled with a mouse; keyboard and screen-reader
+  // users were locked out of the log/table views. Mark them focusable after
+  // each route change, and only when they actually overflow.
+  useEffect(() => {
+    const mark = () => {
+      document.querySelectorAll("#root *").forEach((el) => {
+        if (el.hasAttribute("tabindex") || el.getAttribute("role") === "main") return;
+        const style = window.getComputedStyle(el);
+        const scrollsY = /(auto|scroll)/.test(style.overflowY) && el.scrollHeight > el.clientHeight + 4;
+        const scrollsX = /(auto|scroll)/.test(style.overflowX) && el.scrollWidth > el.clientWidth + 4;
+        if (!scrollsY && !scrollsX) return;
+        el.setAttribute("tabindex", "0");
+        if (!el.getAttribute("aria-label")) {
+          el.setAttribute("aria-label", scrollsY ? "Scrollable panel" : "Scrollable panel, scroll horizontally");
+        }
+      });
+    };
+    const id = window.setTimeout(mark, 600);
+    return () => window.clearTimeout(id);
+  }, [path]);
 
   // 3D FX and Workstation View Mode states
   const [is3dEnabled, setIs3dEnabled] = useState(() => {
@@ -12080,6 +12102,8 @@ function App() {
     // Top Research-Mode Status Panel
     h("div", {
       className: "research-status-banner",
+      role: "region",
+      "aria-label": "Research authorization status",
       style: {
         background: "linear-gradient(90deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98))",
         borderBottom: isGlobalAuth ? "1px solid rgba(0, 229, 168, 0.25)" : "1px solid rgba(56, 189, 248, 0.25)",
@@ -12174,17 +12198,21 @@ function App() {
       }
     }),
 
-    (path === "/landing" || path === "/" || !path) ? (
-      h("div", null,
-        h(HeroSection, { setPath: navigate, livePrice, changePct, predictionData, regimeData, qualityData, decisionData, systemStatus, entryQualityData })
-      )
-    ) : path === "/research" ? (
-      h(ResearchResultsView, { setPath: navigate, livePrice })
-    ) : path === "/arena" ? (
-      h(ArenaExperimentView, { livePrice, predictionData, regimeData, decisionData })
-    ) : (
-      h("div", { className: "terminal-container" },
-        h(TerminalView, terminalProps)
+    // Route content sits in its own landmark so the header, ticker and footer
+    // stay outside it (axe: landmark-contentinfo-is-top-level).
+    h("main", { id: "main-content" },
+      (path === "/landing" || path === "/" || !path) ? (
+        h("div", null,
+          h(HeroSection, { setPath: navigate, livePrice, changePct, predictionData, regimeData, qualityData, decisionData, systemStatus, entryQualityData })
+        )
+      ) : path === "/research" ? (
+        h(ResearchResultsView, { setPath: navigate, livePrice })
+      ) : path === "/arena" ? (
+        h(ArenaExperimentView, { livePrice, predictionData, regimeData, decisionData })
+      ) : (
+        h("div", { className: "terminal-container" },
+          h(TerminalView, terminalProps)
+        )
       )
     ),
 

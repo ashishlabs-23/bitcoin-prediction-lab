@@ -1,3 +1,6 @@
+# Generated artifacts are gitignored; see tests/conftest.py.
+REQUIRES_ARTIFACTS = ['data/raw/btcusd_1-min_data.csv']
+
 import json
 import hashlib
 from pathlib import Path

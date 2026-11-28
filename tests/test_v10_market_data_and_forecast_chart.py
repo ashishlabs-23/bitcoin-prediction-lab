@@ -11,6 +11,9 @@ Validates:
 7. Strict preservation of project invariants: live trading DISABLED, directional recommendation ABSTAIN.
 """
 
+# Generated artifacts are gitignored; see tests/conftest.py.
+REQUIRES_ARTIFACTS = ['data/raw/coinbase_15m.parquet']
+
 import json
 import math
 import os

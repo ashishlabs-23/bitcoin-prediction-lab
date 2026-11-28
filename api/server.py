@@ -27,6 +27,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 
 # Ensure project root is in sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -387,6 +388,30 @@ async def websocket_endpoint(websocket: WebSocket):
 # Cache policy lives in SecurityHeadersMiddleware (api/security_middleware.py):
 # it runs outermost on every response, so setting headers here would only be
 # overwritten. Versioned assets are immutable; HTML revalidates.
+# ---------------------------------------------------------------------------
+# Production docs guard
+# ---------------------------------------------------------------------------
+# docs_url/redoc_url/openapi_url are resolved when the FastAPI object is built,
+# i.e. at import time. Any process that imports api.server before
+# BTC_ENVIRONMENT=production is set keeps Swagger enabled for its whole life --
+# which is exactly what happens under a test runner, and would also happen in a
+# container that sets the variable late. Enforce the policy per request so it
+# cannot depend on import order.
+_DOC_PATHS = {"/docs", "/docs/oauth2-redirect", "/redoc", "/openapi.json"}
+
+
+@app.middleware("http")
+async def _production_docs_guard(request, call_next):
+    env_mode = (
+        os.getenv("BTC_ENVIRONMENT") or os.getenv("ENVIRONMENT") or "development"
+    ).strip().lower()
+    if env_mode == "production" and request.url.path in _DOC_PATHS:
+        return JSONResponse(
+            status_code=404, content={"detail": "Not Found"}
+        )
+    return await call_next(request)
+
+
 web_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "web"))
 if os.path.isdir(web_dir):
     app.mount("/", StaticFiles(directory=web_dir, html=True), name="web")

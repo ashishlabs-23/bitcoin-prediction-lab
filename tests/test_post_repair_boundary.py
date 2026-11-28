@@ -17,6 +17,15 @@ def test_evidence_boundary_format():
     assert dt.year >= 2026
 
 def test_dataset_audit_boundary_enforcement():
+    # Needs the gitignored market-memory database populated with historical rows.
+    import sqlite3
+    from config.database import MARKET_MEMORY_DB_PATH
+    try:
+        _rows = sqlite3.connect(MARKET_MEMORY_DB_PATH).execute("SELECT COUNT(*) FROM predictions").fetchone()[0]
+    except Exception:
+        _rows = 0
+    if _rows == 0:
+        pytest.skip("market_memory database is empty (gitignored research artefact)")
     counts = audit_dataset()
     assert isinstance(counts, dict)
     assert "VALID_POST_REPAIR" in counts

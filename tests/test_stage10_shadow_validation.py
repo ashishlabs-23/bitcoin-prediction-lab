@@ -15,6 +15,9 @@ Verifies:
 11. Honest evaluation of 70% objective (marked UNSUBSTANTIATED).
 """
 
+# Generated artifacts are gitignored; see tests/conftest.py.
+REQUIRES_ARTIFACTS = ['models/registry/research/directional_gbm_1h_v1.joblib']
+
 import os
 import sys
 import json

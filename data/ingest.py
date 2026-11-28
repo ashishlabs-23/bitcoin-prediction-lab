@@ -183,7 +183,7 @@ def fetch_open_interest(exchange_id: str, symbol: str, since_iso: str) -> pd.Dat
         fetch_fn = getattr(exchange, 'fetch_open_interest_history', getattr(exchange, 'fetchOpenInterestHistory', None))
         if fetch_fn is None:
             print(f"Warning: {exchange_id} does not support fetchOpenInterestHistory.")
-            return pd.DataFrame(columns=cols)
+            return pd.DataFrame(columns=["timestamp", "open_interest", "available_time"])
 
         since_ms = exchange.parse8601(since_iso)
         now_ms = exchange.milliseconds()
@@ -220,7 +220,7 @@ def fetch_open_interest(exchange_id: str, symbol: str, since_iso: str) -> pd.Dat
                 time.sleep(exchange.rateLimit / 1000.0)
 
         if not all_oi:
-            return pd.DataFrame(columns=cols)
+            return pd.DataFrame(columns=["timestamp", "open_interest", "available_time"])
 
         df = pd.DataFrame(all_oi)
         oi_col = (
@@ -230,7 +230,7 @@ def fetch_open_interest(exchange_id: str, symbol: str, since_iso: str) -> pd.Dat
         )
         if oi_col is None:
             print(f"Warning: Unexpected open interest response structure keys: {df.columns.tolist()}")
-            return pd.DataFrame(columns=cols)
+            return pd.DataFrame(columns=["timestamp", "open_interest", "available_time"])
 
         df = df.rename(columns={oi_col: 'open_interest'})
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms', utc=True)
@@ -241,7 +241,7 @@ def fetch_open_interest(exchange_id: str, symbol: str, since_iso: str) -> pd.Dat
         return df
     except Exception as e:
         print(f"Warning: Failed to fetch open interest for {symbol} on {exchange_id}: {e}")
-        return pd.DataFrame(columns=cols)
+        return pd.DataFrame(columns=["timestamp", "open_interest", "available_time"])
 
 
 def save_raw(df: pd.DataFrame, name: str) -> str:

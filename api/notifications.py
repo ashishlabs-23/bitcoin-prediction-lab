@@ -648,6 +648,25 @@ class NotificationManager:
         except Exception:
             candle_age_sec = 0.0
 
+        # Fail-closed freshness: a caller-supplied observation older than the
+        # cached candle must never be treated as fresh (stale snapshots are the
+        # most common way a stale alert slips past dedup/cooldown gating).
+        supplied_age_sec = None
+        if isinstance(market_data, dict) and market_data.get("timestamp"):
+            try:
+                raw_ts = market_data["timestamp"]
+                if isinstance(raw_ts, (int, float)) and not isinstance(raw_ts, bool):
+                    s_dt = datetime.fromtimestamp(float(raw_ts), tz=timezone.utc)
+                else:
+                    s_dt = datetime.fromisoformat(str(raw_ts).replace("Z", "+00:00"))
+                    if s_dt.tzinfo is None:
+                        s_dt = s_dt.replace(tzinfo=timezone.utc)
+                    s_dt = s_dt.astimezone(timezone.utc)
+                supplied_age_sec = (now_dt - s_dt).total_seconds()
+                candle_age_sec = max(candle_age_sec, supplied_age_sec)
+            except Exception:
+                supplied_age_sec = None
+
         is_stale = candle_age_sec > 7200.0
         override_freshness = bool(market_data and market_data.get("override_freshness"))
         if is_stale and not override_freshness:
@@ -655,6 +674,7 @@ class NotificationManager:
                 "status": "NO_ALERT",
                 "reason": "STALE_MARKET_DATA",
                 "candle_age_seconds": round(candle_age_sec, 1),
+                "supplied_observation_age_seconds": None if supplied_age_sec is None else round(supplied_age_sec, 1),
                 "message": "Market data exceeds 2-hour freshness threshold; positive alerts rejected."
             })
 
@@ -787,6 +807,10 @@ class NotificationManager:
             "regime": active_regime,
             "limitations": "Descriptive market research only. Live trading and automated execution are permanently disabled. Not a guaranteed return or directional recommendation.",
             "is_research_alert": True,
+            # Top-level non-execution guarantees (mirrored inside "governance" so
+            # consumers that read either shape can never infer an executable alert).
+            "live_trading_enabled": False,
+            "order_submission_enabled": False,
             "governance": {
                 "product_mode": "ANALYSIS_ONLY",
                 "live_trading_enabled": False,

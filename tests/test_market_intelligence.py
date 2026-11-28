@@ -1,6 +1,7 @@
 """
 Unit tests for Market Intelligence Engine in models/market_intelligence.py.
 """
+REQUIRES_ARTIFACTS = ['data/processed/features.parquet']  # gitignored research artefacts; see tests/conftest.py
 
 import sys
 import os

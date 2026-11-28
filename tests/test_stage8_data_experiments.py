@@ -9,6 +9,9 @@ Verifies:
 5. Production model registry immutability (HAR-RS-DOW-v1.0 preserved as authorized production model).
 """
 
+# Generated artifacts are gitignored; see tests/conftest.py.
+REQUIRES_ARTIFACTS = ['data/raw/binance_funding_2022_2026.parquet', 'data/raw/ohlcv.parquet']
+
 import os
 import json
 import numpy as np

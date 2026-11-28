@@ -190,8 +190,10 @@ async def test_research_alert_trigger_on_fresh_condition():
     }
 
     result = await mgr.evaluate_research_conditions(market_data=market_data, force=True)
-    assert result.get("status") in ["DELIVERED", "TRIGGERED", "NO_ALERT"]
-    if result.get("status") in ["DELIVERED", "TRIGGERED"]:
+    # Documented contract (docs/V21_RESEARCH_ALERT_RESTORATION.md): a triggered
+    # research alert returns status "ALERT_DISPATCHED" with a dispatch block.
+    assert result.get("status") in ["DELIVERED", "TRIGGERED", "ALERT_DISPATCHED", "NO_ALERT"]
+    if result.get("status") in ["DELIVERED", "TRIGGERED", "ALERT_DISPATCHED"]:
         alert = result.get("alert", {})
         assert alert.get("is_research_alert") is True
         assert "BTCUSD research condition detected" in alert.get("rationale", "") or "BTCUSD research condition detected" in alert.get("tier_title", "")

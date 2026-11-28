@@ -22,6 +22,7 @@ Validates all V23 requirements:
    - Confirms live trading and execution endpoints remain disabled (analysis only).
    - Confirms routine dashboard queries are 100% idempotent and append zero records.
 """
+REQUIRES_ARTIFACTS = ['experiments/results/market_memory.csv']  # gitignored research artefacts; see tests/conftest.py
 
 import os
 import json

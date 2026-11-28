@@ -41,7 +41,7 @@ from features.build_features import (
 )
 from validation.purged_split import PurgedWalkForwardSplit, sample_uniqueness
 from models.risk_metrics import (
-    sharpe_ratio, sortino_ratio, maximum_drawdown, calmar_ratio, win_rate, deflated_sharpe
+    sharpe_ratio, sortino_ratio, maximum_drawdown, calmar_ratio, deflated_sharpe
 )
 from models.regime_detector import MarketRegimeDetector, REGIMES
 
@@ -581,7 +581,7 @@ def simulate_event_trading_backtest(
     n_trades = len(net_arr)
     win_trades = (net_arr > 0).sum()
     loss_trades = (net_arr < 0).sum()
-    win_rate = win_trades / max(1, n_trades)
+    win_rate_pct = 100.0 * win_trades / max(1, n_trades)
 
     gross_gains = gross_arr[gross_arr > 0].sum() if (gross_arr > 0).any() else 1e-6
     gross_losses = np.abs(gross_arr[gross_arr < 0].sum()) if (gross_arr < 0).any() else 1e-6
@@ -603,7 +603,7 @@ def simulate_event_trading_backtest(
 
     return pd.DataFrame([{
         "Total Active Trades": n_trades,
-        "Win Rate %": round(win_rate * 100, 2),
+        "Win Rate %": round(win_rate_pct, 2),
         "Profit Factor": round(profit_factor, 4),
         "Avg Gross Return per Trade %": round(float(gross_arr.mean()) * 100, 4),
         "Avg Round-Trip Cost %": round(total_cost_pct * 100, 4),

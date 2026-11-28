@@ -534,6 +534,7 @@ def evaluate_candle(
 
     high_p  = float(candle.get("high", candle.get("close", 0)))
     low_p   = float(candle.get("low", candle.get("close", 0)))
+    close_p = float(candle.get("close", 0))
     now_raw = candle.get("timestamp", datetime.now(timezone.utc).isoformat())
     now     = now_raw.isoformat() if hasattr(now_raw, "isoformat") else str(now_raw)
 

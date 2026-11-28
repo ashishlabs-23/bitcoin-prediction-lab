@@ -18,7 +18,10 @@ def test_readme_contract_presence():
     assert "BTCognitive serves one web frontend" in content
     assert "Frozen model inputs remain unverified" in content
     assert "Production forecasts remain blocked" in content
-    assert "calibrated 90% confidence interval" in content
+    # The forecast envelope is explicitly uncalibrated (engine/forecast_engine_15m.py);
+    # the README must say so instead of claiming a calibrated interval.
+    assert "not a calibrated 90% confidence interval" in content
+    assert "uncalibrated diffusion band" in content
     assert "do not add fabricated prices, performance metrics, confidence scores, datasets" in content.casefold()
     assert "Read-only market-data access; no broker/order execution" in content
     assert "Provider outages, stale observations and insufficient history must result in explicit unavailable states" in content

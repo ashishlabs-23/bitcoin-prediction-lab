@@ -11,6 +11,7 @@ Verifies:
 7. Unresolved or invalid records are handled explicitly and excluded from resolved outcomes.
 8. Research authorization gate remains blocked and live trading safeguards remain active.
 """
+REQUIRES_ARTIFACTS = ['data/processed/features.parquet']  # gitignored research artefacts; see tests/conftest.py
 
 import os
 import sys
@@ -249,8 +250,7 @@ def test_research_gate_and_trading_safeguards_remain_intact():
         assert gate.get("trading_enabled", False) is False
         assert live_engine.is_running is False
 
-    # Live trading safeguard check
-    from engine.longitudinal_status import longitudinal_status_service
+    # Live trading safeguard check (service is imported at module level)
     report = longitudinal_status_service.get_status_report()
     assert report.evidence_phase == "POST_REPAIR"
     assert report.research_stop_rule_status == "NO_NEW_RESEARCH_REQUIRED"

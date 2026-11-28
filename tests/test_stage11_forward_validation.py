@@ -14,6 +14,9 @@ Verifies:
 10. Honest assessment: 70% directional accuracy objective marked UNSUBSTANTIATED with empirical upper bound.
 """
 
+# Generated artifacts are gitignored; see tests/conftest.py.
+REQUIRES_ARTIFACTS = ['models/registry/research/directional_gbm_1h_v1.joblib']
+
 import os
 import sys
 import json

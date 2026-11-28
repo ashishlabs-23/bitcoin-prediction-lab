@@ -10,6 +10,7 @@ Tests:
 """
 
 import math
+import os
 import pytest
 import numpy as np
 import pandas as pd
@@ -170,8 +171,14 @@ def test_stale_data_rejection():
     Verify that an observation older than max_staleness_seconds (10,800s) is rejected with MARKET_DATA_STALE.
     """
     planner = HypotheticalScenarioPlanner()
-    # Query with as_of_time 10 days in the future relative to latest parquet candle
-    future_time = datetime(2026, 11, 1, 0, 0, 0, tzinfo=timezone.utc)
+    # Derive the future as_of_time from the dataset itself (10 days past the last
+    # candle) instead of a hard-coded date: a fixed date silently stops being
+    # "future" as soon as the parquet is refreshed past it.
+    ohlcv_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "raw", "ohlcv.parquet")
+    last_candle = pd.Timestamp(pd.read_parquet(ohlcv_path, columns=["timestamp"])["timestamp"].max())
+    if last_candle.tzinfo is None:
+        last_candle = last_candle.tz_localize("UTC")
+    future_time = (last_candle + timedelta(days=10)).to_pydatetime().astimezone(timezone.utc)
     res = planner.compute_scenario_preview(horizon="24h", as_of_time=future_time)
     assert res["status"] == "UNAVAILABLE"
     assert res["rejection_code"] == "MARKET_DATA_STALE"

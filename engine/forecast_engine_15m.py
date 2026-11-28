@@ -28,6 +28,9 @@ import pandas as pd
 
 from engine.coinbase_15m_adapter import coinbase_15m_adapter, GRANULARITY_15M
 
+# Repository root, derived from this file rather than the working directory.
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
 
 def _utc_iso(epoch_sec: float) -> str:
     return datetime.fromtimestamp(epoch_sec, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")

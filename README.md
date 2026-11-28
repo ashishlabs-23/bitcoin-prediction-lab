@@ -7,6 +7,16 @@ BTCognitive is a scientific market risk intelligence platform and empirical rese
 > - **Epistemic Integrity:** Volatility forecasting accuracy (QLIKE, RMSE) is never conflated with directional return prediction or unconditional profitability.
 > - **Production Lock:** Research models remain `OFFLINE_RESEARCH_ONLY`. Production trading is permanently `DISABLED`.
 
+### Current status (2026-11-28)
+
+- BTCognitive serves one web frontend: the FastAPI app in `api/server.py` mounts the static terminal in `web/` (`index.html` + `app.js`) at `/`. There is no second UI to keep in sync.
+- Frozen model inputs remain unverified: the freeze-integrity verifier reports `FREEZE_BROKEN` (missing research benchmarks and a Python-minor mismatch), so no frozen artifact is treated as authoritative.
+- Production forecasts remain blocked. The terminal exposes research envelopes only, and every forecast carries `OFFLINE_RESEARCH_ONLY` governance flags.
+- The 15-minute forecast envelope is a nominal, uncalibrated diffusion band (`uncertainty_method: "Nominal Model-Based Diffusion Envelope"`). It is not a calibrated 90% confidence interval and the UI never presents it as one.
+- Read-only market-data access; no broker/order execution path exists in this codebase.
+- Provider outages, stale observations and insufficient history must result in explicit unavailable states (`STALE_MARKET_DATA`, `DATA_UNAVAILABLE`, `INSUFFICIENT_CONTINUOUS_HISTORY`) rather than a silently reused or interpolated quote.
+- Research discipline: do not add fabricated prices, performance metrics, confidence scores, datasets or backtest results to this repository or to the terminal.
+
 ---
 
 ## 1. System Architecture

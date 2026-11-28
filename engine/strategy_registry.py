@@ -275,6 +275,7 @@ def evaluate_epoch(strategy_name: str) -> Dict[str, Any]:
     if metrics["profit_factor"] <= th["min_profit_factor"]:
         blockers.append(f"Level 4 (Execution Realism) FAIL: Profit Factor {metrics['profit_factor']:.2f} <= {th['min_profit_factor']}")
 
+    keep = not blockers
     notes = "All 7 rungs passed" if keep else " | ".join(blockers)
     now = datetime.now(timezone.utc).isoformat()
     decision = "KEEP" if keep else "RETIRE"
