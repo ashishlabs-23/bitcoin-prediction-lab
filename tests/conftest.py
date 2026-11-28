@@ -219,7 +219,11 @@ def _protect_research_artifacts() -> Generator[None, None, None]:
 
     protected_prefixes = ("research/", "results/", "data/", "experiments/")
     leaked = sorted(
-        f for f in (_dirty() - before) if f.startswith(protected_prefixes)
+        f for f in (_dirty() - before)
+        # Never revert source: an in-progress edit under research/ (or anywhere
+        # else) is not a "mutated artefact". This guard once silently threw away
+        # a working-tree fix while a full suite was running.
+        if f.startswith(protected_prefixes) and not f.endswith((".py", ".pyi", ".pyx"))
     )
     if leaked:
         _git("checkout", "--", *leaked)

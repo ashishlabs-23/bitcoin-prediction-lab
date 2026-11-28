@@ -1961,7 +1961,33 @@ class V12StrategyTournamentEngine:
 # =============================================================================
 
 COST_SCENARIOS = V12StrategyTournamentEngine.COST_SCENARIOS
-REGIME_TOURNAMENT_ENGINE = V12StrategyTournamentEngine()
+
+
+class _LazyEngine:
+    """Constructs the tournament engine on first attribute access.
+
+    Building the engine at import time reads data/raw/ohlcv.parquet, which is
+    gitignored: a fresh clone, CI, or any tooling that merely imports the module
+    (api.server -> api.routes_tournament -> this module) crashed with
+    FileNotFoundError before a single request was served. Call sites keep using
+    REGIME_TOURNAMENT_ENGINE.<attr> unchanged.
+    """
+
+    _engine = None
+
+    def _get(self) -> "V12StrategyTournamentEngine":
+        if _LazyEngine._engine is None:
+            _LazyEngine._engine = V12StrategyTournamentEngine()
+        return _LazyEngine._engine
+
+    def __getattr__(self, name):
+        return getattr(self._get(), name)
+
+    def __repr__(self) -> str:  # pragma: no cover - debugging aid
+        return "<lazy V12StrategyTournamentEngine>"
+
+
+REGIME_TOURNAMENT_ENGINE = _LazyEngine()
 
 
 def build_market_snapshot(
