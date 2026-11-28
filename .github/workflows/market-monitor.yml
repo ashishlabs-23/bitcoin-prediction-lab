@@ -34,7 +34,13 @@ jobs:
           python -m pip install \
             "fastapi>=0.110" "httpx>=0.27" "pydantic>=2" "starlette" \
             "numpy>=1.26" "pandas>=2.0" "pyarrow>=14" "scikit-learn>=1.3" \
+            "xgboost>=2.0" \
             "pytest>=8" "pytest-asyncio" "hypothesis"
+          # torch/shap stay out: torch is an optional accelerator in
+          # models/regime_detector.py (HAS_TORCH guard) and shap is only used by
+          # engine/explainability.py, which is imported lazily. xgboost is NOT
+          # optional -- models/ensemble.py imports it at module scope and the
+          # server reaches it, which is what broke the first fixed run.
 
       - name: Verify the app imports
         run: python -c "import api.server; print('app import OK')"
