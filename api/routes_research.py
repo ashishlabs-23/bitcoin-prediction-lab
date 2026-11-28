@@ -1316,26 +1316,55 @@ def get_shadow_validation_ledger(limit: int = Query(50, ge=1, le=500), event_typ
     if not os.path.isfile(ledger_path):
         raise HTTPException(status_code=404, detail="Shadow prediction ledger not found.")
 
-    events = []
-    try:
-        with open(ledger_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                ev = json.loads(line)
-                if event_type is None or ev.get("event_type") == event_type:
-                    events.append(ev)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to read ledger: {e}")
-
-    # Return the most recent 'limit' events
-    recent = events[-limit:]
+    # The ledger grows to tens of megabytes (46.5 MB at the time of writing), so
+    # parsing it per request cost ~1.2 s and O(file) memory just to return 50
+    # events. Read backwards from EOF instead and stop as soon as `limit` events
+    # have been collected.
+    recent = _tail_jsonl(ledger_path, limit=limit, event_type=event_type)
+    if recent is None:
+        raise HTTPException(status_code=500, detail="Failed to read ledger.")
     return {
-        "total_matching_events": len(events),
         "returned_events_count": len(recent),
-        "events": recent
+        "events": recent,
+        "total_matching_events": None,
+        "count_semantics": "exact total requires a full scan; omitted to keep the endpoint O(limit)",
     }
+
+
+def _tail_jsonl(path: str, limit: int, event_type: Optional[str] = None, block_size: int = 65536) -> Optional[list]:
+    """Return the last `limit` JSON objects from a JSONL file, reading backwards."""
+    try:
+        with open(path, "rb") as fh:
+            fh.seek(0, os.SEEK_END)
+            pos = fh.tell()
+            buffer = b""
+            collected: list = []
+            while pos > 0 and len(collected) < limit:
+                read_size = min(block_size, pos)
+                pos -= read_size
+                fh.seek(pos)
+                buffer = fh.read(read_size) + buffer
+                lines = buffer.split(b"\n")
+                # The first element may be a partial line unless we reached BOF.
+                buffer = lines[0] if pos > 0 else b""
+                candidates = lines[1:] if pos > 0 else lines
+                for raw_line in reversed(candidates):
+                    raw_line = raw_line.strip()
+                    if not raw_line:
+                        continue
+                    try:
+                        ev = json.loads(raw_line)
+                    except json.JSONDecodeError:
+                        continue
+                    if event_type is None or ev.get("event_type") == event_type:
+                        collected.append(ev)
+                        if len(collected) >= limit:
+                            break
+            collected.reverse()
+            return collected
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.error("Failed to tail shadow ledger: %s", type(exc).__name__)
+        return None
 
 
 @router.get("/forward-status")
@@ -1616,9 +1645,15 @@ def get_entry_quality(
         sigma_t0 = max(0.008, sigma_t0)
         feats = entry_quality_engine.compute_setup_features(closes, highs, lows, side=side)
     else:
-        current_price = 65000.0
-        sigma_t0 = 0.012
-        feats = {f: 0.0 for f in entry_quality_engine.feature_names}
+        # Never fabricate a tape: without the dataset there is no defensible
+        # entry, volatility or feature vector to score (AGENTS.md §2.5).
+        return {
+            "status": "DATA_UNAVAILABLE",
+            "reason": "data/raw/ohlcv.parquet is absent; entry quality cannot be evaluated.",
+            "engine_version": entry_quality_engine.RESOLVER_VERSION,
+            "decision": None,
+            "recent_prospective_records": [],
+        }
 
     try:
         decision = entry_quality_engine.evaluate_decision_gate(
@@ -1636,7 +1671,7 @@ def get_entry_quality(
         logger.error(f"Entry quality decision evaluation failed: {e}")
         return {
             "status": "FAILED",
-            "error": str(e),
+            "error": "Entry-quality evaluation failed; see server logs.",
             "engine_version": entry_quality_engine.RESOLVER_VERSION,
             "features_evaluated": feats,
             "decision": None,
@@ -1660,8 +1695,6 @@ def get_entry_quality(
         "decision": decision,
         "recent_prospective_records": recent_ledger
     }
-
-
 
 
 

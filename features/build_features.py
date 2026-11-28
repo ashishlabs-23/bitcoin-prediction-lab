@@ -16,6 +16,7 @@ import numpy as np
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from config import DATA_RAW_DIR, DATA_PROCESSED_DIR
+from data.validate import DataValidationError, validate_ohlcv
 
 
 def load_raw() -> Dict[str, pd.DataFrame]:
@@ -103,6 +104,17 @@ def compute_technical_features(ohlcv: pd.DataFrame) -> pd.DataFrame:
     if ohlcv.empty:
         return ohlcv.copy()
 
+    # Fail closed: never compute features from a frame whose hard OHLCV
+    # invariants are broken (duplicate timestamps, high<low, NaN prices, ...).
+    # A single validation call, before any feature arithmetic.
+    try:
+        raw_report = validate_ohlcv(ohlcv, name="raw_ohlcv")
+    except DataValidationError as exc:
+        print(f"ERROR: refusing to build features from an invalid OHLCV frame: {exc}")
+        raise
+    for warning in raw_report.warnings:
+        print(f"Raw OHLCV validation warning: {warning}")
+
     df = ohlcv.copy()
     df = df.sort_values('timestamp').reset_index(drop=True)
 
@@ -146,9 +158,18 @@ def compute_technical_features(ohlcv: pd.DataFrame) -> pd.DataFrame:
             (df['low'] - prev_close).abs(),
         ], axis=1).max(axis=1)
         df['atr_14'] = tr.ewm(alpha=1.0 / 14.0, min_periods=14, adjust=False).mean()
+        # int8 0/1 rather than bool: keeps the feature matrix numerically
+        # homogeneous for models that do `df[cols].values` (object dtype would
+        # break np.nanmean in training/retrain_pipeline.py).
+        df['atr_14_imputed'] = np.zeros(len(df), dtype=np.int8)
     else:
         # Fallback if high/low absent (should not happen with standard OHLCV)
+        # This is an IMPUTED proxy, not a true ATR: flag it so downstream code
+        # (fitness/backtest sizing) can exclude or down-weight it.
+        print("Warning: high/low absent; atr_14 is an imputed proxy "
+              "(realized_vol_24h * close). Marking atr_14_imputed=1.")
         df['atr_14'] = df['realized_vol_24h'] * df['close']
+        df['atr_14_imputed'] = np.ones(len(df), dtype=np.int8)
 
     return df
 
@@ -157,11 +178,20 @@ def compute_derivatives_features(funding: pd.DataFrame, oi: pd.DataFrame) -> pd.
     """
     Returns a DataFrame keyed by timestamp with columns:
       funding_rate, funding_rate_change_24h, open_interest, oi_pct_change_24h,
-      available_time
+      available_time, funding_rate_imputed, open_interest_imputed
     If funding or oi input is empty, return an empty DataFrame with these
     columns (don't crash) — the merge step must handle a missing source.
+
+    The two `*_imputed` int8 flags (0 = observed, 1 = placeholder) mark columns
+    whose source was entirely missing. Values are NEVER fabricated: a missing
+    source yields NaN plus a 1 flag, so downstream code can drop the column
+    instead of treating NaN (or a hard-coded default) as an observation.
     """
-    cols = ['timestamp', 'funding_rate', 'funding_rate_change_24h', 'open_interest', 'oi_pct_change_24h', 'available_time']
+    cols = [
+        'timestamp', 'funding_rate', 'funding_rate_change_24h', 'open_interest',
+        'oi_pct_change_24h', 'available_time',
+        'funding_rate_imputed', 'open_interest_imputed',
+    ]
 
     if funding.empty and oi.empty:
         return pd.DataFrame(columns=cols)
@@ -195,6 +225,21 @@ def compute_derivatives_features(funding: pd.DataFrame, oi: pd.DataFrame) -> pd.
     for c in cols:
         if c not in res.columns:
             res[c] = np.nan
+
+    # Imputation flags (int8 0/1, numeric so model matrices stay float-typed):
+    # 1 means the column is a non-observed placeholder (all-NaN from a missing
+    # source) rather than a genuine exchange observation. No hard-coded
+    # funding/OI default is ever substituted here; the flags let downstream
+    # code drop the column instead of mistaking NaN for data.
+    for flag_col, source_col in (
+        ('funding_rate_imputed', 'funding_rate'),
+        ('open_interest_imputed', 'open_interest'),
+    ):
+        if flag_col not in res.columns or res[flag_col].isna().all():
+            placeholder = bool(res[source_col].isna().all())
+            res[flag_col] = np.full(len(res), 1 if placeholder else 0, dtype=np.int8)
+        else:
+            res[flag_col] = res[flag_col].fillna(0).astype(np.int8)
 
     return res[cols]
 
@@ -279,4 +324,3 @@ if __name__ == "__main__":
         print("\nPASS: No NaNs remain in non-timestamp columns and shape > 0.")
     else:
         print("\nFAIL: Feature engineering smoke checks failed.")
-

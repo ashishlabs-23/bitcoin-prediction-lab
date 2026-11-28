@@ -13,6 +13,12 @@ primary_region = "sin"        # Singapore — closest to India for low latency
   ENVIRONMENT     = "production"
   SQLITE_DB_PATH  = "/app/data/market_memory.db"
   MEIE_DB_PATH    = "/app/data/meie_memory.db"
+  # TrustedHostMiddleware rejects any Host header not listed here, and
+  # CORSMiddleware only answers browser origins listed in the second var.
+  # Without these the deployed app answers 400 "Invalid host header" to every
+  # request (including the Fly /health check below).
+  BTCOGNITIVE_ALLOWED_HOSTS   = "btcognitive-engine.fly.dev,localhost,127.0.0.1"
+  BTCOGNITIVE_ALLOWED_ORIGINS = "https://btcognitive-engine.fly.dev,https://btcognitive-engine.onrender.com,http://localhost:8000,http://127.0.0.1:8000"
   # Secrets (BTCOGNITIVE_ADMIN_KEY, SMTP_PASSWORD, etc.) are set via:
   #   fly secrets set BTCOGNITIVE_ADMIN_KEY="..."
   # NEVER put real secrets in this file.

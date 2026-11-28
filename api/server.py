@@ -215,6 +215,19 @@ async def lifespan(app: FastAPI):
                         time.perf_counter() - started,
                     )
                     first = False
+                # The feature cache used to be populated once at boot and never
+                # refreshed, while the status contract still called it LIVE.
+                # Reload it whenever a newer closed candle lands (cheap no-op
+                # otherwise) and keep the blocking parquet read off the loop.
+                try:
+                    refreshed = await asyncio.to_thread(feature_cache.refresh)
+                    if refreshed:
+                        logger.info(
+                            "Warm-up: feature cache refreshed to %s",
+                            feature_cache.last_observation_time(),
+                        )
+                except Exception as exc:
+                    logger.debug("Feature-cache refresh skipped: %s", type(exc).__name__)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:

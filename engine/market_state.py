@@ -13,6 +13,8 @@ Synthesizes decoupled, multi-layer contextual market intelligence:
 
 import os
 import sys
+import time
+import numpy as np
 import pandas as pd
 from dataclasses import dataclass, asdict
 from typing import Dict, List, Tuple, Any, Optional
@@ -21,7 +23,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from datetime import datetime, timezone
 from engine.volatility_bridge import volatility_bridge_service, VolatilityTermStructure
-from engine.market_state_explanation import generate_market_state_narrative
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 RESULTS_DIR = os.path.join(ROOT_DIR, "results")
@@ -86,6 +87,63 @@ def classify_derivatives_quadrant(price_change_pct: float, oi_change_pct: float,
     return "STABLE"
 
 
+
+# ---------------------------------------------------------------------------
+# Real point-in-time inputs (added 2026-11-28)
+# ---------------------------------------------------------------------------
+# The market-state endpoint previously reported a hard-coded $65,200 tape while
+# the live quote was $59,450. These helpers read the last closed hourly candle
+# from the local dataset and refuse to answer when the observation is stale.
+_LIVE_INPUT_CACHE: Dict[str, Any] = {"ts": 0.0, "value": None}
+LIVE_INPUT_TTL_SECONDS = 60.0
+MARKET_STATE_MAX_AGE_SECONDS = 7200.0
+
+
+def _load_live_inputs(ttl: float = LIVE_INPUT_TTL_SECONDS) -> Optional[Dict[str, Any]]:
+    """Return {current_price, vol_24h, source} from the last closed candle, or None."""
+    now = time.time()
+    cached = _LIVE_INPUT_CACHE.get("value")
+    if cached is not None and (now - float(_LIVE_INPUT_CACHE.get("ts", 0.0))) < ttl:
+        return cached
+
+    path = os.path.join(ROOT_DIR, "data", "raw", "ohlcv.parquet")
+    if not os.path.exists(path):
+        _LIVE_INPUT_CACHE.update({"ts": now, "value": None})
+        return None
+    try:
+        df = pd.read_parquet(path, columns=["timestamp", "close"])
+    except Exception:
+        _LIVE_INPUT_CACHE.update({"ts": now, "value": None})
+        return None
+    if df.empty or len(df) < 25:
+        _LIVE_INPUT_CACHE.update({"ts": now, "value": None})
+        return None
+
+    df = df.sort_values("timestamp")
+    last_ts = pd.Timestamp(df["timestamp"].iloc[-1])
+    if last_ts.tzinfo is None:
+        last_ts = last_ts.tz_localize("UTC")
+    age = (datetime.now(timezone.utc) - last_ts.to_pydatetime()).total_seconds()
+    if age > MARKET_STATE_MAX_AGE_SECONDS:
+        _LIVE_INPUT_CACHE.update({"ts": now, "value": None})
+        return None
+
+    closes = df["close"].astype(float).to_numpy()[-25:]
+    if not np.all(np.isfinite(closes)) or closes[-1] <= 0:
+        _LIVE_INPUT_CACHE.update({"ts": now, "value": None})
+        return None
+    log_ret = np.diff(np.log(closes))
+    vol_24h = float(np.std(log_ret, ddof=1) * np.sqrt(24.0)) if log_ret.size >= 2 else 0.0
+
+    value = {
+        "current_price": float(closes[-1]),
+        "vol_24h": vol_24h,
+        "source": f"ohlcv.parquet last closed candle {last_ts.isoformat()} (age {age:.0f}s)",
+    }
+    _LIVE_INPUT_CACHE.update({"ts": now, "value": value})
+    return value
+
+
 @dataclass
 class MarketState:
     timestamp: str
@@ -114,80 +172,126 @@ class MarketStateEngine:
 
     def evaluate_market_state(
         self,
-        current_price: float = 65200.0,
-        vol_24h: float = 0.015,
-        hawkes_direction: str = "BEARISH",
-        uncertainty: float = 1.6
+        current_price: Optional[float] = None,
+        vol_24h: Optional[float] = None,
+        hawkes_direction: Optional[str] = None,
+        uncertainty: Optional[float] = None,
+        persist: bool = False,
     ) -> MarketState:
+        """
+        Build the market state from REAL inputs only.
+
+        Governance (AGENTS.md §2.5): this method used to return hard-coded
+        defaults (price 65200.0, vol 0.015, "BEARISH", a $65,200 tape that was
+        9.7% away from the live quote) stamped overall_data_quality="VALID" and
+        governance_status="PRODUCTION". Anything that cannot be derived from a
+        real observation is now reported as UNAVAILABLE with a null value, and a
+        missing/stale price source returns a DATA_UNAVAILABLE state instead of
+        invented numbers.
+        """
         now_dt = datetime.now(timezone.utc)
         now_iso = now_dt.isoformat()
         session_ctx = classify_utc_session(now_dt)
 
+        source_note = "supplied"
+        if current_price is None or vol_24h is None:
+            derived = _load_live_inputs()
+            if derived is None:
+                return self._unavailable_state(
+                    now_iso, session_ctx,
+                    reason="No fresh closed-candle observation available for the market state.",
+                )
+            if current_price is None:
+                current_price = derived["current_price"]
+            if vol_24h is None:
+                vol_24h = derived["vol_24h"]
+            source_note = derived["source"]
+
+        try:
+            current_price = float(current_price)
+            vol_24h = float(vol_24h)
+        except (TypeError, ValueError):
+            return self._unavailable_state(
+                now_iso, session_ctx, reason="Non-numeric price or volatility input.",
+            )
+        if not np.isfinite(current_price) or current_price <= 0 or not np.isfinite(vol_24h) or vol_24h < 0:
+            return self._unavailable_state(
+                now_iso, session_ctx, reason="Non-positive price or negative volatility input.",
+            )
+
         # Volatility term structure
         vol_ts = volatility_bridge_service.analyze_term_structure(vol_24h=vol_24h)
 
+        # Microstructure / order-flow subsystems have no wired point-in-time
+        # source on this path, so they are reported as unavailable rather than
+        # filled with invented intensities.
         micro_state = {
-            "hawkes_event_pressure": "HIGH_SELLING_INTENSITY",
-            "buy_sell_intensity_ratio": 0.65,
-            "liquidity_intensity": 1.42,
-            "volatility_intensity": 1.15,
+            "hawkes_event_pressure": None,
+            "buy_sell_intensity_ratio": None,
+            "liquidity_intensity": None,
+            "volatility_intensity": None,
             "short_term_direction": hawkes_direction,
-            "short_term_uncertainty": 0.1,
-            "governance_status": "VALIDATED_SHADOW_MODEL"
+            "short_term_uncertainty": None,
+            "governance_status": "UNAVAILABLE",
         }
 
         short_state = {
-            "short_term_momentum": -0.0012,
+            "short_term_momentum": None,
             "short_term_range": f"${round(current_price * 0.998, 2)} - ${round(current_price * 1.002, 2)}",
-            "order_flow_state": "BID_SIDE_DEPLETION",
-            "governance_status": "RESEARCH_ONLY"
+            "short_term_range_basis": "nominal +/-0.2% band around the reference price, not a model forecast",
+            "order_flow_state": None,
+            "governance_status": "UNAVAILABLE",
         }
 
         inter_state = {
-            "1h_volatility_bps": 42.5,
-            "1h_technical_trend": "MILD_MOMENTUM_DOWNTREND",
-            "1h_ofi_state": "NEGATIVE_IMBALANCE",
-            "4h_volatility_bps": 88.4,
-            "4h_derivatives_asymmetry": "POSITIVE_FUNDING_LONG_CROWDED",
-            "4h_funding_state": "ELEVATED_PREMIUM",
-            "governance_status": "RESEARCH_ONLY"
+            "1h_volatility_bps": round(vol_24h * 10000.0 / np.sqrt(24.0), 1),
+            "1h_technical_trend": None,
+            "1h_ofi_state": None,
+            "4h_volatility_bps": round(vol_24h * 10000.0 / np.sqrt(6.0), 1),
+            "4h_derivatives_asymmetry": None,
+            "4h_funding_state": None,
+            "governance_status": "RESEARCH_ONLY",
         }
-
-        deriv_quadrant = classify_derivatives_quadrant(
-            price_change_pct=float(short_state["short_term_momentum"]) * 100.0,
-            oi_change_pct=3.2
-        )
 
         deriv_state = {
-            "perp_funding_rate_8h": 0.00015,
-            "open_interest_24h_change_pct": 3.2,
-            "funding_regime": "MILD_LONG_BIAS",
-            "derivatives_quadrant": deriv_quadrant
+            "perp_funding_rate_8h": None,
+            "open_interest_24h_change_pct": None,
+            "funding_regime": None,
+            "derivatives_quadrant": None,
+            "governance_status": "UNAVAILABLE",
         }
 
+        # P90 excursion band derived from the supplied 24h volatility, not from
+        # hard-coded percentages.
+        z90 = 1.6449
+        upper = current_price * float(np.exp(z90 * vol_24h))
+        lower = current_price * float(np.exp(-z90 * vol_24h))
         long_state = {
-            "24h_mfe_p50_pct": 0.4120,
-            "24h_mae_p50_pct": 0.5812,
-            "upper_p90": round(current_price * 1.026, 2),
-            "lower_p90": round(current_price * 0.967, 2),
-            "long_term_risk_state": "ASYMMETRIC_DOWNSIDE",
-            "governance_status": "PRODUCTION"
+            "24h_mfe_p50_pct": None,
+            "24h_mae_p50_pct": None,
+            "upper_p90": round(upper, 2),
+            "lower_p90": round(lower, 2),
+            "band_basis": "lognormal 90% band from the supplied 24h realized volatility (nominal, uncalibrated)",
+            "long_term_risk_state": None,
+            "governance_status": "RESEARCH_ONLY",
         }
 
         uncert_state = {
             "composite_uncertainty": uncertainty,
-            "confidence_band": "MODERATE",
-            "conformal_coverage_p90": 90.32
+            "confidence_band": None,
+            "conformal_coverage_p90": None,
         }
 
-        explanation = generate_market_state_narrative(
-            short_term_direction=hawkes_direction,
-            microstructure_intensity=micro_state["hawkes_event_pressure"],
-            volatility_regime=vol_ts.regime,
-            derivatives_asymmetry=inter_state["4h_derivatives_asymmetry"],
-            long_term_risk_state=long_state["long_term_risk_state"],
-            uncertainty_level=uncertainty
-        )
+        explanation = {
+            "summary": (
+                f"Reference price {current_price:,.2f} with a 24h realized volatility of "
+                f"{vol_24h * 100:.2f}% ({vol_ts.regime}). Microstructure, order-flow and "
+                "derivatives states are reported as unavailable because no point-in-time "
+                "source is wired into this path."
+            ),
+            "input_source": source_note,
+            "governance": "OFFLINE_RESEARCH_ONLY — descriptive only, no directional recommendation.",
+        }
 
         ms = MarketState(
             timestamp=now_iso,
@@ -201,27 +305,51 @@ class MarketStateEngine:
             long_term_state=long_state,
             uncertainty_state=uncert_state,
             explanation=explanation,
-            overall_data_quality="VALID",
+            overall_data_quality="PARTIAL_REAL_INPUTS",
             model_versions={
-                "production_ridge": "v3.0.0-excursion-ridge-conformal",
-                "shadow_hawkes": "v1.0.0-challenger-hawkes-microstructure",
+                "production_ridge": "NOT_LOADED",
+                "shadow_hawkes": "NOT_LOADED",
                 "volatility_bridge": "v1.0.0-deterministic-term-structure"
             },
             session_context=session_ctx
         )
 
-        df_ms = pd.DataFrame([{
-            "timestamp": ms.timestamp,
-            "current_price": ms.current_price,
-            "volatility_regime": vol_ts.regime,
-            "short_direction": hawkes_direction,
-            "long_risk_state": long_state["long_term_risk_state"],
-            "uncertainty": uncertainty
-        }])
-        csv_path = os.path.join(RESULTS_DIR, "market_state.csv")
-        df_ms.to_csv(csv_path, index=False)
+        if persist:
+            # Persistence is opt-in: a GET must never truncate the history file.
+            self._append_snapshot(ms, vol_ts.regime)
 
         return ms
+
+    @staticmethod
+    def _append_snapshot(ms: "MarketState", regime: str) -> None:
+        csv_path = os.path.join(RESULTS_DIR, "market_state.csv")
+        row = pd.DataFrame([{
+            "timestamp": ms.timestamp,
+            "current_price": ms.current_price,
+            "volatility_regime": regime,
+            "data_quality": ms.overall_data_quality,
+        }])
+        header = not os.path.exists(csv_path)
+        row.to_csv(csv_path, index=False, mode="a", header=header)
+
+    def _unavailable_state(self, now_iso: str, session_ctx: Optional[Dict[str, Any]], reason: str) -> MarketState:
+        """Explicit typed unavailable state (never invented values)."""
+        return MarketState(
+            timestamp=now_iso,
+            symbol="BTCUSD",
+            current_price=None,
+            microstructure_state={"governance_status": "UNAVAILABLE"},
+            short_term_state={"governance_status": "UNAVAILABLE"},
+            intermediate_state={"governance_status": "UNAVAILABLE"},
+            volatility_state={"governance_status": "UNAVAILABLE"},
+            derivatives_state={"governance_status": "UNAVAILABLE"},
+            long_term_state={"governance_status": "UNAVAILABLE"},
+            uncertainty_state={"governance_status": "UNAVAILABLE"},
+            explanation={"summary": reason, "governance": "DATA_UNAVAILABLE"},
+            overall_data_quality="DATA_UNAVAILABLE",
+            model_versions={"production_ridge": "NOT_LOADED", "shadow_hawkes": "NOT_LOADED"},
+            session_context=session_ctx,
+        )
 
 
 market_state_engine = MarketStateEngine()

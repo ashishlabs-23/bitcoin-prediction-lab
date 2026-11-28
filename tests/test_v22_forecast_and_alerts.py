@@ -227,15 +227,28 @@ def test_forecast_out_of_sample_tournament_leaderboard(client):
 # 3. Research Alert Reliability & State Persistence
 # ===========================================================================
 
-def test_research_alert_force_query_requires_admin_role(client):
-    """Verify that unauthenticated ?force=true is blocked with HTTP 403 Forbidden."""
+def test_research_alert_evaluate_requires_research_role(client):
+    """Anonymous callers are refused before any evaluation runs.
+
+    The endpoint dispatches outbound notifications, so it requires at least the
+    RESEARCH role (api/routes_notifications.py). Unauthenticated ?force=true is
+    still rejected by the role gate itself (403, before the force/ADMIN check).
+    """
     res = client.post("/api/notifications/research-alerts/evaluate?force=true")
     assert res.status_code == 403, "Unauthenticated ?force=true must be rejected with 403 Forbidden!"
-    assert "requires ADMIN role credentials" in res.json().get("detail", "")
 
-    # Normal evaluation without force is allowed
+    # Normal evaluation without force is NOT open to anonymous callers either
     res_normal = client.post("/api/notifications/research-alerts/evaluate?force=false")
-    assert res_normal.status_code == 200
+    assert res_normal.status_code == 403, "Anonymous evaluation must be refused (RESEARCH role required)"
+
+    # A RESEARCH-tier credential is accepted for a non-forced evaluation
+    research_key = next((k for k, r in API_KEYS_ENV.items() if r == UserRole.RESEARCH), None)
+    if research_key:
+        res_research = client.post(
+            "/api/notifications/research-alerts/evaluate?force=false",
+            headers={"X-API-Key": research_key}
+        )
+        assert res_research.status_code == 200
 
 
 def test_research_alert_force_query_allowed_for_admin(client):

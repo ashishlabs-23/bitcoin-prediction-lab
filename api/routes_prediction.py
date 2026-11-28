@@ -18,6 +18,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from engine.feature_cache import feature_cache
 from backtest.market_memory import load_market_memory, record_prediction
 from api.security_auth import require_role
+from api.security_middleware import sanitize_client_error
 from config.security import UserRole
 
 logger = logging.getLogger("btcognitive.routes_prediction")
@@ -364,7 +365,7 @@ async def get_market_regime(live: bool = False):
         return {
             "status": "DEGRADED",
             "current_regime": "TRANSITION_UNSUPPORTED",
-            "reason": str(e),
+            "reason": sanitize_client_error(e),
             "governance": {
                 "directional_authorization": "OFFLINE_RESEARCH_ONLY",
                 "execution_authorization": "DISABLED"
@@ -749,6 +750,43 @@ def get_prediction_market_state():
 
 @router.get("/prediction/market-state/history")
 def get_prediction_market_state_history(limit: int = Query(50, ge=1, le=200)):
+    """
+    Returns the persisted market-state snapshots, newest last.
+
+    This endpoint used to repeat the current evaluation `limit` times and label
+    the result "VALID", which produced 50 byte-identical rows that looked like
+    history. Only real persisted snapshots are returned now; when none exist the
+    response is an explicit empty state.
+    """
+    import os
+
+    import pandas as pd
+
+    from engine.market_state import RESULTS_DIR
+
+    csv_path = os.path.join(RESULTS_DIR, "market_state.csv")
+    if not os.path.exists(csv_path):
+        return {
+            "status": "UNAVAILABLE_NOT_PERSISTED",
+            "count": 0,
+            "history": [],
+            "reason": "No market-state snapshots have been persisted yet.",
+        }
+    try:
+        df = pd.read_csv(csv_path).tail(limit)
+    except Exception:
+        return {
+            "status": "UNAVAILABLE_CORRUPT_STORE",
+            "count": 0,
+            "history": [],
+            "reason": "The market-state store could not be parsed.",
+        }
+    records = df.to_dict(orient="records")
+    return {
+        "status": "OBSERVED" if records else "UNAVAILABLE_NOT_PERSISTED",
+        "count": len(records),
+        "history": records,
+    }
     from engine.market_state import market_state_engine
     state = market_state_engine.evaluate_market_state().to_dict()
     return {
@@ -1051,5 +1089,3 @@ async def get_price_forecasts(
         return res
         
     return price_forecast_engine.get_all_price_forecasts(live_quote=live_quote)
-
-

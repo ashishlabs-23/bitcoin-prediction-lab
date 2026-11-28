@@ -46,8 +46,12 @@ from validation.startup_gate import (
 logger = logging.getLogger("btcognitive.routes_terminal")
 router = APIRouter(tags=["BTC Volatility Intelligence Terminal"])
 
-# Global Singleton Observatory Instance
-observatory = ForecastAccuracyObservatory(nominal_target=0.90)
+# Shared observatory singleton (added 2026-11-28).
+# This module used to build its own ForecastAccuracyObservatory, so two instances
+# opened the same SQLite file, both loaded ~7.8k records (+1.28 s, 2x memory) and
+# terminal writes were invisible to api/routes_arena. Import the engine singleton
+# so there is exactly one writer and one cache.
+from engine.observatory import observatory  # noqa: E402
 
 # Pre-load frozen models and historical state
 _pipeline = None

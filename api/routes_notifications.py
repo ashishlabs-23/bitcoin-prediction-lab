@@ -100,12 +100,16 @@ from api.security_auth import require_role, get_current_user_role
 async def evaluate_research_alerts(
     request: Request,
     force: bool = Query(False, description="Force evaluation bypassing cooldown (Admin only)"),
-    current_role: UserRole = Depends(get_current_user_role),
+    current_role: UserRole = Depends(require_role(UserRole.RESEARCH)),
 ):
     """
     Evaluates documented BTCUSD research conditions on fresh market data.
     Dispatches notifications across configured channels if a genuine condition is detected.
     Strictly analysis-only: never places an order or enables live execution.
+
+    Requires at least the RESEARCH role: the endpoint triggers outbound
+    notification dispatch, so anonymous callers (PUBLIC) are refused with 403
+    before any evaluation runs.
     """
     if force and current_role != UserRole.ADMIN:
         raise HTTPException(
@@ -166,4 +170,3 @@ def get_research_conditions_status():
         "directional_recommendation_status": "DISABLED",
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
-

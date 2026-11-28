@@ -65,6 +65,21 @@ def _dash_lock():
     return _DASH_LOCK
 
 
+def _gate_fingerprint(request: Request) -> str:
+    """Cache-key component for the research-authorization state.
+
+    The cache used to be keyed by horizon alone, so once the readiness refresher
+    flipped the gate to BLOCKED the dashboard kept serving
+    research.authorized=true (and production_forecast_available=true) from the
+    stale entry for up to TTL x 30 (~4 min). Including the gate state in the key
+    means a flip is visible on the very next request.
+    """
+    gate = getattr(getattr(request, "app", None), "state", None)
+    gate = getattr(gate, "research_gate", None)
+    authorized = bool(gate.get("authorized")) if isinstance(gate, dict) else False
+    return "A" if authorized else "B"
+
+
 async def _dashboard(request: Request, horizon: Horizon = "24h") -> dict:
     """Serve the dashboard, never making a visitor wait on the exchanges.
 
@@ -72,7 +87,7 @@ async def _dashboard(request: Request, horizon: Horizon = "24h") -> dict:
     -> returned immediately while a background task refreshes it, so a slow
     exchange feed degrades data *freshness* instead of page *latency*.
     """
-    key = str(horizon)
+    key = f"{horizon}:{_gate_fingerprint(request)}"
     now = time.monotonic()
     cached = _DASH_CACHE.get(key)
     if cached and now - cached[0] < _DASH_TTL:
@@ -96,7 +111,7 @@ async def _dashboard(request: Request, horizon: Horizon = "24h") -> dict:
 
 
 async def _refresh_dashboard(request: Request, horizon: Horizon) -> None:
-    key = str(horizon)
+    key = f"{horizon}:{_gate_fingerprint(request)}"
     try:
         async with _dash_lock():
             payload = await _build_dashboard(request, horizon)

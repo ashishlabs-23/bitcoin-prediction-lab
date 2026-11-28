@@ -9,6 +9,7 @@ Implements OWASP ASVS 5.0 Authentication & Authorization controls:
 
 import os
 import secrets
+import hashlib
 from typing import Optional, Callable
 from fastapi import Request, HTTPException, status, Security
 from fastapi.security import APIKeyHeader, HTTPBearer, HTTPAuthorizationCredentials
@@ -18,6 +19,19 @@ from engine.security_audit import security_audit
 
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 bearer_scheme = HTTPBearer(auto_error=False)
+
+
+def token_fingerprint(token: str) -> str:
+    """
+    Non-reversible short fingerprint of a presented credential.
+
+    Logs must never contain a prefix (or any other reversible slice) of an API
+    token: a 6-character prefix is a search-space reduction that turns the audit
+    log into a token oracle. A truncated SHA-256 digest still lets operators
+    correlate repeated failed attempts with the same presented token, but it
+    cannot be inverted into the token itself.
+    """
+    return hashlib.sha256(str(token).encode("utf-8")).hexdigest()[:12]
 
 def get_current_user_role(
     request: Request,
@@ -52,7 +66,10 @@ def get_current_user_role(
         severity="WARNING",
         client_ip=client_ip,
         path=request.url.path,
-        details={"provided_token_prefix": token[:6] + "..." if len(token) >= 6 else "SHORT"}
+        details={
+            "provided_token_fingerprint": token_fingerprint(token),
+            "provided_token_length": len(token),
+        }
     )
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

@@ -9,9 +9,16 @@ services:
     healthCheckPath: /ping
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.9
+        value: 3.13.14
       - key: BTC_ENVIRONMENT
         value: production
       - key: WEBHOOK_ENABLED
         value: "false"
-
+      # TrustedHostMiddleware only answers the service hostname (plus loopback
+      # for Render's own health probe); CORSMiddleware only answers listed
+      # browser origins. The deployed hostname pattern is
+      # https://btcognitive-engine.onrender.com.
+      - key: BTCOGNITIVE_ALLOWED_HOSTS
+        value: btcognitive-engine.onrender.com,localhost,127.0.0.1
+      - key: BTCOGNITIVE_ALLOWED_ORIGINS
+        value: https://btcognitive-engine.onrender.com,https://btcognitive-engine.fly.dev,http://localhost:8000,http://127.0.0.1:8000

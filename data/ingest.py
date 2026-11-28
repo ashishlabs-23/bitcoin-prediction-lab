@@ -7,6 +7,7 @@ and saves the results to Parquet files under DATA_RAW_DIR using pyarrow.
 
 import os
 import sys
+import tempfile
 import time
 from typing import Optional
 import pandas as pd
@@ -19,6 +20,50 @@ except ImportError:
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from config import SYMBOL, EXCHANGE, TIMEFRAME, DATA_START, DATA_RAW_DIR
+from data.validate import REQUIRED_OHLCV_COLUMNS, validate_ohlcv
+
+
+#: Bounded-retry policy for exchange pagination. A partial pagination run must
+#: never be mistaken for a complete history, so retries are finite and the
+#: final failure is loud (RuntimeError) rather than a silent `break`.
+FETCH_MAX_ATTEMPTS = 5
+FETCH_BACKOFF_BASE_SECONDS = 0.5
+FETCH_BACKOFF_MAX_SECONDS = 8.0
+
+
+def _call_with_retries(
+    fn,
+    *,
+    description: str,
+    max_attempts: int = FETCH_MAX_ATTEMPTS,
+    base_delay: float = FETCH_BACKOFF_BASE_SECONDS,
+    max_delay: float = FETCH_BACKOFF_MAX_SECONDS,
+):
+    """
+    Calls ``fn()`` with bounded exponential backoff (0.5s, 1s, 2s, 4s, ...).
+
+    Raises RuntimeError after ``max_attempts`` failures. Deliberately does NOT
+    return a partial result: callers must treat an exhausted retry as a failed
+    ingestion run (save_raw merges, so previously ingested history survives).
+    """
+    last_exc = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return fn()
+        except Exception as e:  # network/rate-limit/exchange errors
+            last_exc = e
+            if attempt >= max_attempts:
+                break
+            delay = min(base_delay * (2 ** (attempt - 1)), max_delay)
+            print(
+                f"Warning: {description} failed (attempt {attempt}/{max_attempts}): {e}. "
+                f"Retrying in {delay:.2f}s..."
+            )
+            time.sleep(delay)
+    raise RuntimeError(
+        f"{description} failed after {max_attempts} attempts; aborting instead of "
+        f"writing a silently truncated history. Last error: {last_exc}"
+    ) from last_exc
 
 
 def fetch_ohlcv(exchange_id: str, symbol: str, timeframe: str, since_iso: str) -> pd.DataFrame:
@@ -54,11 +99,12 @@ def fetch_ohlcv(exchange_id: str, symbol: str, timeframe: str, since_iso: str) -
 
     all_ohlcv = []
     while since_ms < now_ms:
-        try:
-            ohlcv = exchange.fetch_ohlcv(actual_symbol, timeframe=timeframe, since=since_ms, limit=1000)
-        except Exception as e:
-            print(f"Warning: Error fetching OHLCV batch for {actual_symbol} starting at {since_ms}: {e}")
-            break
+        ohlcv = _call_with_retries(
+            lambda: exchange.fetch_ohlcv(
+                actual_symbol, timeframe=timeframe, since=since_ms, limit=1000
+            ),
+            description=f"fetch_ohlcv({actual_symbol}, {timeframe}) since {since_ms}",
+        )
 
         if not ohlcv:
             break
@@ -244,11 +290,106 @@ def fetch_open_interest(exchange_id: str, symbol: str, since_iso: str) -> pd.Dat
         return pd.DataFrame(columns=["timestamp", "open_interest", "available_time"])
 
 
+def atomic_write_parquet(df: pd.DataFrame, out_path: str) -> str:
+    """
+    Writes ``df`` to ``out_path`` atomically: parquet is serialised to a
+    temporary file in the SAME directory, fsynced, then moved into place with
+    ``os.replace`` (atomic on POSIX and Windows for same-volume renames).
+
+    A crash or serialisation error leaves the previous file untouched instead
+    of a half-written parquet that would corrupt every downstream consumer.
+    """
+    directory = os.path.dirname(os.path.abspath(out_path))
+    os.makedirs(directory, exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(
+        prefix=f".{os.path.basename(out_path)}.", suffix=".tmp", dir=directory
+    )
+    os.close(fd)
+    try:
+        df.to_parquet(tmp_path, engine="pyarrow", index=False)
+        with open(tmp_path, "rb") as fh:
+            os.fsync(fh.fileno())
+        os.replace(tmp_path, out_path)
+    except BaseException:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+    return out_path
+
+
+def merge_with_existing(df: pd.DataFrame, out_path: str) -> pd.DataFrame:
+    """
+    Unions an incoming frame with the dataset already on disk.
+
+    Rationale: pagination can end early (exchange outage, API cap) and the
+    incoming frame may be a strict subset of history. Overwriting would
+    silently truncate the dataset, so existing rows are preserved.
+
+    Deduplication is on ``timestamp`` with ``keep='last'``: the incoming frame
+    is concatenated *after* the existing rows, so a re-fetched candle replaces
+    its earlier revision (exchanges do revise recent candles). Output is sorted
+    by timestamp with a fresh RangeIndex.
+
+    An unreadable existing file raises instead of being overwritten — losing
+    history to a corrupt read is worse than a failed ingestion run.
+    """
+    if os.path.exists(out_path):
+        try:
+            existing = pd.read_parquet(out_path, engine="pyarrow")
+        except Exception as e:
+            raise RuntimeError(
+                f"Existing dataset '{out_path}' is unreadable ({e}); refusing to "
+                f"overwrite it. Repair or move the file before re-ingesting."
+            ) from e
+        merged = pd.concat([existing, df], ignore_index=True, sort=False)
+    else:
+        merged = df.copy()
+
+    if "timestamp" in merged.columns and not merged.empty:
+        merged = (
+            merged.sort_values("timestamp", kind="mergesort")
+            .drop_duplicates(subset=["timestamp"], keep="last")
+            .reset_index(drop=True)
+        )
+    else:
+        merged = merged.reset_index(drop=True)
+    return merged
+
+
 def save_raw(df: pd.DataFrame, name: str) -> str:
-    """Writes to {DATA_RAW_DIR}/{name}.parquet, returns the path written."""
+    """
+    Validates, merges with existing history, and atomically writes
+    {DATA_RAW_DIR}/{name}.parquet. Returns the path written.
+
+    * OHLCV-shaped frames are hard-validated (raises
+      :class:`data.validate.DataValidationError` on invariant violations, and
+      logs the report warnings otherwise).
+    * Existing rows are preserved (merge, not overwrite).
+    * The file is replaced atomically (tmp + os.replace).
+    """
     os.makedirs(DATA_RAW_DIR, exist_ok=True)
     out_path = os.path.join(DATA_RAW_DIR, f"{name}.parquet")
-    df.to_parquet(out_path, engine="pyarrow")
+
+    if all(c in df.columns for c in REQUIRED_OHLCV_COLUMNS):
+        report = validate_ohlcv(df, name=name)
+        for warning in report.warnings:
+            print(f"Validation warning [{name}]: {warning}")
+        print(
+            f"Validation PASS [{name}]: {report.rows} row(s), "
+            f"largest_gap_bars={report.largest_gap_bars}, "
+            f"gaps_over_2_bars={report.gaps_over_2_bars}"
+        )
+    elif df.empty:
+        print(f"Note: '{name}' frame is empty; existing history will be preserved.")
+
+    merged = merge_with_existing(df, out_path)
+    atomic_write_parquet(merged, out_path)
+    print(
+        f"Merged '{name}': {len(df)} incoming row(s) + existing -> "
+        f"{len(merged)} total row(s) at {out_path}"
+    )
     return out_path
 
 

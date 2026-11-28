@@ -9,6 +9,7 @@ import math
 import pandas as pd
 from fastapi import APIRouter, Query
 
+from api.security_middleware import sanitize_client_error
 from engine.feature_cache import feature_cache
 
 router = APIRouter(tags=["Market Feeds"])
@@ -56,7 +57,7 @@ def get_candles(
                 "count": 0,
                 "degraded": True,
                 "source": "coinbase_15m_adapter",
-                "reason": str(e),
+                "reason": sanitize_client_error(e),
             }
 
     if interval != "1h":

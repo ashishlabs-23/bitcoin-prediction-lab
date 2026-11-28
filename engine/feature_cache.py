@@ -38,7 +38,10 @@ class FeatureCache:
             try:
                 df_feat = pd.read_parquet(feat_path, engine="pyarrow")
                 df_feat["timestamp"] = pd.to_datetime(df_feat["timestamp"], utc=True)
-                df_feat = df_feat.sort_values("timestamp").reset_index(drop=True)
+                # Index by timestamp so downstream staleness gates can read the
+                # last observation age; a RangeIndex made them fall through to a
+                # hard-coded "LIVE" status.
+                df_feat = df_feat.sort_values("timestamp").set_index("timestamp")
             except Exception as e:
                 logger.warning(f"FeatureCache failed to read parquet: {e}")
 
@@ -59,7 +62,8 @@ class FeatureCache:
                 logger.warning(f"FeatureCache failed to inspect raw ohlcv: {e}")
 
         if df_feat is not None and not df_feat.empty:
-            self._df = df_feat
+            # Timestamp index keeps the staleness gate in status_contract reachable.
+            self._df = df_feat if isinstance(df_feat.index, pd.DatetimeIndex) else df_feat.set_index("timestamp")
             self._is_initialized = True
             self._is_degraded = False
             self._last_update_ts = time.time()
@@ -72,6 +76,42 @@ class FeatureCache:
         self._is_degraded = True
         self._last_update_ts = time.time()
         logger.warning("FeatureCache: No real historical data found. Entering DEGRADED state.")
+
+    def refresh(self, max_rows: int = 500) -> bool:
+        """Reload the cache from the raw parquet when newer candles exist.
+
+        Called from the server's warm-up loop. Before this existed the cache was
+        populated once at boot and never refreshed, while the status contract
+        still reported it as LIVE.
+        """
+        raw_path = os.path.join(os.path.dirname(DATA_PROCESSED_DIR), "raw", "ohlcv.parquet")
+        if not os.path.exists(raw_path):
+            return False
+        try:
+            df_raw = pd.read_parquet(raw_path, engine="pyarrow")
+            if df_raw.empty:
+                return False
+            df_raw["timestamp"] = pd.to_datetime(df_raw["timestamp"], utc=True)
+            df_raw = df_raw.sort_values("timestamp").reset_index(drop=True)
+            newest = df_raw["timestamp"].iloc[-1]
+            if self._df is not None and len(self._df) and isinstance(self._df.index, pd.DatetimeIndex):
+                if newest <= self._df.index[-1]:
+                    return False
+            self.update_from_candles(df_raw.tail(max_rows).to_dict("records"))
+            return True
+        except Exception as exc:
+            logger.warning("FeatureCache refresh failed: %s", type(exc).__name__)
+            return False
+
+    def last_observation_time(self):
+        """Return the timestamp of the most recent cached bar, or None."""
+        if self._df is None or not len(self._df):
+            return None
+        if isinstance(self._df.index, pd.DatetimeIndex):
+            return self._df.index[-1]
+        if "timestamp" in self._df.columns:
+            return pd.Timestamp(self._df["timestamp"].iloc[-1])
+        return None
 
     def is_healthy(self) -> bool:
         """Returns True if cache has valid real data and is not degraded."""
@@ -108,7 +148,12 @@ class FeatureCache:
         avg_gain = gain.ewm(alpha=1.0 / 14.0, min_periods=14, adjust=False).mean()
         avg_loss = loss.ewm(alpha=1.0 / 14.0, min_periods=14, adjust=False).mean()
         rs = avg_gain / avg_loss.replace(0, np.nan)
-        df["rsi_14"] = (100.0 - (100.0 / (1.0 + rs))).fillna(50.0)
+        # Imputed rows are flagged so downstream consumers can distinguish a
+        # measured value from a neutral fallback (AGENTS.md §2.5).
+        _rsi = 100.0 - (100.0 / (1.0 + rs))
+        _rsi_na = _rsi.isna()
+        df["rsi_14"] = _rsi.fillna(50.0)
+        df["rsi_14_imputed"] = _rsi_na.astype(bool)
 
         # MACD (12, 26, 9)
         ema12 = df["close"].ewm(span=12, adjust=False).mean()
@@ -123,7 +168,9 @@ class FeatureCache:
         df["sma_ratio_50"] = ((df["close"] / sma50) - 1.0).fillna(0.0)
 
         # Volatility & ATR
-        df["realized_vol_24h"] = df["ret_1h"].rolling(window=24).std().fillna(0.015)
+        _rv = df["ret_1h"].rolling(window=24).std()
+        df["realized_vol_24h"] = _rv.fillna(0.015)
+        df["realized_vol_24h_imputed"] = _rv.isna()
         tr = np.maximum(
             df["high"] - df["low"],
             np.maximum((df["high"] - df["close"].shift(1)).abs(), (df["low"] - df["close"].shift(1)).abs())
@@ -136,6 +183,13 @@ class FeatureCache:
         df["open_interest"] = oi
         df["oi_pct_change_24h"] = oi_change
 
+        # Derivative columns come from defaults, not from a live feed: flag them
+        # so nothing downstream mistakes a constant for an observation.
+        for _col in ("funding_rate", "funding_rate_change_24h", "open_interest", "oi_pct_change_24h"):
+            df[f"{_col}_synthetic"] = True
+        # Index by timestamp so the staleness gate can read the last bar's age.
+        if "timestamp" in df.columns:
+            df = df.set_index("timestamp")
         self._df = df
         self._last_update_ts = time.time()
         self._is_initialized = True

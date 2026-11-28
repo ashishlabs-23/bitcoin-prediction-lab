@@ -1,6 +1,9 @@
 # Multi-stage production Dockerfile for BTCognitive Engine
 # Optimized for Fly.io deployment
-FROM python:3.11-slim as builder
+# Base image is CPython 3.13: the frozen research manifest records Python
+# 3.13.14, so a 3.11 runtime makes the freeze gate permanently BLOCKED in
+# containers. Both stages must use the same interpreter.
+FROM python:3.13-slim as builder
 
 WORKDIR /app
 
@@ -17,7 +20,7 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && pip install --prefix=/install -r requirements.txt
 
 # ── Runtime stage ──────────────────────────────────────────────────────────────
-FROM python:3.11-slim
+FROM python:3.13-slim
 
 WORKDIR /app
 

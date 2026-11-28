@@ -14,7 +14,8 @@ from fastapi import APIRouter, Query, Body, HTTPException, Depends
 from fastapi.responses import FileResponse
 
 from config.security import UserRole
-from api.security_auth import require_role
+from api.security_auth import require_role, get_current_user_role
+from api.security_middleware import sanitize_client_error
 from engine.security_validators import validate_sheet_sync_url, SecurityValidationError
 from engine.arena_runner import arena_runner
 from engine.feature_cache import feature_cache
@@ -276,11 +277,19 @@ async def sync_arena_google_sheet(
 
 
 @router.post("/api/arena/experiment")
-async def run_arena_experiment(payload: Optional[Dict[str, Any]] = Body(default={})):
+async def run_arena_experiment(
+    payload: Optional[Dict[str, Any]] = Body(default={}),
+    current_role: UserRole = Depends(get_current_user_role)
+):
     """
     Executes a multi-trial Monte Carlo stress experiment on the AI Prediction Engine.
     Simulates volatility, on-chain valuation phase shifts, and orderbook shocks.
     Optionally logs trials into isolated SQLite stress_trials table.
+
+    Ledger commits are an ADMIN-only side effect: any caller below ADMIN may
+    still run the read-only simulation, but commit_to_ledger is forced to False
+    instead of rejecting the whole call. This keeps anonymous callers from
+    writing to SQLite / experiments/results/stress_trials.csv.
     """
     if payload is None:
         payload = {}
@@ -289,7 +298,13 @@ async def run_arena_experiment(payload: Optional[Dict[str, Any]] = Body(default=
     vol_mult = float(payload.get("volatility_mult", 1.2))
     macro_shock = str(payload.get("macro_shock", "CURRENT")).upper()
     liq_shock_pct = float(payload.get("liquidity_shock_pct", 0.0))
-    commit_to_ledger = bool(payload.get("commit_to_ledger", False))
+    commit_requested = bool(payload.get("commit_to_ledger", False))
+    commit_to_ledger = commit_requested and current_role == UserRole.ADMIN
+    if commit_requested and not commit_to_ledger:
+        logger.warning(
+            "Arena experiment ledger commit downgraded to False for role %s.",
+            current_role.value,
+        )
 
     row = feature_cache.get_latest_row()
     live_p = float(row["close"]) if row is not None else 65000.0
@@ -408,6 +423,7 @@ async def run_arena_experiment(payload: Optional[Dict[str, Any]] = Body(default=
             "macro_shock": sim_cycle,
             "mvrv": sim_mvrv,
             "liquidity_shock_pct": liq_shock_pct,
+            "commit_requested": commit_requested,
             "committed_to_ledger": commit_to_ledger,
             "experiment_mode": experiment_mode
         },
@@ -517,7 +533,7 @@ def get_meie_state():
     except Exception as e:
         logger.error(f"MEIE state endpoint error: {e}")
         return {
-            "error": str(e),
+            "error": sanitize_client_error(e),
             "meie_state": None,
             "event": {"event_type": "NORMAL"},
             "payoff": {"execute": False, "ev_net_bps": 0.0},
@@ -550,7 +566,7 @@ def get_meie_accounts():
         }
     except Exception as e:
         logger.error(f"MEIE accounts endpoint error: {e}")
-        return {"error": str(e), "accounts": [], "timestamp": datetime.now(timezone.utc).isoformat()}
+        return {"error": sanitize_client_error(e), "accounts": [], "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
 @router.get("/api/arena/meie/leaderboard")
@@ -591,7 +607,7 @@ def get_meie_leaderboard():
         }
     except Exception as e:
         logger.error(f"MEIE leaderboard endpoint error: {e}")
-        return {"error": str(e), "leaderboard": [], "timestamp": datetime.now(timezone.utc).isoformat()}
+        return {"error": sanitize_client_error(e), "leaderboard": [], "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
 @router.get("/api/arena/meie/failures")
@@ -648,7 +664,7 @@ def get_meie_failures(
         }
     except Exception as e:
         logger.error(f"MEIE failures endpoint error: {e}")
-        return {"error": str(e), "failures": [], "timestamp": datetime.now(timezone.utc).isoformat()}
+        return {"error": sanitize_client_error(e), "failures": [], "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
 @router.get("/api/arena/meie/trades")
@@ -690,7 +706,7 @@ def get_meie_trades(
             conn.close()
     except Exception as e:
         logger.error(f"MEIE trades endpoint error: {e}")
-        return {"error": str(e), "trades": [], "timestamp": datetime.now(timezone.utc).isoformat()}
+        return {"error": sanitize_client_error(e), "trades": [], "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
 @router.get("/api/arena/meie/forensic-summary")
@@ -799,7 +815,7 @@ def get_meie_forensic_summary():
         }
     except Exception as e:
         logger.error(f"MEIE forensic summary error: {e}")
-        return {"error": str(e), "forensic_matrix": [], "timestamp": datetime.now(timezone.utc).isoformat()}
+        return {"error": sanitize_client_error(e), "forensic_matrix": [], "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
 @router.get("/api/arena/meie/abstentions")
@@ -822,7 +838,7 @@ def get_meie_abstentions(
         }
     except Exception as e:
         logger.error(f"MEIE abstentions endpoint error: {e}")
-        return {"error": str(e), "abstentions": [], "timestamp": datetime.now(timezone.utc).isoformat()}
+        return {"error": sanitize_client_error(e), "abstentions": [], "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
 @router.get("/api/arena/active-paper-position")
@@ -1570,7 +1586,7 @@ def get_active_paper_position(
             }
     except Exception as e:
         logger.error(f"active_paper_position endpoint error: {e}")
-        return {"has_active_position": False, "error": str(e), "timestamp": datetime.now(timezone.utc).isoformat()}
+        return {"has_active_position": False, "error": sanitize_client_error(e), "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
 @router.get("/api/arena/cross-horizon-profile")
@@ -1602,7 +1618,7 @@ def get_cross_horizon_profile(
         return profile
     except Exception as ex:
         logger.error(f"cross_horizon_profile error: {ex}")
-        return {"error": str(ex), "status": "ERROR"}
+        return {"error": sanitize_client_error(ex), "status": "ERROR"}
 
 
 @router.get("/api/arena/trade-markers")
@@ -1696,7 +1712,7 @@ def get_arena_trade_markers(
         }
     except Exception as e:
         logger.error(f"trade_markers endpoint error: {e}")
-        return {"markers": [], "error": str(e), "timestamp": datetime.now(timezone.utc).isoformat()}
+        return {"markers": [], "error": sanitize_client_error(e), "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
 @router.get("/api/arena/strategy-summary")
@@ -1738,7 +1754,7 @@ def get_strategy_summary():
         }
     except Exception as e:
         logger.error(f"strategy_summary endpoint error: {e}")
-        return {"strategies": [], "error": str(e), "timestamp": datetime.now(timezone.utc).isoformat()}
+        return {"strategies": [], "error": sanitize_client_error(e), "timestamp": datetime.now(timezone.utc).isoformat()}
 @router.post("/api/arena/what-if-scenario")
 @router.get("/api/arena/what-if-scenario")
 def compute_what_if_scenario(
@@ -1899,7 +1915,7 @@ def compute_what_if_scenario(
         }
     except Exception as e:
         logger.error(f"what_if_scenario endpoint error: {e}")
-        return {"status": "ERROR", "error": str(e), "timestamp": datetime.now(timezone.utc).isoformat()}
+        return {"status": "ERROR", "error": sanitize_client_error(e), "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
 @router.get("/api/arena/scenario-preview")
@@ -1955,8 +1971,7 @@ def get_scenario_preview(
             "selected_horizon": horizon,
             "contract_version": "SCENARIO_PLANNER_v1.0",
             "rejection_code": "INTERNAL_ERROR",
-            "rejection_narrative": str(e),
+            "rejection_narrative": sanitize_client_error(e),
             "scenarios": None,
             "disclaimer": "Hypothetical volatility barrier calculation only. Does NOT constitute a directional prediction, trade signal, or investment advice. Execution authorization is DISABLED."
         }
-

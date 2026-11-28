@@ -43,6 +43,28 @@ COST_SCENARIO_BPS = {
 }
 
 
+
+def _atomic_write_jsonl(path: str, records: List[Dict[str, Any]]) -> None:
+    """Write JSONL records to `path` atomically (tmp + fsync + os.replace)."""
+    import os as _os
+
+    directory = _os.path.dirname(_os.path.abspath(path))
+    _os.makedirs(directory, exist_ok=True)
+    tmp_path = f"{path}.tmp-{_os.getpid()}"
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as fh:
+            for record in records:
+                fh.write(json.dumps(record) + "\n")
+            fh.flush()
+            _os.fsync(fh.fileno())
+        _os.replace(tmp_path, path)
+    finally:
+        if _os.path.exists(tmp_path):
+            try:
+                _os.remove(tmp_path)
+            except OSError:
+                pass
+
 class PaperTradeLedger:
     """
     Manages durable paper trade records with transaction cost accounting.
@@ -170,10 +192,10 @@ class PaperTradeLedger:
                 updated_trades.append(t)
 
             if closed_record:
-                # Rewrite entire ledger file atomically
-                with open(self.ledger_file, "w", encoding="utf-8") as f:
-                    for t in updated_trades:
-                        f.write(json.dumps(t) + "\n")
+                # Rewrite the ledger atomically: write a sibling temp file,
+                # fsync it, then os.replace. The previous code truncated the
+                # live ledger in place, so a crash mid-write destroyed it.
+                _atomic_write_jsonl(self.ledger_file, updated_trades)
 
         return closed_record
 
@@ -354,8 +376,9 @@ class PaperTradeLedger:
                 except Exception as e:
                     logger.warning("Failed to create ledger backup: %s", e)
 
-            with open(self.ledger_file, "w", encoding="utf-8") as f:
-                pass
+            # Reset the ledger atomically (a plain open(..., "w") truncates in
+            # place and can leave a half-written file after a crash).
+            _atomic_write_jsonl(self.ledger_file, [])
         return True
 
     def _read_all_trades_unlocked(self) -> List[Dict[str, Any]]:
