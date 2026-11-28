@@ -2,14 +2,27 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>BTCognitive — Probabilistic Risk Intelligence</title>
   <meta name="description" content="BTCognitive BTCUSD market analysis, future-price forecasting, and econometric risk intelligence terminal. Analysis-only research application." />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#040714" />
+  <meta name="robots" content="noindex, nofollow" />
 
+  <!-- Social preview (the app is shared as a link far more often than it is indexed) -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="BTCognitive" />
+  <meta property="og:title" content="BTCognitive — Probabilistic Risk Intelligence" />
+  <meta property="og:description" content="BTCUSD market analysis, future-price forecasting and econometric risk intelligence. Analysis-only research terminal; live trading is disabled." />
+  <meta name="twitter:card" content="summary" />
 
   <!-- Fonts & Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <!-- Exchange/market feeds are contacted within the first second, so warm the TLS handshake now -->
+  <link rel="preconnect" href="https://api.exchange.coinbase.com" />
+  <link rel="preconnect" href="https://unpkg.com" crossorigin />
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧠</text></svg>" />
@@ -17,6 +30,44 @@
   <!-- CSS Stylesheet -->
   <link rel="stylesheet" href="/styles.css?v=29.0.0" />
 
+  <!-- Critical boot styles: paint the terminal's background immediately so the
+       first frame is never white, and show a skeleton until React mounts. -->
+  <style>
+    html { background: #040714; }
+    body { margin: 0; background: #040714; color: #F1F5F9; }
+    #boot-skeleton {
+      position: fixed; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 22px; z-index: 1;
+      font-family: 'Outfit', system-ui, sans-serif; transition: opacity .35s ease;
+    }
+    #boot-skeleton.is-hidden { opacity: 0; pointer-events: none; }
+    .boot-mark {
+      display: flex; align-items: center; gap: 14px;
+      font-size: 22px; font-weight: 700; letter-spacing: .5px;
+    }
+    .boot-mark span.dot {
+      width: 12px; height: 12px; border-radius: 50%; background: #7C5CFF;
+      box-shadow: 0 0 18px 4px rgba(124, 92, 255, .45);
+      animation: boot-pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes boot-pulse { 0%,100% { opacity:.35; transform:scale(.85) } 50% { opacity:1; transform:scale(1) } }
+    .boot-bar { width: min(320px, 60vw); height: 3px; border-radius: 3px; overflow: hidden; background: #080E1E; }
+    .boot-bar i { display: block; height: 100%; width: 40%; border-radius: 3px;
+      background: linear-gradient(90deg, transparent, #7C5CFF, transparent);
+      animation: boot-slide 1.3s ease-in-out infinite; }
+    @keyframes boot-slide { 0% { transform: translateX(-110%) } 100% { transform: translateX(310%) } }
+    .boot-note { color: #7E95B5; font-size: 13px; font-family: 'JetBrains Mono', monospace; }
+    #boot-error {
+      display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+      padding: 12px 18px; font: 500 13px/1.5 'JetBrains Mono', monospace;
+      background: #2A0F1B; color: #FFC7D6; border-bottom: 1px solid #7C2B45;
+    }
+    #boot-error b { color: #FF8FAE; }
+    #boot-error button {
+      float: right; background: transparent; color: inherit; cursor: pointer;
+      border: 1px solid #7C2B45; border-radius: 6px; padding: 2px 10px; font: inherit;
+    }
+  </style>
 
   <!-- Three.js for 3D interactive background -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
@@ -29,10 +80,90 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
 </head>
 <body>
+  <!-- Fail-visible error surface: a crashed panel used to fail silently to a blank page -->
+  <div id="boot-error" role="alert">
+    <button type="button" onclick="this.parentNode.style.display='none'">dismiss</button>
+    <b id="boot-error-title">Startup error</b> <span id="boot-error-msg"></span>
+  </div>
+
+  <div id="boot-skeleton" aria-hidden="true">
+    <div class="boot-mark"><span class="dot"></span>BTCognitive</div>
+    <div class="boot-bar"><i></i></div>
+    <div class="boot-note" id="boot-note">initialising risk engine…</div>
+  </div>
+
   <!-- React Mount Root -->
   <div id="root"></div>
 
-  <!-- Native React Application Script -->
-  <script src="/app.js?v=29.0.0"></script>
+  <noscript>
+    <div style="padding:48px;font-family:system-ui,sans-serif;color:#F1F5F9;text-align:center">
+      <h1 style="font-size:20px">BTCognitive needs JavaScript</h1>
+      <p style="color:#7E95B5;max-width:520px;margin:0 auto">
+        This terminal renders charts and live market state in the browser. Enable JavaScript to continue.
+        The raw data remains available over the HTTP API at <code>/api/dashboard</code> and <code>/health</code>.
+      </p>
+    </div>
+  </noscript>
+
+  <script>
+    (function () {
+      var banner = document.getElementById('boot-error');
+      var titleEl = document.getElementById('boot-error-title');
+      var msgEl = document.getElementById('boot-error-msg');
+      var skeleton = document.getElementById('boot-skeleton');
+      var note = document.getElementById('boot-note');
+      var reported = 0;
+
+      function showError(title, message) {
+        if (!banner || reported++ > 4) return; // never let a loop bury the UI
+        titleEl.textContent = title;
+        msgEl.textContent = message || '';
+        banner.style.display = 'block';
+      }
+      window.__btcShowError = showError;
+
+      window.addEventListener('error', function (e) {
+        if (e.target && e.target.tagName && e.target !== window) {
+          // Asset load failure (CDN blocked, offline) — the usual cause of a blank terminal
+          showError('Asset failed to load', (e.target.src || e.target.href || e.target.tagName));
+          return;
+        }
+        showError('Runtime error', e.message || 'unknown error');
+      }, true);
+
+      window.addEventListener('unhandledrejection', function (e) {
+        var r = e.reason;
+        showError('Request failed', (r && (r.message || r.statusText)) || String(r));
+      });
+
+      // Reveal the app once React has actually painted, not merely when app.js parses.
+      function hideSkeleton() {
+        if (!skeleton || skeleton.classList.contains('is-hidden')) return;
+        skeleton.classList.add('is-hidden');
+        setTimeout(function () { skeleton.remove(); }, 400);
+      }
+      var root = document.getElementById('root');
+      if (root && window.MutationObserver) {
+        new MutationObserver(function () {
+          if (root.childElementCount > 0) hideSkeleton();
+        }).observe(root, { childList: true });
+      }
+
+      // Escalating boot feedback: silence for 10 s looks like a hang.
+      setTimeout(function () {
+        if (note && document.body.contains(skeleton)) note.textContent = 'still starting — loading market models…';
+      }, 10000);
+      setTimeout(function () {
+        if (document.body.contains(skeleton)) {
+          showError('Slow start', 'The terminal has not finished booting. Check /health on the server.');
+        }
+      }, 30000);
+    })();
+  </script>
+
+  <!-- Native React Application Script.
+       Versioned assets are served with `Cache-Control: immutable` for a year,
+       so this ?v= string MUST be bumped whenever app.js changes. -->
+  <script src="/app.js?v=30.0.1"></script>
 </body>
 </html>

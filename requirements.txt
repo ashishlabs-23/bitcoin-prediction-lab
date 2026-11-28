@@ -18,6 +18,7 @@ shap
 pytest
 pytest-asyncio
 pytest-timeout
+hypothesis
 
 # api & server
 fastapi

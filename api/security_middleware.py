@@ -50,8 +50,15 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             response.headers["Expires"] = "0"
         elif path.endswith(".js") or path.endswith(".css"):
             if "v=" in str(request.url.query):
-                response.headers["Cache-Control"] = "public, max-age=86400, stale-while-revalidate=3600"
+                # Fix (2026-11-28): a ?v= URL is content-addressed by
+                # construction, so it can be cached for a year. The old 1-day
+                # window forced a 635 KB re-download every day for no reason.
+                response.headers["Cache-Control"] = (
+                    "public, max-age=31536000, immutable"
+                )
             else:
+                # Unversioned asset URL: the file could change under a cached
+                # copy, so it must not be stored at all.
                 response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         elif path.startswith(("/health", "/api/", "/market/", "/prediction/", "/forecast/", "/tournament/", "/regime/")):
             response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"

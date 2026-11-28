@@ -25,6 +25,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, status, HT
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 
 # Ensure project root is in sys.path
@@ -100,17 +101,34 @@ class HardenedConnectionManager:
         return True
 
     def disconnect(self, websocket: WebSocket, client_ip: str):
+        """Remove a socket and release its per-IP slot. Idempotent.
+
+        Fix (2026-11-28): the old body read ``self.connections_per_ip[client_ip]``
+        on a ``defaultdict``, so merely *checking* a client created a permanent
+        zero-valued entry -- an unbounded per-IP leak on a public endpoint.
+        """
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
-        if self.connections_per_ip[client_ip] > 0:
-            self.connections_per_ip[client_ip] -= 1
+        current = self.connections_per_ip.get(client_ip, 0)
+        if current > 0:
+            self.connections_per_ip[client_ip] = current - 1
 
     async def broadcast(self, message: str):
+        """Send to every subscriber, dropping sockets that have gone away.
+
+        Fix (2026-11-28): the previous body swallowed every exception with
+        ``except Exception: pass`` and left the dead socket in
+        ``active_connections``, permanently holding its per-IP slot. Over time
+        that leaks memory and eventually trips
+        MAX_WEBSOCKET_CONNECTIONS_PER_IP for legitimate clients.
+        """
         for connection in list(self.active_connections):
             try:
                 await connection.send_text(message)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Dropping dead websocket during broadcast: %s", exc)
+                client_ip = connection.client.host if connection.client else "UNKNOWN"
+                self.disconnect(connection, client_ip)
 
 
 ws_manager = HardenedConnectionManager()
@@ -172,10 +190,69 @@ async def lifespan(app: FastAPI):
 
     alert_worker_task = asyncio.create_task(_research_alert_worker())
 
+    # Cold-start warm-up (added 2026-11-28). The very first /api/dashboard call
+    # after a restart took ~8 s (exchange round-trips + candle/feature build),
+    # which is exactly when a user is most likely to be watching. Prime it in
+    # the background so the first real visitor hits a warm cache.
+    async def _warm_caches():
+        await asyncio.sleep(1.5)
+        # Keep the dashboard cache warm for the whole process lifetime. Exchange
+        # round-trips from a cloud VM take 3-15 s, so a visitor must never be
+        # the one who triggers a rebuild.
+        from types import SimpleNamespace
+        from api.market_monitor_routes import _dashboard
+
+        shim = SimpleNamespace(app=app)  # _dashboard only needs .app.state.http
+        first = True
+        while True:
+            try:
+                started = time.perf_counter()
+                await _dashboard(shim, "24h")
+                if first:
+                    logger.info(
+                        "Warm-up: dashboard primed in %.2fs",
+                        time.perf_counter() - started,
+                    )
+                    first = False
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.debug("Warm-up skipped: %s", type(exc).__name__)
+            await asyncio.sleep(20.0)
+
+    warm_task = asyncio.create_task(_warm_caches())
+
+    # Gate refresher (added 2026-11-28). The freeze verifier runs as a
+    # subprocess (~3.6 s). With only a TTL cache, the first request after each
+    # expiry paid that cost in the user's face. Refresh ahead of expiry on a
+    # background thread so no request ever waits on it.
+    # Import as a module: a `from ... import evaluate_runtime_readiness` here
+    # would make that name local to the whole lifespan function and break the
+    # call above it (UnboundLocalError).
+    from validation import startup_gate as _gate
+
+    async def _readiness_refresher():
+        interval = max(30.0, _gate.READINESS_CACHE_TTL_SECONDS / 2.0)
+        while True:
+            try:
+                await asyncio.sleep(interval)
+                readiness = await asyncio.to_thread(
+                    _gate.evaluate_runtime_readiness, True
+                )
+                app.state.research_gate = readiness
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.debug("Readiness refresh skipped: %s", type(exc).__name__)
+
+    readiness_task = asyncio.create_task(_readiness_refresher())
+
     yield
 
     logger.info("Shutting down BTCognitive market monitor and alert worker...")
     alert_worker_task.cancel()
+    warm_task.cancel()
+    readiness_task.cancel()
     try:
         await alert_worker_task
     except asyncio.CancelledError:
@@ -216,6 +293,10 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 # 3. Tier-based Rate Limiting & Body Size Middleware
 app.add_middleware(RateLimitingMiddleware)
+
+# 3b. Response compression. app.js is ~635 KB uncompressed; the dashboard
+# payload is large JSON. GZip cuts the first load by roughly 4x.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 # 4. Trusted Host Middleware
 app.add_middleware(
@@ -303,6 +384,9 @@ async def websocket_endpoint(websocket: WebSocket):
 # ---------------------------------------------------------------------------
 # Static Files / Frontend Mount
 # ---------------------------------------------------------------------------
+# Cache policy lives in SecurityHeadersMiddleware (api/security_middleware.py):
+# it runs outermost on every response, so setting headers here would only be
+# overwritten. Versioned assets are immutable; HTML revalidates.
 web_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "web"))
 if os.path.isdir(web_dir):
     app.mount("/", StaticFiles(directory=web_dir, html=True), name="web")

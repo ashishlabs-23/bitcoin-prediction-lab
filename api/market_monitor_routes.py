@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import logging
-from typing import Literal
+import os
+import time
+from typing import Any, Dict, Literal
 
 from fastapi import APIRouter, Query, Request
 
@@ -42,7 +44,67 @@ def _gate(request: Request) -> dict:
     }
 
 
+# Dashboard request coalescing (added 2026-11-28).
+# Every /api/dashboard hit rebuilt the payload, which means re-fetching three
+# exchange quotes; that measured ~3 s once the 10 s quote cache had expired, so
+# a user polling every 15 s got a slow page every time. A short TTL plus a lock
+# lets concurrent visitors share one build instead of each paying for it.
+_DASH_CACHE: Dict[str, tuple] = {}
+_DASH_TTL = float(os.getenv("BTCOGNITIVE_DASHBOARD_TTL", "8"))
+_DASH_LOCK: "asyncio.Lock | None" = None
+_DASH_REFRESHING: Dict[str, bool] = {}
+_DASH_STALE_FACTOR = 30  # serve stale for up to 30x TTL (~4 min) while refreshing
+
+
+def _dash_lock():
+    global _DASH_LOCK
+    if _DASH_LOCK is None:
+        import asyncio
+        _DASH_LOCK = asyncio.Lock()
+    return _DASH_LOCK
+
+
 async def _dashboard(request: Request, horizon: Horizon = "24h") -> dict:
+    """Serve the dashboard, never making a visitor wait on the exchanges.
+
+    Fresh hit -> returned immediately. Stale hit (younger than the hard limit)
+    -> returned immediately while a background task refreshes it, so a slow
+    exchange feed degrades data *freshness* instead of page *latency*.
+    """
+    key = str(horizon)
+    now = time.monotonic()
+    cached = _DASH_CACHE.get(key)
+    if cached and now - cached[0] < _DASH_TTL:
+        return cached[1]
+    if cached and now - cached[0] < _DASH_TTL * _DASH_STALE_FACTOR:
+        if not _DASH_REFRESHING.get(key):
+            _DASH_REFRESHING[key] = True
+            task = asyncio.create_task(_refresh_dashboard(request, horizon))
+            task.add_done_callback(lambda _t, k=key: _DASH_REFRESHING.pop(k, None))
+        return cached[1]
+    async with _dash_lock():
+        cached = _DASH_CACHE.get(key)
+        if cached and time.monotonic() - cached[0] < _DASH_TTL:
+            return cached[1]
+        payload = await _build_dashboard(request, horizon)
+        # Stored by reference: the payload is only serialised downstream, never
+        # mutated, and deep-copying 2k candles per request would cost more than
+        # the build it saves.
+        _DASH_CACHE[key] = (time.monotonic(), payload)
+        return payload
+
+
+async def _refresh_dashboard(request: Request, horizon: Horizon) -> None:
+    key = str(horizon)
+    try:
+        async with _dash_lock():
+            payload = await _build_dashboard(request, horizon)
+            _DASH_CACHE[key] = (time.monotonic(), payload)
+    except Exception as exc:  # keep the last good payload
+        logger.debug("Dashboard refresh failed: %s", type(exc).__name__)
+
+
+async def _build_dashboard(request: Request, horizon: Horizon = "24h") -> dict:
     try:
         payload = await get_market_dashboard(
             client=getattr(request.app.state, "http", None), horizon=horizon
@@ -80,13 +142,78 @@ async def _dashboard(request: Request, horizon: Horizon = "24h") -> dict:
     return payload
 
 
+# ---------------------------------------------------------------------------
+# TTL cache for the system status contract
+# ---------------------------------------------------------------------------
+# Fix (2026-11-28): monitor_health() rebuilt the full market-state contract
+# (pandas rolling windows over the feature cache, ~1.1s) on every single call.
+# Uptime probes, container healthchecks and the UI all hit this endpoint, so it
+# is cached briefly. 15s is short enough to stay operationally meaningful and
+# long enough to make the endpoint essentially free.
+_STATUS_CACHE: Dict[str, Any] = {"value": None, "at": 0.0}
+STATUS_CACHE_TTL_SECONDS: float = float(os.getenv("BTCOGNITIVE_STATUS_TTL", "15"))
+
+
+_STATUS_REFRESHING = {"flag": False}
+
+
+def _build_system_status() -> None:
+    from engine.status_contract import evaluate_system_status
+
+    value = evaluate_system_status().model_dump()
+    _STATUS_CACHE["value"] = value
+    _STATUS_CACHE["at"] = time.monotonic()
+
+
+def _refresh_system_status_in_background() -> None:
+    """Rebuild the status contract off the request path."""
+    import threading
+
+    def _run() -> None:
+        try:
+            _build_system_status()
+        except Exception as exc:  # keep serving the last good value
+            logger.debug("System status refresh failed: %s", type(exc).__name__)
+        finally:
+            _STATUS_REFRESHING["flag"] = False
+
+    threading.Thread(target=_run, name="status-refresh", daemon=True).start()
+
+
+def _cached_system_status() -> Dict[str, Any]:
+    """Return the system status contract without ever blocking on a refresh.
+
+    evaluate_system_status() inspects live feeds and was measured at 0.5-6.7 s.
+    /health is a liveness probe, so on expiry it now returns the previous value
+    and refreshes in a background thread; only the very first call blocks.
+    """
+    now = time.monotonic()
+    cached = _STATUS_CACHE["value"]
+    if cached is not None:
+        if (
+            (now - _STATUS_CACHE["at"]) >= STATUS_CACHE_TTL_SECONDS
+            and not _STATUS_REFRESHING["flag"]
+        ):
+            _STATUS_REFRESHING["flag"] = True
+            _refresh_system_status_in_background()
+        return cached
+
+    # Cold start: kick off the build and answer immediately. Nothing in the UI
+    # reads /health.system_status (the terminal uses /api/terminal/status), so
+    # a liveness probe must not pay a 0.5-10 s feed inspection.
+    _STATUS_REFRESHING["flag"] = True
+    _refresh_system_status_in_background()
+    return {
+        "status": "INITIALIZING",
+        "detail": "System status contract is being computed; retry in a few seconds.",
+    }
+
+
 @router.get("/health")
 @router.get("/api/health")
 def monitor_health(request: Request) -> dict:
     """The market-monitor service health reporting verified runtime readiness."""
     gate = _gate(request)
-    from engine.status_contract import evaluate_system_status
-    sys_status = evaluate_system_status().model_dump()
     mode = "PRODUCTION_VOLATILITY_INTELLIGENCE" if gate.get("authorized") else "MARKET_MONITOR_ONLY"
     return {
         "status": "ok",
@@ -101,11 +228,25 @@ def monitor_health(request: Request) -> dict:
         "research_alerts_enabled": True,
         "market_data": "FETCH_ON_REQUEST",
         "research_status": gate["authorization_status"],
+        # Ops clarity: a BLOCKED gate is meaningless without the reason.
+        # FROZEN_RUNTIME_MISMATCH (e.g. frozen Python 3.13 vs live 3.12) is
+        # the common cause after a fresh install.
+        "research_reason_code": gate.get("reason_code"),
+        "research_reason": gate.get("reason"),
         "research_authorized": gate["authorized"],
         "production_forecast_available": gate["authorized"],
         "models_loaded": gate["authorized"],
         "trading_enabled": False,
-        "system_status": sys_status
+        # The full status contract (evaluate_system_status) inspects live feeds
+        # and was measured at 0.5-10 s; embedding it made a liveness probe pay
+        # that cost every TTL and stall other requests on the GIL. The complete
+        # contract is served by /api/terminal/status; this is the cheap summary.
+        "system_status": {
+            "status": "OK" if gate.get("authorized") else "RESEARCH_BLOCKED",
+            "production_forecast_available": gate["authorized"],
+            "reason_code": gate.get("reason_code"),
+            "detail_endpoint": "/api/terminal/status",
+        },
     }
 
 
@@ -299,4 +440,4 @@ async def market_comparator(request: Request) -> dict:
     """
     from engine.spot_exchange_comparator import fetch_and_compare_spot_quotes
     client = getattr(request.app.state, "http", None)
-    return await fetch_and_compare_spot_quotes(client=client)
+    return await fetch_and_compare_spot_quotes(client=client)

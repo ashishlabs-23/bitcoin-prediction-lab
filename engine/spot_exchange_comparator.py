@@ -212,7 +212,10 @@ async def fetch_and_compare_spot_quotes(client: Any = None) -> Dict[str, Any]:
 
     async def _safe_fetch(prov_enum: ExchangeProvider, prov_str: str) -> SpotQuote:
         try:
-            res = await asyncio.wait_for(_fetch_quote(prov_str, client), timeout=3.0)
+            # The 3.0 s cap was shorter than a cold TLS handshake to these
+            # exchanges (measured 2-5 s), so every provider timed out and the
+            # comparator reported DEGRADED while spot data was actually fine.
+            res = await asyncio.wait_for(_fetch_quote(prov_str, client), timeout=15.0)
             price = float(res.get("price", 0.0))
             bid = float(res["bid"]) if res.get("bid") is not None else None
             ask = float(res["ask"]) if res.get("ask") is not None else None
@@ -223,7 +226,9 @@ async def fetch_and_compare_spot_quotes(client: Any = None) -> Dict[str, Any]:
                 source_ts = int(float(res["retrieved_at"]) * 1000)
             return comparator.evaluate_quote(prov_enum, price, bid, ask, source_timestamp_ms=source_ts)
         except Exception as e:
-            logger.debug("Comparator failed to fetch %s: %s", prov_str, e)
+            # Previously debug-level: silent degradation is why this went
+            # unnoticed. Type name only, so no URL/credential detail leaks.
+            logger.warning("Comparator quote unavailable for %s: %s", prov_str, type(e).__name__)
             return comparator.evaluate_quote(prov_enum, 0.0)
 
 

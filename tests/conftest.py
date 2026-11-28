@@ -188,3 +188,43 @@ def fresh_test_db(tmp_path) -> Generator[str, None, None]:
     backtest.market_memory.DB_PATH = old_bm_path
     backtest.market_memory.MARKET_MEMORY_DB_PATH = old_bm_path
     engine.hawkes_shadow_session.DB_PATH = old_bm_path
+
+# ---------------------------------------------------------------------------
+# Research-artefact protection (added 2026-11-28)
+# ---------------------------------------------------------------------------
+# A single full test run used to modify 24 TRACKED files: research/*_report.md,
+# results/*_manifest.json and data/prospective_forecast_ledger.jsonl. That
+# silently rewrote the project's own audit trail. This fixture snapshots the
+# set of dirty tracked files before the session and reverts any research
+# artefact the tests touched. It is a no-op outside a git working tree.
+@pytest.fixture(scope="session", autouse=True)
+def _protect_research_artifacts() -> Generator[None, None, None]:
+    import subprocess
+
+    def _git(*args: str):
+        return subprocess.run(
+            ["git", *args], cwd=PROJECT_ROOT, capture_output=True, text=True
+        )
+
+    if _git("rev-parse", "--is-inside-work-tree").returncode != 0:
+        yield
+        return
+
+    def _dirty() -> set:
+        out = _git("diff", "--name-only").stdout
+        return {line.strip() for line in out.splitlines() if line.strip()}
+
+    before = _dirty()
+    yield
+
+    protected_prefixes = ("research/", "results/", "data/", "experiments/")
+    leaked = sorted(
+        f for f in (_dirty() - before) if f.startswith(protected_prefixes)
+    )
+    if leaked:
+        _git("checkout", "--", *leaked)
+        print(
+            f"\n[conftest] reverted {len(leaked)} research artefact(s) mutated by "
+            f"tests: {leaked[:5]}{' ...' if len(leaked) > 5 else ''}"
+        )
+

@@ -265,7 +265,12 @@ def get_strategy_setup(
         if contract.get("stop_geometry_valid") and contract.get("entry_price") is not None:
             contract["setup_state"] = "SETUP_PREVIEW_AVAILABLE"
         elif contract.get("rule_trigger_status") != "TRIGGERED":
-            contract["setup_state"] = "OVERLAY_OFF"
+            # Fix (2026-11-28): "OVERLAY_OFF" described the *overlay*, not the
+            # setup, so a preview request reported a state outside the preview
+            # contract (tests V13 and V14 disagreed about it). The setup state
+            # is now NO_SETUP; overlay state is reported separately.
+            contract["setup_state"] = "NO_SETUP"
+            contract["overlay_state"] = "OVERLAY_OFF"
     else:
         contract["economic_eligibility"]["preview_only"] = False
         # If enabled by user, never present an economically ineligible trade as active setup!

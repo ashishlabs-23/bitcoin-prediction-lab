@@ -94,3 +94,6 @@ experiments/runs/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Runtime state written by the running app, not source.
+data/research_alert_state.json

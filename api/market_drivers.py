@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import math
+import os
 import statistics
 import threading
 import time
@@ -18,12 +19,20 @@ import httpx
 
 HISTORY_DAYS = 90
 HISTORY_TTL_SECONDS = 900
-QUOTE_TTL_SECONDS = 10
+QUOTE_TTL_SECONDS = 30  # 2026-11-28: was 10; a 10 s TTL meant a 3 s quote refetch every ~10 s
 DERIVATIVES_TTL_SECONDS = 60
 MIN_BLOCKS = 20
 BACKTEST_MIN_BLOCKS = 20
 MAX_FORECAST_BLOCKS = 90
 HOUR = 3600
+
+# Fix (2026-11-28): connect=2.0 was hard-coded here. A cold TLS handshake to
+# these exchanges measures 2-5 s from a cloud VM, so every quote sat exactly on
+# the failure boundary: /market/comparator reported all three providers
+# UNAVAILABLE while /api/dashboard (different fetch path) showed a live price,
+# and the first dashboard build took ~8 s in retries. Tunable for slow links.
+_HTTP_CONNECT_TIMEOUT = float(os.getenv("BTCOGNITIVE_HTTP_CONNECT_TIMEOUT", "6.0"))
+_HTTP_TOTAL_TIMEOUT = float(os.getenv("BTCOGNITIVE_HTTP_TIMEOUT", "12.0"))
 
 # The three adapters all describe spot BTC quoted in USD. USDT perpetuals below
 # are context only and are never substituted for the spot price or its candles.
@@ -57,12 +66,13 @@ def _iso_param(epoch: int) -> str:
 
 async def _get_json(client: Any, url: str, params: dict[str, Any] | None = None) -> Any:
     """Fetch public market data using the app's shared client when available."""
+    timeout = httpx.Timeout(_HTTP_TOTAL_TIMEOUT, connect=_HTTP_CONNECT_TIMEOUT)
     if client is not None:
-        response = await client.get(url, params=params, timeout=httpx.Timeout(5.0, connect=2.0))
+        response = await client.get(url, params=params, timeout=timeout)
         response.raise_for_status()
         return response.json()
     async with httpx.AsyncClient(
-        timeout=httpx.Timeout(5.0, connect=2.0),
+        timeout=timeout,
         headers={"User-Agent": "BTCognitive-MarketMonitor/1.0", "Accept": "application/json"},
     ) as own_client:
         response = await own_client.get(url, params=params)
@@ -298,11 +308,24 @@ async def _fetch_derivatives(client: Any) -> dict[str, Any]:
         if result["funding_rate"] is None or result["open_interest_contracts"] is None:
             raise RuntimeError("derivatives response missing required values")
     except Exception as exc:
+        # Fix (2026-11-28): a 451 geo-block, a 429 rate-limit and a DNS failure
+        # all collapsed into the string "HTTPStatusError", which is useless to
+        # an operator. Surface the status code and a named reason.
+        status_code = getattr(getattr(exc, "response", None), "status_code", None)
+        if status_code == 451:
+            reason = "HTTP_451_RESTRICTED_LOCATION"
+        elif status_code == 429:
+            reason = "HTTP_429_RATE_LIMITED"
+        elif status_code is not None:
+            reason = f"HTTP_{status_code}"
+        else:
+            reason = type(exc).__name__
         result = {
             "status": "UNAVAILABLE",
             "source": "Binance USDⓈ-M BTCUSDT perpetual",
             "instrument": "BTCUSDT perpetual (USDT-quoted context, not BTC/USD spot)",
-            "reason": type(exc).__name__,
+            "reason": reason,
+            "http_status": status_code,
             "funding_rate": None,
             "open_interest_contracts": None,
             "mark_price_usdt": None,

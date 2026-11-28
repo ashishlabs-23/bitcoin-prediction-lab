@@ -3570,8 +3570,20 @@ function InstitutionalTickerBar({ livePrice, changePct, marketSummary }) {
   const volText = typeof marketSummary?.realized_volatility_24h_pct === "number"
     ? `${marketSummary.realized_volatility_24h_pct.toFixed(2)}% · Coinbase BTC/USD`
     : "Unavailable · insufficient verified history";
-  const fundingText = "Unavailable · no verified feed";
-  const telemetryText = "Unavailable";
+  // These two were hard-coded strings, so they read "Unavailable" forever even
+  // when the data was present. Derive them from the /market/latest payload.
+  const deriv = marketSummary?.derivatives || {};
+  const fundingText = typeof deriv.funding_rate === "number"
+    ? `${(deriv.funding_rate * 100).toFixed(4)}% · Binance perp (context)`
+    : (deriv.reason
+        ? `Unavailable · ${String(deriv.reason).replace(/_/g, " ").toLowerCase()}`
+        : "Unavailable · no verified feed");
+  const priceAge = typeof marketSummary?.age_seconds === "number" ? marketSummary.age_seconds : null;
+  const venues = Array.isArray(marketSummary?.cross_exchange_quotes)
+    ? marketSummary.cross_exchange_quotes.length : 0;
+  const telemetryText = priceAge === null
+    ? "Awaiting first poll"
+    : `${venues} venue${venues === 1 ? "" : "s"} · price age ${priceAge.toFixed(1)}s`;
 
   return h("div", { className: "institutional-ticker-bar" },
     h("div", { className: "ticker-item" },
@@ -11930,6 +11942,13 @@ function App() {
       setQualityData(qual.status === "fulfilled" ? qual.value : null);
       setMemoryData(mem.status === "fulfilled" ? mem.value : []);
       setPortfolioData(port.status === "fulfilled" ? port.value : null);
+      // The header price came only from direct browser -> Coinbase REST/WSS.
+      // On networks that block those (corporate proxies, some regions, the
+      // headless test browser) the ribbon showed "Unavailable" while the
+      // server had a perfectly good spot quote. Backfill from /market/latest.
+      if (mkt.status === "fulfilled" && typeof mkt.value.price_usd === "number" && mkt.value.price_usd > 0) {
+        setLivePrice((prev) => (prev > 0 ? prev : mkt.value.price_usd));
+      }
       setChangePct(
         mkt.status === "fulfilled" && typeof mkt.value.change_pct_24h === "number"
           ? mkt.value.change_pct_24h

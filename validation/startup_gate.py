@@ -13,8 +13,10 @@ Server startup MUST refuse and fail with RuntimeError if any check fails:
 """
 
 import os
+import re
 import sys
 import json
+import time
 import hashlib
 import logging
 import subprocess
@@ -331,6 +333,50 @@ def verify_scientific_contract(
 # ---------------------------------------------------------------------------
 
 _CACHED_READINESS: Optional[Dict[str, Any]] = None
+# Fix (2026-11-28): the cache had no expiry, and on the BLOCKED path it was
+# never populated at all (see _blocked below), so /health re-ran the 3.6s
+# verify_freeze_manifest subprocess on *every* request. Add a TTL so the gate
+# is re-evaluated periodically but not per request.
+_CACHED_READINESS_AT: float = 0.0
+READINESS_CACHE_TTL_SECONDS: float = float(os.getenv("BTCOGNITIVE_READINESS_TTL", "300"))
+
+
+_UNIX_PATH_RE = re.compile(
+    r"/(?:home|Users|root|tmp|var|mnt|opt|srv|usr|etc)(?:/[\w.@+-]+)+"
+)
+_WIN_PATH_RE = re.compile(r"[A-Za-z]:\\(?:[\w.@ +-]+\\)*[\w.@ +-]+")
+
+
+def _redact_paths(text: Any, limit: int = 400) -> str:
+    """Turn a raw verifier dump into one short, path-free, client-safe sentence.
+
+    The freeze verifier raises with its entire stdout banner attached, which
+    includes absolute manifest paths. Keeping only the failing lines gives the
+    operator what they actually need ("Python version: frozen 3.13.14, live
+    3.12.3") without disclosing the server's filesystem layout.
+    """
+    raw = str(text or "")
+    kept: list = []
+    keeping = False
+    for line in raw.splitlines():
+        stripped = line.strip(" -|")
+        if not stripped:
+            continue
+        upper = stripped.upper()
+        if "✗" in stripped or "FAIL" in upper:
+            kept.append(stripped)
+            keeping = True
+        elif "✓" in stripped or upper.startswith("PASS"):
+            keeping = False
+        elif keeping and line.startswith("   ") and stripped not in kept:
+            kept.append(stripped)  # indented detail, e.g. "frozen=…, live=…"
+        else:
+            keeping = False
+    out = " ".join(kept) if kept else (raw.splitlines()[0] if raw else "")
+    out = _WIN_PATH_RE.sub("<path>", out)
+    out = _UNIX_PATH_RE.sub("<path>", out)
+    out = re.sub(r"\s+", " ", out).strip()
+    return out if len(out) <= limit else out[: limit - 1] + "…"
 
 
 def evaluate_runtime_readiness(
@@ -346,8 +392,12 @@ def evaluate_runtime_readiness(
       MODEL_ARTIFACT_INVALID, FEATURE_CONTRACT_MISMATCH, TARGET_CONTRACT_MISMATCH,
       CALIBRATION_UNAVAILABLE, DATA_STALE, INSUFFICIENT_HISTORY, MODEL_UNAUTHORIZED.
     """
-    global _CACHED_READINESS
-    if _CACHED_READINESS is not None and not force_refresh:
+    global _CACHED_READINESS, _CACHED_READINESS_AT
+    if (
+        _CACHED_READINESS is not None
+        and not force_refresh
+        and (time.monotonic() - _CACHED_READINESS_AT) < READINESS_CACHE_TTL_SECONDS
+    ):
         return _CACHED_READINESS
 
     from datetime import datetime, timezone
@@ -364,6 +414,11 @@ def evaluate_runtime_readiness(
     ) -> Dict[str, Any]:
         check_detail["status"] = "FAIL"
         checks[check_name] = check_detail
+        # The freeze verifier's exception text embeds its full stdout banner,
+        # including absolute manifest paths. This dict is serialised straight
+        # into unauthenticated /health and /api/dashboard responses, so scrub
+        # paths and cap the length before it leaves the process.
+        reason = _redact_paths(reason)
         result = {
             "status": "BLOCKED",
             "authorized": False,
@@ -382,7 +437,10 @@ def evaluate_runtime_readiness(
             "checks": checks,
             "evaluated_at": now_iso,
         }
-        _CACHED_READINESS = result
+        # NOTE: _blocked() is a nested closure, so a bare assignment here would
+        # create a *local* name and silently leave the module cache unset.
+        globals()["_CACHED_READINESS"] = result
+        globals()["_CACHED_READINESS_AT"] = time.monotonic()
         return result
 
     # 1. Manifest file check
@@ -650,5 +708,5 @@ def evaluate_runtime_readiness(
     }
 
     _CACHED_READINESS = result
+    _CACHED_READINESS_AT = time.monotonic()
     return result
-
