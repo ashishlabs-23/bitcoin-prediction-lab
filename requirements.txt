@@ -16,6 +16,7 @@ shap
 
 # testing
 pytest
+jsonschema  # entry_tp_sl artefact manifest schema checks
 pytest-asyncio
 pytest-timeout
 hypothesis
