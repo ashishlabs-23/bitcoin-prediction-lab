@@ -8,10 +8,10 @@ All 4 models were evaluated strictly point-in-time across identical `276` sequen
 
 | Model Name | Target Definition | MAE % | RMSE % | MedAE % | P90 Abs Error % | MFE P90 Coverage % | Joint Path Containment % | Evaluation Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1. Production Ridge MFE Model | 24h MFE / Path | 0.7642 | 0.9238 | 0.7229 | 1.5117 | 90.9% | 75.7% | Production Core |
-| 2. Historical Percentile (168h) | 24h MFE / Path | 0.8009 | 1.0251 | 0.6733 | 1.5425 | 16.3% | 14.7% | Baseline Benchmark |
-| 3. Average True Range (ATR 14) | 24h MFE / Path | 0.5954 | 0.7926 | 0.3993 | 1.3351 | 58.7% | 52.8% | Baseline Benchmark |
-| 4. EWMA Volatility Baseline | 24h MFE / Path | 0.9455 | 1.1144 | 0.8318 | 1.7801 | 90.9% | 81.8% | Baseline Benchmark |
+| 1. Production Ridge MFE Model | 24h MFE / Path | 1.6972 | 2.0486 | 1.5686 | 3.4586 | 89.1% | 76.1% | Production Core |
+| 2. Historical Percentile (168h) | 24h MFE / Path | 2.0413 | 2.7606 | 1.5574 | 4.9912 | 11.2% | 10.1% | Baseline Benchmark |
+| 3. Average True Range (ATR 14) | 24h MFE / Path | 1.5554 | 2.2133 | 0.868 | 4.304 | 54.7% | 49.2% | Baseline Benchmark |
+| 4. EWMA Volatility Baseline | 24h MFE / Path | 1.9449 | 2.3056 | 1.8991 | 3.8032 | 86.2% | 77.6% | Baseline Benchmark |
 
 ## 3. Key Findings
 

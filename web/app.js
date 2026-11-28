@@ -3699,10 +3699,11 @@ function HeroSection({ setPath, livePrice, changePct, predictionData, regimeData
   const contract = systemStatus || decisionData?.status_contract || {};
   // Keyboard parity for the clickable landing cards (WCAG 2.1.1 / axe
   // click-events-have-key-events): role, tab stop and Enter/Space activation.
-  const cardA11y = (onActivate, label) => ({
+  // The accessible name is the card's own visible text (label, price, status);
+  // an aria-label would override it and trip axe label-content-name-mismatch.
+  const cardA11y = (onActivate) => ({
     role: "button",
     tabIndex: 0,
-    "aria-label": label,
     onClick: onActivate,
     onKeyDown: (e) => {
       if (e.key === "Enter" || e.key === " ") {
@@ -3761,7 +3762,7 @@ function HeroSection({ setPath, livePrice, changePct, predictionData, regimeData
 
       // Cards Row — source-backed market state and research authorization
       h("div", { className: "hero-cards-row" },
-        h("div", { className: "glass-pill-card floating-left-card", ...cardA11y(() => setPath("/terminal"), "Open the research terminal: spot market price") },
+        h("div", { className: "glass-pill-card floating-left-card", ...cardA11y(() => setPath("/terminal")) },
           h("div", { className: "card-top-row" },
             h("span", { className: "card-label" }, "Spot Market Price"),
             h("div", { className: "arrow-circle-btn" }, "↗")
@@ -3772,7 +3773,7 @@ function HeroSection({ setPath, livePrice, changePct, predictionData, regimeData
             h("span", { className: "card-pct" }, livePrice > 0 && typeof changePct === "number" ? `${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%` : "—")
           )
         ),
-        h("div", { className: "glass-pill-card floating-right-card", ...cardA11y(() => setPath("/research"), "Open archived research evidence") },
+        h("div", { className: "glass-pill-card floating-right-card", ...cardA11y(() => setPath("/research")) },
           h("div", { className: "card-top-row" },
             h("span", { className: "card-label", style: { color: "#38BDF8" } }, "Archived Research Evidence"),
             h("div", { className: "arrow-circle-btn" }, "↗")
@@ -3794,7 +3795,7 @@ function HeroSection({ setPath, livePrice, changePct, predictionData, regimeData
       }
     },
       // Card 1: Market Data
-      h("div", { className: "c-stat-box", style: { cursor: "pointer" }, ...cardA11y(() => setPath("/terminal"), "Market data status: open the terminal") },
+      h("div", { className: "c-stat-box", style: { cursor: "pointer" }, ...cardA11y(() => setPath("/terminal")) },
         h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" } }, "Market Data"),
         h("div", { className: "c-stat-num", style: { color: isMktLive ? "#00E5A8" : "#F87171", fontSize: "1.25rem" } }, mktStatus),
         h("div", { className: "c-stat-lbl" }, `Coinbase BTC/USD · ${livePrice > 0 ? '$' + livePrice.toLocaleString('en-US', { minimumFractionDigits: 2 }) : 'Click to open Terminal'}`)
@@ -3808,7 +3809,7 @@ function HeroSection({ setPath, livePrice, changePct, predictionData, regimeData
       ),
 
       // Card 3: Entry Research
-      h("div", { className: "c-stat-box", style: { cursor: "pointer" }, ...cardA11y(() => setPath("/research"), "Open research evidence") },
+      h("div", { className: "c-stat-box", style: { cursor: "pointer" }, ...cardA11y(() => setPath("/research")) },
         h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" } }, "Entry Research"),
         h("div", { className: "c-stat-num", style: { color: "#A78BFA", fontSize: "1.15rem" } }, entryResearchLabel),
         h("div", { className: "c-stat-lbl" }, "V28 Meta-Model · selective barrier evaluator")
@@ -3822,7 +3823,7 @@ function HeroSection({ setPath, livePrice, changePct, predictionData, regimeData
       ),
 
       // Card 5: Research Authorization
-      h("div", { className: "c-stat-box", style: { cursor: "pointer" }, ...cardA11y(() => setPath("/research"), "Open research evidence") },
+      h("div", { className: "c-stat-box", style: { cursor: "pointer" }, ...cardA11y(() => setPath("/research")) },
         h("div", { style: { fontSize: "0.70rem", color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" } }, "Research Authorization"),
         h("div", { className: "c-stat-num", style: { color: isAuth ? "#00E5A8" : "#38BDF8", fontSize: "1.15rem" } }, isAuth ? "AUTHORIZED (VOL RISK)" : "OFFLINE RESEARCH"),
         h("div", { className: "c-stat-lbl" }, provenanceLabel)

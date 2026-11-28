@@ -162,3 +162,32 @@ def test_entry_quality_fails_closed_without_dataset(monkeypatch):
     response = rr.get_entry_quality()
     assert response["status"] == "DATA_UNAVAILABLE"
     assert response["decision"] is None
+
+
+# ---------------------------------------------------------------------------
+# 8. Hourly-bar freshness: LIVE must be reachable for a healthy feed
+# ---------------------------------------------------------------------------
+def test_hourly_feed_is_live_between_bar_open_and_next_close():
+    """A healthy hourly feed's newest closed bar is 1h..2h old by construction.
+
+    The old 3600 s cut-off reported such a feed as STALE for two thirds of every
+    hour. 110 minutes (bar closed 50 min ago) must be LIVE; 30 h must be STALE.
+    """
+    import pandas as pd
+    from datetime import datetime, timezone, timedelta
+    from engine.status_contract import evaluate_system_status
+
+    now = datetime.now(timezone.utc)
+    idx = pd.date_range(end=now - timedelta(minutes=110), periods=48, freq="1h")
+    healthy = pd.DataFrame({"close": [59000.0] * 48}, index=idx)
+    status = evaluate_system_status(cache_override=healthy)
+    assert status.market_data_status == "LIVE"
+    assert status.feature_cache_status == "READY"
+
+    old_idx = pd.date_range(end=now - timedelta(hours=20), periods=48, freq="1h")
+    stale = pd.DataFrame({"close": [59000.0] * 48}, index=old_idx)
+    assert evaluate_system_status(cache_override=stale).market_data_status == "STALE"
+
+    dead_idx = pd.date_range(end=now - timedelta(hours=30), periods=48, freq="1h")
+    dead = pd.DataFrame({"close": [59000.0] * 48}, index=dead_idx)
+    assert evaluate_system_status(cache_override=dead).market_data_status == "UNAVAILABLE"

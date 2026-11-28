@@ -1,6 +1,6 @@
 {
-  "failure_id": "TRIGGER-20261021-081324",
-  "timestamp": "2026-10-21T08:13:24.265420+00:00",
+  "failure_id": "TRIGGER-20261128-175343",
+  "timestamp": "2026-11-28T17:53:43.316450+00:00",
   "status": "RESEARCH_TRIGGERED",
   "trigger_type": "PERSISTENT_CALIBRATION_DEGRADATION",
   "evidence": "Persistent failure detected across 3 consecutive review windows.",

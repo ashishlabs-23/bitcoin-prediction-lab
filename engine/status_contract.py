@@ -32,6 +32,17 @@ EvidenceStatus = Literal["SUFFICIENT", "INSUFFICIENT", "NOT_APPLICABLE"]
 ExecutionStatus = Literal["DISABLED — ANALYSIS ONLY"]
 EXECUTION_STATUS_CONSTANT: str = "DISABLED — ANALYSIS ONLY"
 
+# Freshness thresholds for the hourly feature cache.
+#
+# age is measured from the OPEN timestamp of the newest CLOSED hourly bar (the
+# in-progress bar is never counted), so a perfectly healthy feed already sits
+# between 1h and 2h of age. A 1h cut-off made LIVE unreachable and reported a
+# healthy feed as STALE for roughly two thirds of every hour.
+BAR_SECONDS: int = 3600
+INGEST_GRACE_SECONDS: int = 600          # allowed lag between bar close and ingest
+LIVE_MAX_CANDLE_AGE_SECONDS: int = 2 * BAR_SECONDS + INGEST_GRACE_SECONDS   # 7800 s
+STALE_MAX_CANDLE_AGE_SECONDS: int = 86400
+
 
 class SystemStatusContract(BaseModel):
     """Authoritative typed status contract for BTCognitive runtime and intelligence."""
@@ -99,9 +110,9 @@ def evaluate_system_status(cache_override=None, readiness_override=None, researc
             market_details["candle_age_seconds"] = round(age_s, 1)
             market_details["last_timestamp"] = last_dt.isoformat()
 
-            if age_s <= 3600:
+            if age_s <= LIVE_MAX_CANDLE_AGE_SECONDS:
                 market_data_st = "LIVE"
-            elif age_s <= 86400:
+            elif age_s <= STALE_MAX_CANDLE_AGE_SECONDS:
                 market_data_st = "STALE"
             else:
                 market_data_st = "UNAVAILABLE"
